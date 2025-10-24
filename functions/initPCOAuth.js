@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-Deno.serve(async (req) => {
+Deno.serve((req) => {
     try {
         const url = new URL(req.url);
         const state = url.searchParams.get('state');
