@@ -27,6 +27,12 @@ export default function Settings() {
     if (urlParams.get('connected') === 'pco') {
       toast.success('Planning Center connected successfully!');
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlParams.get('connected') === 'clickup') {
+      toast.success('ClickUp connected successfully!');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlParams.get('connected') === 'microsoft') {
+      toast.success('Microsoft 365 connected successfully!');
+      window.history.replaceState({}, '', window.location.pathname);
     } else if (urlParams.get('error')) {
       toast.error('Connection failed. Please try again.');
       window.history.replaceState({}, '', window.location.pathname);
@@ -68,13 +74,8 @@ export default function Settings() {
   // Planning Center OAuth
   const handleConnectPCO = () => {
     const appUrl = window.location.origin;
-    const clientId = base44.env?.PCO_CLIENT_ID || Deno.env.get('PCO_CLIENT_ID');
-    const redirectUri = `${appUrl}/functions/pcoCallback`;
-    const scope = 'calendar';
     const state = user.id;
-    
-    const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
-    window.location.href = authUrl;
+    window.location.href = `${appUrl}/functions/initPCOAuth?state=${state}`;
   };
 
   const handleDisconnectPCO = async () => {
@@ -91,9 +92,11 @@ export default function Settings() {
     }
   };
 
-  // ClickUp OAuth (placeholder for now)
+  // ClickUp OAuth
   const handleConnectClickUp = () => {
-    toast.info("ClickUp OAuth setup coming next!");
+    const appUrl = window.location.origin;
+    const state = user.id;
+    window.location.href = `${appUrl}/functions/initClickUpAuth?state=${state}`;
   };
 
   const handleDisconnectClickUp = async () => {
@@ -110,9 +113,11 @@ export default function Settings() {
     }
   };
 
-  // Microsoft OAuth (placeholder for now)
+  // Microsoft OAuth
   const handleConnectMicrosoft = () => {
-    toast.info("Microsoft OAuth setup coming next!");
+    const appUrl = window.location.origin;
+    const state = user.id;
+    window.location.href = `${appUrl}/functions/initMicrosoftAuth?state=${state}`;
   };
 
   const handleDisconnectMicrosoft = async () => {
