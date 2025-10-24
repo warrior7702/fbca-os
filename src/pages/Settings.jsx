@@ -19,23 +19,29 @@ export default function Settings() {
   const [department, setDepartment] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("profile"); // Added activeTab state
 
   useEffect(() => {
     loadUser();
     
     // Check for OAuth callback success/error messages
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('connected') === 'pco') {
-      toast.success('Planning Center connected successfully!');
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (urlParams.get('connected') === 'clickup') {
-      toast.success('ClickUp connected successfully!');
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (urlParams.get('connected') === 'microsoft') {
-      toast.success('Microsoft 365 connected successfully!');
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (urlParams.get('error')) {
-      toast.error('Connection failed. Please try again.');
+    
+    // If there's a connected or error param, switch to integrations tab
+    if (urlParams.get('connected') || urlParams.get('error')) {
+      setActiveTab('integrations'); // Set active tab to integrations
+      
+      if (urlParams.get('connected') === 'pco') {
+        toast.success('Planning Center connected successfully!');
+      } else if (urlParams.get('connected') === 'clickup') {
+        toast.success('ClickUp connected successfully!');
+      } else if (urlParams.get('connected') === 'microsoft') {
+        toast.success('Microsoft 365 connected successfully!');
+      } else if (urlParams.get('error')) {
+        toast.error('Connection failed. Please try again.');
+      }
+      
+      // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -165,7 +171,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
