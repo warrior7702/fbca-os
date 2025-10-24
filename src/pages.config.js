@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import Marketing from './pages/Marketing';
 import FoodService from './pages/FoodService';
 import FBCANexts from './pages/FBCANexts';
+import Settings from './pages/Settings';
 import Layout from './Layout.jsx';
 
 
@@ -12,6 +13,7 @@ export const PAGES = {
     "Marketing": Marketing,
     "FoodService": FoodService,
     "FBCANexts": FBCANexts,
+    "Settings": Settings,
 }
 
 export const pagesConfig = {
