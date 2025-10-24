@@ -1,33 +1,147 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
+import { Calendar, CheckSquare, Briefcase } from "lucide-react";
 
 export default function Settings() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState("");
+  const [department, setDepartment] = useState("");
+  const [roleTitle, setRoleTitle] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        setUser(currentUser);
-      } catch (error) {
-        console.error("Error loading user:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadUser();
+    
+    // Check for OAuth callback success/error messages
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('connected') === 'pco') {
+      toast.success('Planning Center connected successfully!');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlParams.get('error')) {
+      toast.error('Connection failed. Please try again.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+      setDisplayName(currentUser.display_name || "");
+      setDepartment(currentUser.department || "");
+      setRoleTitle(currentUser.role_title || "");
+    } catch (error) {
+      console.error("Error loading user:", error);
+      toast.error("Failed to load settings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      await base44.auth.updateMe({
+        display_name: displayName,
+        department: department,
+        role_title: roleTitle
+      });
+      toast.success("Profile updated successfully");
+      loadUser();
+    } catch (error) {
+      toast.error("Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Planning Center OAuth
+  const handleConnectPCO = () => {
+    const appUrl = window.location.origin;
+    const clientId = base44.env?.PCO_CLIENT_ID || Deno.env.get('PCO_CLIENT_ID');
+    const redirectUri = `${appUrl}/functions/pcoCallback`;
+    const scope = 'calendar';
+    const state = user.id;
+    
+    const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+    window.location.href = authUrl;
+  };
+
+  const handleDisconnectPCO = async () => {
+    try {
+      await base44.auth.updateMe({
+        pco_access_token: null,
+        pco_refresh_token: null,
+        pco_token_expires_at: null
+      });
+      toast.success("Planning Center disconnected");
+      loadUser();
+    } catch (error) {
+      toast.error("Failed to disconnect");
+    }
+  };
+
+  // ClickUp OAuth (placeholder for now)
+  const handleConnectClickUp = () => {
+    toast.info("ClickUp OAuth setup coming next!");
+  };
+
+  const handleDisconnectClickUp = async () => {
+    try {
+      await base44.auth.updateMe({
+        clickup_access_token: null,
+        clickup_refresh_token: null,
+        clickup_token_expires_at: null
+      });
+      toast.success("ClickUp disconnected");
+      loadUser();
+    } catch (error) {
+      toast.error("Failed to disconnect");
+    }
+  };
+
+  // Microsoft OAuth (placeholder for now)
+  const handleConnectMicrosoft = () => {
+    toast.info("Microsoft OAuth setup coming next!");
+  };
+
+  const handleDisconnectMicrosoft = async () => {
+    try {
+      await base44.auth.updateMe({
+        microsoft_access_token: null,
+        microsoft_refresh_token: null,
+        microsoft_token_expires_at: null
+      });
+      toast.success("Microsoft disconnected");
+      loadUser();
+    } catch (error) {
+      toast.error("Failed to disconnect");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-6 md:p-8 h-full overflow-auto">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
           <div className="p-3 bg-slate-100 rounded-xl">
@@ -42,8 +156,8 @@ export default function Settings() {
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
@@ -56,16 +170,75 @@ export default function Settings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" value={user?.full_name || ''} readOnly />
+                  <Label>Email</Label>
+                  <Input value={user?.email || ''} readOnly className="bg-slate-50" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={user?.email || ''} readOnly />
+                  <Label htmlFor="display_name">Display Name</Label>
+                  <Input
+                    id="display_name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder={user?.full_name}
+                  />
                 </div>
-                <Button disabled>Update Profile</Button>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="e.g., Facilities, IT, Worship"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role_title">Job Title / Role</Label>
+                  <Input
+                    id="role_title"
+                    value={roleTitle}
+                    onChange={(e) => setRoleTitle(e.target.value)}
+                    placeholder="e.g., Facilities Manager, AV Tech"
+                  />
+                </div>
+                <Button onClick={handleSaveProfile} disabled={saving} className="w-full">
+                  {saving ? "Saving..." : "Save Changes"}
+                </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-1">
+              <ConnectionStatusCard
+                title="Planning Center"
+                icon={Calendar}
+                isConnected={!!user?.pco_access_token}
+                onConnect={handleConnectPCO}
+                onDisconnect={handleDisconnectPCO}
+                description="Sync calendars, events, and service planning"
+                color="blue"
+              />
+
+              <ConnectionStatusCard
+                title="ClickUp"
+                icon={CheckSquare}
+                isConnected={!!user?.clickup_access_token}
+                onConnect={handleConnectClickUp}
+                onDisconnect={handleDisconnectClickUp}
+                description="Manage tasks, projects, and workflows"
+                color="purple"
+              />
+
+              <ConnectionStatusCard
+                title="Microsoft 365"
+                icon={Briefcase}
+                isConnected={!!user?.microsoft_access_token}
+                onConnect={handleConnectMicrosoft}
+                onDisconnect={handleDisconnectMicrosoft}
+                description="Access email, calendar, and Office apps"
+                color="orange"
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-4">
@@ -96,25 +269,6 @@ export default function Settings() {
                   </div>
                   <Switch defaultChecked />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="security" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your account security</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Two-Factor Authentication</p>
-                    <p className="text-sm text-slate-500">Add an extra layer of security</p>
-                  </div>
-                  <Switch />
-                </div>
-                <Button variant="outline">Change Password</Button>
               </CardContent>
             </Card>
           </TabsContent>
