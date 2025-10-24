@@ -24,12 +24,15 @@ export default function Settings() {
   useEffect(() => {
     loadUser();
     
-    // Check for OAuth callback success/error messages
+    // Check for OAuth callback success/error messages OR direct tab navigation
     const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
     
-    // If there's a connected or error param, switch to integrations tab
-    if (urlParams.get('connected') || urlParams.get('error')) {
-      setActiveTab('integrations'); // Set active tab to integrations
+    // If there's a tab param or OAuth callback, switch tabs accordingly
+    if (tabParam) {
+      setActiveTab(tabParam);
+    } else if (urlParams.get('connected') || urlParams.get('error')) {
+      setActiveTab('integrations');
       
       if (urlParams.get('connected') === 'pco') {
         toast.success('Planning Center connected successfully!');

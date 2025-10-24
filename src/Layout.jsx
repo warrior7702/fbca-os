@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
+import TheLightHelper from "@/components/layout/TheLightHelper"; // Added import
 import {
   LayoutDashboard,
   Megaphone,
@@ -98,6 +100,9 @@ export default function Layout({ children, currentPageName }) {
       <main className="h-screen pb-16">
         {children}
       </main>
+
+      {/* The Light Helper */}
+      {user && <TheLightHelper user={user} />}
 
       {/* Taskbar - Always Visible */}
       <motion.div
