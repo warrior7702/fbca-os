@@ -7,25 +7,18 @@ import {
   Megaphone,
   UtensilsCrossed,
   User,
-  Wifi,
-  Volume2,
-  Battery,
-  Bell,
-  Search,
   Folder,
   Trash2,
   Settings,
   Grid3x3
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Badge } from "@/components/ui/badge";
 
 const desktopApps = [
   {
@@ -60,8 +53,6 @@ const desktopApps = [
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [notifications] = useState(3);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -73,23 +64,10 @@ export default function Dashboard() {
       }
     };
     loadUser();
-
-    // Update clock every second
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className="h-[calc(100vh-73px)] relative overflow-hidden">
-      <style>{`
-        .fbca-logo-taskbar {
-          filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
-        }
-      `}</style>
-
+    <div className="h-full relative overflow-hidden">
       {/* Desktop Background */}
       <ContextMenu>
         <ContextMenuTrigger>
@@ -179,127 +157,6 @@ export default function Dashboard() {
           </motion.div>
         </div>
       </div>
-
-      {/* Taskbar */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", stiffness: 200, damping: 30 }}
-        className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 shadow-2xl"
-      >
-        <div className="h-full px-4 flex items-center justify-between">
-          {/* Start Button & Quick Launch */}
-          <div className="flex items-center gap-2">
-            <Link to={createPageUrl("Dashboard")}>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow p-1.5"
-              >
-                <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/0bf40efc2_FBCA_AppIcon_Ryl_web.png"
-                  alt="FBCA"
-                  className="w-full h-full object-contain fbca-logo-taskbar"
-                />
-              </motion.button>
-            </Link>
-
-            <div className="h-10 w-px bg-white/20 mx-1" />
-
-            {/* Quick Launch Icons */}
-            <div className="flex items-center gap-1">
-              {desktopApps.slice(0, 3).map((app) => (
-                <Link key={app.name} to={createPageUrl(app.path)}>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <app.icon className="w-5 h-5 text-white/80" />
-                  </motion.div>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Center - Search */}
-          <div className="flex-1 max-w-md mx-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-              <input
-                type="text"
-                placeholder="Search apps and files..."
-                className="w-full h-9 pl-10 pr-4 bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* System Tray */}
-          <div className="flex items-center gap-3">
-            {/* System Icons */}
-            <div className="flex items-center gap-2">
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <Wifi className="w-4 h-4 text-white/80" />
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <Volume2 className="w-4 h-4 text-white/80" />
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <Battery className="w-4 h-4 text-white/80" />
-              </motion.div>
-            </div>
-
-            <div className="h-8 w-px bg-white/20" />
-
-            {/* Notifications */}
-            <motion.div
-              whileHover={{ scale: 1.1 }}
-              className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <Bell className="w-4 h-4 text-white/80" />
-              {notifications > 0 && (
-                <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs border-2 border-slate-900">
-                  {notifications}
-                </Badge>
-              )}
-            </motion.div>
-
-            <div className="h-8 w-px bg-white/20" />
-
-            {/* Clock & Date */}
-            <div className="text-right cursor-pointer hover:bg-white/10 px-3 py-1 rounded transition-colors">
-              <div className="text-white text-sm font-medium leading-tight">
-                {format(currentTime, 'h:mm a')}
-              </div>
-              <div className="text-white/60 text-xs leading-tight">
-                {format(currentTime, 'MMM d, yyyy')}
-              </div>
-            </div>
-
-            {/* User */}
-            <Link to={createPageUrl("FBCANexts")}>
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
-              >
-                <span className="text-white text-sm font-bold">
-                  {user?.full_name?.[0]?.toUpperCase() || 'U'}
-                </span>
-              </motion.div>
-            </Link>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 }
