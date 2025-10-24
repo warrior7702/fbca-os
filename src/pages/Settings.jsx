@@ -72,11 +72,14 @@ export default function Settings() {
     }
   };
 
-  // Planning Center OAuth - USE WORKFLOW HUB FUNCTIONS
+  // Planning Center OAuth - Via Vercel
   const handleConnectPCO = () => {
-    const workflowHubUrl = "https://workflow-hub-xxxxx.base44.app"; // REPLACE with your actual Workflow Hub URL
+    const vercelUrl = "https://pco-webhook.vercel.app";
+    const appUrl = window.location.origin;
+    const settingsUrl = `${appUrl}/Settings`;
     const state = user.id;
-    window.location.href = `${workflowHubUrl}/functions/planningCenterAuth?state=${state}`;
+    
+    window.location.href = `${vercelUrl}/api/pco-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
   };
 
   const handleDisconnectPCO = async () => {
