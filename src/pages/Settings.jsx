@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon } from "lucide-react";
@@ -71,11 +72,11 @@ export default function Settings() {
     }
   };
 
-  // Planning Center OAuth
+  // Planning Center OAuth - USE WORKFLOW HUB FUNCTIONS
   const handleConnectPCO = () => {
-    const appUrl = window.location.origin;
+    const workflowHubUrl = "https://workflow-hub-xxxxx.base44.app"; // REPLACE with your actual Workflow Hub URL
     const state = user.id;
-    window.location.href = `${appUrl}/functions/initPCOAuth?state=${state}`;
+    window.location.href = `${workflowHubUrl}/functions/planningCenterAuth?state=${state}`;
   };
 
   const handleDisconnectPCO = async () => {
