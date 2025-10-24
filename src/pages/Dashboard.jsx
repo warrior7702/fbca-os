@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -83,6 +84,12 @@ export default function Dashboard() {
 
   return (
     <div className="h-[calc(100vh-73px)] relative overflow-hidden">
+      <style>{`
+        .fbca-logo-taskbar {
+          filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
+        }
+      `}</style>
+
       {/* Desktop Background */}
       <ContextMenu>
         <ContextMenuTrigger>
@@ -187,9 +194,13 @@ export default function Dashboard() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow"
+                className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow p-1.5"
               >
-                <span className="text-white font-bold text-sm">FB44</span>
+                <img 
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/0bf40efc2_FBCA_AppIcon_Ryl_web.png"
+                  alt="FBCA"
+                  className="w-full h-full object-contain fbca-logo-taskbar"
+                />
               </motion.button>
             </Link>
 

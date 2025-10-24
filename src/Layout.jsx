@@ -103,6 +103,19 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <style>{`
+        .fbca-logo-chrome {
+          filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.5)) 
+                  drop-shadow(0 0 12px rgba(59, 130, 246, 0.3));
+          transition: all 0.3s ease;
+        }
+        .fbca-logo-chrome:hover {
+          filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.6)) 
+                  drop-shadow(0 0 20px rgba(59, 130, 246, 0.4))
+                  brightness(1.1);
+        }
+      `}</style>
+
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex items-center justify-between px-6 py-3">
@@ -110,13 +123,19 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-4">
             <Link to={createPageUrl("Dashboard")} className="flex items-center gap-3 group">
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-                  <span className="text-white font-bold text-sm">FB44</span>
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow bg-gradient-to-br from-blue-500 to-blue-700 p-1">
+                  <img 
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/0bf40efc2_FBCA_AppIcon_Ryl_web.png"
+                    alt="FBCA Logo"
+                    className="w-full h-full object-contain fbca-logo-chrome"
+                  />
                 </div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-900">FBCA OS</h1>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  FBCA OS
+                </h1>
                 <p className="text-xs text-slate-500">v1.0</p>
               </div>
             </Link>
@@ -222,53 +241,6 @@ export default function Layout({ children, currentPageName }) {
       <main className="min-h-[calc(100vh-73px)]">
         {children}
       </main>
-
-      {/* Command Palette */}
-      <Dialog open={showCommandPalette} onOpenChange={setShowCommandPalette}>
-        <DialogContent className="sm:max-w-2xl p-0">
-          <DialogHeader className="px-4 pt-4 pb-2">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Search className="w-4 h-4" />
-              Quick Search
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-2">
-            <Input
-              placeholder="Search apps, features, or commands..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-0 focus-visible:ring-0 text-base"
-              autoFocus
-            />
-          </div>
-          <div className="border-t max-h-96 overflow-y-auto">
-            {filteredApps.length > 0 ? (
-              <div className="p-2">
-                {filteredApps.map((app) => (
-                  <Link
-                    key={app.name}
-                    to={createPageUrl(app.path)}
-                    onClick={() => setShowCommandPalette(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 transition-colors"
-                  >
-                    <div className={`p-2 rounded-lg ${app.bgColor}`}>
-                      <app.icon className={`w-5 h-5 ${app.color}`} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900">{app.name}</p>
-                      <p className="text-xs text-slate-500">Navigate to {app.name}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-slate-500">
-                No results found
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Base 44 Badge */}
       <div className="fixed bottom-4 right-4 z-50">

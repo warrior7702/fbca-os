@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layers, Zap, Shield, Globe } from "lucide-react";
@@ -38,6 +39,13 @@ export default function Loading() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4 overflow-hidden">
+      <style>{`
+        .fbca-logo-loading {
+          filter: drop-shadow(0 4px 20px rgba(59, 130, 246, 0.6))
+                  drop-shadow(0 0 40px rgba(59, 130, 246, 0.4));
+        }
+      `}</style>
+
       {/* Animated background grid */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute inset-0" style={{
@@ -103,11 +111,12 @@ export default function Loading() {
             </motion.div>
 
             {/* Logo container */}
-            <div className="relative w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl">
-              <div className="text-white font-bold text-3xl">
-                <span className="tracking-wider">FB</span>
-                <span className="text-yellow-300">44</span>
-              </div>
+            <div className="relative w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center shadow-2xl p-3">
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/0bf40efc2_FBCA_AppIcon_Ryl_web.png"
+                alt="FBCA Logo"
+                className="w-full h-full object-contain fbca-logo-loading"
+              />
             </div>
 
             {/* Pulsing glow */}
@@ -133,7 +142,7 @@ export default function Loading() {
           transition={{ delay: 0.3 }}
         >
           <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">
-            FBCA <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">OS</span>
+            FBCA <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">OS</span>
           </h1>
           <p className="text-gray-400 text-sm tracking-widest uppercase">Operating System v1.0</p>
         </motion.div>
