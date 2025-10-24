@@ -96,11 +96,14 @@ export default function Settings() {
     }
   };
 
-  // ClickUp OAuth
+  // ClickUp OAuth - Via Vercel
   const handleConnectClickUp = () => {
+    const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
+    const settingsUrl = `${appUrl}/Settings`;
     const state = user.id;
-    window.location.href = `${appUrl}/functions/initClickUpAuth?state=${state}`;
+    
+    window.location.href = `${vercelUrl}/api/clickup-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
   };
 
   const handleDisconnectClickUp = async () => {
