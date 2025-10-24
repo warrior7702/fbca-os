@@ -131,9 +131,12 @@ export default function Settings() {
 
   // Microsoft OAuth
   const handleConnectMicrosoft = () => {
+    const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
+    const settingsUrl = `${appUrl}/Settings`;
     const state = user.id;
-    window.location.href = `${appUrl}/functions/initMicrosoftAuth?state=${state}`;
+    
+    window.location.href = `${vercelUrl}/api/microsoft-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
   };
 
   const handleDisconnectMicrosoft = async () => {
