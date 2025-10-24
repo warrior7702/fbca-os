@@ -7,6 +7,11 @@ Deno.serve(async (req) => {
         const state = url.searchParams.get('state');
         const error = url.searchParams.get('error');
 
+        console.log('pcoCallback called');
+        console.log('Code:', code ? 'exists' : 'missing');
+        console.log('State:', state);
+        console.log('Error:', error);
+
         if (error) {
             console.error('PCO OAuth error:', error);
             return new Response(null, {
@@ -18,6 +23,7 @@ Deno.serve(async (req) => {
         }
 
         if (!code || !state) {
+            console.error('Missing code or state');
             return Response.json({ error: 'Missing code or state' }, { status: 400 });
         }
 
@@ -50,6 +56,7 @@ Deno.serve(async (req) => {
         }
 
         const tokens = await tokenResponse.json();
+        console.log('Tokens received successfully');
 
         // Calculate expiration time
         const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
@@ -60,6 +67,8 @@ Deno.serve(async (req) => {
             pco_refresh_token: tokens.refresh_token,
             pco_token_expires_at: expiresAt
         });
+
+        console.log('User updated with tokens');
 
         // Redirect back to Settings page with success message
         return new Response(null, {
