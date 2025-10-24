@@ -4,6 +4,7 @@ import Marketing from './pages/Marketing';
 import FoodService from './pages/FoodService';
 import FBCANexts from './pages/FBCANexts';
 import Settings from './pages/Settings';
+import IntegrationTest from './pages/IntegrationTest';
 import Layout from './Layout.jsx';
 
 
@@ -14,6 +15,7 @@ export const PAGES = {
     "FoodService": FoodService,
     "FBCANexts": FBCANexts,
     "Settings": Settings,
+    "IntegrationTest": IntegrationTest,
 }
 
 export const pagesConfig = {
