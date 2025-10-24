@@ -13,27 +13,33 @@ Deno.serve(async (req) => {
         }
 
         const body = await req.json();
-        console.log('ClickUp save request:', { user_id: body.user_id, has_token: !!body.access_token });
+        
+        // Log EVERYTHING we receive
+        console.log('Full ClickUp request body:', JSON.stringify(body, null, 2));
 
-        const { user_id, access_token, expires_at } = body;
+        const { user_id, access_token, expires_at, provider } = body;
 
-        if (!user_id || !access_token || !expires_at) {
-            console.error('Missing required fields');
+        if (!user_id || !access_token) {
+            console.error('Missing user_id or access_token');
             return Response.json({ 
                 error: 'Missing required fields',
-                received: { user_id: !!user_id, access_token: !!access_token, expires_at: !!expires_at }
+                received: body
             }, { status: 400, headers: cors });
         }
 
         const base44 = createClientFromRequest(req);
 
-        // Use service role to update user (OAuth callback from Vercel)
+        // Set expires_at with a default if missing (ClickUp tokens don't expire)
+        const tokenExpiresAt = expires_at || new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)).toISOString();
+
+        console.log('Updating user:', user_id, 'with expires_at:', tokenExpiresAt);
+
         await base44.asServiceRole.entities.User.update(user_id, {
             clickup_access_token: access_token,
-            clickup_token_expires_at: expires_at
+            clickup_token_expires_at: tokenExpiresAt
         });
 
-        console.log('ClickUp tokens saved successfully for user:', user_id);
+        console.log('ClickUp tokens saved successfully');
 
         return Response.json({ 
             success: true,
@@ -41,7 +47,7 @@ Deno.serve(async (req) => {
         }, { headers: cors });
 
     } catch (error) {
-        console.error('Save ClickUp tokens error:', error.message);
+        console.error('Save ClickUp tokens error:', error.message, error.stack);
         return Response.json({ 
             error: error.message
         }, { status: 500, headers: cors });
