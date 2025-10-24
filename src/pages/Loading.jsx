@@ -1,11 +1,14 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layers, Zap, Shield, Globe } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 export default function Loading() {
+  const navigate = useNavigate();
   const [loadingStage, setLoadingStage] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [showClickPrompt, setShowClickPrompt] = useState(false);
 
   const stages = [
     { icon: Shield, text: "Authenticating...", color: "text-blue-500" },
@@ -35,14 +38,40 @@ export default function Loading() {
     };
   }, []);
 
+  useEffect(() => {
+    if (progress >= 100) {
+      setTimeout(() => {
+        setShowClickPrompt(true);
+      }, 500);
+    }
+  }, [progress]);
+
+  const handleClick = () => {
+    if (progress >= 100) {
+      navigate(createPageUrl("Dashboard"));
+    }
+  };
+
   const CurrentIcon = stages[loadingStage].icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4 overflow-hidden">
+    <div 
+      onClick={handleClick}
+      className={`min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4 overflow-hidden ${
+        progress >= 100 ? 'cursor-pointer' : ''
+      }`}
+    >
       <style>{`
         .fbca-logo-loading {
           filter: drop-shadow(0 4px 20px rgba(59, 130, 246, 0.6))
                   drop-shadow(0 0 40px rgba(59, 130, 246, 0.4));
+        }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        .pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
         }
       `}</style>
 
@@ -193,25 +222,41 @@ export default function Loading() {
           </div>
         </div>
 
-        {/* Module indicators */}
+        {/* Tagline */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-12 flex items-center justify-center gap-2"
+          transition={{ delay: 1.5 }}
+          className="mt-12"
         >
-          {['Marketing', 'Food Service', 'FBCA Nexts'].map((module, index) => (
-            <motion.div
-              key={module}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 1.2 + index * 0.2 }}
-              className="px-3 py-1 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-full text-xs text-gray-400"
-            >
-              {module}
-            </motion.div>
-          ))}
+          <p className="text-gray-300 text-lg font-light italic">
+            Everything you need, right here.
+          </p>
         </motion.div>
+
+        {/* Click to Enter Prompt */}
+        <AnimatePresence>
+          {showClickPrompt && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mt-8"
+            >
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="text-white/80 text-sm font-medium pulse-glow"
+              >
+                Click anywhere to enter →
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Base 44 framework badge */}
         <motion.div
