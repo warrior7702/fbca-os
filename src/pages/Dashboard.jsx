@@ -136,12 +136,19 @@ export default function Dashboard() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
-            className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
           >
-            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl shadow-lg flex items-center justify-center">
-              <Folder className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-white text-xs font-medium drop-shadow-lg">Documents</span>
+            <Link to={createPageUrl("Documents")}>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
+              >
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl shadow-lg flex items-center justify-center">
+                  <Folder className="w-7 h-7 text-white" />
+                </div>
+                <span className="text-white text-xs font-medium drop-shadow-lg">Documents</span>
+              </motion.div>
+            </Link>
           </motion.div>
 
           <motion.div

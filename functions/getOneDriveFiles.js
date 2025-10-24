@@ -1,0 +1,54 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const user = await base44.auth.me();
+
+        if (!user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (!user.microsoft_access_token) {
+            return Response.json({ error: 'Microsoft 365 not connected' }, { status: 400 });
+        }
+
+        const url = new URL(req.url);
+        const folderId = url.searchParams.get('folderId') || 'root';
+        const path = folderId === 'root' 
+            ? 'https://graph.microsoft.com/v1.0/me/drive/root/children'
+            : `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`;
+
+        // Get files and folders
+        const response = await fetch(path, {
+            headers: {
+                'Authorization': `Bearer ${user.microsoft_access_token}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OneDrive API error:', errorText);
+            return Response.json({ error: 'Failed to fetch OneDrive files' }, { status: 500 });
+        }
+
+        const data = await response.json();
+
+        const items = data.value.map(item => ({
+            id: item.id,
+            name: item.name,
+            isFolder: !!item.folder,
+            size: item.size,
+            webUrl: item.webUrl,
+            downloadUrl: item['@microsoft.graph.downloadUrl'],
+            modifiedDate: item.lastModifiedDateTime,
+            createdDate: item.createdDateTime
+        }));
+
+        return Response.json({ items });
+
+    } catch (error) {
+        console.error('Get OneDrive files error:', error);
+        return Response.json({ error: error.message }, { status: 500 });
+    }
+});
