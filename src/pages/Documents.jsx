@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -152,10 +153,11 @@ export default function Documents() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   whileHover={{ scale: 1.05 }}
-                  onClick={() => item.isFolder && openFolder(item)}
-                  className={`${item.isFolder ? 'cursor-pointer' : 'cursor-default'}`}
                 >
-                  <Card className="hover:shadow-lg transition-all">
+                  <Card 
+                    className="hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => item.isFolder && openFolder(item)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center gap-3">
                         <div className={`p-3 rounded-xl ${
