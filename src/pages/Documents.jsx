@@ -32,12 +32,14 @@ export default function Documents() {
   const [breadcrumbs, setBreadcrumbs] = useState([{ id: 'root', name: 'OneDrive' }]);
 
   useEffect(() => {
+    console.log('currentFolderId changed to:', currentFolderId);
     loadFiles(currentFolderId);
   }, [currentFolderId]);
 
   const loadFiles = async (folderId) => {
     setLoading(true);
     setError(null);
+    console.log('loadFiles called with folderId:', folderId);
     try {
       console.log('Loading folder:', folderId);
       const response = await base44.functions.invoke('getOneDriveFiles', { 
@@ -56,12 +58,15 @@ export default function Documents() {
   };
 
   const openFolder = (folder) => {
+    console.log('openFolder called with:', folder);
+    console.log('Setting currentFolderId to:', folder.id);
     setCurrentFolderId(folder.id);
     setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
   };
 
   const navigateToBreadcrumb = (index) => {
     const crumb = breadcrumbs[index];
+    console.log('navigateToBreadcrumb called, going to:', crumb);
     setCurrentFolderId(crumb.id);
     setBreadcrumbs(prev => prev.slice(0, index + 1));
   };
@@ -159,7 +164,12 @@ export default function Documents() {
                 >
                   <Card 
                     className="hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => item.isFolder && openFolder(item)}
+                    onClick={() => {
+                      console.log('Card clicked, item:', item);
+                      if (item.isFolder) {
+                        openFolder(item);
+                      }
+                    }}
                   >
                     <CardContent className="p-4">
                       <div className="flex flex-col items-center text-center gap-3">
