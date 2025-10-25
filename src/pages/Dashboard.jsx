@@ -11,7 +11,8 @@ import {
   Trash2,
   Settings,
   Grid3x3,
-  Users // Added Users icon
+  Users, // Added Users icon
+  CheckSquare // Added CheckSquare icon for My Tasks
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -23,32 +24,39 @@ import {
 
 const desktopApps = [
   {
+    name: "My Tasks",
+    icon: CheckSquare,
+    color: "from-blue-500 to-indigo-500",
+    path: "MyTasks",
+    position: { x: 50, y: 50 }
+  },
+  {
     name: "Marketing",
     icon: Megaphone,
     color: "from-purple-500 to-pink-500",
     path: "Marketing",
-    position: { x: 50, y: 50 }
+    position: { x: 50, y: 180 }
   },
   {
     name: "Food Service",
     icon: UtensilsCrossed,
     color: "from-green-500 to-emerald-500",
     path: "FoodService",
-    position: { x: 50, y: 180 }
+    position: { x: 50, y: 310 }
   },
   {
     name: "Staff Directory",
     icon: Users,
     color: "from-teal-500 to-cyan-500",
     path: "StaffDirectory",
-    position: { x: 50, y: 310 } // Adjusted position
+    position: { x: 50, y: 440 }
   },
   {
     name: "Settings",
     icon: Settings,
     color: "from-slate-500 to-slate-600",
     path: "Settings",
-    position: { x: 50, y: 440 } // Adjusted position
+    position: { x: 50, y: 570 }
   }
 ];
 

@@ -22,7 +22,8 @@ import {
   Layers,
   Users,
   Loader2,
-  Folder
+  Folder,
+  CheckSquare // Added CheckSquare icon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +45,12 @@ const apps = [
     path: "Dashboard",
     icon: LayoutDashboard,
     color: "text-blue-500"
+  },
+  {
+    name: "My Tasks",
+    path: "MyTasks",
+    icon: CheckSquare, // Using the new CheckSquare icon
+    color: "text-indigo-500"
   },
   {
     name: "Marketing",
