@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -18,7 +18,9 @@ import {
   LogOut,
   ChevronDown,
   Layers,
-  Users // Added Users icon import
+  Users, // Added Users icon import
+  Loader2, // Added Loader2 for searching state
+  Folder // Added Folder for file results
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -32,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { Card, CardContent } from "@/components/ui/card"; // Added Card, CardContent (though not directly used, keeping as per outline)
 
 const apps = [
   {
@@ -73,6 +76,10 @@ export default function Layout({ children, currentPageName }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications] = useState(3);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [] });
+  const [showResults, setShowResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -90,8 +97,84 @@ export default function Layout({ children, currentPageName }) {
       setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(timer);
+    // Click outside to close search results
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
+
+  // Debounced live search
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      if (searchQuery.length >= 2) {
+        performLiveSearch(searchQuery);
+      } else {
+        setSearchResults({ staff: [], files: [], modules: [] });
+        setShowResults(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery]);
+
+  const performLiveSearch = async (query) => {
+    setSearching(true);
+    setShowResults(true);
+
+    try {
+      // Search staff
+      const staffResponse = await base44.entities.StaffContact.filter({});
+      const lowerQuery = query.toLowerCase();
+      
+      const matchedStaff = (staffResponse || [])
+        .filter(person => {
+          const fullName = person.first_name && person.last_name ? `${person.first_name} ${person.last_name}` : person.full_name || '';
+          return fullName.toLowerCase().includes(lowerQuery) ||
+                 person.first_name?.toLowerCase().includes(lowerQuery) ||
+                 person.last_name?.toLowerCase().includes(lowerQuery) ||
+                 person.email?.toLowerCase().includes(lowerQuery) ||
+                 person.title?.toLowerCase().includes(lowerQuery); // Added title search for staff
+        })
+        .slice(0, 5); // Top 5 results
+
+      // Search modules
+      const matchedModules = apps
+        .filter(app => 
+          app.name.toLowerCase().includes(lowerQuery) ||
+          app.path.toLowerCase().includes(lowerQuery)
+        )
+        .slice(0, 3);
+
+      // Search files
+      let files = [];
+      try {
+        const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
+        files = (filesResponse.data.files || []).slice(0, 5);
+      } catch (error) {
+        console.log('File search skipped or failed:', error);
+        // It's good to indicate to the user if file search failed, e.g., via a message,
+        // but for now, just logging and proceeding with empty files.
+      }
+
+      setSearchResults({
+        staff: matchedStaff,
+        files: files,
+        modules: matchedModules
+      });
+    } catch (error) {
+      console.error('Live search error:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const handleLogout = () => {
     base44.auth.logout();
@@ -102,8 +185,27 @@ export default function Layout({ children, currentPageName }) {
     if (searchQuery.trim()) {
       navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
       setSearchQuery("");
+      setShowResults(false);
     }
   };
+
+  const handleResultClick = (type, item) => {
+    setShowResults(false);
+    setSearchQuery("");
+    
+    if (type === 'module') {
+      navigate(createPageUrl(item.path));
+    } else if (type === 'file') {
+      window.open(item.webUrl, '_blank');
+    } else if (type === 'staff') {
+      // For staff, navigate to StaffDirectory and optionally pass a state or query param to highlight/filter
+      navigate(createPageUrl('StaffDirectory')); 
+      // You might want to navigate to a specific staff profile page or filter the directory
+      // e.g., navigate(createPageUrl('StaffProfile', { id: item.id }));
+    }
+  };
+
+  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -170,18 +272,119 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </div>
 
-          {/* Center - Search */}
-          <div className="flex-1 max-w-md mx-8">
-            <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-              <input
-                type="text"
-                placeholder="Search apps and files..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-10 pr-4 bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm outline-none transition-colors"
-              />
+          {/* Center - Smart Search */}
+          <div className="flex-1 max-w-md mx-8 relative" ref={searchRef}>
+            <form onSubmit={handleSearch}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10" />
+                <input
+                  type="text"
+                  placeholder="Search apps, files, and people..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
+                  className="w-full h-9 pl-10 pr-4 bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm outline-none transition-colors relative z-10"
+                />
+                {searching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 animate-spin z-10" />
+                )}
+              </div>
             </form>
+
+            {/* Live Search Results Dropdown */}
+            {showResults && totalResults > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute bottom-12 left-0 right-0 bg-white rounded-lg shadow-2xl border border-slate-200 max-h-96 overflow-y-auto z-50"
+              >
+                {/* Staff Results */}
+                {searchResults.staff.length > 0 && (
+                  <div className="p-2">
+                    <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
+                      Staff ({searchResults.staff.length})
+                    </div>
+                    {searchResults.staff.map((person) => (
+                      <button
+                        key={person.id}
+                        onClick={() => handleResultClick('staff', person)}
+                        className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-semibold">
+                            {person.first_name && person.first_name.length > 0 && person.last_name && person.last_name.length > 0
+                                ? `${person.first_name[0]}${person.last_name[0]}`
+                                : person.full_name?.[0]?.toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{person.full_name}</p>
+                          <p className="text-xs text-slate-500 truncate">{person.title || person.email}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Module Results */}
+                {searchResults.modules.length > 0 && (
+                  <div className="p-2 border-t border-slate-100">
+                    <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
+                      Modules ({searchResults.modules.length})
+                    </div>
+                    {searchResults.modules.map((module) => (
+                      <button
+                        key={module.path}
+                        onClick={() => handleResultClick('module', module)}
+                        className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <module.icon className={`w-4 h-4 ${module.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900">{module.name}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* File Results */}
+                {searchResults.files.length > 0 && (
+                  <div className="p-2 border-t border-slate-100">
+                    <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
+                      Files ({searchResults.files.length})
+                    </div>
+                    {searchResults.files.map((file) => (
+                      <button
+                        key={file.id}
+                        onClick={() => handleResultClick('file', file)}
+                        className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                      >
+                        <Folder className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* View All Results */}
+                <div className="p-2 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
+                      setShowResults(false);
+                      setSearchQuery("");
+                    }}
+                    className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium py-2"
+                  >
+                    View all results for "{searchQuery}"
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </div>
 
           {/* System Tray */}
