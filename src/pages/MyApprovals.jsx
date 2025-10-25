@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,7 @@ export default function MyApprovals() {
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(null); // Added errorMessage state
+  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -35,7 +34,7 @@ export default function MyApprovals() {
 
   const loadData = async () => {
     setLoading(true);
-    setErrorMessage(null); // Clear previous error messages
+    setErrorMessage(null);
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -46,6 +45,7 @@ export default function MyApprovals() {
         return;
       }
 
+      // Load approvals
       try {
         const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
         console.log('Approvals response:', approvalsResponse.data);
@@ -67,17 +67,22 @@ export default function MyApprovals() {
         toast.error(errorMsg);
       }
 
+      // Load calendar events
       try {
+        console.log('Fetching PCO calendar events...');
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
         console.log('Calendar events response:', eventsResponse.data);
         
         if (eventsResponse.data.error) {
-          toast.error(eventsResponse.data.error); // Toast for calendar specific errors
+          console.error('Calendar events error:', eventsResponse.data.error);
+          toast.error('Failed to load calendar events: ' + eventsResponse.data.error);
         } else {
           setCalendarEvents(eventsResponse.data.events || []);
+          console.log('Loaded', eventsResponse.data.events?.length || 0, 'calendar events');
         }
       } catch (error) {
         console.error('Error fetching calendar events:', error);
+        console.error('Full error:', error.response?.data || error.message);
         toast.error('Failed to load calendar events');
       }
 
@@ -96,7 +101,7 @@ export default function MyApprovals() {
         request_id: approval.id
       });
       toast.success('Request approved!');
-      loadData(); // Reload data
+      loadData();
     } catch (error) {
       console.error('Error approving:', error);
       toast.error('Failed to approve request');
@@ -112,7 +117,7 @@ export default function MyApprovals() {
         request_id: approval.id
       });
       toast.success('Request denied');
-      loadData(); // Reload data
+      loadData();
     } catch (error) {
       console.error('Error denying:', error);
       toast.error('Failed to deny request');
@@ -159,8 +164,6 @@ export default function MyApprovals() {
             </AlertDescription>
           </Alert>
         )}
-
-        {/* Removed the redundant non-destructive PCO connection alert, as errorMessage now handles it */}
 
         {/* Pending Approvals List */}
         <Card>
