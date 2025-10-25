@@ -19,7 +19,7 @@ export default function Onboarding() {
           <Mail className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-slate-700">
             <strong>Important:</strong> You must use your official FBCA email 
-            (@fbca.org or @firstbaptistconroe.org) to access FBCA OS.
+            (@fbca.org) to access FBCA OS.
           </AlertDescription>
         </Alert>
 
@@ -36,7 +36,7 @@ export default function Onboarding() {
               <div>
                 <p className="font-medium text-slate-900">Sign In with Your FBCA Email</p>
                 <p className="text-sm text-slate-600">
-                  Use your @fbca.org or @firstbaptistconroe.org email address
+                  Use your @fbca.org email address
                 </p>
               </div>
             </div>

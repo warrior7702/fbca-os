@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 
 export default function EmailDomainCheck({ user }) {
   const [showWarning, setShowWarning] = useState(false);
-  const allowedDomains = ["fbca.org", "firstbaptistconroe.org"];
+  const allowedDomains = ["fbca.org"];
 
   useEffect(() => {
     if (user?.email) {
@@ -47,7 +47,7 @@ export default function EmailDomainCheck({ user }) {
             </h3>
             <p className="text-slate-600 text-sm mb-4">
               FBCA OS is only available to First Baptist Conroe staff and requires 
-              an official FBCA email address (<strong>@fbca.org</strong> or <strong>@firstbaptistconroe.org</strong>).
+              an official FBCA email address (<strong>@fbca.org</strong>).
             </p>
             <p className="text-slate-600 text-sm mb-4">
               You're currently signed in with: <strong>{user?.email}</strong>
