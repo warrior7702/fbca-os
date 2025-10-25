@@ -129,8 +129,11 @@ export default function Layout({ children, currentPageName }) {
     setSearching(true);
     setShowResults(true);
 
+    console.log('🔍 Starting live search for:', query);
+
     try {
       // Search staff
+      console.log('📋 Searching staff...');
       const staffResponse = await base44.entities.StaffContact.filter({});
       const lowerQuery = query.toLowerCase();
       
@@ -143,7 +146,10 @@ export default function Layout({ children, currentPageName }) {
         })
         .slice(0, 5);
 
+      console.log('✅ Found', matchedStaff.length, 'staff members');
+
       // Search modules
+      console.log('📦 Searching modules...');
       const matchedModules = apps
         .filter(app => 
           app.name.toLowerCase().includes(lowerQuery) ||
@@ -151,14 +157,29 @@ export default function Layout({ children, currentPageName }) {
         )
         .slice(0, 3);
 
+      console.log('✅ Found', matchedModules.length, 'modules');
+
       // Search files (already grouped by folder from backend)
       let files = [];
       try {
+        console.log('📁 Searching OneDrive files...');
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
+        console.log('📁 OneDrive response:', filesResponse.data);
         files = (filesResponse.data.files || []).slice(0, 5);
+        console.log('✅ Found', files.length, 'files/folders');
+        if (files.length > 0) {
+          console.log('📁 File results:', files.map(f => ({ name: f.name, isFolder: f.isFolder })));
+        }
       } catch (error) {
-        console.log('File search skipped:', error);
+        console.error('❌ File search error:', error);
+        console.error('Error details:', error.response?.data || error.message);
       }
+
+      console.log('🎯 Final results:', {
+        staff: matchedStaff.length,
+        modules: matchedModules.length,
+        files: files.length
+      });
 
       setSearchResults({
         staff: matchedStaff,
@@ -166,7 +187,7 @@ export default function Layout({ children, currentPageName }) {
         modules: matchedModules
       });
     } catch (error) {
-      console.error('Live search error:', error);
+      console.error('❌ Live search error:', error);
     } finally {
       setSearching(false);
     }
