@@ -5,7 +5,6 @@ import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import TheLightHelper from "@/components/layout/TheLightHelper";
 import EmailDomainCheck from "@/components/layout/EmailDomainCheck";
-import AdminToggle from "@/components/layout/AdminToggle";
 import {
   LayoutDashboard,
   Megaphone,
@@ -234,9 +233,6 @@ export default function Layout({ children, currentPageName }) {
           filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
         }
       `}</style>
-
-      {/* Admin Toggle - Only shows for admins */}
-      {user && <AdminToggle user={user} />}
 
       {/* Email Domain Check - DISABLED */}
       {/* {user && <EmailDomainCheck user={user} exceptionEmail="warrior7702@gmail.com" />} */}
