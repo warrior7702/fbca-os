@@ -15,7 +15,7 @@ import {
   CheckSquare,
   GripVertical
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -41,10 +41,15 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
+const GRID_COLS = 8;
+const GRID_ROWS = 6;
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [apps, setApps] = useState(defaultApps);
   const [wallpaper, setWallpaper] = useState("church_steeple_night");
+  const [editMode, setEditMode] = useState(false);
+  const [appPositions, setAppPositions] = useState({});
 
   useEffect(() => {
     loadUser();
@@ -60,18 +65,25 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // Load custom desktop layout
+      // Load custom desktop layout with positions
       if (currentUser.desktop_layout && Array.isArray(currentUser.desktop_layout)) {
-        const customLayout = currentUser.desktop_layout.map(item => {
-          const app = defaultApps.find(a => a.id === item.id);
-          return app;
-        }).filter(Boolean);
-        
-        // Add any new apps that weren't in the saved layout
-        const savedIds = currentUser.desktop_layout.map(i => i.id);
-        const newApps = defaultApps.filter(a => !savedIds.includes(a.id));
-        
-        setApps([...customLayout, ...newApps]);
+        const positions = {};
+        currentUser.desktop_layout.forEach(item => {
+          if (item.row !== undefined && item.col !== undefined) {
+            positions[item.id] = { row: item.row, col: item.col };
+          }
+        });
+        setAppPositions(positions);
+      } else {
+        // Set default positions
+        const defaultPositions = {};
+        defaultApps.forEach((app, index) => {
+          defaultPositions[app.id] = {
+            row: Math.floor(index / 2),
+            col: index % 2
+          };
+        });
+        setAppPositions(defaultPositions);
       }
     } catch (error) {
       console.error("Error loading user:", error);
@@ -87,22 +99,98 @@ export default function Dashboard() {
     
     setApps(items);
     
+    // Recalculate positions
+    const newPositions = {};
+    items.forEach((app, index) => {
+      newPositions[app.id] = {
+        row: Math.floor(index / 2),
+        col: index % 2
+      };
+    });
+    setAppPositions(newPositions);
+    
     // Save layout
+    await saveLayout(newPositions);
+  };
+
+  const handleIconDragStart = (e, app) => {
+    if (!editMode) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('appId', app.id);
+  };
+
+  const handleGridCellDrop = async (e, row, col) => {
+    e.preventDefault();
+    if (!editMode) return;
+    
+    const appId = e.dataTransfer.getData('appId');
+    if (!appId) return;
+
+    // Check if cell is occupied
+    const isOccupied = Object.entries(appPositions).some(
+      ([id, pos]) => id !== appId && pos.row === row && pos.col === col
+    );
+
+    if (isOccupied) {
+      toast.error('This spot is already occupied');
+      return;
+    }
+
+    // Update position
+    const newPositions = {
+      ...appPositions,
+      [appId]: { row, col }
+    };
+    setAppPositions(newPositions);
+    await saveLayout(newPositions);
+    toast.success('Icon moved!');
+  };
+
+  const handleGridCellDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const saveLayout = async (positions) => {
     try {
-      const layout = items.map((app, index) => ({
-        id: app.id,
-        position: index
+      const layout = Object.entries(positions).map(([id, pos]) => ({
+        id,
+        row: pos.row,
+        col: pos.col
       }));
       
       await base44.auth.updateMe({ desktop_layout: layout });
-      toast.success("Desktop layout saved");
     } catch (error) {
       console.error("Error saving layout:", error);
       toast.error("Failed to save layout");
     }
   };
 
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    if (editMode) {
+      toast.success('Layout locked');
+    } else {
+      toast.info('Edit mode: Drag icons to reposition them');
+    }
+  };
+
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.church_steeple_night;
+
+  // Create grid cells
+  const gridCells = [];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      gridCells.push({ row, col });
+    }
+  }
+
+  // Find which app is at each position
+  const getAppAtPosition = (row, col) => {
+    return apps.find(app => {
+      const pos = appPositions[app.id];
+      return pos && pos.row === row && pos.col === col;
+    });
+  };
 
   return (
     <div className="h-full relative overflow-hidden">
@@ -121,13 +209,13 @@ export default function Dashboard() {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem>
-            <Grid3x3 className="w-4 h-4 mr-2" />
-            View
+          <ContextMenuItem onClick={toggleEditMode}>
+            <GripVertical className="w-4 h-4 mr-2" />
+            {editMode ? 'Lock Icons' : 'Rearrange Icons'}
           </ContextMenuItem>
           <ContextMenuItem>
-            <Folder className="w-4 h-4 mr-2" />
-            New Folder
+            <Grid3x3 className="w-4 h-4 mr-2" />
+            View Options
           </ContextMenuItem>
           <ContextMenuItem>
             <Settings className="w-4 h-4 mr-2" />
@@ -136,68 +224,90 @@ export default function Dashboard() {
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Desktop Icons - Draggable Grid */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="desktop" direction="vertical">
-          {(provided) => (
-            <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="relative h-full p-8"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, 120px)',
-                gridAutoRows: '120px',
-                gap: '20px',
-                alignContent: 'start'
-              }}
+      {/* Edit Mode Indicator */}
+      {editMode && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
+        >
+          <div className="bg-blue-600/90 backdrop-blur-lg text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
+            <GripVertical className="w-5 h-5 animate-pulse" />
+            <span className="font-medium">Edit Mode: Drag icons to move them</span>
+            <button
+              onClick={toggleEditMode}
+              className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors"
             >
-              {apps.map((app, index) => (
-                <Draggable key={app.id} draggableId={app.id} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      style={{
-                        ...provided.draggableProps.style,
-                        opacity: snapshot.isDragging ? 0.5 : 1
-                      }}
+              Done
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Desktop Grid */}
+      <div 
+        className="relative h-full p-8"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${GRID_COLS}, 120px)`,
+          gridTemplateRows: `repeat(${GRID_ROWS}, 120px)`,
+          gap: '20px',
+          justifyContent: 'start',
+          alignContent: 'start'
+        }}
+      >
+        {gridCells.map(({ row, col }) => {
+          const app = getAppAtPosition(row, col);
+          
+          return (
+            <div
+              key={`${row}-${col}`}
+              onDrop={(e) => handleGridCellDrop(e, row, col)}
+              onDragOver={handleGridCellDragOver}
+              className={`relative rounded-lg transition-all ${
+                editMode ? 'ring-1 ring-white/20 hover:ring-white/40 hover:bg-white/5' : ''
+              }`}
+            >
+              {app ? (
+                <div
+                  draggable={editMode}
+                  onDragStart={(e) => handleIconDragStart(e, app)}
+                  className={editMode ? 'cursor-move' : 'cursor-pointer'}
+                >
+                  <Link to={createPageUrl(app.path)} onClick={(e) => editMode && e.preventDefault()}>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={editMode ? { scale: 1.1 } : { scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all h-full ${
+                        editMode ? 'bg-white/10 backdrop-blur-sm animate-pulse' : 'hover:bg-white/10 backdrop-blur-sm'
+                      }`}
                     >
-                      <Link to={createPageUrl(app.path)}>
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: index * 0.05 }}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all cursor-move ${
-                            snapshot.isDragging ? 'bg-white/30 backdrop-blur-lg' : 'hover:bg-white/10 backdrop-blur-sm'
-                          }`}
-                        >
-                          <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center group-hover:shadow-3xl transition-shadow relative`}>
-                            <app.icon className="w-8 h-8 text-white" />
-                            {snapshot.isDragging && (
-                              <GripVertical className="absolute -top-2 -right-2 w-5 h-5 text-white/70" />
-                            )}
-                          </div>
-                          <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                            {app.name}
-                          </span>
-                        </motion.div>
-                      </Link>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
+                      <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center transition-shadow relative`}>
+                        <app.icon className="w-8 h-8 text-white" />
+                        {editMode && (
+                          <GripVertical className="absolute -top-2 -right-2 w-5 h-5 text-white bg-blue-600 rounded-full p-0.5" />
+                        )}
+                      </div>
+                      <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                        {app.name}
+                      </span>
+                    </motion.div>
+                  </Link>
+                </div>
+              ) : editMode ? (
+                <div className="h-full flex items-center justify-center text-white/30 text-xs">
+                  Empty
+                </div>
+              ) : null}
             </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+          );
+        })}
+      </div>
 
       {/* Desktop Shortcuts - Right Side (Static) */}
-      <div className="absolute right-8 top-8 space-y-4">
+      <div className="absolute right-8 top-8 space-y-4 z-40">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
