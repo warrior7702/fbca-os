@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
         const body = await req.json();
         const query = body.query || '';
 
-        console.log('Searching OneDrive for:', query);
+        console.log('🔍 Searching OneDrive for:', query);
 
         if (!query || query.length < 2) {
             return Response.json({ files: [] });
@@ -34,46 +34,65 @@ Deno.serve(async (req) => {
             accessToken = refreshResponse.data.access_token;
         }
 
-        // Search OneDrive
-        const searchUrl = `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(query)}')`;
-        console.log('Search URL:', searchUrl);
-
-        const response = await fetch(searchUrl, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OneDrive search error:', errorText);
-            return Response.json({ error: 'Search failed' }, { status: 500 });
-        }
-
-        const data = await response.json();
-        console.log('Raw search results count:', data.value?.length || 0);
-        
-        if (data.value && data.value.length > 0) {
-            console.log('First few results:', data.value.slice(0, 3).map(i => ({
-                name: i.name,
-                isFolder: !!i.folder
-            })));
-        }
-
         const lowerQuery = query.toLowerCase();
+        let allResults = [];
 
-        // Separate folders and files
+        // APPROACH 1: Try Microsoft Graph search API
+        try {
+            const searchUrl = `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(query)}')`;
+            console.log('Trying Graph API search...');
+
+            const response = await fetch(searchUrl, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Graph API returned:', data.value?.length || 0, 'items');
+                allResults = data.value || [];
+            }
+        } catch (error) {
+            console.log('Graph API search failed:', error.message);
+        }
+
+        // APPROACH 2: If search returned nothing, manually list and filter folders
+        if (allResults.length === 0) {
+            console.log('Graph search empty, trying manual folder listing...');
+            
+            try {
+                const listUrl = 'https://graph.microsoft.com/v1.0/me/drive/root/children';
+                const listResponse = await fetch(listUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (listResponse.ok) {
+                    const listData = await listResponse.json();
+                    console.log('Listed', listData.value?.length || 0, 'root items');
+                    
+                    // Filter items that match the query
+                    allResults = (listData.value || []).filter(item => 
+                        item.name.toLowerCase().includes(lowerQuery)
+                    );
+                    console.log('Filtered to', allResults.length, 'matching items');
+                }
+            } catch (error) {
+                console.log('Manual listing failed:', error.message);
+            }
+        }
+
+        // Process results
         const folders = [];
         const folderMap = new Map();
         const standaloneFiles = [];
 
-        data.value.forEach(item => {
-            console.log('Processing item:', item.name, 'isFolder:', !!item.folder);
-            
+        allResults.forEach(item => {
             if (item.folder) {
-                // It's a folder that matches the search
+                // It's a folder that matches
                 if (!folderMap.has(item.id)) {
-                    console.log('Adding folder:', item.name);
                     folders.push({
                         id: item.id,
                         name: item.name,
@@ -89,13 +108,9 @@ Deno.serve(async (req) => {
                 const parentName = item.parentReference?.name || '';
                 const parentId = item.parentReference?.id;
                 
-                console.log('File:', item.name, 'Parent:', parentName);
-                
-                // Check if parent folder name matches query
                 if (parentName.toLowerCase().includes(lowerQuery)) {
                     // File's parent folder matches
                     if (parentId && !folderMap.has(parentId)) {
-                        console.log('Adding parent folder:', parentName);
                         folders.push({
                             id: parentId,
                             name: parentName,
@@ -110,8 +125,7 @@ Deno.serve(async (req) => {
                         folders[folderIndex].fileCount++;
                     }
                 } else if (item.name.toLowerCase().includes(lowerQuery)) {
-                    // File name itself matches query
-                    console.log('Adding standalone file:', item.name);
+                    // File name matches
                     standaloneFiles.push({
                         id: item.id,
                         name: item.name,
@@ -127,18 +141,16 @@ Deno.serve(async (req) => {
 
         const results = [...folders, ...standaloneFiles];
 
-        console.log('Final results:', {
-            totalResults: results.length,
+        console.log('✅ Final results:', {
             folders: folders.length,
-            standaloneFiles: standaloneFiles.length,
-            folderNames: folders.map(f => f.name),
-            fileNames: standaloneFiles.map(f => f.name)
+            files: standaloneFiles.length,
+            total: results.length
         });
 
         return Response.json({ files: results });
 
     } catch (error) {
-        console.error('Search OneDrive error:', error);
+        console.error('❌ Search error:', error);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
