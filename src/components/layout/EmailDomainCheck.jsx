@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 
 export default function EmailDomainCheck({ user }) {
   const [showWarning, setShowWarning] = useState(false);
-  const allowedDomains = ["fbca.org", "firstbaptistconroe.org"]; // Add your domains
+  const allowedDomains = ["fbca.org", "firstbaptistconroe.org"];
 
   useEffect(() => {
     if (user?.email) {
@@ -43,11 +43,11 @@ export default function EmailDomainCheck({ user }) {
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              Microsoft 365 Email Required
+              FBCA Email Required
             </h3>
             <p className="text-slate-600 text-sm mb-4">
-              FBCA OS requires a First Baptist Conroe Microsoft 365 email address 
-              (<strong>@fbca.org</strong> or <strong>@firstbaptistconroe.org</strong>).
+              FBCA OS is only available to First Baptist Conroe staff and requires 
+              an official FBCA email address (<strong>@fbca.org</strong> or <strong>@firstbaptistconroe.org</strong>).
             </p>
             <p className="text-slate-600 text-sm mb-4">
               You're currently signed in with: <strong>{user?.email}</strong>
@@ -55,15 +55,18 @@ export default function EmailDomainCheck({ user }) {
             <Alert className="mb-4 border-blue-200 bg-blue-50">
               <Mail className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-sm text-slate-700">
-                Please sign out and sign in using your FBCA Microsoft 365 account.
+                Please sign out and sign in using your FBCA email account.
               </AlertDescription>
             </Alert>
             <Button 
               onClick={handleLogout}
               className="w-full bg-slate-900 hover:bg-slate-800"
             >
-              Sign Out & Use Microsoft Email
+              Sign Out & Use FBCA Email
             </Button>
+            <p className="text-xs text-slate-500 mt-3 text-center">
+              Don't have an FBCA email? Contact IT Support.
+            </p>
           </div>
         </div>
       </motion.div>
