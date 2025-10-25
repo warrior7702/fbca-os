@@ -1,13 +1,46 @@
-
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; // Added Badge import
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft, ChevronRight, List } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday } from "date-fns";
 
 export default function FullCalendarModal({ open, onOpenChange, tasks }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Generate consistent colors for each list
+  const getListColor = (listName) => {
+    if (!listName) return { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', dot: 'bg-slate-500' };
+    
+    let hash = 0;
+    for (let i = 0; i < listName.length; i++) {
+      hash = listName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const colors = [
+      { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-400', dot: 'bg-blue-500' },
+      { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-400', dot: 'bg-purple-500' },
+      { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-400', dot: 'bg-pink-500' },
+      { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-400', dot: 'bg-green-500' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-400', dot: 'bg-yellow-500' },
+      { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-400', dot: 'bg-orange-500' },
+      { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-400', dot: 'bg-red-500' },
+      { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-400', dot: 'bg-teal-500' },
+      { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-400', dot: 'bg-indigo-500' },
+      { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-400', dot: 'bg-cyan-500' },
+    ];
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Get unique lists and their colors
+  const listLegend = useMemo(() => {
+    const uniqueLists = [...new Set(tasks.map(t => t.list_name).filter(Boolean))];
+    return uniqueLists.map(listName => ({
+      name: listName,
+      color: getListColor(listName)
+    }));
+  }, [tasks]);
 
   const generateMonthDays = () => {
     const monthStart = startOfMonth(currentMonth);
@@ -39,13 +72,13 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
     }
   });
 
-  const getPriorityColor = (priority) => {
+  const getPriorityIcon = (priority) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-500 border-red-600 text-white';
-      case 'high': return 'bg-orange-400 border-orange-500 text-white';
-      case 'normal': return 'bg-blue-400 border-blue-500 text-white';
-      case 'low': return 'bg-gray-300 border-gray-400 text-gray-800';
-      default: return 'bg-slate-300 border-slate-400 text-slate-800';
+      case 'urgent': return '🔴';
+      case 'high': return '🟠';
+      case 'normal': return '🔵';
+      case 'low': return '⚪';
+      default: return '⚫';
     }
   };
 
@@ -56,10 +89,10 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold">
+            <DialogTitle className="text-3xl font-bold">
               {format(currentMonth, 'MMMM yyyy')}
             </DialogTitle>
             <div className="flex items-center gap-2">
@@ -71,9 +104,10 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 onClick={() => setCurrentMonth(new Date())}
+                className="bg-blue-600 hover:bg-blue-700"
               >
                 Today
               </Button>
@@ -86,14 +120,28 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
               </Button>
             </div>
           </div>
+
+          {/* List Legend */}
+          {listLegend.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200 mt-3">
+              <List className="w-4 h-4 text-slate-500" />
+              <span className="text-xs font-medium text-slate-600 mr-1">Lists:</span>
+              {listLegend.map((list) => (
+                <Badge key={list.name} variant="outline" className={`${list.color.bg} ${list.color.text} ${list.color.border} text-xs`}>
+                  <div className={`w-2 h-2 rounded-full ${list.color.dot} mr-1.5`} />
+                  {list.name}
+                </Badge>
+              ))}
+            </div>
+          )}
         </DialogHeader>
 
-        <div className="mt-4">
-          <div className="border rounded-lg overflow-hidden">
+        <div className="flex-1 overflow-auto mt-4">
+          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
             {/* Day Headers */}
             <div className="grid grid-cols-7 bg-slate-50 border-b">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-3 text-center font-semibold text-slate-700 border-r last:border-r-0">
+              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                <div key={day} className="p-3 text-center font-semibold text-slate-700 border-r last:border-r-0 text-sm">
                   {day}
                 </div>
               ))}
@@ -111,38 +159,51 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                   return (
                     <div
                       key={dayIdx}
-                      className={`min-h-[120px] p-2 border-r last:border-r-0 ${
-                        isTodayDate ? 'bg-indigo-50' : isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                      className={`min-h-[140px] p-2 border-r last:border-r-0 ${
+                        isTodayDate ? 'bg-blue-50 ring-2 ring-inset ring-blue-500' : isCurrentMonth ? 'bg-white' : 'bg-gray-50'
                       }`}
                     >
-                      <div className={`text-sm font-semibold mb-2 ${
-                        isTodayDate ? 'text-indigo-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                      } flex items-center`}>
-                        {format(day, 'd')}
+                      <div className={`text-base font-semibold mb-2 ${
+                        isTodayDate ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      } flex items-center justify-between`}>
+                        <span>{format(day, 'd')}</span>
                         {isTodayDate && (
-                          <Badge className="ml-1 bg-indigo-600 text-[8px] px-1 py-0">Today</Badge>
+                          <Badge className="bg-blue-600 text-[8px] px-1.5 py-0">Today</Badge>
                         )}
                       </div>
 
                       <div className="space-y-1">
-                        {dayTasks.map((task, taskIdx) => (
-                          <a
-                            key={taskIdx}
-                            href={task.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <div className={`text-xs p-1.5 rounded border ${getPriorityColor(task.priority)} hover:opacity-90 transition-opacity cursor-pointer`}>
-                              <div className="font-medium truncate">{task.title}</div>
-                              {task.list_name && (
-                                <div className="text-[10px] opacity-90 truncate mt-0.5">
-                                  {task.list_name}
+                        {dayTasks.map((task, taskIdx) => {
+                          const listColor = getListColor(task.list_name);
+                          return (
+                            <a
+                              key={taskIdx}
+                              href={task.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
+                                <div className="flex items-start gap-1 mb-0.5">
+                                  <span className="text-[10px] leading-none">{getPriorityIcon(task.priority)}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`font-medium truncate ${listColor.text} group-hover:underline leading-tight`}>
+                                      {task.title}
+                                    </div>
+                                    {task.list_name && (
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${listColor.dot}`} />
+                                        <span className="text-[9px] text-slate-600 truncate">
+                                          {task.list_name}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </a>
-                        ))}
+                              </div>
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   );
