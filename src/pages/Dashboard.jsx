@@ -41,15 +41,24 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
-const GRID_COLS = 8;
-const GRID_ROWS = 6;
+// Create default positions for all apps
+const createDefaultPositions = () => {
+  const positions = {};
+  defaultApps.forEach((app, index) => {
+    positions[app.id] = {
+      row: Math.floor(index / 2),
+      col: index % 2
+    };
+  });
+  return positions;
+};
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [apps, setApps] = useState(defaultApps);
+  const [apps] = useState(defaultApps);
   const [wallpaper, setWallpaper] = useState("church_steeple_night");
   const [editMode, setEditMode] = useState(false);
-  const [appPositions, setAppPositions] = useState({});
+  const [appPositions, setAppPositions] = useState(createDefaultPositions());
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
 
   useEffect(() => {
@@ -67,7 +76,7 @@ export default function Dashboard() {
       }
       
       // Load custom desktop layout with positions
-      if (currentUser.desktop_layout && Array.isArray(currentUser.desktop_layout)) {
+      if (currentUser.desktop_layout && Array.isArray(currentUser.desktop_layout) && currentUser.desktop_layout.length > 0) {
         const positions = {};
         currentUser.desktop_layout.forEach(item => {
           if (item.row !== undefined && item.col !== undefined) {
@@ -75,16 +84,6 @@ export default function Dashboard() {
           }
         });
         setAppPositions(positions);
-      } else {
-        // Set default positions
-        const defaultPositions = {};
-        defaultApps.forEach((app, index) => {
-          defaultPositions[app.id] = {
-            row: Math.floor(index / 2),
-            col: index % 2
-          };
-        });
-        setAppPositions(defaultPositions);
       }
     } catch (error) {
       console.error("Error loading user:", error);
@@ -166,25 +165,9 @@ export default function Dashboard() {
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.church_steeple_night;
 
-  // Create grid cells
-  const gridCells = [];
-  for (let row = 0; row < GRID_ROWS; row++) {
-    for (let col = 0; col < GRID_COLS; col++) {
-      gridCells.push({ row, col });
-    }
-  }
-
-  // Find which app is at each position
-  const getAppAtPosition = (row, col) => {
-    return apps.find(app => {
-      const pos = appPositions[app.id];
-      return pos && pos.row === row && pos.col === col;
-    });
-  };
-
   return (
     <div className="h-full relative overflow-hidden">
-      {/* Desktop Background */}
+      {/* Desktop Background with Right-Click Menu */}
       <ContextMenu>
         <ContextMenuTrigger>
           <div
@@ -282,69 +265,48 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Desktop Grid */}
-      <div 
-        className="relative h-full p-8"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${GRID_COLS}, 120px)`,
-          gridTemplateRows: `repeat(${GRID_ROWS}, 120px)`,
-          gap: '20px',
-          justifyContent: 'start',
-          alignContent: 'start'
-        }}
-      >
-        {gridCells.map(({ row, col }) => {
-          const app = getAppAtPosition(row, col);
+      {/* Desktop Apps Grid - Simple Layout */}
+      <div className="relative h-full p-8 flex flex-wrap gap-6 content-start items-start">
+        {apps.map((app, index) => {
+          const pos = appPositions[app.id] || { row: Math.floor(index / 2), col: index % 2 };
           
           return (
             <div
-              key={`${row}-${col}`}
-              onDrop={(e) => handleGridCellDrop(e, row, col)}
-              onDragOver={handleGridCellDragOver}
-              className={`relative rounded-lg transition-all ${
-                editMode ? 'ring-1 ring-white/20 hover:ring-white/40 hover:bg-white/5' : ''
-              }`}
+              key={app.id}
+              draggable={editMode}
+              onDragStart={(e) => handleIconDragStart(e, app)}
+              className={editMode ? 'cursor-move' : 'cursor-pointer'}
+              style={{
+                order: pos.row * 10 + pos.col
+              }}
             >
-              {app ? (
-                <div
-                  draggable={editMode}
-                  onDragStart={(e) => handleIconDragStart(e, app)}
-                  className={editMode ? 'cursor-move' : 'cursor-pointer'}
+              <Link to={createPageUrl(app.path)} onClick={(e) => editMode && e.preventDefault()}>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={editMode ? { scale: 1.1 } : { scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all w-24 ${
+                    editMode ? 'bg-white/10 backdrop-blur-sm ring-2 ring-white/30' : 'hover:bg-white/10 backdrop-blur-sm'
+                  }`}
                 >
-                  <Link to={createPageUrl(app.path)} onClick={(e) => editMode && e.preventDefault()}>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      whileHover={editMode ? { scale: 1.1 } : { scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all h-full ${
-                        editMode ? 'bg-white/10 backdrop-blur-sm animate-pulse' : 'hover:bg-white/10 backdrop-blur-sm'
-                      }`}
-                    >
-                      <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center transition-shadow relative`}>
-                        <app.icon className="w-8 h-8 text-white" />
-                        {editMode && (
-                          <GripVertical className="absolute -top-2 -right-2 w-5 h-5 text-white bg-blue-600 rounded-full p-0.5" />
-                        )}
-                      </div>
-                      <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                        {app.name}
-                      </span>
-                    </motion.div>
-                  </Link>
-                </div>
-              ) : editMode ? (
-                <div className="h-full flex items-center justify-center text-white/30 text-xs">
-                  Empty
-                </div>
-              ) : null}
+                  <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center transition-shadow relative`}>
+                    <app.icon className="w-8 h-8 text-white" />
+                    {editMode && (
+                      <GripVertical className="absolute -top-2 -right-2 w-5 h-5 text-white bg-blue-600 rounded-full p-0.5" />
+                    )}
+                  </div>
+                  <span className="text-white text-xs font-medium text-center drop-shadow-lg leading-tight">
+                    {app.name}
+                  </span>
+                </motion.div>
+              </Link>
             </div>
           );
         })}
       </div>
 
-      {/* Desktop Shortcuts - Right Side (Static) */}
+      {/* Desktop Shortcuts - Right Side */}
       <div className="absolute right-8 top-8 space-y-4 z-40">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
