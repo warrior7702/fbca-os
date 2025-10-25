@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -97,22 +98,14 @@ export default function Documents() {
       window.location.href = `ms-powerpoint:ofe|u|${encodeURIComponent(item.webUrl)}`;
       toast.info('Opening in Microsoft PowerPoint...');
     } 
-    // PDFs - open in default PDF viewer
+    // PDFs - open in browser (OneDrive has built-in viewer)
     else if (ext === 'pdf') {
-      if (item.downloadUrl) {
-        window.open(item.downloadUrl, '_blank');
-      } else {
-        window.open(item.webUrl, '_blank');
-      }
-      toast.info('Opening PDF in default viewer...');
+      window.open(item.webUrl, '_blank');
+      toast.info('Opening PDF...');
     }
-    // Images - open in default image viewer
+    // Images - open in browser preview
     else if (ext.match(/jpg|jpeg|png|gif|bmp|svg|webp|tiff?/)) {
-      if (item.downloadUrl) {
-        window.open(item.downloadUrl, '_blank');
-      } else {
-        window.open(item.webUrl, '_blank');
-      }
+      window.open(item.webUrl, '_blank');
       toast.info('Opening image...');
     }
     // Everything else - open in browser
@@ -122,27 +115,25 @@ export default function Documents() {
   };
 
   const openInDesktop = (item) => {
-    const desktopUrl = `ms-onedrive://open?url=${encodeURIComponent(item.webUrl)}`;
+    // Method 1: Try the direct file path protocol
+    const odOpenUrl = `odopen://sync?scope=FOLDER&siteId=${encodeURIComponent(item.webUrl)}`;
+    window.location.href = odOpenUrl;
     
-    const link = document.createElement('a');
-    link.href = desktopUrl;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.info(
-      <div>
-        <p>Opening in OneDrive desktop app...</p>
-        <button 
-          onClick={() => window.open(item.webUrl, '_blank')}
-          className="text-blue-600 underline text-sm mt-1"
-        >
-          Click here if nothing happens
-        </button>
-      </div>,
-      { duration: 5000 }
-    );
+    // Show helpful message
+    setTimeout(() => {
+      toast.info(
+        <div>
+          <p className="font-medium mb-1">Opening in OneDrive...</p>
+          <p className="text-xs text-slate-600">If nothing happens:</p>
+          <p className="text-xs text-slate-600">• Make sure OneDrive app is installed</p>
+          <p className="text-xs text-slate-600">• Or <button 
+            onClick={() => window.open(item.webUrl, '_blank')}
+            className="text-blue-600 underline"
+          >open in browser instead</button></p>
+        </div>,
+        { duration: 6000 }
+      );
+    }, 500);
   };
 
   return (
