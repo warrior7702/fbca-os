@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 export default function TheLightHelper({ user }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     // Check if user is missing any connections
@@ -21,6 +22,7 @@ export default function TheLightHelper({ user }) {
     const dismissed = sessionStorage.getItem('lightHelperDismissed');
 
     if (missingConnections && !dismissed) {
+      setMessage("It looks like one or more of your accounts are not connected. Let me help you get everything set up!");
       // Delay appearance for smooth entrance
       const timer = setTimeout(() => setIsVisible(true), 1000);
       return () => clearTimeout(timer);
@@ -99,9 +101,15 @@ export default function TheLightHelper({ user }) {
 
               {/* Message */}
               <p className="text-slate-700 text-sm mb-4 leading-relaxed">
-                It looks like one or more of your accounts are not connected. 
-                Let me help you get everything set up!
+                {message}
               </p>
+
+              {/* Tip */}
+              <div className="bg-blue-50 rounded-lg p-3 mb-4 border border-blue-200">
+                <p className="text-xs text-blue-800">
+                  <strong>💡 Tip:</strong> You can change your desktop wallpaper anytime! Just right-click on the desktop and select "Change Wallpaper".
+                </p>
+              </div>
 
               {/* Action button */}
               <Link to={createPageUrl("Settings") + "?tab=integrations"}>

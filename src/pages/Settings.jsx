@@ -47,7 +47,7 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [department, setDepartment] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
-  const [selectedWallpaper, setSelectedWallpaper] = useState("church_steeple_night"); // Added selectedWallpaper state
+  const [selectedWallpaper, setSelectedWallpaper] = useState("cross_white_glow"); // Changed default wallpaper
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
@@ -86,7 +86,7 @@ export default function Settings() {
       setDisplayName(currentUser.display_name || "");
       setDepartment(currentUser.department || "");
       setRoleTitle(currentUser.role_title || "");
-      setSelectedWallpaper(currentUser.wallpaper || "church_steeple_night"); // Load user's wallpaper preference
+      setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow"); // Load user's wallpaper preference, updated default
     } catch (error) {
       console.error("Error loading user:", error);
       toast.error("Failed to load settings");

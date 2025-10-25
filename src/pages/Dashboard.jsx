@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -13,7 +12,8 @@ import {
   Grid3x3,
   Users,
   CheckSquare,
-  GripVertical
+  GripVertical,
+  Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -42,13 +42,15 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
-// Create default positions for all apps
+// Create default positions for all apps (free positioning)
 const createDefaultPositions = () => {
   const positions = {};
   defaultApps.forEach((app, index) => {
+    const row = Math.floor(index / 2);
+    const col = index % 2;
     positions[app.id] = {
-      row: Math.floor(index / 2),
-      col: index % 2
+      x: 50 + (col * 150),
+      y: 50 + (row * 130)
     };
   });
   return positions;
@@ -57,10 +59,13 @@ const createDefaultPositions = () => {
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [apps] = useState(defaultApps);
-  const [wallpaper, setWallpaper] = useState("church_steeple_night");
+  const [wallpaper, setWallpaper] = useState("cross_white_glow");
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState(createDefaultPositions());
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  const [draggingApp, setDraggingApp] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
 
   useEffect(() => {
     loadUser();
@@ -76,64 +81,67 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // Load custom desktop layout with positions
+      // Load custom desktop layout with free positions
       if (currentUser.desktop_layout && Array.isArray(currentUser.desktop_layout) && currentUser.desktop_layout.length > 0) {
         const positions = {};
         currentUser.desktop_layout.forEach(item => {
-          if (item.row !== undefined && item.col !== undefined) {
-            positions[item.id] = { row: item.row, col: item.col };
+          if (item.x !== undefined && item.y !== undefined) {
+            positions[item.id] = { x: item.x, y: item.y };
           }
         });
-        setAppPositions(positions);
+        if (Object.keys(positions).length > 0) {
+          setAppPositions(positions);
+        }
       }
     } catch (error) {
       console.error("Error loading user:", error);
     }
   };
 
-  const handleIconDragStart = (e, app) => {
-    if (!editMode) return;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('appId', app.id);
-  };
-
-  const handleGridCellDrop = async (e, row, col) => {
-    e.preventDefault();
+  const handleMouseDown = (e, app) => {
     if (!editMode) return;
     
-    const appId = e.dataTransfer.getData('appId');
-    if (!appId) return;
-
-    // Check if cell is occupied
-    const isOccupied = Object.entries(appPositions).some(
-      ([id, pos]) => id !== appId && pos.row === row && pos.col === col
-    );
-
-    if (isOccupied) {
-      toast.error('This spot is already occupied');
-      return;
-    }
-
-    // Update position
-    const newPositions = {
-      ...appPositions,
-      [appId]: { row, col }
-    };
-    setAppPositions(newPositions);
-    await saveLayout(newPositions);
-    toast.success('Icon moved!');
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDraggingApp(app.id);
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
   };
 
-  const handleGridCellDragOver = (e) => {
-    e.preventDefault();
+  const handleMouseMove = (e) => {
+    if (!draggingApp || !editMode || !containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newX = e.clientX - containerRect.left - dragOffset.x;
+    const newY = e.clientY - containerRect.top - dragOffset.y;
+    
+    // Keep within bounds
+    const boundedX = Math.max(10, Math.min(newX, containerRect.width - 110));
+    const boundedY = Math.max(10, Math.min(newY, containerRect.height - 110));
+    
+    setAppPositions(prev => ({
+      ...prev,
+      [draggingApp]: { x: boundedX, y: boundedY }
+    }));
+  };
+
+  const handleMouseUp = async () => {
+    if (draggingApp && editMode) {
+      await saveLayout(appPositions);
+      setDraggingApp(null);
+    }
   };
 
   const saveLayout = async (positions) => {
     try {
       const layout = Object.entries(positions).map(([id, pos]) => ({
         id,
-        row: pos.row,
-        col: pos.col
+        x: pos.x,
+        y: pos.y
       }));
       
       await base44.auth.updateMe({ desktop_layout: layout });
@@ -147,8 +155,9 @@ export default function Dashboard() {
     setEditMode(!editMode);
     if (editMode) {
       toast.success('Layout locked');
+      setDraggingApp(null);
     } else {
-      toast.info('Edit mode: Drag icons to reposition them');
+      toast.info('Edit mode: Click and drag icons to move them');
     }
   };
 
@@ -164,20 +173,21 @@ export default function Dashboard() {
     }
   };
 
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    // The ContextMenu component will handle showing the menu
-  };
-
-  const wallpaperUrl = wallpapers[wallpaper] || wallpapers.church_steeple_night;
+  const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
   return (
-    <div className="h-full relative overflow-hidden" onContextMenu={handleContextMenu}>
+    <div 
+      ref={containerRef}
+      className="h-full relative overflow-hidden select-none"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* Desktop Background with Right-Click Menu */}
       <ContextMenu>
-        <ContextMenuTrigger asChild>
+        <ContextMenuTrigger className="absolute inset-0">
           <div
-            className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
+            className="w-full h-full bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
             style={{
               backgroundImage: `url('${wallpaperUrl}')`,
               backgroundSize: 'cover',
@@ -193,7 +203,7 @@ export default function Dashboard() {
             {editMode ? 'Lock Icons' : 'Rearrange Icons'}
           </ContextMenuItem>
           <ContextMenuItem onClick={() => setShowWallpaperPicker(true)}>
-            <Settings className="w-4 h-4 mr-2" />
+            <ImageIcon className="w-4 h-4 mr-2" />
             Change Wallpaper
           </ContextMenuItem>
           <ContextMenuItem>
@@ -260,7 +270,7 @@ export default function Dashboard() {
         >
           <div className="bg-blue-600/90 backdrop-blur-lg text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
             <GripVertical className="w-5 h-5 animate-pulse" />
-            <span className="font-medium">Edit Mode: Drag icons to move them</span>
+            <span className="font-medium">Edit Mode: Click and drag icons to move them</span>
             <button
               onClick={toggleEditMode}
               className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors"
@@ -271,31 +281,34 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Desktop Apps Grid - Simple Layout */}
-      <div className="relative h-full p-8 flex flex-wrap gap-6 content-start items-start">
-        {apps.map((app, index) => {
-          const pos = appPositions[app.id] || { row: Math.floor(index / 2), col: index % 2 };
+      {/* Desktop Apps - Free Positioning */}
+      <div className="absolute inset-0 pointer-events-none">
+        {apps.map((app) => {
+          const pos = appPositions[app.id] || { x: 50, y: 50 };
           
           return (
-            <div
+            <motion.div
               key={app.id}
-              draggable={editMode}
-              onDragStart={(e) => handleIconDragStart(e, app)}
-              className={editMode ? 'cursor-move' : 'cursor-pointer'}
               style={{
-                order: pos.row * 10 + pos.col
+                position: 'absolute',
+                left: pos.x,
+                top: pos.y,
+                pointerEvents: 'auto'
               }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={editMode ? {} : { scale: 1.05 }}
+              onMouseDown={(e) => handleMouseDown(e, app)}
+              className={`${editMode ? 'cursor-move' : 'cursor-pointer'}`}
             >
-              <Link to={createPageUrl(app.path)} onClick={(e) => editMode && e.preventDefault()}>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={editMode ? { scale: 1.1 } : { scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all w-24 ${
-                    editMode ? 'bg-white/10 backdrop-blur-sm ring-2 ring-white/30' : 'hover:bg-white/10 backdrop-blur-sm'
-                  }`}
-                >
+              <Link 
+                to={createPageUrl(app.path)} 
+                onClick={(e) => editMode && e.preventDefault()}
+                className="pointer-events-auto"
+              >
+                <div className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all w-24 ${
+                  editMode ? 'bg-white/10 backdrop-blur-sm ring-2 ring-white/30' : 'hover:bg-white/10 backdrop-blur-sm'
+                }`}>
                   <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center transition-shadow relative`}>
                     <app.icon className="w-8 h-8 text-white" />
                     {editMode && (
@@ -305,15 +318,15 @@ export default function Dashboard() {
                   <span className="text-white text-xs font-medium text-center drop-shadow-lg leading-tight">
                     {app.name}
                   </span>
-                </motion.div>
+                </div>
               </Link>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
       {/* Desktop Shortcuts - Right Side */}
-      <div className="absolute right-8 top-8 space-y-4 z-40">
+      <div className="absolute right-8 top-8 space-y-4 z-40 pointer-events-auto">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}

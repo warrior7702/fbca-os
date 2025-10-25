@@ -23,7 +23,7 @@
         "cross_white_glow",
         "cross_metal_texture"
       ],
-      "default": "church_steeple_night",
+      "default": "cross_white_glow",
       "description": "Selected desktop wallpaper"
     },
     "desktop_layout": {
@@ -34,12 +34,15 @@
           "id": {
             "type": "string"
           },
-          "position": {
-            "type": "integer"
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
           }
         }
       },
-      "description": "Custom desktop icon positions"
+      "description": "Custom desktop icon positions with x,y coordinates"
     },
     "pco_access_token": {
       "type": "string",
