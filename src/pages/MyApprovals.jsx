@@ -21,7 +21,56 @@ import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalen
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import { toast } from "sonner";
 
-export default function MyApprovals() {
+// Safe array coercion
+const A = (x) => Array.isArray(x) ? x : [];
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 md:p-8 h-full">
+          <div className="max-w-2xl mx-auto">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-semibold">Something went wrong</p>
+                  <p className="text-sm">{this.state.error?.message || 'Unknown error'}</p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => window.location.reload()}
+                    className="mt-2"
+                  >
+                    Reload Page
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function MyApprovalsContent() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -57,19 +106,19 @@ export default function MyApprovals() {
       // Sync approvals (incremental)
       const syncResponse = await base44.functions.invoke('syncMyApprovals', {
         forceResync: false
+      }).catch(err => {
+        console.error('Sync error:', err);
+        return { data: { pending_approvals: [], count: 0 } };
       });
 
-      if (syncResponse?.data) {
-        setApprovals(syncResponse.data.pending_approvals || []);
-        setSyncStats(syncResponse.data.sync_stats || null);
-      } else {
-        setApprovals([]);
-      }
+      const responseData = syncResponse?.data || {};
+      setApprovals(A(responseData.pending_approvals));
+      setSyncStats(responseData.sync_stats || null);
 
       // Load calendar events
       try {
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-        setCalendarEvents(eventsResponse?.data?.events || []);
+        setCalendarEvents(A(eventsResponse?.data?.events));
       } catch (err) {
         console.error('Calendar error:', err);
         setCalendarEvents([]);
@@ -95,11 +144,10 @@ export default function MyApprovals() {
         forceResync: true
       });
 
-      if (syncResponse?.data) {
-        setApprovals(syncResponse.data.pending_approvals || []);
-        setSyncStats(syncResponse.data.sync_stats || null);
-        toast.success(`Resync complete! Found ${syncResponse.data.count || 0} pending approvals.`);
-      }
+      const responseData = syncResponse?.data || {};
+      setApprovals(A(responseData.pending_approvals));
+      setSyncStats(responseData.sync_stats || null);
+      toast.success(`Resync complete! Found ${responseData.count || 0} pending approvals.`);
     } catch (error) {
       console.error('Force resync error:', error);
       setError(error.message || 'Failed to resync');
@@ -110,6 +158,8 @@ export default function MyApprovals() {
   };
 
   const handleApprove = async (approval) => {
+    if (!approval?.request_id) return;
+    
     setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('approveResourceRequest', {
@@ -126,6 +176,8 @@ export default function MyApprovals() {
   };
 
   const handleDeny = async (approval) => {
+    if (!approval?.request_id) return;
+    
     setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('denyResourceRequest', {
@@ -142,6 +194,7 @@ export default function MyApprovals() {
   };
 
   const handleViewDetails = (approval) => {
+    if (!approval) return;
     setSelectedApproval(approval);
     setShowDetailModal(true);
   };
@@ -187,6 +240,7 @@ export default function MyApprovals() {
   }
 
   const displayName = user?.display_name || user?.full_name || 'User';
+  const safeApprovals = A(approvals);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-auto bg-gradient-to-br from-slate-50 to-blue-50">
@@ -240,12 +294,12 @@ export default function MyApprovals() {
                 Pending Approvals
               </CardTitle>
               <Badge className="bg-red-500 text-white">
-                {approvals.length} pending
+                {safeApprovals.length} pending
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            {approvals.length === 0 ? (
+            {safeApprovals.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-500">No pending approvals</p>
@@ -253,81 +307,87 @@ export default function MyApprovals() {
               </div>
             ) : (
               <div className="space-y-3">
-                {approvals.map((approval) => (
-                  <div
-                    key={approval.request_id}
-                    className="bg-white border-2 border-orange-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="w-4 h-4 text-slate-400" />
-                          <h3 className="font-semibold text-lg text-slate-900">
-                            {approval.event_name}
-                          </h3>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge className="bg-orange-100 text-orange-700 border-orange-300">
-                              {approval.resource_name}
-                            </Badge>
-                            <span className="text-sm text-slate-600">
-                              Qty: {approval.quantity}
-                            </span>
+                {safeApprovals.map((approval) => {
+                  if (!approval) return null;
+                  
+                  return (
+                    <div
+                      key={approval.request_id || Math.random()}
+                      className="bg-white border-2 border-orange-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            <h3 className="font-semibold text-lg text-slate-900">
+                              {approval.event_name || 'Unnamed Event'}
+                            </h3>
                           </div>
-                          {approval.event_starts_at && (
-                            <p className="text-sm text-slate-600">
-                              Event: {format(parseISO(approval.event_starts_at), 'PPP p')}
-                            </p>
-                          )}
-                          <p className="text-xs text-slate-500">
-                            Requested: {format(parseISO(approval.pco_created_at), 'PPp')}
-                          </p>
-                          <button
-                            onClick={() => handleViewDetails(approval)}
-                            className="text-sm text-blue-600 hover:underline"
-                          >
-                            Click to view details and resource questions →
-                          </button>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+                                {approval.resource_name || 'Unknown Resource'}
+                              </Badge>
+                              <span className="text-sm text-slate-600">
+                                Qty: {approval.quantity || 0}
+                              </span>
+                            </div>
+                            {approval.event_starts_at && (
+                              <p className="text-sm text-slate-600">
+                                Event: {format(parseISO(approval.event_starts_at), 'PPP p')}
+                              </p>
+                            )}
+                            {approval.pco_created_at && (
+                              <p className="text-xs text-slate-500">
+                                Requested: {format(parseISO(approval.pco_created_at), 'PPp')}
+                              </p>
+                            )}
+                            <button
+                              onClick={() => handleViewDetails(approval)}
+                              className="text-sm text-blue-600 hover:underline"
+                            >
+                              Click to view details and resource questions →
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-green-600 border-green-600 hover:bg-green-50"
-                          onClick={() => handleApprove(approval)}
-                          disabled={processingApproval === approval.request_id}
-                        >
-                          {processingApproval === approval.request_id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-600 hover:bg-red-50"
-                          onClick={() => handleDeny(approval)}
-                          disabled={processingApproval === approval.request_id}
-                        >
-                          {processingApproval === approval.request_id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Deny
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-600 hover:bg-green-50"
+                            onClick={() => handleApprove(approval)}
+                            disabled={processingApproval === approval.request_id}
+                          >
+                            {processingApproval === approval.request_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                            onClick={() => handleDeny(approval)}
+                            disabled={processingApproval === approval.request_id}
+                          >
+                            {processingApproval === approval.request_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Deny
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -353,7 +413,7 @@ export default function MyApprovals() {
           </CardHeader>
           <CardContent>
             <ApprovalCalendar 
-              approvals={approvals}
+              approvals={safeApprovals}
               onApprovalClick={handleViewDetails}
             />
           </CardContent>
@@ -364,7 +424,7 @@ export default function MyApprovals() {
       <FullApprovalCalendarModal
         open={showFullCalendar}
         onClose={() => setShowFullCalendar(false)}
-        approvals={approvals}
+        approvals={safeApprovals}
         onApprovalClick={handleViewDetails}
       />
 
@@ -381,5 +441,13 @@ export default function MyApprovals() {
         />
       )}
     </div>
+  );
+}
+
+export default function MyApprovals() {
+  return (
+    <ErrorBoundary>
+      <MyApprovalsContent />
+    </ErrorBoundary>
   );
 }
