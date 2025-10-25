@@ -13,17 +13,20 @@ import {
   ArrowLeft,
   Home,
   Loader2,
-  FolderOpen
+  FolderOpen,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function Documents() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentFolderId, setCurrentFolderId] = useState('root');
   const [breadcrumbs, setBreadcrumbs] = useState([{ id: 'root', name: 'OneDrive' }]);
 
@@ -33,11 +36,16 @@ export default function Documents() {
 
   const loadFiles = async (folderId) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await base44.functions.invoke('getOneDriveFiles', { folderId });
-      setItems(response.data.items);
+      console.log('OneDrive response:', response.data);
+      setItems(response.data.items || []);
     } catch (error) {
       console.error('Failed to load files:', error);
+      const errorMessage = error.response?.data?.error || error.message;
+      setError(errorMessage);
+      toast.error('Failed to load OneDrive files');
     } finally {
       setLoading(false);
     }
@@ -90,29 +98,50 @@ export default function Documents() {
           </div>
         </div>
 
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+              {error.includes('not connected') && (
+                <Button
+                  variant="link"
+                  className="ml-2 h-auto p-0 text-red-600 underline"
+                  onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
+                >
+                  Connect Microsoft 365
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 mb-4 text-sm">
-          {breadcrumbs.map((crumb, index) => (
-            <React.Fragment key={crumb.id}>
-              {index > 0 && <span className="text-slate-400">/</span>}
-              <button
-                onClick={() => navigateToBreadcrumb(index)}
-                className={`hover:text-blue-600 transition-colors ${
-                  index === breadcrumbs.length - 1 ? 'text-blue-600 font-medium' : 'text-slate-600'
-                }`}
-              >
-                {crumb.name}
-              </button>
-            </React.Fragment>
-          ))}
-        </div>
+        {!error && (
+          <div className="flex items-center gap-2 mb-4 text-sm">
+            {breadcrumbs.map((crumb, index) => (
+              <React.Fragment key={crumb.id}>
+                {index > 0 && <span className="text-slate-400">/</span>}
+                <button
+                  onClick={() => navigateToBreadcrumb(index)}
+                  className={`hover:text-blue-600 transition-colors ${
+                    index === breadcrumbs.length - 1 ? 'text-blue-600 font-medium' : 'text-slate-600'
+                  }`}
+                >
+                  {crumb.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
 
         {/* Files Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
-        ) : (
+        ) : !error && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {items.map((item) => {
               const Icon = item.isFolder ? Folder : getFileIcon(item.name);
@@ -185,7 +214,7 @@ export default function Documents() {
           </div>
         )}
 
-        {items.length === 0 && !loading && (
+        {items.length === 0 && !loading && !error && (
           <div className="text-center py-20">
             <FolderOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">This folder is empty</p>
