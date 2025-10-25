@@ -87,6 +87,22 @@ export default function Documents() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const openInNativeApp = (item) => {
+    const ext = item.name.split('.').pop().toLowerCase();
+    
+    // Office files - open in desktop apps
+    if (ext.match(/docx?|dotx?/)) {
+      window.location.href = `ms-word:ofe|u|${encodeURIComponent(item.webUrl)}`;
+    } else if (ext.match(/xlsx?|xltx?/)) {
+      window.location.href = `ms-excel:ofe|u|${encodeURIComponent(item.webUrl)}`;
+    } else if (ext.match(/pptx?|potx?|ppsx?/)) {
+      window.location.href = `ms-powerpoint:ofe|u|${encodeURIComponent(item.webUrl)}`;
+    } else {
+      // Everything else - open in browser (PDFs, images, etc.)
+      window.open(item.webUrl, '_blank');
+    }
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -190,36 +206,36 @@ export default function Documents() {
                             </p>
                           )}
                         </div>
-                        <div className="flex flex-col gap-1 w-full">
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(item.webUrl, '_blank');
-                              }}
-                            >
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              Open
-                            </Button>
-                            {!item.isFolder && item.downloadUrl && (
+                        {!item.isFolder && (
+                          <div className="flex flex-col gap-1 w-full">
+                            <div className="flex gap-1">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="flex-1 text-xs"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  window.open(item.downloadUrl, '_blank');
+                                  openInNativeApp(item);
                                 }}
                               >
-                                <Download className="w-3 h-3 mr-1" />
-                                Save
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Open
                               </Button>
-                            )}
-                          </div>
-                          {!item.isFolder && ( // Only show "Open in Desktop" for files
+                              {item.downloadUrl && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(item.downloadUrl, '_blank');
+                                  }}
+                                >
+                                  <Download className="w-3 h-3 mr-1" />
+                                  Save
+                                </Button>
+                              )}
+                            </div>
                             <Button
                               size="sm"
                               variant="outline"
@@ -231,8 +247,8 @@ export default function Documents() {
                             >
                               🖥️ Open in Desktop
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
