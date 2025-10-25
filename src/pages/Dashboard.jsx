@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -163,13 +164,18 @@ export default function Dashboard() {
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    // The ContextMenu component will handle showing the menu
+  };
+
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.church_steeple_night;
 
   return (
-    <div className="h-full relative overflow-hidden">
+    <div className="h-full relative overflow-hidden" onContextMenu={handleContextMenu}>
       {/* Desktop Background with Right-Click Menu */}
       <ContextMenu>
-        <ContextMenuTrigger>
+        <ContextMenuTrigger asChild>
           <div
             className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
             style={{
