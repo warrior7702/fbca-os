@@ -13,6 +13,18 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Microsoft 365 not connected' }, { status: 400 });
         }
 
+        // Check if token needs refresh
+        const expiresAt = new Date(user.microsoft_token_expires_at);
+        const now = new Date();
+        
+        let accessToken = user.microsoft_access_token;
+
+        if (expiresAt <= now) {
+            console.log('Token expired, refreshing...');
+            const refreshResponse = await base44.functions.invoke('refreshMicrosoftToken');
+            accessToken = refreshResponse.data.access_token;
+        }
+
         const url = new URL(req.url);
         const folderId = url.searchParams.get('folderId') || 'root';
         
@@ -24,7 +36,7 @@ Deno.serve(async (req) => {
 
         const response = await fetch(path, {
             headers: {
-                'Authorization': `Bearer ${user.microsoft_access_token}`
+                'Authorization': `Bearer ${accessToken}`
             }
         });
 
