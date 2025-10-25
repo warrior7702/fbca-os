@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -17,7 +18,8 @@ import {
   Download,
   FileImage,
   FileVideo,
-  FileArchive
+  FileArchive,
+  Users // Added Users icon for Staff Directory
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
+  const [people, setPeople] = useState([]); // New state for staff directory
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -53,10 +56,29 @@ export default function Search() {
     }
   }, [location.search]);
 
+  // New relevance calculation function
+  const calculateRelevance = (item, searchQuery) => {
+    const lowerQuery = searchQuery.toLowerCase();
+    const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || ''; // Handle both name and displayName
+    
+    // Exact match = highest score
+    if (lowerName === lowerQuery) return 1000;
+    
+    // Starts with query = high score
+    if (lowerName.startsWith(lowerQuery)) return 500;
+    
+    // Contains query = medium score
+    if (lowerName.includes(lowerQuery)) return 100;
+    
+    // Default
+    return 1;
+  };
+
   const performSearch = async (searchQuery) => {
     if (!searchQuery || searchQuery.length < 2) {
       setFiles([]);
       setModules([]);
+      setPeople([]); // Clear people results
       setHasSearched(false);
       return;
     }
@@ -64,20 +86,41 @@ export default function Search() {
     setLoading(true);
     setHasSearched(true);
 
-    // Search modules
-    const matchedModules = appModules.filter(module =>
-      module.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      module.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Search modules with relevance
+    const matchedModules = appModules
+      .filter(module =>
+        module.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        module.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .map(module => ({
+        ...module,
+        relevance: calculateRelevance(module, searchQuery)
+      }))
+      .sort((a, b) => b.relevance - a.relevance); // Sort by relevance
+    
     setModules(matchedModules);
 
-    // Search OneDrive files
+    // Search files and people in parallel
     try {
-      const response = await base44.functions.invoke('searchOneDrive', { query: searchQuery });
-      setFiles(response.data.files || []);
+      const [filesResponse, peopleResponse] = await Promise.all([
+        base44.functions.invoke('searchOneDrive', { query: searchQuery }),
+        base44.functions.invoke('searchStaff', { query: searchQuery }) // New API call for staff
+      ]);
+
+      // Sort files by relevance
+      const sortedFiles = (filesResponse.data.files || [])
+        .map(file => ({
+          ...file,
+          relevance: calculateRelevance(file, searchQuery)
+        }))
+        .sort((a, b) => b.relevance - a.relevance);
+
+      setFiles(sortedFiles);
+      setPeople(peopleResponse.data.people || []); // Set people results
     } catch (error) {
       console.error('Search error:', error);
       setFiles([]);
+      setPeople([]); // Clear people results on error
     } finally {
       setLoading(false);
     }
@@ -104,7 +147,7 @@ export default function Search() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const totalResults = modules.length + files.length;
+  const totalResults = modules.length + files.length + people.length; // Updated total results
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6 overflow-auto">
@@ -148,6 +191,67 @@ export default function Search() {
             {totalResults > 0 && (
               <div className="text-sm text-slate-600">
                 Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{query}"
+              </div>
+            )}
+
+            {people.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Staff Directory
+                </h2>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {people.map((person) => (
+                    <motion.div
+                      key={person.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <Card className="hover:shadow-lg transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {person.photoUrl ? (
+                                <img src={person.photoUrl} alt={person.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-white font-semibold">
+                                  {person.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900">{person.name}</p>
+                              {person.jobTitle && (
+                                <p className="text-sm text-slate-600">{person.jobTitle}</p>
+                              )}
+                              {person.department && (
+                                <p className="text-xs text-slate-500">{person.department}</p>
+                              )}
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {person.email && (
+                                  <a 
+                                    href={`mailto:${person.email}`}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    {person.email}
+                                  </a>
+                                )}
+                                {person.phone && (
+                                  <a 
+                                    href={`tel:${person.phone}`}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    {person.phone}
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -249,7 +353,7 @@ export default function Search() {
           <div className="text-center py-20">
             <SearchIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">Start typing to search</p>
-            <p className="text-sm text-slate-400 mt-2">Search across OneDrive files and app modules</p>
+            <p className="text-sm text-slate-400 mt-2">Search staff, files, and app modules</p> {/* Updated description */}
           </div>
         )}
       </div>
