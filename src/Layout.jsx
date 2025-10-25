@@ -54,6 +54,12 @@ const apps = [
     color: "text-indigo-500"
   },
   {
+    name: "My Approvals",
+    path: "MyApprovals",
+    icon: CheckSquare,
+    color: "text-orange-500"
+  },
+  {
     name: "Marketing",
     path: "Marketing",
     icon: Megaphone,
