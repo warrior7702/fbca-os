@@ -120,45 +120,65 @@ Deno.serve(async (req) => {
         console.log('I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
         console.log('Mapped', Object.keys(resourceToGroupMap).length, 'resources to groups');
 
-        // Get pending requests - SORTED BY CREATED_AT DESCENDING (most recent first)
-        // Also increased limit to 200 to catch more requests
-        const requestsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&order=-created_at&per_page=200&include=event,resource`,
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        if (!requestsResponse.ok) throw new Error('Failed to fetch requests');
-
-        const requestsData = await requestsResponse.json();
+        // Get ALL pending requests with no limit - fetch multiple pages if needed
+        let allRequests = [];
+        let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`;
         
-        // Build maps from included data
+        while (nextUrl) {
+            const requestsResponse = await fetch(nextUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!requestsResponse.ok) throw new Error('Failed to fetch requests');
+
+            const requestsData = await requestsResponse.json();
+            allRequests = allRequests.concat(requestsData.data || []);
+            
+            // Build maps from included data
+            if (requestsData.included) {
+                requestsData.included.forEach(item => {
+                    if (item.type === 'Event') {
+                        if (!eventMap[item.id]) eventMap[item.id] = item;
+                    } else if (item.type === 'Resource') {
+                        if (!resourceMap[item.id]) resourceMap[item.id] = item;
+                    }
+                });
+            }
+            
+            // Check for next page
+            nextUrl = requestsData.links?.next || null;
+            
+            // Safety limit - stop after 500 requests
+            if (allRequests.length >= 500) break;
+        }
+        
         const eventMap = {};
         const resourceMap = {};
         
-        if (requestsData.included) {
-            requestsData.included.forEach(item => {
-                if (item.type === 'Event') eventMap[item.id] = item;
-                else if (item.type === 'Resource') resourceMap[item.id] = item;
-            });
+        // Re-fetch all events and resources for mapping
+        const requestsResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        if (requestsResponse.ok) {
+            const requestsData = await requestsResponse.json();
+            if (requestsData.included) {
+                requestsData.included.forEach(item => {
+                    if (item.type === 'Event') eventMap[item.id] = item;
+                    else if (item.type === 'Resource') resourceMap[item.id] = item;
+                });
+            }
         }
 
         const myApprovals = [];
-        const debugInfo = [];
         
-        for (const request of requestsData.data || []) {
+        for (const request of allRequests) {
             const resourceId = request.relationships?.resource?.data?.id;
             const resource = resourceMap[resourceId];
             const groupInfo = resourceToGroupMap[resourceId];
             
             const isInMyGroups = groupInfo && myGroupIds.includes(groupInfo.groupId);
-            
-            debugInfo.push({
-                resource_name: resource?.attributes?.name,
-                resource_id: resourceId,
-                approval_group: groupInfo?.groupName || 'None',
-                is_in_my_groups: isInMyGroups,
-                created_at: request.attributes?.created_at
-            });
             
             if (isInMyGroups) {
                 const eventId = request.relationships?.event?.data?.id;
@@ -177,19 +197,25 @@ Deno.serve(async (req) => {
                     created_at: request.attributes?.created_at,
                     approval_status: request.attributes?.approval_status
                 });
-                console.log('✓ MATCH! Found approval for', resource?.attributes?.name, 'created at', request.attributes?.created_at);
             }
         }
 
-        console.log('Found', myApprovals.length, 'approvals I can act on');
+        // Sort by event start date (most recent/soonest first)
+        myApprovals.sort((a, b) => {
+            const dateA = new Date(a.event_starts_at || a.created_at);
+            const dateB = new Date(b.event_starts_at || b.created_at);
+            return dateA - dateB; // Ascending order - soonest events first
+        });
+
+        console.log('Found', myApprovals.length, 'approvals total');
         
         return Response.json({ 
             pending_approvals: myApprovals,
             count: myApprovals.length,
             my_groups_count: myGroupIds.length,
             my_groups: Object.values(myGroupNames),
-            debug: debugInfo.slice(0, 30), // Show more debug info
-            total_pending_in_system: requestsData.data?.length
+            total_fetched: allRequests.length,
+            cache_bust: Date.now() // Force cache refresh
         });
 
     } catch (error) {
