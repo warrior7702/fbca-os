@@ -190,8 +190,8 @@ export default function Documents() {
                             </p>
                           )}
                         </div>
-                        {!item.isFolder && (
-                          <div className="flex gap-1 w-full">
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="flex gap-1">
                             <Button
                               size="sm"
                               variant="outline"
@@ -204,7 +204,7 @@ export default function Documents() {
                               <ExternalLink className="w-3 h-3 mr-1" />
                               Open
                             </Button>
-                            {item.downloadUrl && (
+                            {!item.isFolder && item.downloadUrl && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -219,7 +219,20 @@ export default function Documents() {
                               </Button>
                             )}
                           </div>
-                        )}
+                          {!item.isFolder && ( // Only show "Open in Desktop" for files
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `ms-onedrive://open?url=${encodeURIComponent(item.webUrl)}`;
+                              }}
+                            >
+                              🖥️ Open in Desktop
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
