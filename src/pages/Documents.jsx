@@ -87,16 +87,10 @@ export default function Documents() {
   const openInNativeApp = (item) => {
     const ext = item.name.split('.').pop().toLowerCase();
     
-    // Office files - open in desktop apps using proper protocols
-    if (ext.match(/docx?|dotx?/)) {
-      window.location.href = `ms-word:ofe|u|${encodeURIComponent(item.webUrl)}`;
-      toast.info('Opening in Microsoft Word...');
-    } else if (ext.match(/xlsx?|xltx?|csv/)) {
-      window.location.href = `ms-excel:ofe|u|${encodeURIComponent(item.webUrl)}`;
-      toast.info('Opening in Microsoft Excel...');
-    } else if (ext.match(/pptx?|potx?|ppsx?/)) {
-      window.location.href = `ms-powerpoint:ofe|u|${encodeURIComponent(item.webUrl)}`;
-      toast.info('Opening in Microsoft PowerPoint...');
+    // Office files - open in Office Online (web apps) - no security issues
+    if (ext.match(/docx?|dotx?|xlsx?|xltx?|csv|pptx?|potx?|ppsx?/)) {
+      window.open(item.webUrl, '_blank');
+      toast.info('Opening in Office Online...');
     } 
     // PDFs - open in browser (OneDrive has built-in viewer)
     else if (ext === 'pdf') {
