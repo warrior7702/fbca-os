@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
         console.log('Found approval groups:', groupsData.data?.length);
 
         const myGroupIds = [];
+        const myGroupNames = [];
         for (const group of groupsData.data || []) {
             const membersResponse = await fetch(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people`,
@@ -125,12 +126,13 @@ Deno.serve(async (req) => {
                 
                 if (membersData.data?.some(person => person.id === myPcoPersonId)) {
                     myGroupIds.push(group.id);
-                    console.log('Member of group:', group.attributes?.name, 'ID:', group.id);
+                    myGroupNames.push(group.attributes?.name);
+                    console.log('✓ Member of group:', group.attributes?.name, 'ID:', group.id);
                 }
             }
         }
 
-        console.log('I am in', myGroupIds.length, 'approval groups:', myGroupIds);
+        console.log('I am in', myGroupIds.length, 'approval groups:', myGroupNames);
 
         if (myGroupIds.length === 0) {
             return Response.json({ 
@@ -140,7 +142,34 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log('Getting pending approvals...');
+        console.log('Getting ALL event resource requests (not just pending)...');
+        
+        // First, let's get ALL requests to see what's there
+        const allRequestsResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?per_page=100&include=event,resource`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (!allRequestsResponse.ok) {
+            const errorText = await allRequestsResponse.text();
+            console.error('Failed to get all requests:', errorText);
+            throw new Error('Failed to fetch resource requests');
+        }
+
+        const allRequestsData = await allRequestsResponse.json();
+        console.log('Found TOTAL requests:', allRequestsData.data?.length);
+        
+        // Log all unique approval statuses
+        const statuses = new Set(allRequestsData.data?.map(r => r.attributes?.approval_status));
+        console.log('Unique approval statuses found:', Array.from(statuses));
+
+        // Now get pending ones
+        console.log('Getting PENDING resource requests...');
         const requestsResponse = await fetch(
             `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
             {
@@ -153,12 +182,12 @@ Deno.serve(async (req) => {
 
         if (!requestsResponse.ok) {
             const errorText = await requestsResponse.text();
-            console.error('Failed to get requests:', errorText);
-            throw new Error('Failed to fetch resource requests');
+            console.error('Failed to get pending requests:', errorText);
+            throw new Error('Failed to fetch pending resource requests');
         }
 
         const requestsData = await requestsResponse.json();
-        console.log('Found total pending requests:', requestsData.data?.length);
+        console.log('Found PENDING requests:', requestsData.data?.length);
         
         const eventMap = {};
         const resourceMap = {};
@@ -174,13 +203,14 @@ Deno.serve(async (req) => {
         }
 
         const myApprovals = [];
+        const debugInfo = [];
         
         for (const request of requestsData.data || []) {
             const resourceId = request.relationships?.resource?.data?.id;
             const resource = resourceMap[resourceId];
             
             if (resource) {
-                console.log('Checking resource:', resource.attributes?.name);
+                console.log('Checking resource:', resource.attributes?.name, 'ID:', resourceId);
                 
                 const resourceDetailResponse = await fetch(
                     `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
@@ -196,6 +226,13 @@ Deno.serve(async (req) => {
                     const resourceDetail = await resourceDetailResponse.json();
                     const approvalGroupId = resourceDetail.data?.relationships?.resource_approval_group?.data?.id;
                     
+                    debugInfo.push({
+                        resource_name: resource.attributes?.name,
+                        resource_id: resourceId,
+                        approval_group_id: approvalGroupId,
+                        is_in_my_groups: myGroupIds.includes(approvalGroupId)
+                    });
+                    
                     console.log('  - Resource approval group ID:', approvalGroupId);
                     console.log('  - Is in my groups?', myGroupIds.includes(approvalGroupId));
                     
@@ -206,7 +243,9 @@ Deno.serve(async (req) => {
                             event_name: eventMap[eventId]?.attributes?.name || 'Unknown Event',
                             resource_name: resource.attributes?.name || 'Unknown Resource'
                         });
-                        console.log('  - MATCH! Added to my approvals');
+                        console.log('  - ✓ MATCH! Added to my approvals');
+                    } else {
+                        console.log('  - ✗ Not in my approval groups');
                     }
                 }
             }
@@ -217,7 +256,10 @@ Deno.serve(async (req) => {
         return Response.json({ 
             pending_approvals: myApprovals,
             count: myApprovals.length,
-            my_groups_count: myGroupIds.length
+            my_groups_count: myGroupIds.length,
+            my_groups: myGroupNames,
+            debug: debugInfo,
+            total_pending_in_system: requestsData.data?.length
         });
 
     } catch (error) {
