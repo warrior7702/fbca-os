@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import TheLightHelper from "@/components/layout/TheLightHelper"; // Added import
+import TheLightHelper from "@/components/layout/TheLightHelper";
 import {
   LayoutDashboard,
   Megaphone,
@@ -17,7 +17,8 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  Layers
+  Layers,
+  Users // Added Users icon import
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +57,12 @@ const apps = [
     path: "FBCANexts",
     icon: User,
     color: "text-orange-500"
+  },
+  {
+    name: "Staff Directory",
+    path: "StaffDirectory",
+    icon: Users,
+    color: "text-teal-500"
   }
 ];
 

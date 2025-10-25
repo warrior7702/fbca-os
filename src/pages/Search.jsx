@@ -19,7 +19,9 @@ import {
   FileImage,
   FileVideo,
   FileArchive,
-  Users // Added Users icon for Staff Directory
+  Users, // Added Users icon for Staff Directory
+  Mail, // NEW: Added Mail icon
+  Phone // NEW: Added Phone icon
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,7 @@ export default function Search() {
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
   const [people, setPeople] = useState([]); // New state for staff directory
+  const [localStaff, setLocalStaff] = useState([]); // NEW: State for local StaffContact entities
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -59,7 +62,8 @@ export default function Search() {
   // New relevance calculation function
   const calculateRelevance = (item, searchQuery) => {
     const lowerQuery = searchQuery.toLowerCase();
-    const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || ''; // Handle both name and displayName
+    // Handle name, displayName, and full_name for different data sources
+    const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || item.full_name?.toLowerCase() || '';
     
     // Exact match = highest score
     if (lowerName === lowerQuery) return 1000;
@@ -79,6 +83,7 @@ export default function Search() {
       setFiles([]);
       setModules([]);
       setPeople([]); // Clear people results
+      setLocalStaff([]); // NEW: Clear local staff results
       setHasSearched(false);
       return;
     }
@@ -100,11 +105,12 @@ export default function Search() {
     
     setModules(matchedModules);
 
-    // Search files and people in parallel
+    // Search files, people, and local staff in parallel
     try {
-      const [filesResponse, peopleResponse] = await Promise.all([
+      const [filesResponse, peopleResponse, staffResponse] = await Promise.all([ // NEW: Added staffResponse
         base44.functions.invoke('searchOneDrive', { query: searchQuery }),
-        base44.functions.invoke('searchStaff', { query: searchQuery }) // New API call for staff
+        base44.functions.invoke('searchStaff', { query: searchQuery }), // New API call for staff
+        base44.entities.StaffContact.filter({}) // NEW: Get all staff, we'll filter client-side
       ]);
 
       // Sort files by relevance
@@ -117,10 +123,30 @@ export default function Search() {
 
       setFiles(sortedFiles);
       setPeople(peopleResponse.data.people || []); // Set people results
+
+      // NEW: Filter and sort local staff
+      const lowerQuery = searchQuery.toLowerCase();
+      const matchedStaff = (staffResponse || [])
+        .filter(person =>
+          person.full_name?.toLowerCase().includes(lowerQuery) ||
+          person.email?.toLowerCase().includes(lowerQuery) ||
+          person.title?.toLowerCase().includes(lowerQuery) ||
+          person.phone?.includes(searchQuery) || // Phone numbers can be checked directly
+          person.cell_phone?.includes(searchQuery)
+        )
+        .map(person => ({
+          ...person,
+          relevance: calculateRelevance(person, searchQuery)
+        }))
+        .sort((a, b) => b.relevance - a.relevance);
+      
+      setLocalStaff(matchedStaff);
+
     } catch (error) {
       console.error('Search error:', error);
       setFiles([]);
       setPeople([]); // Clear people results on error
+      setLocalStaff([]); // NEW: Clear local staff results on error
     } finally {
       setLoading(false);
     }
@@ -147,7 +173,8 @@ export default function Search() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const totalResults = modules.length + files.length + people.length; // Updated total results
+  // NEW: Updated total results to include localStaff
+  const totalResults = modules.length + files.length + people.length + localStaff.length; 
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6 overflow-auto">
@@ -194,11 +221,85 @@ export default function Search() {
               </div>
             )}
 
+            {/* NEW: Local Staff Directory results */}
+            {localStaff.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  FBCA Staff ({localStaff.length})
+                </h2>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {localStaff.map((person) => (
+                    <motion.div
+                      key={person.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <Card className="hover:shadow-lg transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              <span className="text-white font-semibold">
+                                {/* Display initials from first_name and last_name, with fallbacks */}
+                                {person.first_name ? person.first_name[0] : ''}
+                                {person.last_name ? person.last_name[0] : ''}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900">{person.full_name}</p>
+                              {person.title && (
+                                <p className="text-sm text-slate-600">{person.title}</p>
+                              )}
+                              {person.ministry && (
+                                <Badge variant="secondary" className="mt-1 text-xs">
+                                  {person.ministry}
+                                </Badge>
+                              )}
+                              <div className="flex flex-col gap-1 mt-2">
+                                {person.email && (
+                                  <a 
+                                    href={`mailto:${person.email}`}
+                                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    <Mail className="w-3 h-3" />
+                                    {person.email}
+                                  </a>
+                                )}
+                                {person.phone && (
+                                  <a 
+                                    href={`tel:${person.phone}`}
+                                    className="text-xs text-slate-600 hover:text-blue-600 flex items-center gap-1"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    {person.phone}
+                                    {person.extension && ` (ext. ${person.extension})`}
+                                  </a>
+                                )}
+                                {person.cell_phone && (
+                                  <a 
+                                    href={`tel:${person.cell_phone}`}
+                                    className="text-xs text-slate-600 hover:text-blue-600 flex items-center gap-1"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    {person.cell_phone} <span className="text-xs text-slate-400">(cell)</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {people.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Staff Directory
+                  Microsoft 365 Directory ({people.length}) {/* NEW: Updated title and added count */}
                 </h2>
                 <div className="grid md:grid-cols-2 gap-3">
                   {people.map((person) => (

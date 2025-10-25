@@ -7,6 +7,7 @@ import Settings from './pages/Settings';
 import IntegrationTest from './pages/IntegrationTest';
 import Documents from './pages/Documents';
 import Search from './pages/Search';
+import StaffDirectory from './pages/StaffDirectory';
 import Layout from './Layout.jsx';
 
 
@@ -20,6 +21,7 @@ export const PAGES = {
     "IntegrationTest": IntegrationTest,
     "Documents": Documents,
     "Search": Search,
+    "StaffDirectory": StaffDirectory,
 }
 
 export const pagesConfig = {

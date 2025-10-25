@@ -10,7 +10,8 @@ import {
   Folder,
   Trash2,
   Settings,
-  Grid3x3
+  Grid3x3,
+  Users // Added Users icon
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -43,11 +44,18 @@ const desktopApps = [
     position: { x: 50, y: 310 }
   },
   {
+    name: "Staff Directory", // New App
+    icon: Users,
+    color: "from-teal-500 to-cyan-500",
+    path: "StaffDirectory",
+    position: { x: 50, y: 440 }
+  },
+  {
     name: "Settings",
     icon: Settings,
     color: "from-slate-500 to-slate-600",
     path: "Settings",
-    position: { x: 50, y: 440 }
+    position: { x: 50, y: 570 } // Adjusted position for Settings
   }
 ];
 
@@ -71,7 +79,7 @@ export default function Dashboard() {
       {/* Desktop Background */}
       <ContextMenu>
         <ContextMenuTrigger>
-          <div 
+          <div
             className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
             style={{
               backgroundImage: `url('https://images.unsplash.com/photo-1557683316-973673baf926?w=1920&q=80')`,
@@ -108,9 +116,9 @@ export default function Dashboard() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
             className="absolute"
-            style={{ 
-              left: `${app.position.x}px`, 
-              top: `${app.position.y}px` 
+            style={{
+              left: `${app.position.x}px`,
+              top: `${app.position.y}px`
             }}
           >
             <Link to={createPageUrl(app.path)}>
