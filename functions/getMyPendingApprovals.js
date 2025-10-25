@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
         const eventMap = {};
         const resourceMap = {};
 
-        // Get ALL pending requests with no limit - fetch multiple pages if needed
+        // Get ALL pending requests - fetch multiple pages if needed
         let allRequests = [];
         let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`;
         
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
             // Check for next page
             nextUrl = requestsData.links?.next || null;
             
-            // Safety limit - stop after 500 requests
+            // Safety limit
             if (allRequests.length >= 500) break;
         }
 
@@ -171,12 +171,33 @@ Deno.serve(async (req) => {
                 const eventId = request.relationships?.event?.data?.id;
                 const event = eventMap[eventId];
                 
+                // Fetch event instances to get actual dates
+                let eventStartsAt = null;
+                let eventEndsAt = null;
+                
+                try {
+                    const instancesResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    );
+                    
+                    if (instancesResponse.ok) {
+                        const instancesData = await instancesResponse.json();
+                        if (instancesData.data && instancesData.data.length > 0) {
+                            eventStartsAt = instancesData.data[0].attributes?.starts_at;
+                            eventEndsAt = instancesData.data[0].attributes?.ends_at;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching event instance:', err);
+                }
+                
                 myApprovals.push({
                     id: request.id,
                     event_id: eventId,
                     event_name: event?.attributes?.name || 'Unknown Event',
-                    event_starts_at: event?.attributes?.starts_at,
-                    event_ends_at: event?.attributes?.ends_at,
+                    event_starts_at: eventStartsAt,
+                    event_ends_at: eventEndsAt,
                     resource_id: resourceId,
                     resource_name: resource?.attributes?.name || 'Unknown Resource',
                     approval_group_name: groupInfo.groupName,
@@ -187,11 +208,11 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Sort by event start date (soonest first)
+        // Sort by event start date (soonest first), fallback to created_at if no event date
         myApprovals.sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.created_at);
             const dateB = new Date(b.event_starts_at || b.created_at);
-            return dateA - dateB; // Ascending order - soonest events first
+            return dateA - dateB;
         });
 
         console.log('Found', myApprovals.length, 'approvals for my groups');
