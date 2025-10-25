@@ -8,10 +8,20 @@ import { motion } from "framer-motion";
 export default function EmailDomainCheck({ user }) {
   const [showWarning, setShowWarning] = useState(false);
   const allowedDomains = ["fbca.org"];
+  const whitelistedEmails = ["warrior7702@gmail.com"]; // Your admin access
 
   useEffect(() => {
     if (user?.email) {
-      const emailDomain = user.email.split("@")[1]?.toLowerCase();
+      const email = user.email.toLowerCase();
+      
+      // Check if email is whitelisted
+      if (whitelistedEmails.includes(email)) {
+        setShowWarning(false);
+        return;
+      }
+      
+      // Check if email domain is allowed
+      const emailDomain = email.split("@")[1];
       const isAllowedDomain = allowedDomains.some(domain => emailDomain === domain.toLowerCase());
       
       if (!isAllowedDomain) {
