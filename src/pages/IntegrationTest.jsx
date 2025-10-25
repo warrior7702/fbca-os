@@ -1,242 +1,161 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, CheckSquare, Mail, Loader2, RefreshCw, AlertCircle } from "lucide-react";
-import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
 
 export default function IntegrationTest() {
-  const [loading, setLoading] = useState({ pco: false, clickup: false, microsoft: false });
-  const [data, setData] = useState({ pco: null, clickup: null, microsoft: null });
-  const [errors, setErrors] = useState({ pco: null, clickup: null, microsoft: null });
+  const [testing, setTesting] = useState(false);
+  const [results, setResults] = useState(null);
 
-  const testPCO = async () => {
-    setLoading(prev => ({ ...prev, pco: true }));
-    setErrors(prev => ({ ...prev, pco: null }));
+  const runTest = async () => {
+    setTesting(true);
+    setResults(null);
+    
     try {
+      console.log('Testing PCO connection...');
       const response = await base44.functions.invoke('testPCO');
-      setData(prev => ({ ...prev, pco: response.data }));
-      toast.success('Planning Center data loaded!');
+      console.log('PCO test response:', response.data);
+      setResults({
+        success: true,
+        data: response.data
+      });
     } catch (error) {
-      setErrors(prev => ({ ...prev, pco: error.response?.data?.error || error.message }));
-      toast.error('Failed to load Planning Center data');
+      console.error('PCO test error:', error);
+      setResults({
+        success: false,
+        error: error.response?.data || error.message
+      });
     } finally {
-      setLoading(prev => ({ ...prev, pco: false }));
+      setTesting(false);
     }
   };
 
-  const testClickUp = async () => {
-    setLoading(prev => ({ ...prev, clickup: true }));
-    setErrors(prev => ({ ...prev, clickup: null }));
+  const testCalendarEvents = async () => {
+    setTesting(true);
+    setResults(null);
+    
     try {
-      const response = await base44.functions.invoke('testClickUp');
-      setData(prev => ({ ...prev, clickup: response.data }));
-      toast.success('ClickUp data loaded!');
+      console.log('Testing PCO calendar events...');
+      const response = await base44.functions.invoke('getPCOCalendarEvents');
+      console.log('Calendar events response:', response.data);
+      setResults({
+        success: true,
+        data: response.data
+      });
     } catch (error) {
-      setErrors(prev => ({ ...prev, clickup: error.response?.data?.error || error.message }));
-      toast.error('Failed to load ClickUp data');
+      console.error('Calendar events error:', error);
+      setResults({
+        success: false,
+        error: error.response?.data || error.message
+      });
     } finally {
-      setLoading(prev => ({ ...prev, clickup: false }));
+      setTesting(false);
     }
   };
 
-  const testMicrosoft = async () => {
-    setLoading(prev => ({ ...prev, microsoft: true }));
-    setErrors(prev => ({ ...prev, microsoft: null }));
+  const testApprovals = async () => {
+    setTesting(true);
+    setResults(null);
+    
     try {
-      const response = await base44.functions.invoke('testMicrosoft');
-      setData(prev => ({ ...prev, microsoft: response.data }));
-      toast.success('Microsoft 365 data loaded!');
+      console.log('Testing PCO approvals...');
+      const response = await base44.functions.invoke('getMyPendingApprovals');
+      console.log('Approvals response:', response.data);
+      setResults({
+        success: true,
+        data: response.data
+      });
     } catch (error) {
-      setErrors(prev => ({ ...prev, microsoft: error.response?.data?.error || error.message }));
-      toast.error('Failed to load Microsoft 365 data');
+      console.error('Approvals error:', error);
+      setResults({
+        success: false,
+        error: error.response?.data || error.message
+      });
     } finally {
-      setLoading(prev => ({ ...prev, microsoft: false }));
+      setTesting(false);
     }
-  };
-
-  const testAll = () => {
-    testPCO();
-    testClickUp();
-    testMicrosoft();
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Integration Test</h1>
-            <p className="text-slate-600">Verify your connected services are working</p>
-          </div>
-          <Button onClick={testAll} className="bg-blue-600 hover:bg-blue-700">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Test All
-          </Button>
+    <div className="p-6 md:p-8 h-full overflow-auto">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Integration Test</h1>
+          <p className="text-slate-600">Test your Planning Center connection</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Planning Center */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-500" />
-                  <CardTitle className="text-lg">Planning Center</CardTitle>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={testPCO}
-                  disabled={loading.pco}
-                >
-                  {loading.pco ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
-                </Button>
-              </div>
-              <CardDescription>Calendar & Events</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading.pco && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                </div>
-              )}
-              {errors.pco && (
-                <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{errors.pco}</span>
-                </div>
-              )}
-              {data.pco && !loading.pco && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">User ID</p>
-                    <p className="font-mono text-sm">{data.pco.user_id}</p>
-                  </div>
-                  {data.pco.events && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-2">Upcoming Events</p>
-                      <div className="space-y-1">
-                        {data.pco.events.slice(0, 3).map((event, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {event.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Run Tests</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              onClick={runTest} 
+              disabled={testing}
+              className="w-full"
+            >
+              {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Test Basic PCO Connection
+            </Button>
 
-          {/* ClickUp */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-5 h-5 text-purple-500" />
-                  <CardTitle className="text-lg">ClickUp</CardTitle>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={testClickUp}
-                  disabled={loading.clickup}
-                >
-                  {loading.clickup ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
-                </Button>
-              </div>
-              <CardDescription>Tasks & Projects</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading.clickup && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                </div>
-              )}
-              {errors.clickup && (
-                <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{errors.clickup}</span>
-                </div>
-              )}
-              {data.clickup && !loading.clickup && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">User Name</p>
-                    <p className="font-medium">{data.clickup.user?.username}</p>
-                  </div>
-                  {data.clickup.teams && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-2">Workspaces</p>
-                      <div className="space-y-1">
-                        {data.clickup.teams.slice(0, 3).map((team, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {team.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            <Button 
+              onClick={testCalendarEvents} 
+              disabled={testing}
+              variant="outline"
+              className="w-full"
+            >
+              {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Test Calendar Events
+            </Button>
 
-          {/* Microsoft 365 */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-orange-500" />
-                  <CardTitle className="text-lg">Microsoft 365</CardTitle>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={testMicrosoft}
-                  disabled={loading.microsoft}
-                >
-                  {loading.microsoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
-                </Button>
+            <Button 
+              onClick={testApprovals} 
+              disabled={testing}
+              variant="outline"
+              className="w-full"
+            >
+              {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Test My Approvals
+            </Button>
+          </CardContent>
+        </Card>
+
+        {results && (
+          <Alert variant={results.success ? "default" : "destructive"}>
+            {results.success ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-semibold">
+                  {results.success ? 'Test Passed ✓' : 'Test Failed ✗'}
+                </p>
+                <pre className="mt-2 p-3 bg-slate-900 text-white rounded-lg overflow-x-auto text-xs">
+                  {JSON.stringify(results.success ? results.data : results.error, null, 2)}
+                </pre>
               </div>
-              <CardDescription>Email & Calendar</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading.microsoft && (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-                </div>
-              )}
-              {errors.microsoft && (
-                <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{errors.microsoft}</span>
-                </div>
-              )}
-              {data.microsoft && !loading.microsoft && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Display Name</p>
-                    <p className="font-medium">{data.microsoft.user?.displayName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Email</p>
-                    <p className="text-sm">{data.microsoft.user?.mail || data.microsoft.user?.userPrincipalName}</p>
-                  </div>
-                  {data.microsoft.emails && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-2">Recent Emails</p>
-                      <p className="text-sm font-semibold">{data.microsoft.emails.length} emails</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Instructions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-slate-600">
+            <p>1. Click "Test Basic PCO Connection" first to verify your token works</p>
+            <p>2. If that passes, try "Test Calendar Events" to check the calendar API</p>
+            <p>3. Then try "Test My Approvals" to check approval groups</p>
+            <p>4. Check the results below and the browser console (F12) for detailed logs</p>
+            <p className="mt-4 text-xs text-slate-500">
+              If tests fail with token errors, go to Settings → Integrations and reconnect Planning Center
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
