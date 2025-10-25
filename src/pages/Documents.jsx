@@ -103,6 +103,33 @@ export default function Documents() {
     }
   };
 
+  const openInDesktop = (item) => {
+    // Try to open in OneDrive desktop app
+    const desktopUrl = `ms-onedrive://open?url=${encodeURIComponent(item.webUrl)}`;
+    
+    // Create a hidden link and click it
+    const link = document.createElement('a');
+    link.href = desktopUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show toast and provide fallback
+    toast.info(
+      <div>
+        <p>Opening in OneDrive desktop app...</p>
+        <button 
+          onClick={() => window.open(item.webUrl, '_blank')}
+          className="text-blue-600 underline text-sm mt-1"
+        >
+          Click here if nothing happens
+        </button>
+      </div>,
+      { duration: 5000 }
+    );
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -242,7 +269,7 @@ export default function Documents() {
                               className="w-full text-xs"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `ms-onedrive://open?url=${encodeURIComponent(item.webUrl)}`;
+                                openInDesktop(item);
                               }}
                             >
                               🖥️ Open in Desktop
