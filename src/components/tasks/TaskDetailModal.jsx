@@ -20,7 +20,10 @@ import {
   Users,
   CheckSquare,
   Paperclip,
-  MessageSquare
+  MessageSquare,
+  Building2,
+  Mail,
+  Link as LinkIcon
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -69,14 +72,18 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
   };
 
   const formatCustomFieldValue = (field) => {
-    if (!field.value) return null;
+    if (!field.value && field.value !== 0) return null;
     
     switch (field.type) {
       case 'drop_down':
+        return field.value;
       case 'labels':
+        if (Array.isArray(field.value)) {
+          return field.value.join(', ');
+        }
         return field.value;
       case 'checkbox':
-        return field.value ? '✓ Yes' : '✗ No';
+        return field.value ? '✓ Yes' : null; // Only show if checked
       case 'date':
         try {
           return format(new Date(parseInt(field.value)), 'MMM d, yyyy h:mm a');
@@ -87,16 +94,48 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
         return field.value;
       case 'email':
         return field.value;
+      case 'phone':
+        return field.value;
+      case 'currency':
+        return `$${field.value}`;
+      case 'number':
+        return field.value;
+      case 'text':
+      case 'short_text':
+        return field.value;
       default:
         return field.value;
     }
   };
 
-  // Filter out custom fields with no value
-  const nonEmptyCustomFields = task.custom_fields?.filter(field => {
+  const getCustomFieldIcon = (fieldName) => {
+    const nameLower = fieldName.toLowerCase();
+    if (nameLower.includes('building')) return Building2;
+    if (nameLower.includes('email') || nameLower.includes('requestor')) return Mail;
+    if (nameLower.includes('url') || nameLower.includes('website') || nameLower.includes('link')) return LinkIcon;
+    if (nameLower.includes('date')) return Calendar;
+    if (nameLower.includes('code')) return FileText;
+    return FileText;
+  };
+
+  // Filter out custom fields with no value and categorize them
+  const customFieldsWithValues = task.custom_fields?.filter(field => {
     const value = formatCustomFieldValue(field);
     return value !== null && value !== '';
   }) || [];
+
+  // Separate important fields (like Buildings) from others
+  const importantFields = customFieldsWithValues.filter(field => 
+    field.name.toLowerCase().includes('building') || 
+    field.name.toLowerCase().includes('requestor') ||
+    field.name.toLowerCase().includes('code')
+  );
+  
+  const otherFields = customFieldsWithValues.filter(field => 
+    !field.name.toLowerCase().includes('building') && 
+    !field.name.toLowerCase().includes('requestor') &&
+    !field.name.toLowerCase().includes('code')
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,6 +162,39 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
               </Badge>
             )}
           </div>
+
+          {/* Important Custom Fields (Buildings, Code, Requestor) - Highlighted */}
+          {importantFields.length > 0 && (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {importantFields.map((field, idx) => {
+                  const Icon = getCustomFieldIcon(field.name);
+                  const value = formatCustomFieldValue(field);
+                  return (
+                    <div key={idx} className="flex items-start gap-2">
+                      <Icon className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-blue-900 mb-0.5">{field.name}</div>
+                        <div className="text-sm text-blue-800 font-medium">
+                          {field.type === 'url' ? (
+                            <a href={value} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {value}
+                            </a>
+                          ) : field.type === 'email' ? (
+                            <a href={`mailto:${value}`} className="hover:underline">
+                              {value}
+                            </a>
+                          ) : (
+                            value
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Main Details Grid */}
           <div className="grid grid-cols-2 gap-4">
@@ -226,22 +298,35 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
             </div>
           )}
 
-          {/* Custom Fields - Only show if there are non-empty fields */}
-          {nonEmptyCustomFields.length > 0 && (
+          {/* Other Custom Fields */}
+          {otherFields.length > 0 && (
             <div className="border-t pt-4">
               <div className="flex items-center gap-2 mb-3">
                 <FileText className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-medium text-slate-700">Custom Fields</span>
+                <span className="text-sm font-medium text-slate-700">Additional Details</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {nonEmptyCustomFields.map((field, idx) => (
-                  <div key={idx} className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 font-medium mb-1">{field.name}</div>
-                    <div className="text-sm text-slate-900">
-                      {formatCustomFieldValue(field)}
+                {otherFields.map((field, idx) => {
+                  const value = formatCustomFieldValue(field);
+                  return (
+                    <div key={idx} className="bg-slate-50 rounded-lg p-3">
+                      <div className="text-xs text-slate-500 font-medium mb-1">{field.name}</div>
+                      <div className="text-sm text-slate-900">
+                        {field.type === 'url' ? (
+                          <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            {value}
+                          </a>
+                        ) : field.type === 'email' ? (
+                          <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
+                            {value}
+                          </a>
+                        ) : (
+                          value
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
