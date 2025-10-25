@@ -14,6 +14,33 @@
       "type": "string",
       "description": "Job title or role"
     },
+    "wallpaper": {
+      "type": "string",
+      "enum": [
+        "church_steeple_night",
+        "church_building_blue",
+        "cross_chrome_blue",
+        "cross_white_glow",
+        "cross_metal_texture"
+      ],
+      "default": "church_steeple_night",
+      "description": "Selected desktop wallpaper"
+    },
+    "desktop_layout": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          }
+        }
+      },
+      "description": "Custom desktop icon positions"
+    },
     "pco_access_token": {
       "type": "string",
       "description": "Planning Center OAuth access token"

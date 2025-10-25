@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
 import { Calendar, CheckSquare, Briefcase } from "lucide-react";
+import { motion } from "framer-motion"; // Added framer-motion import
+
+const wallpapers = [
+  {
+    id: "church_steeple_night",
+    name: "Church Steeple Night",
+    url: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/c4c5d5f09_ChatGPTImageOct25202502_23_44AM.png"
+  },
+  {
+    id: "church_building_blue",
+    name: "Church Building Blue",
+    url: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/3e3148244_ChatGPTImageOct25202502_24_10AM.png"
+  },
+  {
+    id: "cross_chrome_blue",
+    name: "Cross Chrome Blue",
+    url: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/ad26483c6_ChatGPTImageOct25202502_25_20AM.png"
+  },
+  {
+    id: "cross_white_glow",
+    name: "Cross White Glow",
+    url: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/a221e8e71_ChatGPTImageOct25202502_30_15AM.png"
+  },
+  {
+    id: "cross_metal_texture",
+    name: "Cross Metal Texture",
+    url: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
+  }
+];
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -18,8 +47,9 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [department, setDepartment] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
+  const [selectedWallpaper, setSelectedWallpaper] = useState("church_steeple_night"); // Added selectedWallpaper state
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("profile"); // Added activeTab state
+  const [activeTab, setActiveTab] = useState("profile");
 
   useEffect(() => {
     loadUser();
@@ -56,6 +86,7 @@ export default function Settings() {
       setDisplayName(currentUser.display_name || "");
       setDepartment(currentUser.department || "");
       setRoleTitle(currentUser.role_title || "");
+      setSelectedWallpaper(currentUser.wallpaper || "church_steeple_night"); // Load user's wallpaper preference
     } catch (error) {
       console.error("Error loading user:", error);
       toast.error("Failed to load settings");
@@ -78,6 +109,17 @@ export default function Settings() {
       toast.error("Failed to update profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleWallpaperChange = async (wallpaperId) => {
+    setSelectedWallpaper(wallpaperId);
+    try {
+      await base44.auth.updateMe({ wallpaper: wallpaperId });
+      toast.success("Wallpaper updated!");
+    } catch (error) {
+      console.error("Error updating wallpaper:", error);
+      toast.error("Failed to update wallpaper");
     }
   };
 
@@ -300,7 +342,48 @@ export default function Settings() {
           <TabsContent value="appearance" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Appearance</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="w-5 h-5" />
+                  Desktop Wallpaper
+                </CardTitle>
+                <CardDescription>Choose your desktop background</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {wallpapers.map((wallpaper) => (
+                    <motion.div
+                      key={wallpaper.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`relative cursor-pointer rounded-lg overflow-hidden border-4 transition-all ${
+                        selectedWallpaper === wallpaper.id
+                          ? 'border-blue-600 shadow-lg ring-2 ring-blue-300'
+                          : 'border-transparent hover:border-slate-300'
+                      }`}
+                      onClick={() => handleWallpaperChange(wallpaper.id)}
+                    >
+                      <img
+                        src={wallpaper.url}
+                        alt={wallpaper.name}
+                        className="w-full h-40 object-cover"
+                      />
+                      {selectedWallpaper === wallpaper.id && (
+                        <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1">
+                          <CheckSquare className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                        <p className="text-white text-sm font-medium">{wallpaper.name}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Other Appearance Settings</CardTitle>
                 <CardDescription>Customize how FBCA OS looks</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -311,10 +394,7 @@ export default function Settings() {
                   </div>
                   <Switch />
                 </div>
-                <div className="space-y-2">
-                  <Label>Desktop Background</Label>
-                  <p className="text-sm text-slate-500">Coming soon</p>
-                </div>
+                {/* Removed the 'Desktop Background' label and 'Coming soon' paragraph as it's now handled by the new wallpaper card. */}
               </CardContent>
             </Card>
           </TabsContent>
