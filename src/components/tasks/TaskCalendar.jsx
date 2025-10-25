@@ -24,7 +24,6 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
   const getListColor = (listName) => {
     if (!listName) return { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', ring: 'ring-slate-200' };
     
-    // Hash function for consistent colors
     let hash = 0;
     for (let i = 0; i < listName.length; i++) {
       hash = listName.charCodeAt(i) + ((hash << 5) - hash);
@@ -44,6 +43,22 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
     ];
     
     return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Get ClickUp status color
+  const getStatusColor = (status) => {
+    const statusLower = status?.toLowerCase() || '';
+    
+    // Match ClickUp's status colors
+    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500';
+    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500';
+    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500';
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return 'bg-purple-500';
+    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-400';
+    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500';
+    if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500';
+    
+    return 'bg-slate-400'; // Default
   };
 
   // Get unique lists and their colors
@@ -148,6 +163,7 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                 <div className="p-2 space-y-1.5 min-h-[120px]">
                   {dayTasks.slice(0, 3).map((task) => {
                     const listColor = getListColor(task.list_name);
+                    const statusColor = getStatusColor(task.status);
                     return (
                       <a
                         key={task.id}
@@ -158,17 +174,14 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                       >
                         <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
                           <div className="flex items-start gap-1.5 mb-1">
-                            <span className="text-xs leading-none">{getPriorityIcon(task.priority)}</span>
+                            <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                             <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
                               {task.title}
                             </span>
                           </div>
                           {task.list_name && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${listColor.dot}`} />
-                              <span className="text-[10px] text-slate-600 truncate">
-                                {task.list_name}
-                              </span>
+                            <div className="text-[10px] text-slate-600 truncate ml-3.5">
+                              {task.list_name}
                             </div>
                           )}
                         </div>
@@ -214,6 +227,7 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                 <div className="p-2 space-y-1.5 min-h-[120px]">
                   {dayTasks.slice(0, 3).map((task) => {
                     const listColor = getListColor(task.list_name);
+                    const statusColor = getStatusColor(task.status);
                     return (
                       <a
                         key={task.id}
@@ -224,17 +238,14 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                       >
                         <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
                           <div className="flex items-start gap-1.5 mb-1">
-                            <span className="text-xs leading-none">{getPriorityIcon(task.priority)}</span>
+                            <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                             <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
                               {task.title}
                             </span>
                           </div>
                           {task.list_name && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${listColor.dot}`} />
-                              <span className="text-[10px] text-slate-600 truncate">
-                                {task.list_name}
-                              </span>
+                            <div className="text-[10px] text-slate-600 truncate ml-3.5">
+                              {task.list_name}
                             </div>
                           )}
                         </div>

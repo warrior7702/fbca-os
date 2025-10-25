@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,22 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
     ];
     
     return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Get ClickUp status color
+  const getStatusColor = (status) => {
+    const statusLower = status?.toLowerCase() || '';
+    
+    // Match ClickUp's status colors
+    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500';
+    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500';
+    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500';
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return 'bg-purple-500';
+    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-400';
+    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500';
+    if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500';
+    
+    return 'bg-slate-400'; // Default
   };
 
   // Get unique lists and their colors
@@ -72,6 +89,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
     }
   });
 
+  // This function is no longer used for the dot, but kept if needed elsewhere
   const getPriorityIcon = (priority) => {
     switch (priority) {
       case 'urgent': return '🔴';
@@ -175,6 +193,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                       <div className="space-y-1">
                         {dayTasks.map((task, taskIdx) => {
                           const listColor = getListColor(task.list_name);
+                          const statusColor = getStatusColor(task.status);
                           return (
                             <a
                               key={taskIdx}
@@ -185,17 +204,14 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                             >
                               <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
                                 <div className="flex items-start gap-1 mb-0.5">
-                                  <span className="text-[10px] leading-none">{getPriorityIcon(task.priority)}</span>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                                   <div className="flex-1 min-w-0">
                                     <div className={`font-medium truncate ${listColor.text} group-hover:underline leading-tight`}>
                                       {task.title}
                                     </div>
                                     {task.list_name && (
-                                      <div className="flex items-center gap-1 mt-0.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${listColor.dot}`} />
-                                        <span className="text-[9px] text-slate-600 truncate">
-                                          {task.list_name}
-                                        </span>
+                                      <div className="text-[9px] text-slate-600 truncate mt-0.5">
+                                        {task.list_name}
                                       </div>
                                     )}
                                   </div>
