@@ -139,11 +139,10 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log('Getting pending resource requests with approval groups included...');
+        console.log('Getting pending resource requests...');
         
-        // Include resource_approval_group in the query so we don't need separate API calls
         const requestsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource,resource.resource_approval_group`,
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -164,7 +163,6 @@ Deno.serve(async (req) => {
         // Build maps from included data
         const eventMap = {};
         const resourceMap = {};
-        const approvalGroupMap = {};
         
         if (requestsData.included) {
             requestsData.included.forEach(item => {
@@ -172,14 +170,14 @@ Deno.serve(async (req) => {
                     eventMap[item.id] = item;
                 } else if (item.type === 'Resource') {
                     resourceMap[item.id] = item;
-                } else if (item.type === 'ResourceApprovalGroup') {
-                    approvalGroupMap[item.id] = item;
                 }
             });
         }
 
         console.log('Found', Object.keys(resourceMap).length, 'resources');
-        console.log('Found', Object.keys(approvalGroupMap).length, 'approval groups in response');
+
+        // Cache for resource approval groups
+        const resourceApprovalGroupCache = {};
 
         const myApprovals = [];
         const debugInfo = [];
@@ -189,20 +187,50 @@ Deno.serve(async (req) => {
             const resource = resourceMap[resourceId];
             
             if (resource) {
-                const approvalGroupId = resource.relationships?.resource_approval_group?.data?.id;
-                const approvalGroup = approvalGroupMap[approvalGroupId];
+                // Fetch the resource's approval group if not cached
+                if (!resourceApprovalGroupCache[resourceId]) {
+                    const resourceDetailResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}?include=resource_approval_group`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+                    
+                    if (resourceDetailResponse.ok) {
+                        const resourceDetail = await resourceDetailResponse.json();
+                        const approvalGroupId = resourceDetail.data?.relationships?.resource_approval_group?.data?.id;
+                        
+                        let approvalGroupName = null;
+                        if (approvalGroupId && resourceDetail.included) {
+                            const approvalGroup = resourceDetail.included.find(inc => inc.id === approvalGroupId);
+                            approvalGroupName = approvalGroup?.attributes?.name;
+                        }
+                        
+                        resourceApprovalGroupCache[resourceId] = {
+                            id: approvalGroupId,
+                            name: approvalGroupName
+                        };
+                    }
+                }
+                
+                const approvalGroup = resourceApprovalGroupCache[resourceId];
+                const approvalGroupId = approvalGroup?.id;
+                const approvalGroupName = approvalGroup?.name;
                 const isInMyGroups = myGroupIds.includes(approvalGroupId);
                 
                 console.log('Resource:', resource.attributes?.name, 
                            'Approval Group ID:', approvalGroupId,
-                           'Approval Group Name:', approvalGroup?.attributes?.name,
+                           'Approval Group Name:', approvalGroupName,
                            'Is in my groups:', isInMyGroups);
                 
                 debugInfo.push({
                     resource_name: resource.attributes?.name,
                     resource_id: resourceId,
                     approval_group_id: approvalGroupId,
-                    approval_group_name: approvalGroup?.attributes?.name,
+                    approval_group_name: approvalGroupName,
                     my_group_name: myGroupNames[approvalGroupId],
                     is_in_my_groups: isInMyGroups
                 });
@@ -219,7 +247,7 @@ Deno.serve(async (req) => {
                         event_ends_at: event?.attributes?.ends_at,
                         resource_id: resourceId,
                         resource_name: resource.attributes?.name || 'Unknown Resource',
-                        approval_group_name: approvalGroup?.attributes?.name,
+                        approval_group_name: approvalGroupName,
                         quantity: request.attributes?.quantity,
                         created_at: request.attributes?.created_at,
                         approval_status: request.attributes?.approval_status
@@ -236,7 +264,7 @@ Deno.serve(async (req) => {
             count: myApprovals.length,
             my_groups_count: myGroupIds.length,
             my_groups: Object.values(myGroupNames),
-            debug: debugInfo,
+            debug: debugInfo.slice(0, 10), // Only show first 10 for readability
             total_pending_in_system: requestsData.data?.length
         });
 
