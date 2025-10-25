@@ -8,6 +8,7 @@ import IntegrationTest from './pages/IntegrationTest';
 import Documents from './pages/Documents';
 import Search from './pages/Search';
 import StaffDirectory from './pages/StaffDirectory';
+import MicrosoftLogin from './pages/MicrosoftLogin';
 import Layout from './Layout.jsx';
 
 
@@ -22,6 +23,7 @@ export const PAGES = {
     "Documents": Documents,
     "Search": Search,
     "StaffDirectory": StaffDirectory,
+    "MicrosoftLogin": MicrosoftLogin,
 }
 
 export const pagesConfig = {
