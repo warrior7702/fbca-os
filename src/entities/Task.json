@@ -1,0 +1,91 @@
+{
+  "name": "Task",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Event ID"
+    },
+    "context": {
+      "type": "string",
+      "enum": [
+        "RoomSetup",
+        "Maintenance",
+        "AV",
+        "Marketing",
+        "Access"
+      ],
+      "description": "Department context"
+    },
+    "scope_ref_type": {
+      "type": "string",
+      "enum": [
+        "EventRoom",
+        "EventResource"
+      ],
+      "description": "Type of scope reference"
+    },
+    "scope_ref_id": {
+      "type": "string",
+      "description": "EventRoom or EventResource ID"
+    },
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "details": {
+      "type": "string",
+      "description": "Task details"
+    },
+    "assignee": {
+      "type": "string",
+      "description": "Assigned user email"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Due date/time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Todo",
+        "In_Progress",
+        "Blocked",
+        "Done"
+      ],
+      "default": "Todo",
+      "description": "Task status"
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "default": [],
+      "description": "Task checklist"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "File URLs"
+    }
+  },
+  "required": [
+    "event_id",
+    "context",
+    "title"
+  ]
+}

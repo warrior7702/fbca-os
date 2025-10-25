@@ -37,10 +37,10 @@ const desktopApps = [
     position: { x: 50, y: 180 }
   },
   {
-    name: "FBCA Nexts",
+    name: "Me", // Changed from "FBCA Nexts"
     icon: User,
     color: "from-orange-500 to-red-500",
-    path: "FBCANexts",
+    path: "Me", // Changed from "FBCANexts"
     position: { x: 50, y: 310 }
   },
   {

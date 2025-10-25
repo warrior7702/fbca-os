@@ -58,8 +58,8 @@ const apps = [
     color: "text-green-500"
   },
   {
-    name: "FBCA Nexts",
-    path: "FBCANexts",
+    name: "Me",
+    path: "Me",
     icon: User,
     color: "text-orange-500"
   },
@@ -497,7 +497,7 @@ export default function Layout({ children, currentPageName }) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to={createPageUrl("FBCANexts")} className="cursor-pointer">
+                  <Link to={createPageUrl("Me")} className="cursor-pointer">
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </Link>
