@@ -23,7 +23,8 @@ import {
   Users,
   Loader2,
   Folder,
-  CheckSquare // Added CheckSquare icon
+  CheckSquare, // Added CheckSquare icon
+  Sparkles // Added for AI Helper
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -440,6 +441,29 @@ export default function Layout({ children, currentPageName }) {
             </div>
 
             <div className="h-8 w-px bg-white/20" />
+
+            {/* AI Helper */}
+            <Link to={createPageUrl('AIHelper')}>
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer group"
+              >
+                <Sparkles className="w-4 h-4 text-white" />
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.5, 0.8, 0.5],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="absolute inset-0 bg-yellow-400 rounded blur-md opacity-0 group-hover:opacity-50"
+                />
+              </motion.div>
+            </Link>
 
             {/* Notifications */}
             <DropdownMenu>

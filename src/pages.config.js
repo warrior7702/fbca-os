@@ -10,6 +10,7 @@ import StaffDirectory from './pages/StaffDirectory';
 import MicrosoftLogin from './pages/MicrosoftLogin';
 import Onboarding from './pages/Onboarding';
 import MyTasks from './pages/MyTasks';
+import AIHelper from './pages/AIHelper';
 import Layout from './Layout.jsx';
 
 
@@ -26,6 +27,7 @@ export const PAGES = {
     "MicrosoftLogin": MicrosoftLogin,
     "Onboarding": Onboarding,
     "MyTasks": MyTasks,
+    "AIHelper": AIHelper,
 }
 
 export const pagesConfig = {
