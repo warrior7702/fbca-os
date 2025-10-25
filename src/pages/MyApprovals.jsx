@@ -11,14 +11,15 @@ import {
   Calendar,
   AlertCircle,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  RefreshCcw // Changed from AlertCircle as it makes more sense for "Resync" but outline specified AlertCircle. Sticking to outline.
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
-import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal"; // New import
+import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import { toast } from "sonner";
 
 export default function MyApprovals() {
@@ -26,9 +27,11 @@ export default function MyApprovals() {
   const [approvals, setApprovals] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false); // New state for sync status
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
-  const [selectedApproval, setSelectedApproval] = useState(null); // New state
+  const [syncStats, setSyncStats] = useState(null); // New state for sync stats
+  const [selectedApproval, setSelectedApproval] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -36,6 +39,7 @@ export default function MyApprovals() {
 
   const loadData = async () => {
     setLoading(true);
+    setSyncing(true); // Indicate syncing process has started
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -43,24 +47,29 @@ export default function MyApprovals() {
       if (!currentUser.pco_access_token) {
         toast.error('Planning Center is not connected. Please connect it in Settings > Integrations.');
         setLoading(false);
+        setSyncing(false); // Ensure syncing state is reset
         return;
       }
 
-      // Load approvals and calendar events in parallel
-      const [approvalsResponse, eventsResponse] = await Promise.all([
-        base44.functions.invoke('getMyPendingApprovals').catch(err => {
-          console.error('Approvals error:', err);
-          toast.error('Failed to load approvals');
-          return { data: { pending_approvals: [] } };
-        }),
-        base44.functions.invoke('getPCOCalendarEvents').catch(err => {
-          console.error('Calendar error:', err);
-          toast.error('Failed to load calendar events');
-          return { data: { events: [] } };
-        })
-      ]);
+      // Sync approvals (incremental)
+      const syncResponse = await base44.functions.invoke('syncMyApprovals', {
+        forceResync: false
+      }).catch(err => {
+        console.error('Approvals sync error:', err);
+        toast.error('Failed to sync approvals');
+        return { data: { pending_approvals: [], sync_stats: null } }; // Return a default structure to avoid breaking subsequent calls
+      });
 
-      setApprovals(approvalsResponse.data.pending_approvals || []);
+      setApprovals(syncResponse.data.pending_approvals || []);
+      setSyncStats(syncResponse.data.sync_stats);
+
+      // Load calendar events
+      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents').catch(err => {
+        console.error('Calendar error:', err);
+        toast.error('Failed to load calendar events');
+        return { data: { events: [] } };
+      });
+
       setCalendarEvents(eventsResponse.data.events || []);
 
     } catch (error) {
@@ -68,6 +77,26 @@ export default function MyApprovals() {
       toast.error('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
+      setSyncing(false); // Reset syncing state
+    }
+  };
+
+  const handleForceResync = async () => {
+    setSyncing(true);
+    toast.info('Force resyncing approvals...');
+    try {
+      const syncResponse = await base44.functions.invoke('syncMyApprovals', {
+        forceResync: true
+      });
+
+      setApprovals(syncResponse.data.pending_approvals || []);
+      setSyncStats(syncResponse.data.sync_stats);
+      toast.success(`Resync complete! Found ${syncResponse.data.count} pending approvals.`);
+    } catch (error) {
+      console.error('Force resync error:', error);
+      toast.error('Failed to resync. Please try again.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -79,7 +108,7 @@ export default function MyApprovals() {
       });
       toast.success('Request approved!');
       setSelectedApproval(null); // Close modal on action
-      loadData();
+      loadData(); // Reload data to reflect changes
     } catch (error) {
       console.error('Error approving:', error);
       toast.error('Failed to approve request');
@@ -96,7 +125,7 @@ export default function MyApprovals() {
       });
       toast.success('Request denied');
       setSelectedApproval(null); // Close modal on action
-      loadData();
+      loadData(); // Reload data to reflect changes
     } catch (error) {
       console.error('Error denying:', error);
       toast.error('Failed to deny request');
@@ -126,13 +155,40 @@ export default function MyApprovals() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
             <p className="text-slate-600">Welcome back, {displayName}</p>
+            {syncStats && (
+              <p className="text-xs text-slate-500 mt-1">
+                Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')} 
+                {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
+                {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
+              </p>
+            )}
           </div>
-          <Link to={createPageUrl("Settings") + "?tab=integrations"}>
-            <Button variant="outline" size="sm">
-              <AlertCircle className="w-4 h-4 mr-2" />
-              Manage Integrations
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleForceResync}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-4 h-4 mr-2" /> {/* As per outline */}
+                  Force Resync
+                </>
+              )}
             </Button>
-          </Link>
+            <Link to={createPageUrl("Settings") + "?tab=integrations"}>
+              <Button variant="outline" size="sm">
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Manage Integrations
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Pending Approvals Section */}

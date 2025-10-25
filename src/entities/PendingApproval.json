@@ -1,0 +1,74 @@
+{
+  "name": "PendingApproval",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User email this approval belongs to"
+    },
+    "request_id": {
+      "type": "string",
+      "description": "PCO request ID"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "PCO event ID"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Event name"
+    },
+    "event_starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start date/time"
+    },
+    "event_ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end date/time"
+    },
+    "resource_id": {
+      "type": "string",
+      "description": "Resource ID"
+    },
+    "resource_name": {
+      "type": "string",
+      "description": "Resource name"
+    },
+    "approval_group_name": {
+      "type": "string",
+      "description": "Approval group name"
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Quantity requested"
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": [
+        "P",
+        "A",
+        "R"
+      ],
+      "description": "Approval status: P=Pending, A=Approved, R=Rejected"
+    },
+    "pco_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was created in PCO"
+    },
+    "pco_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was last updated in PCO"
+    }
+  },
+  "required": [
+    "user_email",
+    "request_id",
+    "event_id",
+    "resource_id",
+    "approval_status"
+  ]
+}
