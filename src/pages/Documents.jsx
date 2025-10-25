@@ -108,28 +108,6 @@ export default function Documents() {
     }
   };
 
-  const openInDesktop = (item) => {
-    // Method 1: Try the direct file path protocol
-    const odOpenUrl = `odopen://sync?scope=FOLDER&siteId=${encodeURIComponent(item.webUrl)}`;
-    window.location.href = odOpenUrl;
-    
-    // Show helpful message
-    setTimeout(() => {
-      toast.info(
-        <div>
-          <p className="font-medium mb-1">Opening in OneDrive...</p>
-          <p className="text-xs text-slate-600">If nothing happens:</p>
-          <p className="text-xs text-slate-600">• Make sure OneDrive app is installed</p>
-          <p className="text-xs text-slate-600">• Or <button 
-            onClick={() => window.open(item.webUrl, '_blank')}
-            className="text-blue-600 underline"
-          >open in browser instead</button></p>
-        </div>,
-        { duration: 6000 }
-      );
-    }, 500);
-  };
-
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -229,46 +207,33 @@ export default function Documents() {
                           )}
                         </div>
                         {!item.isFolder && (
-                          <div className="flex flex-col gap-1 w-full">
-                            <div className="flex gap-1">
+                          <div className="flex gap-1 w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInNativeApp(item);
+                              }}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Open
+                            </Button>
+                            {item.downloadUrl && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="flex-1 text-xs"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  openInNativeApp(item);
+                                  window.open(item.downloadUrl, '_blank');
                                 }}
                               >
-                                <ExternalLink className="w-3 h-3 mr-1" />
-                                Open
+                                <Download className="w-3 h-3 mr-1" />
+                                Save
                               </Button>
-                              {item.downloadUrl && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(item.downloadUrl, '_blank');
-                                  }}
-                                >
-                                  <Download className="w-3 h-3 mr-1" />
-                                  Save
-                                </Button>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openInDesktop(item);
-                              }}
-                            >
-                              🖥️ Open in Desktop
-                            </Button>
+                            )}
                           </div>
                         )}
                       </div>
