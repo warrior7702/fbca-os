@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, List } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday } from "date-fns";
 
-export default function FullCalendarModal({ open, onOpenChange, tasks }) {
+export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskClick }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Generate consistent colors for each list
@@ -195,14 +195,12 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                           const listColor = getListColor(task.list_name);
                           const statusColor = getStatusColor(task.status);
                           return (
-                            <a
+                            <div
                               key={taskIdx}
-                              href={task.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block"
+                              onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                              className="cursor-pointer"
                             >
-                              <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
+                              <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all group`}>
                                 <div className="flex items-start gap-1 mb-0.5">
                                   <div className={`w-1.5 h-1.5 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                                   <div className="flex-1 min-w-0">
@@ -217,7 +215,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks }) {
                                   </div>
                                 </div>
                               </div>
-                            </a>
+                            </div>
                           );
                         })}
                       </div>

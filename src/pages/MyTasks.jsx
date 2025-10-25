@@ -22,6 +22,7 @@ import { createPageUrl } from "@/utils";
 import { format, isToday, parseISO } from "date-fns";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
+import TaskDetailModal from "../components/tasks/TaskDetailModal"; // Added import
 import { toast } from "sonner";
 
 export default function MyTasks() {
@@ -30,6 +31,8 @@ export default function MyTasks() {
   const [emails, setEmails] = useState({ focused: [], flagged: [], categorized: {} });
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null); // Added state
+  const [showTaskDetail, setShowTaskDetail] = useState(false); // Added state
 
   useEffect(() => {
     loadData();
@@ -75,6 +78,15 @@ export default function MyTasks() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTaskClick = (task, e) => {
+    // Prevent default action if there was one (e.g., from an <a> tag, though now it's a div)
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    setSelectedTask(task);
+    setShowTaskDetail(true);
   };
 
   const todayTasks = tasks.filter(task => 
@@ -186,12 +198,10 @@ export default function MyTasks() {
             ) : (
               <div className="space-y-2">
                 {todayTasks.map((task) => (
-                  <a
+                  <div
                     key={task.id}
-                    href={task.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                    onClick={(e) => handleTaskClick(task, e)}
+                    className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -210,7 +220,7 @@ export default function MyTasks() {
                       </div>
                       <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             )}
@@ -228,6 +238,7 @@ export default function MyTasks() {
             <TaskCalendar 
               tasks={tasks} 
               onOpenFullView={() => setShowFullCalendar(true)}
+              onTaskClick={handleTaskClick} {/* Added prop */}
             />
           </CardContent>
         </Card>
@@ -377,6 +388,13 @@ export default function MyTasks() {
         open={showFullCalendar}
         onOpenChange={setShowFullCalendar}
         tasks={tasks}
+        onTaskClick={handleTaskClick} {/* Added prop */}
+      />
+
+      <TaskDetailModal
+        task={selectedTask}
+        open={showTaskDetail}
+        onOpenChange={setShowTaskDetail}
       />
     </div>
   );

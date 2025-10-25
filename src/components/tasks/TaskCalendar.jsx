@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Maximize2, List } from "lucide-react";
 import { format, addDays, startOfWeek, isToday, startOfDay } from "date-fns";
 
-export default function TaskCalendar({ tasks, onOpenFullView }) {
+export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
@@ -165,14 +166,12 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                     const listColor = getListColor(task.list_name);
                     const statusColor = getStatusColor(task.status);
                     return (
-                      <a
+                      <div
                         key={task.id}
-                        href={task.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
+                        onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                        className="cursor-pointer"
                       >
-                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
+                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
                           <div className="flex items-start gap-1.5 mb-1">
                             <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                             <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
@@ -185,7 +184,7 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                             </div>
                           )}
                         </div>
-                      </a>
+                      </div>
                     );
                   })}
                   {dayTasks.length > 3 && (
@@ -229,14 +228,12 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                     const listColor = getListColor(task.list_name);
                     const statusColor = getStatusColor(task.status);
                     return (
-                      <a
+                      <div
                         key={task.id}
-                        href={task.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
+                        onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                        className="cursor-pointer"
                       >
-                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all cursor-pointer group`}>
+                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
                           <div className="flex items-start gap-1.5 mb-1">
                             <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
                             <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
@@ -249,7 +246,7 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                             </div>
                           )}
                         </div>
-                      </a>
+                      </div>
                     );
                   })}
                   {dayTasks.length > 3 && (
