@@ -26,7 +26,6 @@ export default function MyApprovals() {
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -34,61 +33,36 @@ export default function MyApprovals() {
 
   const loadData = async () => {
     setLoading(true);
-    setErrorMessage(null);
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
       if (!currentUser.pco_access_token) {
-        setErrorMessage('Planning Center is not connected. Please connect it in Settings > Integrations.');
+        toast.error('Planning Center is not connected. Please connect it in Settings > Integrations.');
         setLoading(false);
         return;
       }
 
-      // Load approvals
-      try {
-        const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
-        console.log('Approvals response:', approvalsResponse.data);
-        
-        if (approvalsResponse.data.error) {
-          setErrorMessage(approvalsResponse.data.error);
-          toast.error(approvalsResponse.data.error);
-        } else {
-          setApprovals(approvalsResponse.data.pending_approvals || []);
-          
-          if (approvalsResponse.data.message) {
-            toast.info(approvalsResponse.data.message);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching approvals:', error);
-        const errorMsg = error.response?.data?.error || error.message || 'Failed to load approvals';
-        setErrorMessage(errorMsg);
-        toast.error(errorMsg);
-      }
+      // Load approvals and calendar events in parallel
+      const [approvalsResponse, eventsResponse] = await Promise.all([
+        base44.functions.invoke('getMyPendingApprovals').catch(err => {
+          console.error('Approvals error:', err);
+          toast.error('Failed to load approvals');
+          return { data: { pending_approvals: [] } };
+        }),
+        base44.functions.invoke('getPCOCalendarEvents').catch(err => {
+          console.error('Calendar error:', err);
+          toast.error('Failed to load calendar events');
+          return { data: { events: [] } };
+        })
+      ]);
 
-      // Load calendar events
-      try {
-        console.log('Fetching PCO calendar events...');
-        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-        console.log('Calendar events response:', eventsResponse.data);
-        
-        if (eventsResponse.data.error) {
-          console.error('Calendar events error:', eventsResponse.data.error);
-          toast.error('Failed to load calendar events: ' + eventsResponse.data.error);
-        } else {
-          setCalendarEvents(eventsResponse.data.events || []);
-          console.log('Loaded', eventsResponse.data.events?.length || 0, 'calendar events');
-        }
-      } catch (error) {
-        console.error('Error fetching calendar events:', error);
-        console.error('Full error:', error.response?.data || error.message);
-        toast.error('Failed to load calendar events');
-      }
+      setApprovals(approvalsResponse.data.pending_approvals || []);
+      setCalendarEvents(eventsResponse.data.events || []);
 
     } catch (error) {
       console.error("Error loading data:", error);
-      setErrorMessage('Failed to load data. Please try again.');
+      toast.error('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -140,131 +114,161 @@ export default function MyApprovals() {
   const displayName = user?.display_name || user?.full_name;
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
-          <p className="text-slate-600">Welcome back, {displayName}</p>
+    <div className="p-6 md:p-8 h-full overflow-auto bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
+            <p className="text-slate-600">Welcome back, {displayName}</p>
+          </div>
+          <Link to={createPageUrl("Settings") + "?tab=integrations"}>
+            <Button variant="outline" size="sm">
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Manage Integrations
+            </Button>
+          </Link>
         </div>
 
-        {errorMessage && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {errorMessage}
-              {errorMessage.includes('not connected') && (
-                <>
-                  {' '}
-                  <Link to={createPageUrl('Settings') + '?tab=integrations'} className="font-medium underline">
-                    Go to Settings
-                  </Link>
-                </>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Pending Approvals List */}
+        {/* Pending Approvals Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-5 h-5 text-orange-500" />
                 Pending Approvals
               </CardTitle>
-              <Badge variant="secondary">{approvals.length} pending</Badge>
+              {approvals.length > 0 && (
+                <Badge variant="destructive" className="text-lg px-3 py-1">
+                  {approvals.length} pending
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             {approvals.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No pending approvals! 🎉</p>
+              <div className="text-center py-12">
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-xl font-semibold text-slate-700">No pending approvals! 🎉</p>
+                <p className="text-slate-500 mt-2">You're all caught up.</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {approvals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className="p-4 bg-slate-50 rounded-lg border border-slate-200"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 mb-1">
-                          {approval.event_name}
-                        </h3>
-                        <p className="text-sm text-slate-600 mb-2">
-                          Resource: <span className="font-medium">{approval.resource_name}</span>
-                        </p>
-                        {approval.attributes?.quantity && (
-                          <p className="text-xs text-slate-500">
-                            Quantity: {approval.attributes.quantity}
-                          </p>
-                        )}
+                  <Card key={approval.id} className="border-2 border-orange-200 bg-orange-50/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                              <Calendar className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-slate-900 text-lg">
+                                {approval.event_name}
+                              </h3>
+                              <div className="mt-2 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+                                    {approval.resource_name}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    Qty: {approval.quantity}
+                                  </Badge>
+                                </div>
+                                {approval.event_starts_at && (
+                                  <p className="text-sm text-slate-600">
+                                    📅 {format(parseISO(approval.event_starts_at), 'PPP p')}
+                                  </p>
+                                )}
+                                <p className="text-xs text-slate-500">
+                                  Requested: {format(parseISO(approval.created_at), 'PPp')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 hover:bg-green-50 border-green-300"
+                            onClick={() => handleApprove(approval)}
+                            disabled={processingApproval === approval.id}
+                          >
+                            {processingApproval === approval.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50 border-red-300"
+                            onClick={() => handleDeny(approval)}
+                            disabled={processingApproval === approval.id}
+                          >
+                            {processingApproval === approval.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Deny
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(approval)}
-                          disabled={processingApproval === approval.id}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          {processingApproval === approval.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeny(approval)}
-                          disabled={processingApproval === approval.id}
-                          className="text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          {processingApproval === approval.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Deny
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Approval Calendar */}
+        {/* Calendar Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Calendar - Next 2 Weeks
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-500" />
+                Calendar - Next 2 Weeks
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowFullCalendar(true)}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Full View
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <ApprovalCalendar 
-              approvals={approvals}
-              calendarEvents={calendarEvents}
-              onOpenFullView={() => setShowFullCalendar(true)}
-            />
+            {calendarEvents.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No upcoming events in the next 2 weeks</p>
+              </div>
+            ) : (
+              <ApprovalCalendar events={calendarEvents} />
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <FullApprovalCalendarModal
-        open={showFullCalendar}
-        onOpenChange={setShowFullCalendar}
-        approvals={approvals}
-        calendarEvents={calendarEvents}
-      />
+      {/* Full Calendar Modal */}
+      {showFullCalendar && (
+        <FullApprovalCalendarModal
+          events={calendarEvents}
+          onClose={() => setShowFullCalendar(false)}
+        />
+      )}
     </div>
   );
 }
