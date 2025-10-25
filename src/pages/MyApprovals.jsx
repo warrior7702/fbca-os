@@ -27,6 +27,7 @@ export default function MyApprovals() {
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null); // Added errorMessage state
 
   useEffect(() => {
     loadData();
@@ -34,12 +35,13 @@ export default function MyApprovals() {
 
   const loadData = async () => {
     setLoading(true);
+    setErrorMessage(null); // Clear previous error messages
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
       if (!currentUser.pco_access_token) {
-        toast.error('Please connect Planning Center in Settings');
+        setErrorMessage('Planning Center is not connected. Please connect it in Settings > Integrations.');
         setLoading(false);
         return;
       }
@@ -47,16 +49,33 @@ export default function MyApprovals() {
       try {
         const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
         console.log('Approvals response:', approvalsResponse.data);
-        setApprovals(approvalsResponse.data.pending_approvals || []);
+        
+        if (approvalsResponse.data.error) {
+          setErrorMessage(approvalsResponse.data.error);
+          toast.error(approvalsResponse.data.error);
+        } else {
+          setApprovals(approvalsResponse.data.pending_approvals || []);
+          
+          if (approvalsResponse.data.message) {
+            toast.info(approvalsResponse.data.message);
+          }
+        }
       } catch (error) {
         console.error('Error fetching approvals:', error);
-        toast.error('Failed to load approvals');
+        const errorMsg = error.response?.data?.error || error.message || 'Failed to load approvals';
+        setErrorMessage(errorMsg);
+        toast.error(errorMsg);
       }
 
       try {
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
         console.log('Calendar events response:', eventsResponse.data);
-        setCalendarEvents(eventsResponse.data.events || []);
+        
+        if (eventsResponse.data.error) {
+          toast.error(eventsResponse.data.error); // Toast for calendar specific errors
+        } else {
+          setCalendarEvents(eventsResponse.data.events || []);
+        }
       } catch (error) {
         console.error('Error fetching calendar events:', error);
         toast.error('Failed to load calendar events');
@@ -64,6 +83,7 @@ export default function MyApprovals() {
 
     } catch (error) {
       console.error("Error loading data:", error);
+      setErrorMessage('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -123,17 +143,24 @@ export default function MyApprovals() {
           <p className="text-slate-600">Welcome back, {displayName}</p>
         </div>
 
-        {!user?.pco_access_token && (
-          <Alert>
+        {errorMessage && (
+          <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <span>Planning Center is not connected. </span>
-              <Link to={createPageUrl('Settings') + '?tab=integrations'} className="font-medium text-blue-600 hover:underline">
-                Connect it in Settings
-              </Link>
+              {errorMessage}
+              {errorMessage.includes('not connected') && (
+                <>
+                  {' '}
+                  <Link to={createPageUrl('Settings') + '?tab=integrations'} className="font-medium underline">
+                    Go to Settings
+                  </Link>
+                </>
+              )}
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Removed the redundant non-destructive PCO connection alert, as errorMessage now handles it */}
 
         {/* Pending Approvals List */}
         <Card>
