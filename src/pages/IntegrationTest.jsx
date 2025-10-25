@@ -78,6 +78,29 @@ export default function IntegrationTest() {
     }
   };
 
+  const debugRequest = async () => {
+    setTesting(true);
+    setResults(null);
+    
+    try {
+      console.log('Debugging PCO request structure...');
+      const response = await base44.functions.invoke('debugPCORequest');
+      console.log('Debug response:', response.data);
+      setResults({
+        success: true,
+        data: response.data
+      });
+    } catch (error) {
+      console.error('Debug error:', error);
+      setResults({
+        success: false,
+        error: error.response?.data || error.message
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8 h-full overflow-auto">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -119,6 +142,16 @@ export default function IntegrationTest() {
               {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Test My Approvals
             </Button>
+
+            <Button 
+              onClick={debugRequest} 
+              disabled={testing}
+              variant="outline"
+              className="w-full bg-purple-50"
+            >
+              {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              🔍 Debug Request Structure
+            </Button>
           </CardContent>
         </Card>
 
@@ -134,7 +167,7 @@ export default function IntegrationTest() {
                 <p className="font-semibold">
                   {results.success ? 'Test Passed ✓' : 'Test Failed ✗'}
                 </p>
-                <pre className="mt-2 p-3 bg-slate-900 text-white rounded-lg overflow-x-auto text-xs">
+                <pre className="mt-2 p-3 bg-slate-900 text-white rounded-lg overflow-x-auto text-xs max-h-96 overflow-y-auto">
                   {JSON.stringify(results.success ? results.data : results.error, null, 2)}
                 </pre>
               </div>
@@ -150,7 +183,7 @@ export default function IntegrationTest() {
             <p>1. Click "Test Basic PCO Connection" first to verify your token works</p>
             <p>2. If that passes, try "Test Calendar Events" to check the calendar API</p>
             <p>3. Then try "Test My Approvals" to check approval groups</p>
-            <p>4. Check the results below and the browser console (F12) for detailed logs</p>
+            <p>4. Click "🔍 Debug Request Structure" to see detailed request data</p>
             <p className="mt-4 text-xs text-slate-500">
               If tests fail with token errors, go to Settings → Integrations and reconnect Planning Center
             </p>
