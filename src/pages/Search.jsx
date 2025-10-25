@@ -102,7 +102,7 @@ export default function Search() {
         ...module,
         relevance: calculateRelevance(module, searchQuery)
       }))
-      .sort((a, b) => b.relevance - a.relevance); // Sort by relevance
+      .sort((a, b) => b.relevance - a.relevance); 
     
     setModules(matchedModules);
 
@@ -125,21 +125,35 @@ export default function Search() {
       setFiles(sortedFiles);
       setPeople(peopleResponse.data.people || []); // Set people results
 
-      // NEW: Filter and sort local staff
+      // Filter and sort local staff - MORE COMPREHENSIVE
       const lowerQuery = searchQuery.toLowerCase();
       const matchedStaff = (staffResponse || [])
-        .filter(person =>
-          person.full_name?.toLowerCase().includes(lowerQuery) ||
-          person.email?.toLowerCase().includes(lowerQuery) ||
-          person.title?.toLowerCase().includes(lowerQuery) ||
-          person.phone?.includes(searchQuery) || // Phone numbers can be checked directly
-          person.cell_phone?.includes(searchQuery)
-        )
+        .filter(person => {
+          // Check all fields for matches
+          const fullNameMatch = person.full_name?.toLowerCase().includes(lowerQuery);
+          const firstNameMatch = person.first_name?.toLowerCase().includes(lowerQuery);
+          const lastNameMatch = person.last_name?.toLowerCase().includes(lowerQuery);
+          const emailMatch = person.email?.toLowerCase().includes(lowerQuery);
+          const titleMatch = person.title?.toLowerCase().includes(lowerQuery);
+          const ministryMatch = person.ministry?.toLowerCase().includes(lowerQuery);
+          const phoneMatch = person.phone?.includes(searchQuery); // Phone numbers can be checked directly
+          const cellMatch = person.cell_phone?.includes(searchQuery);
+          
+          return fullNameMatch || firstNameMatch || lastNameMatch || emailMatch || 
+                 titleMatch || ministryMatch || phoneMatch || cellMatch;
+        })
         .map(person => ({
           ...person,
           relevance: calculateRelevance(person, searchQuery)
         }))
         .sort((a, b) => b.relevance - a.relevance);
+      
+      console.log('Staff search results:', {
+        query: searchQuery,
+        totalStaff: staffResponse?.length || 0,
+        matchedStaff: matchedStaff.length,
+        matches: matchedStaff.map(s => s.full_name)
+      });
       
       setLocalStaff(matchedStaff);
 
