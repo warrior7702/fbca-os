@@ -47,66 +47,71 @@ Deno.serve(async (req) => {
         }
 
         const data = await response.json();
+        const lowerQuery = query.toLowerCase();
 
-        // Group files by parent folder
-        const folderMap = new Map();
-        const standaloneItems = [];
+        // Separate folders and files
+        const folders = [];
+        const folderMap = new Map(); // Track folders we've seen
+        const standaloneFiles = [];
 
         data.value.forEach(item => {
-            const parentPath = item.parentReference?.path || '';
-            const parentId = item.parentReference?.id || 'root';
-            
             if (item.folder) {
-                // It's a folder - add as standalone
-                standaloneItems.push({
-                    id: item.id,
-                    name: item.name,
-                    isFolder: true,
-                    size: item.size,
-                    webUrl: item.webUrl,
-                    modifiedDate: item.lastModifiedDateTime,
-                    path: parentPath,
-                    itemCount: item.folder?.childCount || 0
-                });
+                // It's a folder that matches the search
+                if (!folderMap.has(item.id)) {
+                    folders.push({
+                        id: item.id,
+                        name: item.name,
+                        isFolder: true,
+                        webUrl: item.webUrl,
+                        path: item.parentReference?.path || '',
+                        fileCount: item.folder?.childCount || 0
+                    });
+                    folderMap.set(item.id, true);
+                }
             } else {
-                // It's a file - check if parent folder name matches query
+                // It's a file
                 const parentName = item.parentReference?.name || '';
-                const lowerQuery = query.toLowerCase();
+                const parentId = item.parentReference?.id;
                 
+                // Check if parent folder name matches query
                 if (parentName.toLowerCase().includes(lowerQuery)) {
-                    // File is in a matching folder - group by folder
-                    if (!folderMap.has(parentId)) {
-                        folderMap.set(parentId, {
+                    // File's parent folder matches - add folder if not already added
+                    if (parentId && !folderMap.has(parentId)) {
+                        folders.push({
                             id: parentId,
                             name: parentName,
                             isFolder: true,
                             webUrl: item.webUrl.split('/').slice(0, -1).join('/'),
-                            path: parentPath,
-                            fileCount: 0,
-                            files: []
+                            path: item.parentReference?.path || '',
+                            fileCount: 1 // We'll increment this if we find more files
                         });
+                        folderMap.set(parentId, folders.length - 1); // Store index
+                    } else if (parentId && typeof folderMap.get(parentId) === 'number') {
+                        // Increment file count for this folder
+                        const folderIndex = folderMap.get(parentId);
+                        folders[folderIndex].fileCount++;
                     }
-                    const folder = folderMap.get(parentId);
-                    folder.fileCount++;
-                    folder.files.push(item.name);
-                } else {
-                    // File name matches directly - add as standalone
-                    standaloneItems.push({
+                } else if (item.name.toLowerCase().includes(lowerQuery)) {
+                    // File name itself matches query (not in a matching folder)
+                    standaloneFiles.push({
                         id: item.id,
                         name: item.name,
                         isFolder: false,
                         size: item.size,
                         webUrl: item.webUrl,
                         downloadUrl: item['@microsoft.graph.downloadUrl'],
-                        modifiedDate: item.lastModifiedDateTime,
-                        path: parentPath
+                        path: item.parentReference?.path || ''
                     });
                 }
             }
         });
 
-        // Combine folders and standalone items
-        const results = [...Array.from(folderMap.values()), ...standaloneItems];
+        // Combine folders first, then standalone files
+        const results = [...folders, ...standaloneFiles];
+
+        console.log('Search results for:', query, 'Found:', results.length, 'items');
+        console.log('Folders:', folders.map(f => f.name));
+        console.log('Files:', standaloneFiles.map(f => f.name));
 
         return Response.json({ files: results });
 
