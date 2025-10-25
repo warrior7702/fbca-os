@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,7 @@ import { createPageUrl } from "@/utils";
 import { format, isToday, parseISO } from "date-fns";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
-import TaskDetailModal from "../components/tasks/TaskDetailModal"; // Added import
+import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import { toast } from "sonner";
 
 export default function MyTasks() {
@@ -31,8 +30,8 @@ export default function MyTasks() {
   const [emails, setEmails] = useState({ focused: [], flagged: [], categorized: {} });
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null); // Added state
-  const [showTaskDetail, setShowTaskDetail] = useState(false); // Added state
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -81,10 +80,7 @@ export default function MyTasks() {
   };
 
   const handleTaskClick = (task, e) => {
-    // Prevent default action if there was one (e.g., from an <a> tag, though now it's a div)
-    if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
-    }
+    e.preventDefault();
     setSelectedTask(task);
     setShowTaskDetail(true);
   };
@@ -120,7 +116,6 @@ export default function MyTasks() {
 
   const formatStatus = (status) => {
     if (!status) return 'No Status';
-    // Capitalize first letter of each word
     return status
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -145,7 +140,6 @@ export default function MyTasks() {
     window.open('https://outlook.office.com/mail/', '_blank');
   };
 
-  // Count unread focused emails
   const unreadFocusedCount = emails.focused?.filter(e => !e.isRead).length || 0;
 
   if (loading) {
@@ -238,13 +232,12 @@ export default function MyTasks() {
             <TaskCalendar 
               tasks={tasks} 
               onOpenFullView={() => setShowFullCalendar(true)}
-              onTaskClick={handleTaskClick} {/* Added prop */}
+              onTaskClick={handleTaskClick}
             />
           </CardContent>
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Focused Inbox - Unread Count */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -266,7 +259,6 @@ export default function MyTasks() {
             </CardContent>
           </Card>
 
-          {/* Flagged Emails */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -328,7 +320,6 @@ export default function MyTasks() {
           </Card>
         </div>
 
-        {/* Categorized Emails Section */}
         {emails.categorized && Object.keys(emails.categorized).length > 0 && (
           <div className="grid md:grid-cols-2 gap-6">
             {Object.entries(emails.categorized).slice(0, 4).map(([category, categoryEmails]) => (
@@ -388,7 +379,7 @@ export default function MyTasks() {
         open={showFullCalendar}
         onOpenChange={setShowFullCalendar}
         tasks={tasks}
-        onTaskClick={handleTaskClick} {/* Added prop */}
+        onTaskClick={handleTaskClick}
       />
 
       <TaskDetailModal
