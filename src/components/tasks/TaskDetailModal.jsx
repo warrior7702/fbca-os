@@ -69,7 +69,7 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
   };
 
   const formatCustomFieldValue = (field) => {
-    if (!field.value) return 'Empty';
+    if (!field.value) return null;
     
     switch (field.type) {
       case 'drop_down':
@@ -91,6 +91,12 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
         return field.value;
     }
   };
+
+  // Filter out custom fields with no value
+  const nonEmptyCustomFields = task.custom_fields?.filter(field => {
+    const value = formatCustomFieldValue(field);
+    return value !== null && value !== '';
+  }) || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -220,15 +226,15 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
             </div>
           )}
 
-          {/* Custom Fields */}
-          {task.custom_fields && task.custom_fields.length > 0 && (
+          {/* Custom Fields - Only show if there are non-empty fields */}
+          {nonEmptyCustomFields.length > 0 && (
             <div className="border-t pt-4">
               <div className="flex items-center gap-2 mb-3">
                 <FileText className="w-4 h-4 text-slate-500" />
                 <span className="text-sm font-medium text-slate-700">Custom Fields</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {task.custom_fields.map((field, idx) => (
+                {nonEmptyCustomFields.map((field, idx) => (
                   <div key={idx} className="bg-slate-50 rounded-lg p-3">
                     <div className="text-xs text-slate-500 font-medium mb-1">{field.name}</div>
                     <div className="text-sm text-slate-900">
@@ -240,8 +246,8 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
             </div>
           )}
 
-          {/* Description */}
-          {task.description && (
+          {/* Description - Only show if not empty */}
+          {task.description && task.description.trim() && (
             <div className="border-t pt-4">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="w-4 h-4 text-slate-500" />
