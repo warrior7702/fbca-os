@@ -57,12 +57,7 @@ const apps = [
     icon: UtensilsCrossed,
     color: "text-green-500"
   },
-  {
-    name: "Me",
-    path: "Me",
-    icon: User,
-    color: "text-orange-500"
-  },
+  // Removed "Me" module
   {
     name: "Staff Directory",
     path: "StaffDirectory",
@@ -496,8 +491,9 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {/* Profile link remains here as it's a generic user profile, not tied to a specific "Me" app module */}
                 <DropdownMenuItem asChild>
-                  <Link to={createPageUrl("Me")} className="cursor-pointer">
+                  <Link to={createPageUrl("Me")} className="cursor-pointer"> 
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </Link>

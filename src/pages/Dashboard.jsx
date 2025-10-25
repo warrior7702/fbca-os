@@ -37,25 +37,18 @@ const desktopApps = [
     position: { x: 50, y: 180 }
   },
   {
-    name: "Me", // Changed from "FBCA Nexts"
-    icon: User,
-    color: "from-orange-500 to-red-500",
-    path: "Me", // Changed from "FBCANexts"
-    position: { x: 50, y: 310 }
-  },
-  {
-    name: "Staff Directory", // New App
+    name: "Staff Directory",
     icon: Users,
     color: "from-teal-500 to-cyan-500",
     path: "StaffDirectory",
-    position: { x: 50, y: 440 }
+    position: { x: 50, y: 310 } // Adjusted position
   },
   {
     name: "Settings",
     icon: Settings,
     color: "from-slate-500 to-slate-600",
     path: "Settings",
-    position: { x: 50, y: 570 } // Adjusted position for Settings
+    position: { x: 50, y: 440 } // Adjusted position
   }
 ];
 

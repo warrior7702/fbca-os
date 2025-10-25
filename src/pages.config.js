@@ -9,9 +9,6 @@ import Search from './pages/Search';
 import StaffDirectory from './pages/StaffDirectory';
 import MicrosoftLogin from './pages/MicrosoftLogin';
 import Onboarding from './pages/Onboarding';
-import Me from './pages/Me';
-import Tasks from './pages/Tasks';
-import Approvals from './pages/Approvals';
 import Layout from './Layout.jsx';
 
 
@@ -27,9 +24,6 @@ export const PAGES = {
     "StaffDirectory": StaffDirectory,
     "MicrosoftLogin": MicrosoftLogin,
     "Onboarding": Onboarding,
-    "Me": Me,
-    "Tasks": Tasks,
-    "Approvals": Approvals,
 }
 
 export const pagesConfig = {
