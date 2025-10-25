@@ -22,8 +22,9 @@ import {
   Users,
   Loader2,
   Folder,
-  CheckSquare, // Added CheckSquare icon
-  Sparkles // Added for AI Helper
+  CheckSquare,
+  Sparkles,
+  ListChecks // Added for task results
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -80,7 +81,8 @@ export default function Layout({ children, currentPageName }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications] = useState(3);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [] });
+  // Updated searchResults state to include tasks
+  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [], tasks: [] });
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef(null);
@@ -121,7 +123,7 @@ export default function Layout({ children, currentPageName }) {
       if (searchQuery.length >= 2) {
         performLiveSearch(searchQuery);
       } else {
-        setSearchResults({ staff: [], files: [], modules: [] });
+        setSearchResults({ staff: [], files: [], modules: [], tasks: [] }); // Clear tasks as well
         setShowResults(false);
       }
     }, 300); // 300ms debounce
@@ -136,12 +138,14 @@ export default function Layout({ children, currentPageName }) {
     console.log('🔍 Starting live search for:', query);
 
     try {
+      const lowerQuery = query.toLowerCase();
+      const newResults = { staff: [], files: [], modules: [], tasks: [] };
+
       // Search staff
       console.log('📋 Searching staff...');
       const staffResponse = await base44.entities.StaffContact.filter({});
-      const lowerQuery = query.toLowerCase();
       
-      const matchedStaff = (staffResponse || [])
+      newResults.staff = (staffResponse || [])
         .filter(person => {
           return person.full_name?.toLowerCase().includes(lowerQuery) ||
                  person.first_name?.toLowerCase().includes(lowerQuery) ||
@@ -149,47 +153,54 @@ export default function Layout({ children, currentPageName }) {
                  person.email?.toLowerCase().includes(lowerQuery);
         })
         .slice(0, 5);
-
-      console.log('✅ Found', matchedStaff.length, 'staff members');
+      console.log('✅ Found', newResults.staff.length, 'staff members');
 
       // Search modules
       console.log('📦 Searching modules...');
-      const matchedModules = apps
+      newResults.modules = apps
         .filter(app => 
           app.name.toLowerCase().includes(lowerQuery) ||
           app.path.toLowerCase().includes(lowerQuery)
         )
         .slice(0, 3);
-
-      console.log('✅ Found', matchedModules.length, 'modules');
+      console.log('✅ Found', newResults.modules.length, 'modules');
 
       // Search files (already grouped by folder from backend)
-      let files = [];
       try {
         console.log('📁 Searching OneDrive files...');
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
         console.log('📁 OneDrive response:', filesResponse.data);
-        files = (filesResponse.data.files || []).slice(0, 5);
-        console.log('✅ Found', files.length, 'files/folders');
-        if (files.length > 0) {
-          console.log('📁 File results:', files.map(f => ({ name: f.name, isFolder: f.isFolder })));
+        newResults.files = (filesResponse.data.files || []).slice(0, 5);
+        console.log('✅ Found', newResults.files.length, 'files/folders');
+        if (newResults.files.length > 0) {
+          console.log('📁 File results:', newResults.files.map(f => ({ name: f.name, isFolder: f.isFolder })));
         }
       } catch (error) {
         console.error('❌ File search error:', error);
         console.error('Error details:', error.response?.data || error.message);
       }
 
+      // Search ClickUp tasks
+      try {
+        console.log('✅ Searching ClickUp tasks...');
+        const tasksResponse = await base44.functions.invoke('searchClickUpTasks', { query });
+        console.log('✅ ClickUp tasks response:', tasksResponse.data);
+        // Assuming tasksResponse.data contains an array of task objects
+        newResults.tasks = (tasksResponse.data || []).slice(0, 5);
+        console.log('✅ Found', newResults.tasks.length, 'tasks');
+      } catch (error) {
+        console.error('❌ ClickUp task search error:', error);
+        console.error('Error details:', error.response?.data || error.message);
+      }
+
       console.log('🎯 Final results:', {
-        staff: matchedStaff.length,
-        modules: matchedModules.length,
-        files: files.length
+        staff: newResults.staff.length,
+        modules: newResults.modules.length,
+        files: newResults.files.length,
+        tasks: newResults.tasks.length
       });
 
-      setSearchResults({
-        staff: matchedStaff,
-        files: files,
-        modules: matchedModules
-      });
+      setSearchResults(newResults);
     } catch (error) {
       console.error('❌ Live search error:', error);
     } finally {
@@ -221,10 +232,13 @@ export default function Layout({ children, currentPageName }) {
     } else if (type === 'staff') {
       // Navigate to Staff Directory with this person pre-filtered
       navigate(createPageUrl('StaffDirectory') + `?name=${encodeURIComponent(item.full_name)}`);
+    } else if (type === 'task') { // Handle task clicks
+      window.open(item.url, '_blank'); // Assuming item.url exists for tasks
     }
   };
 
-  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length;
+  // Updated totalResults to include tasks
+  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length + searchResults.tasks.length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -301,7 +315,7 @@ export default function Layout({ children, currentPageName }) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10" />
                 <input
                   type="text"
-                  placeholder="Search apps, files, and people..."
+                  placeholder="Search apps, files, ClickUp tasks, and people..." // Updated placeholder
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
@@ -388,6 +402,30 @@ export default function Layout({ children, currentPageName }) {
                           <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
                           {file.isFolder && file.fileCount && (
                             <p className="text-xs text-slate-500">{file.fileCount} file{file.fileCount !== 1 ? 's' : ''}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Task Results */}
+                {searchResults.tasks.length > 0 && (
+                  <div className="p-2 border-t border-slate-100">
+                    <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
+                      Tasks ({searchResults.tasks.length})
+                    </div>
+                    {searchResults.tasks.map((task) => (
+                      <button
+                        key={task.id}
+                        onClick={() => handleResultClick('task', task)}
+                        className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                      >
+                        <ListChecks className="w-4 h-4 flex-shrink-0 text-amber-500" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{task.name}</p>
+                          {task.listName && (
+                            <p className="text-xs text-slate-500 truncate">{task.listName}</p>
                           )}
                         </div>
                       </button>

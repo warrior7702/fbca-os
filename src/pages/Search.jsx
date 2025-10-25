@@ -22,7 +22,8 @@ import {
   Users,
   Mail,
   Phone,
-  MessageSquare
+  MessageSquare,
+  CheckSquare // Added for "My Tasks" module
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,9 +34,10 @@ import { Link } from "react-router-dom";
 
 const appModules = [
   { name: "Dashboard", path: "Dashboard", icon: LayoutDashboard, description: "Your main hub", color: "text-blue-500" },
+  { name: "My Tasks", path: "MyTasks", icon: CheckSquare, description: "ClickUp tasks, calendar, and emails", color: "text-indigo-500" },
   { name: "Marketing", path: "Marketing", icon: Megaphone, description: "Campaign requests and assets", color: "text-purple-500" },
   { name: "Food Service", path: "FoodService", icon: UtensilsCrossed, description: "Catering orders and menu planning", color: "text-green-500" },
-  { name: "FBCA Nexts", path: "FBCANexts", icon: User, description: "Your personal dashboard", color: "text-orange-500" },
+  { name: "Staff Directory", path: "StaffDirectory", icon: Users, description: "Contact information for all FBCA staff", color: "text-teal-500" },
   { name: "Settings", path: "Settings", icon: Settings, description: "Manage preferences and integrations", color: "text-slate-500" },
   { name: "Documents", path: "Documents", icon: Folder, description: "Browse OneDrive files", color: "text-blue-500" }
 ];
@@ -197,7 +199,7 @@ export default function Search() {
             <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
               type="text"
-              placeholder="Search files, documents, and modules..."
+              placeholder="Search files, documents, modules, ClickUp tasks, and team members..." // Updated placeholder
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-12 h-14 text-lg"
