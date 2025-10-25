@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay, isToday, startOfDay } from "date-fns";
 
 export default function TaskCalendar({ tasks, onOpenFullView }) {
-  const [currentWeekStart, setCurrentWeekStart] = React.useState(() => 
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
 
@@ -53,7 +53,6 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
     }
   };
 
-  // Split into weeks
   const week1 = twoWeeksDays.slice(0, 7);
   const week2 = twoWeeksDays.slice(7, 14);
 
