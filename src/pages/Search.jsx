@@ -21,7 +21,8 @@ import {
   FileArchive,
   Users, // Added Users icon for Staff Directory
   Mail, // NEW: Added Mail icon
-  Phone // NEW: Added Phone icon
+  Phone, // NEW: Added Phone icon
+  MessageSquare // NEW: Added MessageSquare icon for Teams
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -257,13 +258,22 @@ export default function Search() {
                               )}
                               <div className="flex flex-col gap-1 mt-2">
                                 {person.email && (
-                                  <a 
-                                    href={`mailto:${person.email}`}
-                                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                                  >
-                                    <Mail className="w-3 h-3" />
-                                    {person.email}
-                                  </a>
+                                  <>
+                                    <a 
+                                      href={`mailto:${person.email}`}
+                                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                      <Mail className="w-3 h-3" />
+                                      {person.email}
+                                    </a>
+                                    <a 
+                                      href={`msteams:/l/chat/0/0?users=${person.email}`}
+                                      className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                      Message in Teams
+                                    </a>
+                                  </>
                                 )}
                                 {person.phone && (
                                   <a 

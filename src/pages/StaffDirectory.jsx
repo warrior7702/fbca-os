@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, Mail, Search as SearchIcon, Building2 } from "lucide-react";
+import { Users, Phone, Mail, Search as SearchIcon, Building2, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 export default function StaffDirectory() {
   const [staff, setStaff] = useState([]);
@@ -149,13 +151,22 @@ export default function StaffDirectory() {
 
                   <div className="mt-4 space-y-2">
                     {person.email && (
-                      <a
-                        href={`mailto:${person.email}`}
-                        className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                      >
-                        <Mail className="w-4 h-4" />
-                        {person.email}
-                      </a>
+                      <>
+                        <a
+                          href={`mailto:${person.email}`}
+                          className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                        >
+                          <Mail className="w-4 h-4" />
+                          {person.email}
+                        </a>
+                        <a
+                          href={`msteams:/l/chat/0/0?users=${person.email}`}
+                          className="flex items-center gap-2 text-sm text-purple-600 hover:underline"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Message in Teams
+                        </a>
+                      </>
                     )}
                     {person.phone && (
                       <a
