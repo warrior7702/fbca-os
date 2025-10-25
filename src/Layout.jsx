@@ -490,14 +490,6 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </div>
       </motion.div>
-
-      {/* Base 44 Badge */}
-      <div className="fixed bottom-20 right-4 z-50">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-full shadow-lg text-xs text-slate-600">
-          <Layers className="w-3 h-3 text-blue-500" />
-          <span className="font-medium">Powered by Base 44</span>
-        </div>
-      </div>
     </div>
   );
 }

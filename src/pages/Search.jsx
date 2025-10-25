@@ -404,7 +404,7 @@ export default function Search() {
             {/* Files */}
             {files.length > 0 && (
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 mb-3">Files</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-3">Files & Folders</h2>
                 <div className="space-y-2">
                   {files.map((file) => {
                     const Icon = file.isFolder ? Folder : getFileIcon(file.name);
@@ -417,12 +417,15 @@ export default function Search() {
                         <Card className="hover:shadow-md transition-all">
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="p-2 bg-slate-100 rounded-lg">
-                                <Icon className="w-5 h-5 text-slate-600" />
+                              <div className={`p-2 rounded-lg ${file.isFolder ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                                <Icon className={`w-5 h-5 ${file.isFolder ? 'text-blue-600' : 'text-slate-600'}`} />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-slate-900 truncate">{file.name}</p>
                                 <div className="flex items-center gap-2 text-xs text-slate-500">
+                                  {file.isFolder && file.fileCount && (
+                                    <span>{file.fileCount} matching file{file.fileCount !== 1 ? 's' : ''}</span>
+                                  )}
                                   {!file.isFolder && <span>{formatFileSize(file.size)}</span>}
                                   {file.path && <span>• {file.path}</span>}
                                 </div>

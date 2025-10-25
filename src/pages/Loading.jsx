@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layers, Zap, Shield, Globe } from "lucide-react";
@@ -257,16 +258,6 @@ export default function Loading() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Base 44 framework badge */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
-          className="mt-8 text-gray-500 text-xs"
-        >
-          Powered by <span className="text-blue-400 font-semibold">Base 44</span> Framework
-        </motion.div>
       </div>
     </div>
   );

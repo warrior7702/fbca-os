@@ -48,18 +48,67 @@ Deno.serve(async (req) => {
 
         const data = await response.json();
 
-        const files = data.value.map(item => ({
-            id: item.id,
-            name: item.name,
-            isFolder: !!item.folder,
-            size: item.size,
-            webUrl: item.webUrl,
-            downloadUrl: item['@microsoft.graph.downloadUrl'],
-            modifiedDate: item.lastModifiedDateTime,
-            path: item.parentReference?.path || ''
-        }));
+        // Group files by parent folder
+        const folderMap = new Map();
+        const standaloneItems = [];
 
-        return Response.json({ files });
+        data.value.forEach(item => {
+            const parentPath = item.parentReference?.path || '';
+            const parentId = item.parentReference?.id || 'root';
+            
+            if (item.folder) {
+                // It's a folder - add as standalone
+                standaloneItems.push({
+                    id: item.id,
+                    name: item.name,
+                    isFolder: true,
+                    size: item.size,
+                    webUrl: item.webUrl,
+                    modifiedDate: item.lastModifiedDateTime,
+                    path: parentPath,
+                    itemCount: item.folder?.childCount || 0
+                });
+            } else {
+                // It's a file - check if parent folder name matches query
+                const parentName = item.parentReference?.name || '';
+                const lowerQuery = query.toLowerCase();
+                
+                if (parentName.toLowerCase().includes(lowerQuery)) {
+                    // File is in a matching folder - group by folder
+                    if (!folderMap.has(parentId)) {
+                        folderMap.set(parentId, {
+                            id: parentId,
+                            name: parentName,
+                            isFolder: true,
+                            webUrl: item.webUrl.split('/').slice(0, -1).join('/'),
+                            path: parentPath,
+                            fileCount: 0,
+                            files: []
+                        });
+                    }
+                    const folder = folderMap.get(parentId);
+                    folder.fileCount++;
+                    folder.files.push(item.name);
+                } else {
+                    // File name matches directly - add as standalone
+                    standaloneItems.push({
+                        id: item.id,
+                        name: item.name,
+                        isFolder: false,
+                        size: item.size,
+                        webUrl: item.webUrl,
+                        downloadUrl: item['@microsoft.graph.downloadUrl'],
+                        modifiedDate: item.lastModifiedDateTime,
+                        path: parentPath
+                    });
+                }
+            }
+        });
+
+        // Combine folders and standalone items
+        const results = [...Array.from(folderMap.values()), ...standaloneItems];
+
+        return Response.json({ files: results });
 
     } catch (error) {
         console.error('Search OneDrive error:', error);
