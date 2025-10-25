@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -120,9 +121,9 @@ Deno.serve(async (req) => {
         console.log('Resource to Group Map:', Object.keys(resourceToGroupMap).length, 'resources mapped');
         console.log('I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
 
-        // Get pending requests
+        // Get pending requests, including event, resource, answers, and resource form
         const requestsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource,answers,resource.resource_form`,
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
@@ -133,11 +134,15 @@ Deno.serve(async (req) => {
         // Build maps from included data
         const eventMap = {};
         const resourceMap = {};
+        const answersMap = {}; // Map answer ID to answer object
+        const resourceFormMap = {}; // Map resource form ID to resource form object
         
         if (requestsData.included) {
             requestsData.included.forEach(item => {
                 if (item.type === 'Event') eventMap[item.id] = item;
                 else if (item.type === 'Resource') resourceMap[item.id] = item;
+                else if (item.type === 'Answer') answersMap[item.id] = item;
+                else if (item.type === 'ResourceForm') resourceFormMap[item.id] = item;
             });
         }
 
@@ -161,6 +166,27 @@ Deno.serve(async (req) => {
             if (isInMyGroups) {
                 const eventId = request.relationships?.event?.data?.id;
                 const event = eventMap[eventId];
+
+                const questionsAndAnswers = [];
+                const resourceFormId = resource?.relationships?.resource_form?.data?.id;
+                const resourceForm = resourceFormMap[resourceFormId];
+                
+                if (resourceForm?.attributes?.questions && Array.isArray(resourceForm.attributes.questions)) {
+                    const requestAnswers = request.relationships?.answers?.data || [];
+                    const answersForRequest = requestAnswers
+                        .map(answerRel => answersMap[answerRel.id])
+                        .filter(Boolean); // Filter out any null/undefined answers
+                    
+                    resourceForm.attributes.questions.forEach(question => {
+                        const answer = answersForRequest.find(ans => ans.attributes?.question_id === question.id);
+                        questionsAndAnswers.push({
+                            question_id: question.id,
+                            question_text: question.text,
+                            question_type: question.type,
+                            answer_value: answer?.attributes?.value || null
+                        });
+                    });
+                }
                 
                 myApprovals.push({
                     id: request.id,
@@ -173,7 +199,8 @@ Deno.serve(async (req) => {
                     approval_group_name: groupInfo.groupName,
                     quantity: request.attributes?.quantity,
                     created_at: request.attributes?.created_at,
-                    approval_status: request.attributes?.approval_status
+                    approval_status: request.attributes?.approval_status,
+                    questions: questionsAndAnswers
                 });
                 console.log('✓ MATCH! Found approval for', resource?.attributes?.name);
             }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
+import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal"; // New import
 import { toast } from "sonner";
 
 export default function MyApprovals() {
@@ -26,6 +28,7 @@ export default function MyApprovals() {
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
+  const [selectedApproval, setSelectedApproval] = useState(null); // New state
 
   useEffect(() => {
     loadData();
@@ -75,6 +78,7 @@ export default function MyApprovals() {
         request_id: approval.id
       });
       toast.success('Request approved!');
+      setSelectedApproval(null); // Close modal on action
       loadData();
     } catch (error) {
       console.error('Error approving:', error);
@@ -91,6 +95,7 @@ export default function MyApprovals() {
         request_id: approval.id
       });
       toast.success('Request denied');
+      setSelectedApproval(null); // Close modal on action
       loadData();
     } catch (error) {
       console.error('Error denying:', error);
@@ -155,7 +160,11 @@ export default function MyApprovals() {
             ) : (
               <div className="space-y-3">
                 {approvals.map((approval) => (
-                  <Card key={approval.id} className="border-2 border-orange-200 bg-orange-50/30">
+                  <Card 
+                    key={approval.id} 
+                    className="border-2 border-orange-200 bg-orange-50/30 hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => setSelectedApproval(approval)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
@@ -168,7 +177,7 @@ export default function MyApprovals() {
                                 {approval.event_name}
                               </h3>
                               <div className="mt-2 space-y-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <Badge className="bg-orange-100 text-orange-700 border-orange-300">
                                     {approval.resource_name}
                                   </Badge>
@@ -184,11 +193,14 @@ export default function MyApprovals() {
                                 <p className="text-xs text-slate-500">
                                   Requested: {format(parseISO(approval.created_at), 'PPp')}
                                 </p>
+                                <p className="text-xs text-blue-600 font-medium mt-2">
+                                  Click to view details and resource questions &rarr;
+                                </p>
                               </div>
                             </div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -261,6 +273,18 @@ export default function MyApprovals() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Approval Detail Modal */}
+      {selectedApproval && (
+        <ApprovalDetailModal
+          approval={selectedApproval}
+          open={!!selectedApproval}
+          onClose={() => setSelectedApproval(null)}
+          onApprove={handleApprove}
+          onDeny={handleDeny}
+          isProcessing={processingApproval === selectedApproval.id}
+        />
+      )}
 
       {/* Full Calendar Modal */}
       {showFullCalendar && (
