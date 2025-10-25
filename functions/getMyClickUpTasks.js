@@ -45,9 +45,9 @@ Deno.serve(async (req) => {
 
         for (const team of teamsData.teams) {
             try {
-                // Get tasks assigned to me
+                // Get tasks assigned to me with more details
                 const tasksResponse = await fetch(
-                    `https://api.clickup.com/api/v2/team/${team.id}/task?assignees[]=${clickupUserId}&include_closed=false`,
+                    `https://api.clickup.com/api/v2/team/${team.id}/task?assignees[]=${clickupUserId}&include_closed=false&subtasks=true`,
                     {
                         headers: {
                             'Authorization': user.clickup_access_token
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Format tasks
+        // Format tasks with all details
         const formattedTasks = allTasks.map(task => ({
             id: task.id,
             title: task.name,
@@ -75,7 +75,18 @@ Deno.serve(async (req) => {
             list_name: task.list?.name,
             folder_name: task.folder?.name,
             space_name: task.space?.name,
-            description: task.description
+            description: task.description || task.text_content,
+            tags: task.tags?.map(tag => tag.name) || [],
+            time_estimate: task.time_estimate,
+            assignees: task.assignees?.map(a => a.username) || [],
+            custom_fields: task.custom_fields?.map(field => ({
+                name: field.name,
+                value: field.value,
+                type: field.type
+            })) || [],
+            subtasks: task.subtasks?.length || 0,
+            attachments: task.attachments?.length || 0,
+            comments: task.comments?.length || 0
         }));
 
         return Response.json({ 
