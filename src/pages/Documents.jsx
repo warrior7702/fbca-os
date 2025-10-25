@@ -39,7 +39,10 @@ export default function Documents() {
     setLoading(true);
     setError(null);
     try {
-      const response = await base44.functions.invoke('getOneDriveFiles', { folderId });
+      console.log('Loading folder:', folderId);
+      const response = await base44.functions.invoke('getOneDriveFiles', { 
+        folder_id: folderId 
+      });
       console.log('OneDrive response:', response.data);
       setItems(response.data.items || []);
     } catch (error) {

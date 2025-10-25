@@ -25,8 +25,9 @@ Deno.serve(async (req) => {
             accessToken = refreshResponse.data.access_token;
         }
 
-        const url = new URL(req.url);
-        const folderId = url.searchParams.get('folderId') || 'root';
+        // Read folder_id from request body
+        const body = await req.json();
+        const folderId = body.folder_id || 'root';
         
         const path = folderId === 'root' 
             ? 'https://graph.microsoft.com/v1.0/me/drive/root/children'
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
             createdDate: item.createdDateTime
         }));
 
-        console.log('Returning', items.length, 'items');
+        console.log('Returning', items.length, 'items for folder:', folderId);
 
         return Response.json({ items });
 
