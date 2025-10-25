@@ -18,9 +18,9 @@ import {
   LogOut,
   ChevronDown,
   Layers,
-  Users, // Added Users icon import
-  Loader2, // Added Loader2 for searching state
-  Folder // Added Folder for file results
+  Users,
+  Loader2,
+  Folder
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card"; // Added Card, CardContent (though not directly used, keeping as per outline)
+import { Card, CardContent } from "@/components/ui/card";
 
 const apps = [
   {
@@ -136,14 +136,12 @@ export default function Layout({ children, currentPageName }) {
       
       const matchedStaff = (staffResponse || [])
         .filter(person => {
-          const fullName = person.first_name && person.last_name ? `${person.first_name} ${person.last_name}` : person.full_name || '';
-          return fullName.toLowerCase().includes(lowerQuery) ||
+          return person.full_name?.toLowerCase().includes(lowerQuery) ||
                  person.first_name?.toLowerCase().includes(lowerQuery) ||
                  person.last_name?.toLowerCase().includes(lowerQuery) ||
-                 person.email?.toLowerCase().includes(lowerQuery) ||
-                 person.title?.toLowerCase().includes(lowerQuery); // Added title search for staff
+                 person.email?.toLowerCase().includes(lowerQuery);
         })
-        .slice(0, 5); // Top 5 results
+        .slice(0, 5);
 
       // Search modules
       const matchedModules = apps
@@ -153,15 +151,13 @@ export default function Layout({ children, currentPageName }) {
         )
         .slice(0, 3);
 
-      // Search files
+      // Search files (already grouped by folder from backend)
       let files = [];
       try {
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
         files = (filesResponse.data.files || []).slice(0, 5);
       } catch (error) {
-        console.log('File search skipped or failed:', error);
-        // It's good to indicate to the user if file search failed, e.g., via a message,
-        // but for now, just logging and proceeding with empty files.
+        console.log('File search skipped:', error);
       }
 
       setSearchResults({
@@ -359,9 +355,12 @@ export default function Layout({ children, currentPageName }) {
                         onClick={() => handleResultClick('file', file)}
                         className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
                       >
-                        <Folder className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <Folder className={`w-4 h-4 flex-shrink-0 ${file.isFolder ? 'text-blue-500' : 'text-slate-400'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
+                          {file.isFolder && file.fileCount && (
+                            <p className="text-xs text-slate-500">{file.fileCount} file{file.fileCount !== 1 ? 's' : ''}</p>
+                          )}
                         </div>
                       </button>
                     ))}
