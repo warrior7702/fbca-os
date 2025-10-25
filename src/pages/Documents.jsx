@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +11,6 @@ import {
   Download,
   ExternalLink,
   ArrowLeft,
-  Home,
   Loader2,
   FolderOpen,
   AlertCircle
@@ -41,7 +39,6 @@ export default function Documents() {
     setError(null);
     console.log('loadFiles called with folderId:', folderId);
     try {
-      console.log('Loading folder:', folderId);
       const response = await base44.functions.invoke('getOneDriveFiles', { 
         folder_id: folderId 
       });
@@ -59,7 +56,6 @@ export default function Documents() {
 
   const openFolder = (folder) => {
     console.log('openFolder called with:', folder);
-    console.log('Setting currentFolderId to:', folder.id);
     setCurrentFolderId(folder.id);
     setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
   };
@@ -90,24 +86,44 @@ export default function Documents() {
   const openInNativeApp = (item) => {
     const ext = item.name.split('.').pop().toLowerCase();
     
-    // Office files - open in desktop apps
+    // Office files - open in desktop apps using proper protocols
     if (ext.match(/docx?|dotx?/)) {
       window.location.href = `ms-word:ofe|u|${encodeURIComponent(item.webUrl)}`;
-    } else if (ext.match(/xlsx?|xltx?/)) {
+      toast.info('Opening in Microsoft Word...');
+    } else if (ext.match(/xlsx?|xltx?|csv/)) {
       window.location.href = `ms-excel:ofe|u|${encodeURIComponent(item.webUrl)}`;
+      toast.info('Opening in Microsoft Excel...');
     } else if (ext.match(/pptx?|potx?|ppsx?/)) {
       window.location.href = `ms-powerpoint:ofe|u|${encodeURIComponent(item.webUrl)}`;
-    } else {
-      // Everything else - open in browser (PDFs, images, etc.)
+      toast.info('Opening in Microsoft PowerPoint...');
+    } 
+    // PDFs - open in default PDF viewer
+    else if (ext === 'pdf') {
+      if (item.downloadUrl) {
+        window.open(item.downloadUrl, '_blank');
+      } else {
+        window.open(item.webUrl, '_blank');
+      }
+      toast.info('Opening PDF in default viewer...');
+    }
+    // Images - open in default image viewer
+    else if (ext.match(/jpg|jpeg|png|gif|bmp|svg|webp|tiff?/)) {
+      if (item.downloadUrl) {
+        window.open(item.downloadUrl, '_blank');
+      } else {
+        window.open(item.webUrl, '_blank');
+      }
+      toast.info('Opening image...');
+    }
+    // Everything else - open in browser
+    else {
       window.open(item.webUrl, '_blank');
     }
   };
 
   const openInDesktop = (item) => {
-    // Try to open in OneDrive desktop app
     const desktopUrl = `ms-onedrive://open?url=${encodeURIComponent(item.webUrl)}`;
     
-    // Create a hidden link and click it
     const link = document.createElement('a');
     link.href = desktopUrl;
     link.style.display = 'none';
@@ -115,7 +131,6 @@ export default function Documents() {
     link.click();
     document.body.removeChild(link);
     
-    // Show toast and provide fallback
     toast.info(
       <div>
         <p>Opening in OneDrive desktop app...</p>
@@ -133,7 +148,6 @@ export default function Documents() {
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Button
@@ -150,7 +164,6 @@ export default function Documents() {
           </div>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
@@ -169,7 +182,6 @@ export default function Documents() {
           </Alert>
         )}
 
-        {/* Breadcrumbs */}
         {!error && (
           <div className="flex items-center gap-2 mb-4 text-sm">
             {breadcrumbs.map((crumb, index) => (
@@ -188,7 +200,6 @@ export default function Documents() {
           </div>
         )}
 
-        {/* Files Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -208,7 +219,6 @@ export default function Documents() {
                   <Card 
                     className="hover:shadow-lg transition-all cursor-pointer"
                     onClick={() => {
-                      console.log('Card clicked, item:', item);
                       if (item.isFolder) {
                         openFolder(item);
                       }
