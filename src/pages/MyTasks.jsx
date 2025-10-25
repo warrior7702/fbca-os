@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,6 +106,15 @@ export default function MyTasks() {
     return 'bg-slate-400 text-white border-slate-500';
   };
 
+  const formatStatus = (status) => {
+    if (!status) return 'No Status';
+    // Capitalize first letter of each word
+    return status
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const getCategoryColor = (category) => {
     const categoryLower = category?.toLowerCase() || '';
     
@@ -188,10 +198,10 @@ export default function MyTasks() {
                         <h3 className="font-medium text-slate-900 mb-1">{task.title}</h3>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge className={getPriorityBadge(task.priority)}>
-                            {task.priority === 'none' ? 'No Priority' : task.priority}
+                            {task.priority === 'none' ? 'No Priority' : task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                           </Badge>
                           <Badge className={getStatusColor(task.status)}>
-                            {task.status}
+                            {formatStatus(task.status)}
                           </Badge>
                           {task.list_name && (
                             <span className="text-xs text-slate-500">{task.list_name}</span>
