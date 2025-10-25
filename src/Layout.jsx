@@ -235,8 +235,8 @@ export default function Layout({ children, currentPageName }) {
       {/* Admin Toggle - Only shows for admins */}
       {user && <AdminToggle user={user} />}
 
-      {/* Email Domain Check - Re-enabled with whitelist */}
-      {user && <EmailDomainCheck user={user} exceptionEmail="warrior7702@gmail.com" />}
+      {/* Email Domain Check - DISABLED */}
+      {/* {user && <EmailDomainCheck user={user} exceptionEmail="warrior7702@gmail.com" />} */}
 
       {/* Main Content - Full Height */}
       <main className="h-screen pb-16">
