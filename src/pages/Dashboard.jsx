@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -23,6 +24,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const defaultApps = [
   { id: "mytasks", name: "My Tasks", icon: CheckSquare, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
@@ -50,6 +52,7 @@ export default function Dashboard() {
   const [wallpaper, setWallpaper] = useState("church_steeple_night");
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState({});
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -174,6 +177,18 @@ export default function Dashboard() {
     }
   };
 
+  const handleWallpaperChange = async (wallpaperId) => {
+    setWallpaper(wallpaperId);
+    try {
+      await base44.auth.updateMe({ wallpaper: wallpaperId });
+      toast.success("Wallpaper updated!");
+      setShowWallpaperPicker(false);
+    } catch (error) {
+      console.error("Error updating wallpaper:", error);
+      toast.error("Failed to update wallpaper");
+    }
+  };
+
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.church_steeple_night;
 
   // Create grid cells
@@ -213,16 +228,64 @@ export default function Dashboard() {
             <GripVertical className="w-4 h-4 mr-2" />
             {editMode ? 'Lock Icons' : 'Rearrange Icons'}
           </ContextMenuItem>
+          <ContextMenuItem onClick={() => setShowWallpaperPicker(true)}>
+            <Settings className="w-4 h-4 mr-2" />
+            Change Wallpaper
+          </ContextMenuItem>
           <ContextMenuItem>
             <Grid3x3 className="w-4 h-4 mr-2" />
             View Options
           </ContextMenuItem>
-          <ContextMenuItem>
-            <Settings className="w-4 h-4 mr-2" />
-            Desktop Settings
-          </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+
+      {/* Wallpaper Picker Modal */}
+      <Dialog open={showWallpaperPicker} onOpenChange={setShowWallpaperPicker}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Choose Wallpaper</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+            {Object.entries(wallpapers).map(([id, url]) => {
+              const wallpaperInfo = [
+                { id: "church_steeple_night", name: "Church Steeple Night" },
+                { id: "church_building_blue", name: "Church Building Blue" },
+                { id: "cross_chrome_blue", name: "Cross Chrome Blue" },
+                { id: "cross_white_glow", name: "Cross White Glow" },
+                { id: "cross_metal_texture", name: "Cross Metal Texture" }
+              ].find(w => w.id === id);
+
+              return (
+                <motion.div
+                  key={id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`relative cursor-pointer rounded-lg overflow-hidden border-4 transition-all ${
+                    wallpaper === id
+                      ? 'border-blue-600 shadow-lg ring-2 ring-blue-300'
+                      : 'border-transparent hover:border-slate-300'
+                  }`}
+                  onClick={() => handleWallpaperChange(id)}
+                >
+                  <img
+                    src={url}
+                    alt={wallpaperInfo?.name || id}
+                    className="w-full h-40 object-cover"
+                  />
+                  {wallpaper === id && (
+                    <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1">
+                      <CheckSquare className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                    <p className="text-white text-sm font-medium">{wallpaperInfo?.name || id}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Mode Indicator */}
       {editMode && (
