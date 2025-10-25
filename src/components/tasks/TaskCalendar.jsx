@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay, isToday, startOfDay } from "date-fns";
 
 export default function TaskCalendar({ tasks, onOpenFullView }) {
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
 
@@ -45,11 +46,21 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-500';
-      case 'high': return 'bg-orange-500';
-      case 'normal': return 'bg-blue-500';
-      case 'low': return 'bg-gray-400';
-      default: return 'bg-gray-300';
+      case 'urgent': return 'bg-red-500'; // ClickUp Urgent Red
+      case 'high': return 'bg-orange-400'; // ClickUp High Orange/Yellow
+      case 'normal': return 'bg-blue-400'; // ClickUp Normal Blue
+      case 'low': return 'bg-gray-300'; // ClickUp Low Gray
+      default: return 'bg-slate-300'; // No priority
+    }
+  };
+
+  const getPriorityBorderColor = (priority) => {
+    switch (priority) {
+      case 'urgent': return 'border-red-500';
+      case 'high': return 'border-orange-400';
+      case 'normal': return 'border-blue-400';
+      case 'low': return 'border-gray-300';
+      default: return 'border-slate-300';
     }
   };
 
@@ -101,10 +112,10 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                       rel="noopener noreferrer"
                       className="block"
                     >
-                      <div className="text-xs p-1.5 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer">
+                      <div className={`text-xs p-1.5 rounded bg-white hover:bg-slate-50 border-l-2 ${getPriorityBorderColor(task.priority)} border-r border-t border-b border-slate-200 cursor-pointer transition-all`}>
                         <div className="flex items-center gap-1 mb-1">
                           <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                          <span className="truncate flex-1">{task.title}</span>
+                          <span className="truncate flex-1 font-medium">{task.title}</span>
                         </div>
                         {task.list_name && (
                           <div className="text-[10px] text-slate-500 truncate">
@@ -151,10 +162,10 @@ export default function TaskCalendar({ tasks, onOpenFullView }) {
                       rel="noopener noreferrer"
                       className="block"
                     >
-                      <div className="text-xs p-1.5 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer">
+                      <div className={`text-xs p-1.5 rounded bg-white hover:bg-slate-50 border-l-2 ${getPriorityBorderColor(task.priority)} border-r border-t border-b border-slate-200 cursor-pointer transition-all`}>
                         <div className="flex items-center gap-1 mb-1">
                           <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                          <span className="truncate flex-1">{task.title}</span>
+                          <span className="truncate flex-1 font-medium">{task.title}</span>
                         </div>
                         {task.list_name && (
                           <div className="text-[10px] text-slate-500 truncate">
