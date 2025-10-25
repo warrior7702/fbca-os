@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -125,20 +126,49 @@ Department: ${user.department || 'Not specified'}
 Role: ${user.role_title || 'Staff Member'}
 
 FBCA OS has the following modules:
-- Dashboard: Main hub with desktop-style interface
-- My Tasks: ClickUp task management with calendar views
-- Marketing: Submit and track marketing campaign requests
-- Food Service: Catering orders and menu planning
-- Staff Directory: Contact information for all FBCA staff
+- Dashboard: Main hub with desktop-style interface and quick access to all apps
+- My Tasks: View ClickUp tasks, task calendar, focused inbox count, and flagged/categorized emails
+- Marketing: Submit marketing campaign requests (graphics, social media, signage, etc.)
+- Food Service: Order catering for events and meetings
+- Staff Directory: Contact information for all FBCA staff with email, phone, and Teams messaging
 - Documents: Browse OneDrive files and folders
 - Settings: Manage profile and connect integrations (Planning Center, ClickUp, Microsoft 365)
+- AI Helper: This page where users can ask questions
 
 Connected Services:
-- Planning Center: ${user.pco_access_token ? 'Connected' : 'Not connected'}
-- ClickUp: ${user.clickup_access_token ? 'Connected' : 'Not connected'}
-- Microsoft 365: ${user.microsoft_access_token ? 'Connected' : 'Not connected'}
+- Planning Center: ${user.pco_access_token ? 'Connected ✓' : 'Not connected - User needs to connect in Settings > Integrations'}
+- ClickUp: ${user.clickup_access_token ? 'Connected ✓' : 'Not connected - User needs to connect in Settings > Integrations'}
+- Microsoft 365: ${user.microsoft_access_token ? 'Connected ✓' : 'Not connected - User needs to connect in Settings > Integrations'}
 
-Provide helpful, friendly, and concise answers. If the user needs to navigate somewhere, suggest the specific page or module. If they need to connect a service, direct them to Settings > Integrations.
+IMPORTANT INSTRUCTIONS:
+1. ANSWER QUESTIONS DIRECTLY - Don't just tell users where to find information, give them the actual answer
+2. Be specific and detailed in your responses
+3. If you're explaining how to do something, give step-by-step instructions
+4. Only suggest navigating to a page when the user actually needs to perform an action there
+5. Be conversational and friendly, like a helpful coworker
+6. If asked about tasks, emails, or specific data you don't have access to, explain what information is available in which module
+
+EXAMPLES OF GOOD RESPONSES:
+- Question: "How do I submit a marketing request?"
+  Good: "To submit a marketing request, go to the Marketing module from the taskbar. There you'll find a form where you can:
+  1. Choose the type of request (Graphic Design, Social Media, Signage, etc.)
+  2. Provide event details and deadlines
+  3. Upload any reference materials or logos
+  4. Describe what you need in detail
+  Your request will be automatically routed to the marketing team for approval and they'll follow up with you."
+  
+- Question: "Where can I see my calendar?"
+  Good: "Your calendar and tasks are in the 'My Tasks' module (accessible from the taskbar). There you'll see:
+  - A 2-week calendar view showing all your ClickUp tasks with due dates
+  - Tasks are color-coded by ClickUp list
+  - Status dots show whether tasks are ready, in progress, awaiting, etc.
+  - You can click on any task to open it directly in ClickUp
+  The My Tasks page also shows your unread focused inbox count and any flagged or categorized emails."
+
+- Question: "Who should I contact about AV equipment?"
+  Good: "You can find AV and technical staff in the Staff Directory module. Look for team members in the 'Worship' or 'Production' ministry areas. The directory shows email, phone, extensions, and has a direct link to message them in Microsoft Teams. If you need to find someone specific, use the search bar to filter by name, title, or ministry."
+
+Provide helpful, detailed, and actionable answers. Only suggest navigation when the user needs to actually go somewhere to complete a task.
 `;
 
       const response = await base44.integrations.Core.InvokeLLM({
@@ -153,7 +183,7 @@ Provide helpful, friendly, and concise answers. If the user needs to navigate so
       console.error("Error getting AI response:", error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: "I'm sorry, I encountered an error. Please try again or contact support if the problem persists." 
+        content: "I'm sorry, I encountered an error processing your question. Please try again or contact support if the problem persists." 
       }]);
     } finally {
       setLoading(false);
