@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +11,7 @@ import {
   AlertCircle,
   Loader2,
   ExternalLink,
-  RefreshCcw // Changed from AlertCircle as it makes more sense for "Resync" but outline specified AlertCircle. Sticking to outline.
+  RefreshCw
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -27,11 +26,13 @@ export default function MyApprovals() {
   const [approvals, setApprovals] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false); // New state for sync status
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState(null);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
-  const [syncStats, setSyncStats] = useState(null); // New state for sync stats
+  const [syncStats, setSyncStats] = useState(null);
   const [selectedApproval, setSelectedApproval] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -39,61 +40,69 @@ export default function MyApprovals() {
 
   const loadData = async () => {
     setLoading(true);
-    setSyncing(true); // Indicate syncing process has started
+    setSyncing(true);
+    setError(null);
+    
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      if (!currentUser.pco_access_token) {
-        toast.error('Planning Center is not connected. Please connect it in Settings > Integrations.');
+      if (!currentUser?.pco_access_token) {
+        setError('Planning Center is not connected. Please connect it in Settings > Integrations.');
         setLoading(false);
-        setSyncing(false); // Ensure syncing state is reset
+        setSyncing(false);
         return;
       }
 
       // Sync approvals (incremental)
       const syncResponse = await base44.functions.invoke('syncMyApprovals', {
         forceResync: false
-      }).catch(err => {
-        console.error('Approvals sync error:', err);
-        toast.error('Failed to sync approvals');
-        return { data: { pending_approvals: [], sync_stats: null } }; // Return a default structure to avoid breaking subsequent calls
       });
 
-      setApprovals(syncResponse.data.pending_approvals || []);
-      setSyncStats(syncResponse.data.sync_stats);
+      if (syncResponse?.data) {
+        setApprovals(syncResponse.data.pending_approvals || []);
+        setSyncStats(syncResponse.data.sync_stats || null);
+      } else {
+        setApprovals([]);
+      }
 
       // Load calendar events
-      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents').catch(err => {
+      try {
+        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+        setCalendarEvents(eventsResponse?.data?.events || []);
+      } catch (err) {
         console.error('Calendar error:', err);
-        toast.error('Failed to load calendar events');
-        return { data: { events: [] } };
-      });
-
-      setCalendarEvents(eventsResponse.data.events || []);
+        setCalendarEvents([]);
+      }
 
     } catch (error) {
       console.error("Error loading data:", error);
-      toast.error('Failed to load data. Please try again.');
+      setError(error.message || 'Failed to load approvals');
+      toast.error('Failed to load approvals. Please try again.');
     } finally {
       setLoading(false);
-      setSyncing(false); // Reset syncing state
+      setSyncing(false);
     }
   };
 
   const handleForceResync = async () => {
     setSyncing(true);
+    setError(null);
     toast.info('Force resyncing approvals...');
+    
     try {
       const syncResponse = await base44.functions.invoke('syncMyApprovals', {
         forceResync: true
       });
 
-      setApprovals(syncResponse.data.pending_approvals || []);
-      setSyncStats(syncResponse.data.sync_stats);
-      toast.success(`Resync complete! Found ${syncResponse.data.count} pending approvals.`);
+      if (syncResponse?.data) {
+        setApprovals(syncResponse.data.pending_approvals || []);
+        setSyncStats(syncResponse.data.sync_stats || null);
+        toast.success(`Resync complete! Found ${syncResponse.data.count || 0} pending approvals.`);
+      }
     } catch (error) {
       console.error('Force resync error:', error);
+      setError(error.message || 'Failed to resync');
       toast.error('Failed to resync. Please try again.');
     } finally {
       setSyncing(false);
@@ -101,14 +110,13 @@ export default function MyApprovals() {
   };
 
   const handleApprove = async (approval) => {
-    setProcessingApproval(approval.id);
+    setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.id
+        request_id: approval.request_id
       });
       toast.success('Request approved!');
-      setSelectedApproval(null); // Close modal on action
-      loadData(); // Reload data to reflect changes
+      await loadData();
     } catch (error) {
       console.error('Error approving:', error);
       toast.error('Failed to approve request');
@@ -118,20 +126,24 @@ export default function MyApprovals() {
   };
 
   const handleDeny = async (approval) => {
-    setProcessingApproval(approval.id);
+    setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('denyResourceRequest', {
-        request_id: approval.id
+        request_id: approval.request_id
       });
       toast.success('Request denied');
-      setSelectedApproval(null); // Close modal on action
-      loadData(); // Reload data to reflect changes
+      await loadData();
     } catch (error) {
       console.error('Error denying:', error);
       toast.error('Failed to deny request');
     } finally {
       setProcessingApproval(null);
     }
+  };
+
+  const handleViewDetails = (approval) => {
+    setSelectedApproval(approval);
+    setShowDetailModal(true);
   };
 
   if (loading) {
@@ -145,17 +157,46 @@ export default function MyApprovals() {
     );
   }
 
-  const displayName = user?.display_name || user?.full_name;
+  if (error) {
+    return (
+      <div className="p-6 md:p-8 h-full">
+        <div className="max-w-2xl mx-auto">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p>{error}</p>
+                {error.includes('not connected') ? (
+                  <Link to={createPageUrl('Settings') + '?tab=integrations'}>
+                    <Button size="sm" variant="outline" className="mt-2">
+                      Connect Planning Center
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={loadData} className="mt-2">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Again
+                  </Button>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
+  const displayName = user?.display_name || user?.full_name || 'User';
 
   return (
     <div className="p-6 md:p-8 h-full overflow-auto bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
             <p className="text-slate-600">Welcome back, {displayName}</p>
-            {syncStats && (
+            {syncStats && syncStats.last_sync_after && (
               <p className="text-xs text-slate-500 mt-1">
                 Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')} 
                 {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
@@ -177,14 +218,13 @@ export default function MyApprovals() {
                 </>
               ) : (
                 <>
-                  <AlertCircle className="w-4 h-4 mr-2" /> {/* As per outline */}
+                  <RefreshCw className="w-4 h-4 mr-2" />
                   Force Resync
                 </>
               )}
             </Button>
             <Link to={createPageUrl("Settings") + "?tab=integrations"}>
               <Button variant="outline" size="sm">
-                <AlertCircle className="w-4 h-4 mr-2" />
                 Manage Integrations
               </Button>
             </Link>
@@ -199,100 +239,94 @@ export default function MyApprovals() {
                 <CheckCircle className="w-5 h-5 text-orange-500" />
                 Pending Approvals
               </CardTitle>
-              {approvals.length > 0 && (
-                <Badge variant="destructive" className="text-lg px-3 py-1">
-                  {approvals.length} pending
-                </Badge>
-              )}
+              <Badge className="bg-red-500 text-white">
+                {approvals.length} pending
+              </Badge>
             </div>
           </CardHeader>
           <CardContent>
             {approvals.length === 0 ? (
               <div className="text-center py-12">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <p className="text-xl font-semibold text-slate-700">No pending approvals! 🎉</p>
-                <p className="text-slate-500 mt-2">You're all caught up.</p>
+                <CheckCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">No pending approvals</p>
+                <p className="text-sm text-slate-400 mt-2">You're all caught up!</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {approvals.map((approval) => (
-                  <Card 
-                    key={approval.id} 
-                    className="border-2 border-orange-200 bg-orange-50/30 hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => setSelectedApproval(approval)}
+                  <div
+                    key={approval.request_id}
+                    className="bg-white border-2 border-orange-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-orange-100 rounded-lg">
-                              <Calendar className="w-5 h-5 text-orange-600" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-slate-900 text-lg">
-                                {approval.event_name}
-                              </h3>
-                              <div className="mt-2 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge className="bg-orange-100 text-orange-700 border-orange-300">
-                                    {approval.resource_name}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    Qty: {approval.quantity}
-                                  </Badge>
-                                </div>
-                                {approval.event_starts_at && (
-                                  <p className="text-sm text-slate-600">
-                                    📅 {format(parseISO(approval.event_starts_at), 'PPP p')}
-                                  </p>
-                                )}
-                                <p className="text-xs text-slate-500">
-                                  Requested: {format(parseISO(approval.created_at), 'PPp')}
-                                </p>
-                                <p className="text-xs text-blue-600 font-medium mt-2">
-                                  Click to view details and resource questions &rarr;
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calendar className="w-4 h-4 text-slate-400" />
+                          <h3 className="font-semibold text-lg text-slate-900">
+                            {approval.event_name}
+                          </h3>
                         </div>
-                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 hover:bg-green-50 border-green-300"
-                            onClick={() => handleApprove(approval)}
-                            disabled={processingApproval === approval.id}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+                              {approval.resource_name}
+                            </Badge>
+                            <span className="text-sm text-slate-600">
+                              Qty: {approval.quantity}
+                            </span>
+                          </div>
+                          {approval.event_starts_at && (
+                            <p className="text-sm text-slate-600">
+                              Event: {format(parseISO(approval.event_starts_at), 'PPP p')}
+                            </p>
+                          )}
+                          <p className="text-xs text-slate-500">
+                            Requested: {format(parseISO(approval.pco_created_at), 'PPp')}
+                          </p>
+                          <button
+                            onClick={() => handleViewDetails(approval)}
+                            className="text-sm text-blue-600 hover:underline"
                           >
-                            {processingApproval === approval.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Approve
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:bg-red-50 border-red-300"
-                            onClick={() => handleDeny(approval)}
-                            disabled={processingApproval === approval.id}
-                          >
-                            {processingApproval === approval.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Deny
-                              </>
-                            )}
-                          </Button>
+                            Click to view details and resource questions →
+                          </button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-green-600 border-green-600 hover:bg-green-50"
+                          onClick={() => handleApprove(approval)}
+                          disabled={processingApproval === approval.request_id}
+                        >
+                          {processingApproval === approval.request_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Approve
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-600 hover:bg-red-50"
+                          onClick={() => handleDeny(approval)}
+                          disabled={processingApproval === approval.request_id}
+                        >
+                          {processingApproval === approval.request_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Deny
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -304,11 +338,11 @@ export default function MyApprovals() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-500" />
+                <Calendar className="w-5 h-5 text-blue-600" />
                 Calendar - Next 2 Weeks
               </CardTitle>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setShowFullCalendar(true)}
               >
@@ -318,35 +352,32 @@ export default function MyApprovals() {
             </div>
           </CardHeader>
           <CardContent>
-            {calendarEvents.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No upcoming events in the next 2 weeks</p>
-              </div>
-            ) : (
-              <ApprovalCalendar events={calendarEvents} />
-            )}
+            <ApprovalCalendar 
+              approvals={approvals}
+              onApprovalClick={handleViewDetails}
+            />
           </CardContent>
         </Card>
       </div>
 
-      {/* Approval Detail Modal */}
+      {/* Modals */}
+      <FullApprovalCalendarModal
+        open={showFullCalendar}
+        onClose={() => setShowFullCalendar(false)}
+        approvals={approvals}
+        onApprovalClick={handleViewDetails}
+      />
+
       {selectedApproval && (
         <ApprovalDetailModal
           approval={selectedApproval}
-          open={!!selectedApproval}
-          onClose={() => setSelectedApproval(null)}
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedApproval(null);
+          }}
           onApprove={handleApprove}
           onDeny={handleDeny}
-          isProcessing={processingApproval === selectedApproval.id}
-        />
-      )}
-
-      {/* Full Calendar Modal */}
-      {showFullCalendar && (
-        <FullApprovalCalendarModal
-          events={calendarEvents}
-          onClose={() => setShowFullCalendar(false)}
         />
       )}
     </div>
