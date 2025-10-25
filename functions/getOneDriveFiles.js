@@ -15,11 +15,13 @@ Deno.serve(async (req) => {
 
         const url = new URL(req.url);
         const folderId = url.searchParams.get('folderId') || 'root';
+        
         const path = folderId === 'root' 
             ? 'https://graph.microsoft.com/v1.0/me/drive/root/children'
             : `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`;
 
-        // Get files and folders
+        console.log('Fetching OneDrive path:', path);
+
         const response = await fetch(path, {
             headers: {
                 'Authorization': `Bearer ${user.microsoft_access_token}`
@@ -29,7 +31,10 @@ Deno.serve(async (req) => {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('OneDrive API error:', errorText);
-            return Response.json({ error: 'Failed to fetch OneDrive files' }, { status: 500 });
+            return Response.json({ 
+                error: 'Failed to fetch OneDrive files',
+                details: errorText 
+            }, { status: 500 });
         }
 
         const data = await response.json();
@@ -45,10 +50,15 @@ Deno.serve(async (req) => {
             createdDate: item.createdDateTime
         }));
 
+        console.log('Successfully fetched', items.length, 'items');
+
         return Response.json({ items });
 
     } catch (error) {
         console.error('Get OneDrive files error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ 
+            error: error.message,
+            stack: error.stack 
+        }, { status: 500 });
     }
 });
