@@ -1,10 +1,11 @@
+
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday, startOfDay, parseISO } from "date-fns";
 
-export default function FullApprovalCalendarModal({ open, onOpenChange, approvals }) {
+export default function FullApprovalCalendarModal({ open, onOpenChange, approvals, calendarEvents }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const generateMonthDays = () => {
@@ -39,7 +40,24 @@ export default function FullApprovalCalendarModal({ open, onOpenChange, approval
         }
         approvalsByDate[dateKey].push(approval);
       } catch (error) {
-        console.error('Error parsing date:', error);
+        console.error('Error parsing approval date:', error);
+      }
+    }
+  });
+
+  // Group calendar events by date
+  const eventsByDate = {};
+  (calendarEvents || []).forEach((event) => {
+    if (event.starts_at) {
+      try {
+        const date = parseISO(event.starts_at);
+        const dateKey = format(startOfDay(date), 'yyyy-MM-dd');
+        if (!eventsByDate[dateKey]) {
+          eventsByDate[dateKey] = [];
+        }
+        eventsByDate[dateKey].push(event);
+      } catch (error) {
+        console.error('Error parsing event date:', error);
       }
     }
   });
@@ -55,7 +73,7 @@ export default function FullApprovalCalendarModal({ open, onOpenChange, approval
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-3xl font-bold">
-              {format(currentMonth, 'MMMM yyyy')} - Approvals
+              {format(currentMonth, 'MMMM yyyy')} - Calendar
             </DialogTitle>
             <div className="flex items-center gap-2">
               <Button
@@ -101,6 +119,7 @@ export default function FullApprovalCalendarModal({ open, onOpenChange, approval
                 {week.map((day, dayIdx) => {
                   const dateKey = format(day, 'yyyy-MM-dd');
                   const dayApprovals = approvalsByDate[dateKey] || [];
+                  const dayEvents = eventsByDate[dateKey] || [];
                   const isTodayDate = isToday(day);
                   const isCurrentMonth = isSameMonth(day, currentMonth);
 
@@ -118,9 +137,10 @@ export default function FullApprovalCalendarModal({ open, onOpenChange, approval
                       </div>
 
                       <div className="space-y-1">
+                        {/* Show pending approvals */}
                         {dayApprovals.map((approval, idx) => (
                           <div
-                            key={idx}
+                            key={`approval-${idx}`}
                             className="text-xs p-1.5 rounded-md bg-orange-100 border border-orange-300 hover:shadow-md transition-all"
                           >
                             <div className="flex items-start gap-1 mb-0.5">
@@ -136,6 +156,23 @@ export default function FullApprovalCalendarModal({ open, onOpenChange, approval
                                 )}
                               </div>
                             </div>
+                          </div>
+                        ))}
+
+                        {/* Show regular events */}
+                        {dayEvents.map((event, idx) => (
+                          <div
+                            key={`event-${idx}`}
+                            className="text-xs p-1.5 rounded-md bg-blue-50 border border-blue-200 hover:shadow-md transition-all"
+                          >
+                            <div className="font-medium truncate text-blue-900 leading-tight">
+                              {event.name}
+                            </div>
+                            {event.starts_at && (
+                              <div className="text-[9px] text-blue-600 mt-0.5">
+                                {format(parseISO(event.starts_at), 'h:mm a')}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

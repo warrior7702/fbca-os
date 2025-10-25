@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 export default function MyApprovals() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
@@ -49,6 +51,15 @@ export default function MyApprovals() {
       } catch (error) {
         console.error('Error fetching approvals:', error);
         toast.error('Failed to load approvals');
+      }
+
+      try {
+        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+        console.log('Calendar events response:', eventsResponse.data);
+        setCalendarEvents(eventsResponse.data.events || []);
+      } catch (error) {
+        console.error('Error fetching calendar events:', error);
+        toast.error('Failed to load calendar events');
       }
 
     } catch (error) {
@@ -205,12 +216,13 @@ export default function MyApprovals() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Approval Calendar - Next 2 Weeks
+              Calendar - Next 2 Weeks
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ApprovalCalendar 
               approvals={approvals}
+              calendarEvents={calendarEvents}
               onOpenFullView={() => setShowFullCalendar(true)}
             />
           </CardContent>
@@ -221,6 +233,7 @@ export default function MyApprovals() {
         open={showFullCalendar}
         onOpenChange={setShowFullCalendar}
         approvals={approvals}
+        calendarEvents={calendarEvents}
       />
     </div>
   );
