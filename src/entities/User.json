@@ -26,24 +26,6 @@
       "default": "cross_white_glow",
       "description": "Selected desktop wallpaper"
     },
-    "desktop_layout": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "x": {
-            "type": "number"
-          },
-          "y": {
-            "type": "number"
-          }
-        }
-      },
-      "description": "Custom desktop icon positions with x,y coordinates"
-    },
     "pco_access_token": {
       "type": "string",
       "description": "Planning Center OAuth access token"
