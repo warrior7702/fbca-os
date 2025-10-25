@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,7 @@ import { toast } from "sonner";
 export default function MyTasks() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [emails, setEmails] = useState({ focused: [], flagged: [] });
+  const [emails, setEmails] = useState({ focused: [], flagged: [], categorized: {} });
   const [loading, setLoading] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
 
@@ -87,6 +88,39 @@ export default function MyTasks() {
       'none': 'bg-slate-300 text-slate-800 border-slate-400'
     };
     return colors[priority] || colors['none'];
+  };
+
+  const getStatusColor = (status) => {
+    // ClickUp status colors
+    const statusLower = status?.toLowerCase() || '';
+    
+    // Common ClickUp statuses with their colors
+    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500 text-white border-green-600';
+    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500 text-white border-pink-600';
+    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500 text-white border-blue-600';
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return 'bg-purple-500 text-white border-purple-600';
+    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-500 text-white border-gray-600';
+    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500 text-white border-red-600';
+    if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500 text-white border-orange-600';
+    
+    // Default
+    return 'bg-slate-400 text-white border-slate-500';
+  };
+
+  const getCategoryColor = (category) => {
+    const categoryLower = category?.toLowerCase() || '';
+    
+    // Outlook category colors
+    if (categoryLower.includes('action') || categoryLower.includes('needed')) return 'bg-orange-500 text-white';
+    if (categoryLower.includes('followup') || categoryLower.includes('follow')) return 'bg-purple-500 text-white';
+    if (categoryLower.includes('network') || categoryLower.includes('networking')) return 'bg-yellow-400 text-black'; // Changed to black text for better contrast
+    if (categoryLower.includes('pending') || categoryLower.includes('order')) return 'bg-teal-500 text-white';
+    if (categoryLower.includes('important') || categoryLower.includes('urgent')) return 'bg-red-500 text-white';
+    if (categoryLower.includes('personal') || categoryLower.includes('private')) return 'bg-blue-500 text-white';
+    if (categoryLower.includes('project') || categoryLower.includes('work')) return 'bg-indigo-500 text-white';
+    
+    // Default
+    return 'bg-slate-500 text-white';
   };
 
   if (loading) {
@@ -153,7 +187,9 @@ export default function MyTasks() {
                           <Badge className={getPriorityBadge(task.priority)}>
                             {task.priority === 'none' ? 'No Priority' : task.priority}
                           </Badge>
-                          <Badge variant="outline">{task.status}</Badge>
+                          <Badge className={getStatusColor(task.status)}>
+                            {task.status}
+                          </Badge>
                           {task.list_name && (
                             <span className="text-xs text-slate-500">{task.list_name}</span>
                           )}
@@ -199,23 +235,41 @@ export default function MyTasks() {
                   {emails.focused.slice(0, 5).map((email, idx) => (
                     <div
                       key={idx}
-                      className={`p-3 rounded-lg border ${
-                        email.isRead ? 'bg-white border-slate-200' : 'bg-blue-50 border-blue-200'
+                      className={`p-3 rounded-lg border transition-all ${
+                        email.isRead 
+                          ? 'bg-white border-slate-200' 
+                          : 'bg-blue-50 border-blue-300 shadow-sm'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className={`text-sm flex-1 ${email.isRead ? 'font-normal' : 'font-semibold'}`}>
+                        <p className={`text-sm flex-1 ${email.isRead ? 'font-normal text-slate-700' : 'font-bold text-slate-900'}`}>
                           {email.subject || '(No Subject)'}
                         </p>
-                        {email.hasAttachments && (
-                          <Paperclip className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {!email.isRead && (
+                            <div className="w-2 h-2 bg-blue-600 rounded-full" title="Unread" />
+                          )}
+                          {email.hasAttachments && (
+                            <Paperclip className="w-3 h-3 text-slate-400" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-xs text-slate-600">{email.fromName || email.from}</p>
-                        <p className="text-xs text-slate-500">
-                          {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {email.categories && email.categories.length > 0 && (
+                            <div className="flex gap-1">
+                              {email.categories.slice(0, 2).map((cat, i) => (
+                                <Badge key={i} className={`text-[10px] px-1.5 py-0 ${getCategoryColor(cat)}`}>
+                                  {cat}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500">
+                            {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -239,23 +293,41 @@ export default function MyTasks() {
                   {emails.flagged.slice(0, 5).map((email, idx) => (
                     <div
                       key={idx}
-                      className={`p-3 rounded-lg border ${
-                        email.isRead ? 'bg-white border-slate-200' : 'bg-orange-50 border-orange-200'
+                      className={`p-3 rounded-lg border transition-all ${
+                        email.isRead 
+                          ? 'bg-white border-slate-200' 
+                          : 'bg-orange-50 border-orange-300 shadow-sm'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className={`text-sm flex-1 ${email.isRead ? 'font-normal' : 'font-semibold'}`}>
+                        <p className={`text-sm flex-1 ${email.isRead ? 'font-normal text-slate-700' : 'font-bold text-slate-900'}`}>
                           {email.subject || '(No Subject)'}
                         </p>
-                        {email.hasAttachments && (
-                          <Paperclip className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {!email.isRead && (
+                            <div className="w-2 h-2 bg-orange-600 rounded-full" title="Unread" />
+                          )}
+                          {email.hasAttachments && (
+                            <Paperclip className="w-3 h-3 text-slate-400" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-xs text-slate-600">{email.fromName || email.from}</p>
-                        <p className="text-xs text-slate-500">
-                          {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {email.categories && email.categories.length > 0 && (
+                            <div className="flex gap-1">
+                              {email.categories.slice(0, 2).map((cat, i) => (
+                                <Badge key={i} className={`text-[10px] px-1.5 py-0 ${getCategoryColor(cat)}`}>
+                                  {cat}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500">
+                            {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -264,6 +336,56 @@ export default function MyTasks() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Categorized Emails Section */}
+        {Object.keys(emails.categorized || {}).length > 0 && (
+          <div className="grid md:grid-cols-2 gap-6">
+            {Object.entries(emails.categorized).slice(0, 4).map(([category, categoryEmails]) => (
+              <Card key={category}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="w-5 h-5" />
+                    <Badge className={getCategoryColor(category)}>{category}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {categoryEmails.slice(0, 3).map((email, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg border transition-all ${
+                          email.isRead 
+                            ? 'bg-white border-slate-200' 
+                            : 'bg-slate-50 border-slate-300 shadow-sm'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className={`text-sm flex-1 ${email.isRead ? 'font-normal text-slate-700' : 'font-bold text-slate-900'}`}>
+                            {email.subject || '(No Subject)'}
+                          </p>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {!email.isRead && (
+                              <div className={`w-2 h-2 rounded-full ${getCategoryColor(category).replace('text-white', '').replace('text-black', '').trim()}`} title="Unread" />
+                            )}
+                            {email.hasAttachments && (
+                              <Paperclip className="w-3 h-3 text-slate-400" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-slate-600">{email.fromName || email.from}</p>
+                          <p className="text-xs text-slate-500">
+                            {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       <FullCalendarModal
