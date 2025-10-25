@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -19,10 +18,10 @@ import {
   FileImage,
   FileVideo,
   FileArchive,
-  Users, // Added Users icon for Staff Directory
-  Mail, // NEW: Added Mail icon
-  Phone, // NEW: Added Phone icon
-  MessageSquare // NEW: Added MessageSquare icon for Teams
+  Users,
+  Mail,
+  Phone,
+  MessageSquare
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,8 +45,8 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
-  const [people, setPeople] = useState([]); // New state for staff directory
-  const [localStaff, setLocalStaff] = useState([]); // NEW: State for local StaffContact entities
+  const [people, setPeople] = useState([]);
+  const [localStaff, setLocalStaff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -60,22 +59,14 @@ export default function Search() {
     }
   }, [location.search]);
 
-  // New relevance calculation function
+  // Relevance calculation
   const calculateRelevance = (item, searchQuery) => {
     const lowerQuery = searchQuery.toLowerCase();
-    // Handle name, displayName, and full_name for different data sources
     const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || item.full_name?.toLowerCase() || '';
     
-    // Exact match = highest score
     if (lowerName === lowerQuery) return 1000;
-    
-    // Starts with query = high score
     if (lowerName.startsWith(lowerQuery)) return 500;
-    
-    // Contains query = medium score
     if (lowerName.includes(lowerQuery)) return 100;
-    
-    // Default
     return 1;
   };
 
@@ -83,8 +74,8 @@ export default function Search() {
     if (!searchQuery || searchQuery.length < 2) {
       setFiles([]);
       setModules([]);
-      setPeople([]); // Clear people results
-      setLocalStaff([]); // NEW: Clear local staff results
+      setPeople([]);
+      setLocalStaff([]);
       setHasSearched(false);
       return;
     }
@@ -92,7 +83,7 @@ export default function Search() {
     setLoading(true);
     setHasSearched(true);
 
-    // Search modules with relevance
+    // Search modules
     const matchedModules = appModules
       .filter(module =>
         module.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -102,41 +93,27 @@ export default function Search() {
         ...module,
         relevance: calculateRelevance(module, searchQuery)
       }))
-      .sort((a, b) => b.relevance - a.relevance); 
+      .sort((a, b) => b.relevance - a.relevance);
     
     setModules(matchedModules);
 
-    // Search files, people, and local staff in parallel
+    // Search files, people, and local staff
     try {
-      const [filesResponse, peopleResponse, staffResponse] = await Promise.all([ // NEW: Added staffResponse
-        base44.functions.invoke('searchOneDrive', { query: searchQuery }),
-        base44.functions.invoke('searchStaff', { query: searchQuery }), // New API call for staff
-        base44.entities.StaffContact.filter({}) // NEW: Get all staff, we'll filter client-side
-      ]);
+      // Get local staff first
+      const staffResponse = await base44.entities.StaffContact.filter({});
+      console.log('Total staff loaded:', staffResponse?.length || 0);
 
-      // Sort files by relevance
-      const sortedFiles = (filesResponse.data.files || [])
-        .map(file => ({
-          ...file,
-          relevance: calculateRelevance(file, searchQuery)
-        }))
-        .sort((a, b) => b.relevance - a.relevance);
-
-      setFiles(sortedFiles);
-      setPeople(peopleResponse.data.people || []); // Set people results
-
-      // Filter and sort local staff - MORE COMPREHENSIVE
+      // Filter local staff
       const lowerQuery = searchQuery.toLowerCase();
       const matchedStaff = (staffResponse || [])
         .filter(person => {
-          // Check all fields for matches
           const fullNameMatch = person.full_name?.toLowerCase().includes(lowerQuery);
           const firstNameMatch = person.first_name?.toLowerCase().includes(lowerQuery);
           const lastNameMatch = person.last_name?.toLowerCase().includes(lowerQuery);
           const emailMatch = person.email?.toLowerCase().includes(lowerQuery);
           const titleMatch = person.title?.toLowerCase().includes(lowerQuery);
           const ministryMatch = person.ministry?.toLowerCase().includes(lowerQuery);
-          const phoneMatch = person.phone?.includes(searchQuery); // Phone numbers can be checked directly
+          const phoneMatch = person.phone?.includes(searchQuery);
           const cellMatch = person.cell_phone?.includes(searchQuery);
           
           return fullNameMatch || firstNameMatch || lastNameMatch || emailMatch || 
@@ -148,20 +125,27 @@ export default function Search() {
         }))
         .sort((a, b) => b.relevance - a.relevance);
       
-      console.log('Staff search results:', {
-        query: searchQuery,
-        totalStaff: staffResponse?.length || 0,
-        matchedStaff: matchedStaff.length,
-        matches: matchedStaff.map(s => s.full_name)
-      });
-      
+      console.log('Matched staff:', matchedStaff.map(s => s.full_name));
       setLocalStaff(matchedStaff);
+
+      // Search files and Microsoft people in parallel
+      const [filesResponse, peopleResponse] = await Promise.all([
+        base44.functions.invoke('searchOneDrive', { query: searchQuery }).catch(() => ({ data: { files: [] } })),
+        base44.functions.invoke('searchStaff', { query: searchQuery }).catch(() => ({ data: { people: [] } }))
+      ]);
+
+      const sortedFiles = (filesResponse.data.files || [])
+        .map(file => ({
+          ...file,
+          relevance: calculateRelevance(file, searchQuery)
+        }))
+        .sort((a, b) => b.relevance - a.relevance);
+
+      setFiles(sortedFiles);
+      setPeople(peopleResponse.data.people || []);
 
     } catch (error) {
       console.error('Search error:', error);
-      setFiles([]);
-      setPeople([]); // Clear people results on error
-      setLocalStaff([]); // NEW: Clear local staff results on error
     } finally {
       setLoading(false);
     }
@@ -188,8 +172,7 @@ export default function Search() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  // NEW: Updated total results to include localStaff
-  const totalResults = modules.length + files.length + people.length + localStaff.length; 
+  const totalResults = modules.length + files.length + people.length + localStaff.length;
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6 overflow-auto">
@@ -236,7 +219,7 @@ export default function Search() {
               </div>
             )}
 
-            {/* NEW: Local Staff Directory results */}
+            {/* Local Staff Directory */}
             {localStaff.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
@@ -253,11 +236,9 @@ export default function Search() {
                       <Card className="hover:shadow-lg transition-all">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
                               <span className="text-white font-semibold">
-                                {/* Display initials from first_name and last_name, with fallbacks */}
-                                {person.first_name ? person.first_name[0] : ''}
-                                {person.last_name ? person.last_name[0] : ''}
+                                {person.first_name[0]}{person.last_name[0]}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -319,11 +300,12 @@ export default function Search() {
               </div>
             )}
 
+            {/* Microsoft 365 Directory */}
             {people.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Microsoft 365 Directory ({people.length}) {/* NEW: Updated title and added count */}
+                  Microsoft 365 Directory ({people.length})
                 </h2>
                 <div className="grid md:grid-cols-2 gap-3">
                   {people.map((person) => (
@@ -380,6 +362,7 @@ export default function Search() {
               </div>
             )}
 
+            {/* Modules */}
             {modules.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-3">Modules</h2>
@@ -411,6 +394,7 @@ export default function Search() {
               </div>
             )}
 
+            {/* Files */}
             {files.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-3">Files</h2>
@@ -478,7 +462,7 @@ export default function Search() {
           <div className="text-center py-20">
             <SearchIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">Start typing to search</p>
-            <p className="text-sm text-slate-400 mt-2">Search staff, files, and app modules</p> {/* Updated description */}
+            <p className="text-sm text-slate-400 mt-2">Search files, modules, and team members</p>
           </div>
         )}
       </div>
