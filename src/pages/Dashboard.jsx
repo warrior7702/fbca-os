@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   Megaphone,
   UtensilsCrossed,
@@ -91,29 +89,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error loading user:", error);
     }
-  };
-
-  const handleDragEnd = async (result) => {
-    if (!result.destination) return;
-    
-    const items = Array.from(apps);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    
-    setApps(items);
-    
-    // Recalculate positions
-    const newPositions = {};
-    items.forEach((app, index) => {
-      newPositions[app.id] = {
-        row: Math.floor(index / 2),
-        col: index % 2
-      };
-    });
-    setAppPositions(newPositions);
-    
-    // Save layout
-    await saveLayout(newPositions);
   };
 
   const handleIconDragStart = (e, app) => {
