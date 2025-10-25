@@ -120,6 +120,10 @@ Deno.serve(async (req) => {
         console.log('I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
         console.log('Mapped', Object.keys(resourceToGroupMap).length, 'resources to groups');
 
+        // Initialize maps for events and resources
+        const eventMap = {};
+        const resourceMap = {};
+
         // Get ALL pending requests with no limit - fetch multiple pages if needed
         let allRequests = [];
         let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`;
@@ -151,25 +155,8 @@ Deno.serve(async (req) => {
             // Safety limit - stop after 500 requests
             if (allRequests.length >= 500) break;
         }
-        
-        const eventMap = {};
-        const resourceMap = {};
-        
-        // Re-fetch all events and resources for mapping
-        const requestsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-        
-        if (requestsResponse.ok) {
-            const requestsData = await requestsResponse.json();
-            if (requestsData.included) {
-                requestsData.included.forEach(item => {
-                    if (item.type === 'Event') eventMap[item.id] = item;
-                    else if (item.type === 'Resource') resourceMap[item.id] = item;
-                });
-            }
-        }
+
+        console.log('Fetched', allRequests.length, 'total pending requests');
 
         const myApprovals = [];
         
@@ -200,14 +187,14 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Sort by event start date (most recent/soonest first)
+        // Sort by event start date (soonest first)
         myApprovals.sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.created_at);
             const dateB = new Date(b.event_starts_at || b.created_at);
             return dateA - dateB; // Ascending order - soonest events first
         });
 
-        console.log('Found', myApprovals.length, 'approvals total');
+        console.log('Found', myApprovals.length, 'approvals for my groups');
         
         return Response.json({ 
             pending_approvals: myApprovals,
@@ -215,7 +202,7 @@ Deno.serve(async (req) => {
             my_groups_count: myGroupIds.length,
             my_groups: Object.values(myGroupNames),
             total_fetched: allRequests.length,
-            cache_bust: Date.now() // Force cache refresh
+            cache_bust: Date.now()
         });
 
     } catch (error) {
