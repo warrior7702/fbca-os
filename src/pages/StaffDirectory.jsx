@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "react-router-dom";
 
 export default function StaffDirectory() {
+  const location = useLocation();
   const [staff, setStaff] = useState([]);
   const [filteredStaff, setFilteredStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,14 @@ export default function StaffDirectory() {
 
   useEffect(() => {
     loadStaff();
-  }, []);
+    
+    // Check for name parameter in URL
+    const params = new URLSearchParams(location.search);
+    const nameParam = params.get('name');
+    if (nameParam) {
+      setSearchQuery(nameParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     filterStaff();

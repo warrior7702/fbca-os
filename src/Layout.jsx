@@ -198,10 +198,8 @@ export default function Layout({ children, currentPageName }) {
     } else if (type === 'file') {
       window.open(item.webUrl, '_blank');
     } else if (type === 'staff') {
-      // For staff, navigate to StaffDirectory and optionally pass a state or query param to highlight/filter
-      navigate(createPageUrl('StaffDirectory')); 
-      // You might want to navigate to a specific staff profile page or filter the directory
-      // e.g., navigate(createPageUrl('StaffProfile', { id: item.id }));
+      // Navigate to Staff Directory with this person pre-filtered
+      navigate(createPageUrl('StaffDirectory') + `?name=${encodeURIComponent(item.full_name)}`);
     }
   };
 

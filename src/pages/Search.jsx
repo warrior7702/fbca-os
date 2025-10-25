@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -232,6 +233,8 @@ export default function Search() {
                       key={person.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
+                      onClick={() => navigate(createPageUrl('StaffDirectory') + `?name=${encodeURIComponent(person.full_name)}`)}
+                      className="cursor-pointer"
                     >
                       <Card className="hover:shadow-lg transition-all">
                         <CardContent className="p-4">
@@ -257,6 +260,7 @@ export default function Search() {
                                     <a 
                                       href={`mailto:${person.email}`}
                                       className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()} // Prevent card click from navigating
                                     >
                                       <Mail className="w-3 h-3" />
                                       {person.email}
@@ -264,6 +268,7 @@ export default function Search() {
                                     <a 
                                       href={`msteams:/l/chat/0/0?users=${person.email}`}
                                       className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()} // Prevent card click from navigating
                                     >
                                       <MessageSquare className="w-3 h-3" />
                                       Message in Teams
@@ -274,6 +279,7 @@ export default function Search() {
                                   <a 
                                     href={`tel:${person.phone}`}
                                     className="text-xs text-slate-600 hover:text-blue-600 flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()} // Prevent card click from navigating
                                   >
                                     <Phone className="w-3 h-3" />
                                     {person.phone}
@@ -284,6 +290,7 @@ export default function Search() {
                                   <a 
                                     href={`tel:${person.cell_phone}`}
                                     className="text-xs text-slate-600 hover:text-blue-600 flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()} // Prevent card click from navigating
                                   >
                                     <Phone className="w-3 h-3" />
                                     {person.cell_phone} <span className="text-xs text-slate-400">(cell)</span>
