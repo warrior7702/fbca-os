@@ -104,13 +104,6 @@ export default function TheLightHelper({ user }) {
                 {message}
               </p>
 
-              {/* Tip */}
-              <div className="bg-blue-50 rounded-lg p-3 mb-4 border border-blue-200">
-                <p className="text-xs text-blue-800">
-                  <strong>💡 Tip:</strong> You can change your desktop wallpaper anytime! Just right-click on the desktop and select "Change Wallpaper".
-                </p>
-              </div>
-
               {/* Action button */}
               <Link to={createPageUrl("Settings") + "?tab=integrations"}>
                 <Button 
