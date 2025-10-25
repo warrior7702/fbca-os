@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import TheLightHelper from "@/components/layout/TheLightHelper";
+import EmailDomainCheck from "@/components/layout/EmailDomainCheck";
 import {
   LayoutDashboard,
   Megaphone,
@@ -229,6 +230,9 @@ export default function Layout({ children, currentPageName }) {
           filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
         }
       `}</style>
+
+      {/* Email Domain Check - Shows if user has wrong email */}
+      {user && <EmailDomainCheck user={user} />}
 
       {/* Main Content - Full Height */}
       <main className="h-screen pb-16">
