@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { useUser } from "@/hooks/useUser"; // Assuming useUser hook exists and provides user data
+// Removed: import { useUser } from "@/hooks/useUser"; // Assuming useUser hook exists and provides user data
 import ConnectionWarning from "../components/shared/ConnectionWarning"; // Unified connection warning component
 import {
   Search as SearchIcon,
@@ -13,7 +13,7 @@ import {
   Loader2,
   Megaphone,
   UtensilsCrossed,
-  User,
+  User, // User icon was present in original, keeping it
   Settings,
   LayoutDashboard,
   ExternalLink,
@@ -47,7 +47,8 @@ const appModules = [
 export default function Search() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useUser(); // Access user data from the useUser hook
+  // Changed: Replaced useUser hook with useState and useEffect for user data
+  const [user, setUser] = useState(null);
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
@@ -55,6 +56,19 @@ export default function Search() {
   const [localStaff, setLocalStaff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Changed: Added useEffect to load user data from base44.auth.me()
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
+      } catch (error) {
+        console.error("Error loading user:", error);
+      }
+    };
+    loadUser();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
