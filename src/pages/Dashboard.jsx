@@ -173,14 +173,15 @@ export default function Dashboard() {
             exit={{ opacity: 0, y: -20 }}
             className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
           >
-            <div className="bg-yellow-500 text-yellow-900 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
+            {/* Restored Light bubble message */}
+            <div className="bg-white/90 text-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
               <Unlock className="w-4 h-4" />
               Edit Mode - Drag icons to rearrange
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={toggleEditMode}
-                className="ml-2 h-6 bg-yellow-600 hover:bg-yellow-700 text-white"
+                className="ml-2 h-6 bg-gray-700 hover:bg-gray-800 text-white"
               >
                 Done
               </Button>

@@ -3,8 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import TheLightHelper from "@/components/layout/TheLightHelper";
-import EmailDomainCheck from "@/components/layout/EmailDomainCheck";
+import EmailDomainCheck from "@/components/layout/EmailDomainCheck"; // Keep if needed, currently commented out in JSX
 import {
   LayoutDashboard,
   Megaphone,
@@ -17,8 +16,8 @@ import {
   Search,
   Settings,
   LogOut,
-  ChevronDown,
-  Layers,
+  ChevronDown, // Imported but not used in the original or new code
+  Layers,      // Imported but not used in the original or new code
   Users,
   Loader2,
   Folder,
@@ -36,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -91,12 +90,27 @@ export default function Layout({ children, currentPageName }) {
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef(null);
+  const [hasConnectionAlert, setHasConnectionAlert] = useState(false);
+  const [showLightBubble, setShowLightBubble] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
+        
+        // Check if user needs to connect accounts
+        const hasPCO = !!currentUser?.pco_access_token;
+        const hasClickUp = !!currentUser?.clickup_access_token;
+        const hasMicrosoft = !!currentUser?.microsoft_access_token;
+        const missingConnections = !hasPCO || !hasClickUp || !hasMicrosoft;
+        
+        setHasConnectionAlert(missingConnections);
+        
+        // Show bubble after a delay if there are missing connections
+        if (missingConnections && !sessionStorage.getItem('lightBubbleDismissed')) {
+          setTimeout(() => setShowLightBubble(true), 2000);
+        }
       } catch (error) {
         console.error("Error loading user:", error);
       }
@@ -245,8 +259,13 @@ export default function Layout({ children, currentPageName }) {
   // Updated totalResults to include tasks
   const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length + searchResults.tasks.length;
 
+  const handleDismissLightBubble = () => {
+    setShowLightBubble(false);
+    sessionStorage.setItem('lightBubbleDismissed', 'true');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen"> {/* Removed bg-slate-50 to allow underlying wallpaper/background */}
       <style>{`
         .fbca-logo-taskbar {
           filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
@@ -261,8 +280,47 @@ export default function Layout({ children, currentPageName }) {
         {children}
       </main>
 
-      {/* The Light Helper */}
-      {user && <TheLightHelper user={user} />}
+      {/* Light Helper Bubble */}
+      <AnimatePresence>
+        {showLightBubble && hasConnectionAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="fixed bottom-24 right-6 z-[60] max-w-xs"
+          >
+            <div className="bg-white rounded-2xl shadow-2xl border-2 border-yellow-400 p-4 relative">
+              <button
+                onClick={handleDismissLightBubble}
+                className="absolute -top-2 -right-2 w-6 h-6 bg-slate-900 text-white rounded-full flex items-center justify-center hover:bg-slate-700 transition-colors text-xs"
+              >
+                ×
+              </button>
+              
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wide">
+                  The Light
+                </span>
+              </div>
+
+              <p className="text-slate-700 text-sm mb-3 leading-relaxed">
+                Click here to connect your accounts and get started!
+              </p>
+
+              <Link to={createPageUrl("Settings") + "?tab=integrations"} onClick={handleDismissLightBubble}>
+                <Button className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-slate-900 font-medium shadow-lg text-sm h-9">
+                  Connect Now →
+                </Button>
+              </Link>
+
+              {/* Speech bubble tail */}
+              <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r-2 border-b-2 border-yellow-400 transform rotate-45" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Taskbar - Always Visible */}
       <motion.div
@@ -488,19 +546,22 @@ export default function Layout({ children, currentPageName }) {
                 whileTap={{ scale: 0.95 }}
                 className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer group"
               >
-                <Sparkles className="w-4 h-4 text-white" />
-                <motion.div
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.5, 0.8, 0.5],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  className="absolute inset-0 bg-yellow-400 rounded blur-md opacity-0 group-hover:opacity-50"
-                />
+                <Sparkles className={`w-4 h-4 ${hasConnectionAlert ? 'text-yellow-300' : 'text-yellow-600'}`} />
+                {/* Glow effect - only when there's an alert */}
+                {hasConnectionAlert && (
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      opacity: [0.5, 0.8, 0.5],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className="absolute inset-0 bg-yellow-400 rounded blur-md opacity-50"
+                  />
+                )}
               </motion.div>
             </Link>
 
