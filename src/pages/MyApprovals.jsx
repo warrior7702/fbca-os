@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import { toast } from "sonner";
+import ConnectionWarning from "../components/shared/ConnectionWarning";
 
 // Safe array coercion
 const A = (x) => Array.isArray(x) ? x : [];
@@ -96,32 +98,33 @@ function MyApprovalsContent() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      if (!currentUser?.pco_access_token) {
-        setError('Planning Center is not connected. Please connect it in Settings > Integrations.');
-        setLoading(false);
-        setSyncing(false);
-        return;
-      }
+      // Only attempt sync/calendar if PCO is connected, otherwise data will be empty
+      if (currentUser?.pco_access_token) {
+        // Sync approvals (incremental)
+        const syncResponse = await base44.functions.invoke('syncMyApprovals', {
+          forceResync: false
+        }).catch(err => {
+          console.error('Sync error:', err);
+          return { data: { pending_approvals: [], count: 0 } };
+        });
 
-      // Sync approvals (incremental)
-      const syncResponse = await base44.functions.invoke('syncMyApprovals', {
-        forceResync: false
-      }).catch(err => {
-        console.error('Sync error:', err);
-        return { data: { pending_approvals: [], count: 0 } };
-      });
+        const responseData = syncResponse?.data || {};
+        setApprovals(A(responseData.pending_approvals));
+        setSyncStats(responseData.sync_stats || null);
 
-      const responseData = syncResponse?.data || {};
-      setApprovals(A(responseData.pending_approvals));
-      setSyncStats(responseData.sync_stats || null);
-
-      // Load calendar events
-      try {
-        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-        setCalendarEvents(A(eventsResponse?.data?.events));
-      } catch (err) {
-        console.error('Calendar error:', err);
+        // Load calendar events
+        try {
+          const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+          setCalendarEvents(A(eventsResponse?.data?.events));
+        } catch (err) {
+          console.error('Calendar error:', err);
+          setCalendarEvents([]);
+        }
+      } else {
+        // If PCO is not connected, clear approvals and calendar events
+        setApprovals([]);
         setCalendarEvents([]);
+        setSyncStats(null); // Clear sync stats as no sync happened
       }
 
     } catch (error) {
@@ -140,6 +143,11 @@ function MyApprovalsContent() {
     toast.info('Force resyncing approvals...');
     
     try {
+      if (!user?.pco_access_token) {
+        toast.error('Planning Center is not connected. Cannot resync.');
+        setSyncing(false);
+        return;
+      }
       const syncResponse = await base44.functions.invoke('syncMyApprovals', {
         forceResync: true
       });
@@ -159,6 +167,10 @@ function MyApprovalsContent() {
 
   const handleApprove = async (approval) => {
     if (!approval?.request_id) return;
+    if (!user?.pco_access_token) {
+      toast.error('Planning Center is not connected. Cannot approve.');
+      return;
+    }
     
     setProcessingApproval(approval.request_id);
     try {
@@ -177,6 +189,10 @@ function MyApprovalsContent() {
 
   const handleDeny = async (approval) => {
     if (!approval?.request_id) return;
+    if (!user?.pco_access_token) {
+      toast.error('Planning Center is not connected. Cannot deny.');
+      return;
+    }
     
     setProcessingApproval(approval.request_id);
     try {
@@ -219,18 +235,10 @@ function MyApprovalsContent() {
             <AlertDescription>
               <div className="space-y-2">
                 <p>{error}</p>
-                {error.includes('not connected') ? (
-                  <Link to={createPageUrl('Settings') + '?tab=integrations'}>
-                    <Button size="sm" variant="outline" className="mt-2">
-                      Connect Planning Center
-                    </Button>
-                  </Link>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={loadData} className="mt-2">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Try Again
-                  </Button>
-                )}
+                <Button size="sm" variant="outline" onClick={loadData} className="mt-2">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Try Again
+                </Button>
               </div>
             </AlertDescription>
           </Alert>
@@ -243,8 +251,13 @@ function MyApprovalsContent() {
   const safeApprovals = A(approvals);
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-auto bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="h-full bg-gradient-to-br from-orange-50 to-slate-50 overflow-auto">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Connection Warning */}
+        {!user?.pco_access_token && (
+          <ConnectionWarning />
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -263,7 +276,7 @@ function MyApprovalsContent() {
               variant="outline"
               size="sm"
               onClick={handleForceResync}
-              disabled={syncing}
+              disabled={syncing || !user?.pco_access_token}
             >
               {syncing ? (
                 <>
@@ -356,7 +369,7 @@ function MyApprovalsContent() {
                             variant="outline"
                             className="text-green-600 border-green-600 hover:bg-green-50"
                             onClick={() => handleApprove(approval)}
-                            disabled={processingApproval === approval.request_id}
+                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
                             {processingApproval === approval.request_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -372,7 +385,7 @@ function MyApprovalsContent() {
                             variant="outline"
                             className="text-red-600 border-red-600 hover:bg-red-50"
                             onClick={() => handleDeny(approval)}
-                            disabled={processingApproval === approval.request_id}
+                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
                             {processingApproval === approval.request_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -405,6 +418,7 @@ function MyApprovalsContent() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowFullCalendar(true)}
+                disabled={!user?.pco_access_token}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Full View

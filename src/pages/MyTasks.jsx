@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import { toast } from "sonner";
+import ConnectionWarning from "../components/shared/ConnectionWarning";
 
 export default function MyTasks() {
   const [user, setUser] = useState(null);
@@ -156,25 +158,17 @@ export default function MyTasks() {
   const displayName = user?.display_name || user?.full_name;
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Connection Warning */}
+        {(!user?.clickup_access_token || !user?.microsoft_access_token) && (
+          <ConnectionWarning />
+        )}
         
         <div>
           <h1 className="text-3xl font-bold text-slate-900">My Tasks</h1>
           <p className="text-slate-600">Welcome back, {displayName}</p>
         </div>
-
-        {(!user?.clickup_access_token || !user?.microsoft_access_token) && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <span>Some integrations are not connected. </span>
-              <Link to={createPageUrl('Settings') + '?tab=integrations'} className="font-medium text-blue-600 hover:underline">
-                Connect them in Settings
-              </Link>
-            </AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>

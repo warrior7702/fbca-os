@@ -21,9 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import ConnectionWarning from "@/components/shared/ConnectionWarning";
+import { useAuth } from "@/context/AuthContext"; // Assuming useAuth is available for user data
 
 export default function Documents() {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Access user context to check for connection status
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,8 +35,15 @@ export default function Documents() {
 
   useEffect(() => {
     console.log('currentFolderId changed to:', currentFolderId);
-    loadFiles(currentFolderId);
-  }, [currentFolderId]);
+    // Only attempt to load files if the user is connected
+    if (user?.microsoft_access_token) {
+      loadFiles(currentFolderId);
+    } else {
+      setLoading(false);
+      setError(null); // Clear any previous API errors if not connected
+      setItems([]); // Clear items if not connected
+    }
+  }, [currentFolderId, user?.microsoft_access_token]); // Re-run effect if connection status changes
 
   const loadFiles = async (folderId) => {
     setLoading(true);
@@ -127,6 +137,13 @@ export default function Documents() {
           </div>
         </div>
 
+        {/* Connection Warning */}
+        {!user?.microsoft_access_token && (
+          <div className="mb-6">
+            <ConnectionWarning />
+          </div>
+        )}
+
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
@@ -145,7 +162,8 @@ export default function Documents() {
           </Alert>
         )}
 
-        {!error && (
+        {/* Only show breadcrumbs and file browser if connected */}
+        {user?.microsoft_access_token && !error && (
           <div className="flex items-center gap-2 mb-4 text-sm">
             {breadcrumbs.map((crumb, index) => (
               <React.Fragment key={crumb.id}>
@@ -163,11 +181,11 @@ export default function Documents() {
           </div>
         )}
 
-        {loading ? (
+        {user?.microsoft_access_token && loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
-        ) : !error && (
+        ) : user?.microsoft_access_token && !error && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {items.map((item) => {
               const Icon = item.isFolder ? Folder : getFileIcon(item.name);
@@ -245,7 +263,7 @@ export default function Documents() {
           </div>
         )}
 
-        {items.length === 0 && !loading && !error && (
+        {user?.microsoft_access_token && items.length === 0 && !loading && !error && (
           <div className="text-center py-20">
             <FolderOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">This folder is empty</p>

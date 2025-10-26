@@ -15,6 +15,7 @@ import {
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "react-router-dom";
+import ConnectionWarning from "../components/shared/ConnectionWarning";
 
 export default function StaffDirectory() {
   const location = useLocation();
@@ -24,6 +25,7 @@ export default function StaffDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMinistry, setSelectedMinistry] = useState("all");
   const [ministries, setMinistries] = useState([]);
+  const [user, setUser] = useState<any | null>(null); // State to hold user data for connection warning
 
   useEffect(() => {
     loadStaff();
@@ -35,6 +37,20 @@ export default function StaffDirectory() {
       setSearchQuery(nameParam);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    // Fetch current user data (e.g., to check for Microsoft access token)
+    const fetchUser = async () => {
+      try {
+        const currentUser = await base44.me.get(); // Assuming base44.me.get() exists for current user
+        setUser(currentUser);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        setUser(null);
+      }
+    };
+    fetchUser();
+  }, []); // Run once on component mount to get user info
 
   useEffect(() => {
     filterStaff();
@@ -88,9 +104,9 @@ export default function StaffDirectory() {
   }
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-auto">
+    <div className="h-full bg-gradient-to-br from-teal-50 to-slate-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6">
           <div className="p-3 bg-blue-100 rounded-xl">
             <Users className="w-6 h-6 text-blue-600" />
           </div>
@@ -99,6 +115,13 @@ export default function StaffDirectory() {
             <p className="text-slate-600">{staff.length} team members</p>
           </div>
         </div>
+
+        {/* Connection Warning */}
+        {user !== null && !user?.microsoft_access_token && (
+          <div className="mb-6">
+            <ConnectionWarning />
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">

@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { useUser } from "@/hooks/useUser"; // Assuming useUser hook exists and provides user data
+import ConnectionWarning from "../components/shared/ConnectionWarning"; // Unified connection warning component
 import {
   Search as SearchIcon,
   FileText,
@@ -45,6 +47,7 @@ const appModules = [
 export default function Search() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useUser(); // Access user data from the useUser hook
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState([]);
   const [modules, setModules] = useState([]);
@@ -193,6 +196,13 @@ export default function Search() {
             <p className="text-slate-600 text-sm">Search across files and modules</p>
           </div>
         </div>
+
+        {/* Connection Warning */}
+        {(!user?.microsoft_access_token || !user?.clickup_access_token) && (
+          <div className="mb-6">
+            <ConnectionWarning />
+          </div>
+        )}
 
         <form onSubmit={handleSearch} className="mb-8">
           <div className="relative">
