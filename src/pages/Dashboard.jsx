@@ -12,7 +12,9 @@ import {
   Grid3x3,
   Users,
   CheckSquare,
-  ImageIcon
+  ImageIcon,
+  Lock,
+  Unlock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const defaultApps = [
   { id: "mytasks", name: "My Tasks", icon: CheckSquare, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
@@ -41,10 +44,17 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
+// Grid configuration
+const COLS = 6;
+const ROWS = 4;
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [wallpaper, setWallpaper] = useState("cross_white_glow");
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [appPositions, setAppPositions] = useState({});
+  const [draggedApp, setDraggedApp] = useState(null);
 
   useEffect(() => {
     loadUser();
@@ -55,12 +65,79 @@ export default function Dashboard() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // Load custom wallpaper
       if (currentUser.wallpaper) {
         setWallpaper(currentUser.wallpaper);
       }
+      
+      // Load saved positions or set defaults
+      if (currentUser.desktop_layout && typeof currentUser.desktop_layout === 'object') {
+        setAppPositions(currentUser.desktop_layout);
+      } else {
+        // Default positions - 2 columns
+        const defaultPositions = {};
+        defaultApps.forEach((app, index) => {
+          defaultPositions[app.id] = {
+            row: Math.floor(index / 2),
+            col: index % 2
+          };
+        });
+        setAppPositions(defaultPositions);
+      }
     } catch (error) {
       console.error("Error loading user:", error);
+    }
+  };
+
+  const handleDragStart = (e, app) => {
+    if (!editMode) return;
+    setDraggedApp(app);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e, row, col) => {
+    e.preventDefault();
+    if (!editMode || !draggedApp) return;
+
+    // Check if spot is occupied
+    const occupied = Object.entries(appPositions).find(
+      ([id, pos]) => id !== draggedApp.id && pos.row === row && pos.col === col
+    );
+
+    if (occupied) {
+      toast.error('Spot already taken!');
+      setDraggedApp(null);
+      return;
+    }
+
+    // Update position
+    const newPositions = {
+      ...appPositions,
+      [draggedApp.id]: { row, col }
+    };
+    
+    setAppPositions(newPositions);
+    setDraggedApp(null);
+    
+    // Save to database
+    try {
+      await base44.auth.updateMe({ desktop_layout: newPositions });
+      toast.success('Icon moved!');
+    } catch (error) {
+      console.error("Error saving layout:", error);
+      toast.error('Failed to save layout');
+    }
+  };
+
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    if (!editMode) {
+      toast.info('Drag icons to rearrange');
+    } else {
+      toast.success('Layout locked');
     }
   };
 
@@ -74,6 +151,14 @@ export default function Dashboard() {
       console.error("Error updating wallpaper:", error);
       toast.error("Failed to update wallpaper");
     }
+  };
+
+  const getAppAtPosition = (row, col) => {
+    const appId = Object.entries(appPositions).find(
+      ([id, pos]) => pos.row === row && pos.col === col
+    )?.[0];
+    
+    return defaultApps.find(app => app.id === appId);
   };
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
@@ -95,16 +180,41 @@ export default function Dashboard() {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
+          <ContextMenuItem onClick={toggleEditMode}>
+            {editMode ? <Lock className="w-4 h-4 mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
+            {editMode ? 'Lock Icons' : 'Rearrange Icons'}
+          </ContextMenuItem>
           <ContextMenuItem onClick={() => setShowWallpaperPicker(true)}>
             <ImageIcon className="w-4 h-4 mr-2" />
             Change Wallpaper
           </ContextMenuItem>
-          <ContextMenuItem>
-            <Grid3x3 className="w-4 h-4 mr-2" />
-            View Options
-          </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+
+      {/* Edit Mode Indicator */}
+      <AnimatePresence>
+        {editMode && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="bg-yellow-500 text-yellow-900 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
+              <Unlock className="w-4 h-4" />
+              Edit Mode - Drag icons to rearrange
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={toggleEditMode}
+                className="ml-2 h-6 bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                Done
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Wallpaper Picker Modal */}
       <Dialog open={showWallpaperPicker} onOpenChange={setShowWallpaperPicker}>
@@ -154,26 +264,63 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Desktop Apps Grid */}
-      <div className="absolute inset-0 p-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 content-start">
-        {defaultApps.map((app, index) => (
-          <Link key={app.id} to={createPageUrl(app.path)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              className="flex flex-col items-center gap-3 p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
-            >
-              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center transition-shadow`}>
-                <app.icon className="w-8 h-8 text-white" />
-              </div>
-              <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                {app.name}
-              </span>
-            </motion.div>
-          </Link>
-        ))}
+      {/* Desktop Grid */}
+      <div className="absolute inset-0 p-8">
+        <div className="grid gap-4" style={{
+          gridTemplateColumns: `repeat(${COLS}, 140px)`,
+          gridTemplateRows: `repeat(${ROWS}, 140px)`
+        }}>
+          {Array.from({ length: ROWS }, (_, row) =>
+            Array.from({ length: COLS }, (_, col) => {
+              const app = getAppAtPosition(row, col);
+              
+              return (
+                <div
+                  key={`${row}-${col}`}
+                  className={`relative ${editMode ? 'border-2 border-dashed border-white/20 rounded-xl' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, row, col)}
+                >
+                  {app && (
+                    <div
+                      draggable={editMode}
+                      onDragStart={(e) => handleDragStart(e, app)}
+                      className={`h-full ${editMode ? 'cursor-move' : ''}`}
+                    >
+                      {editMode ? (
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm"
+                        >
+                          <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                            <app.icon className="w-8 h-8 text-white" />
+                          </div>
+                          <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                            {app.name}
+                          </span>
+                        </motion.div>
+                      ) : (
+                        <Link to={createPageUrl(app.path)} className="block h-full">
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                          >
+                            <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                              <app.icon className="w-8 h-8 text-white" />
+                            </div>
+                            <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                              {app.name}
+                            </span>
+                          </motion.div>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Desktop Shortcuts - Right Side */}
