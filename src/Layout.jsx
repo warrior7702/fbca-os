@@ -22,9 +22,9 @@ import {
   Users,
   Loader2,
   Folder,
-  CheckSquare,
-  Sparkles,
-  ListChecks // Added for task results
+  ListChecks, // Used for My Tasks app and Task Results search
+  ClipboardCheck, // NEW: for My Approvals app
+  Sparkles
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,13 +50,13 @@ const apps = [
   {
     name: "My Tasks",
     path: "MyTasks",
-    icon: CheckSquare, // Using the new CheckSquare icon
+    icon: ListChecks, // Changed from CheckSquare to ListChecks
     color: "text-indigo-500"
   },
   {
     name: "My Approvals",
     path: "MyApprovals",
-    icon: CheckSquare,
+    icon: ClipboardCheck, // Changed from CheckSquare to ClipboardCheck
     color: "text-orange-500"
   },
   {

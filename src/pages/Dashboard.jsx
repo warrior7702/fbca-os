@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -10,7 +11,8 @@ import {
   Trash2,
   Settings,
   Users,
-  CheckSquare,
+  ListChecks, // Changed from CheckSquare
+  ClipboardCheck, // Changed from CheckSquare
   Unlock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,8 +20,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 const defaultApps = [
-  { id: "mytasks", name: "My Tasks", icon: CheckSquare, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
-  { id: "myapprovals", name: "My Approvals", icon: CheckSquare, color: "from-orange-500 to-red-500", path: "MyApprovals" },
+  { id: "mytasks", name: "My Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
+  { id: "myapprovals", name: "My Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals" },
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
   { id: "foodservice", name: "Food Service", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Staff Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
