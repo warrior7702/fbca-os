@@ -16,8 +16,8 @@ import {
   Search,
   Settings,
   LogOut,
-  ChevronDown, // Imported but not used in the original or new code
-  Layers,      // Imported but not used in the original or new code
+  ChevronDown,
+  Layers,
   Users,
   Loader2,
   Folder,
@@ -113,6 +113,12 @@ export default function Layout({ children, currentPageName }) {
         }
       } catch (error) {
         console.error("Error loading user:", error);
+        // User is not logged in or there was an error - show the alert
+        // This alerts the user to connect accounts, which includes logging in if not authenticated.
+        setHasConnectionAlert(true);
+        if (!sessionStorage.getItem('lightBubbleDismissed')) {
+          setTimeout(() => setShowLightBubble(true), 2000);
+        }
       }
     };
     loadUser();
