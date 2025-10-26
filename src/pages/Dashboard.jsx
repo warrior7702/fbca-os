@@ -48,12 +48,24 @@ const wallpapers = {
 const COLS = 6;
 const ROWS = 4;
 
+// Create default positions
+const getDefaultPositions = () => {
+  const positions = {};
+  defaultApps.forEach((app, index) => {
+    positions[app.id] = {
+      row: Math.floor(index / 2),
+      col: index % 2
+    };
+  });
+  return positions;
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [wallpaper, setWallpaper] = useState("cross_white_glow");
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [appPositions, setAppPositions] = useState({});
+  const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
 
   useEffect(() => {
@@ -69,19 +81,9 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // Load saved positions or set defaults
-      if (currentUser.desktop_layout && typeof currentUser.desktop_layout === 'object') {
+      // Load saved positions if they exist
+      if (currentUser.desktop_layout && typeof currentUser.desktop_layout === 'object' && Object.keys(currentUser.desktop_layout).length > 0) {
         setAppPositions(currentUser.desktop_layout);
-      } else {
-        // Default positions - 2 columns
-        const defaultPositions = {};
-        defaultApps.forEach((app, index) => {
-          defaultPositions[app.id] = {
-            row: Math.floor(index / 2),
-            col: index % 2
-          };
-        });
-        setAppPositions(defaultPositions);
       }
     } catch (error) {
       console.error("Error loading user:", error);
@@ -166,18 +168,21 @@ export default function Dashboard() {
   return (
     <div className="h-full relative overflow-hidden">
       {/* Desktop Background with Right-Click Menu */}
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
+        style={{
+          backgroundImage: `url('${wallpaperUrl}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="absolute inset-0 bg-black/20" />
+      </div>
+
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
-            style={{
-              backgroundImage: `url('${wallpaperUrl}')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          >
-            <div className="absolute inset-0 bg-black/20" />
-          </div>
+          <div className="absolute inset-0" />
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onClick={toggleEditMode}>
@@ -265,8 +270,8 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Desktop Grid */}
-      <div className="absolute inset-0 p-8">
-        <div className="grid gap-4" style={{
+      <div className="absolute inset-0 p-8 pointer-events-none">
+        <div className="grid gap-4 pointer-events-auto" style={{
           gridTemplateColumns: `repeat(${COLS}, 140px)`,
           gridTemplateRows: `repeat(${ROWS}, 140px)`
         }}>
@@ -277,7 +282,7 @@ export default function Dashboard() {
               return (
                 <div
                   key={`${row}-${col}`}
-                  className={`relative ${editMode ? 'border-2 border-dashed border-white/20 rounded-xl' : ''}`}
+                  className={`relative ${editMode ? 'border-2 border-dashed border-white/30 rounded-xl bg-white/5' : ''}`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, row, col)}
                 >
