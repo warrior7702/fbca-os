@@ -628,9 +628,9 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {/* Profile link remains here as it's a generic user profile, not tied to a specific "Me" app module */}
+                {/* Profile link updated to point to Settings profile tab */}
                 <DropdownMenuItem asChild>
-                  <Link to={createPageUrl("Me")} className="cursor-pointer"> 
+                  <Link to={createPageUrl("Settings") + "?tab=profile"} className="cursor-pointer"> 
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </Link>
