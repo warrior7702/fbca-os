@@ -9,22 +9,12 @@ import {
   Folder,
   Trash2,
   Settings,
-  Grid3x3,
   Users,
   CheckSquare,
-  ImageIcon,
-  Lock,
   Unlock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const defaultApps = [
@@ -44,11 +34,9 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
-// Grid configuration
 const COLS = 6;
 const ROWS = 4;
 
-// Create default positions
 const getDefaultPositions = () => {
   const positions = {};
   defaultApps.forEach((app, index) => {
@@ -63,13 +51,21 @@ const getDefaultPositions = () => {
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [wallpaper, setWallpaper] = useState("cross_white_glow");
-  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
 
   useEffect(() => {
     loadUser();
+  }, []);
+
+  useEffect(() => {
+    // Check if edit mode is enabled in URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('edit') === 'true') {
+      setEditMode(true);
+      toast.info('Drag icons to rearrange');
+    }
   }, []);
 
   const loadUser = async () => {
@@ -81,7 +77,6 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // Load saved positions if they exist
       if (currentUser.desktop_layout && typeof currentUser.desktop_layout === 'object' && Object.keys(currentUser.desktop_layout).length > 0) {
         setAppPositions(currentUser.desktop_layout);
       }
@@ -104,7 +99,6 @@ export default function Dashboard() {
     e.preventDefault();
     if (!editMode || !draggedApp) return;
 
-    // Check if spot is occupied
     const occupied = Object.entries(appPositions).find(
       ([id, pos]) => id !== draggedApp.id && pos.row === row && pos.col === col
     );
@@ -115,7 +109,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Update position
     const newPositions = {
       ...appPositions,
       [draggedApp.id]: { row, col }
@@ -124,7 +117,6 @@ export default function Dashboard() {
     setAppPositions(newPositions);
     setDraggedApp(null);
     
-    // Save to database
     try {
       await base44.auth.updateMe({ desktop_layout: newPositions });
       toast.success('Icon moved!');
@@ -135,23 +127,14 @@ export default function Dashboard() {
   };
 
   const toggleEditMode = () => {
-    setEditMode(!editMode);
-    if (!editMode) {
-      toast.info('Drag icons to rearrange');
+    const newEditMode = !editMode;
+    setEditMode(newEditMode);
+    
+    if (newEditMode) {
+      window.history.pushState({}, '', '?edit=true');
     } else {
+      window.history.pushState({}, '', window.location.pathname);
       toast.success('Layout locked');
-    }
-  };
-
-  const handleWallpaperChange = async (wallpaperId) => {
-    setWallpaper(wallpaperId);
-    try {
-      await base44.auth.updateMe({ wallpaper: wallpaperId });
-      toast.success("Wallpaper updated!");
-      setShowWallpaperPicker(false);
-    } catch (error) {
-      console.error("Error updating wallpaper:", error);
-      toast.error("Failed to update wallpaper");
     }
   };
 
@@ -167,7 +150,7 @@ export default function Dashboard() {
 
   return (
     <div className="h-full relative overflow-hidden">
-      {/* Desktop Background with Right-Click Menu */}
+      {/* Desktop Background */}
       <div
         className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
         style={{
@@ -175,26 +158,9 @@ export default function Dashboard() {
           backgroundSize: 'cover',
           backgroundPosition: 'center'
         }}
-        onContextMenu={(e) => e.preventDefault()}
       >
         <div className="absolute inset-0 bg-black/20" />
       </div>
-
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div className="absolute inset-0" />
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={toggleEditMode}>
-            {editMode ? <Lock className="w-4 h-4 mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
-            {editMode ? 'Lock Icons' : 'Rearrange Icons'}
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => setShowWallpaperPicker(true)}>
-            <ImageIcon className="w-4 h-4 mr-2" />
-            Change Wallpaper
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
 
       {/* Edit Mode Indicator */}
       <AnimatePresence>
@@ -220,54 +186,6 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Wallpaper Picker Modal */}
-      <Dialog open={showWallpaperPicker} onOpenChange={setShowWallpaperPicker}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Choose Wallpaper</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-            {Object.entries(wallpapers).map(([id, url]) => {
-              const wallpaperInfo = [
-                { id: "church_steeple_night", name: "Church Steeple Night" },
-                { id: "church_building_blue", name: "Church Building Blue" },
-                { id: "cross_chrome_blue", name: "Cross Chrome Blue" },
-                { id: "cross_white_glow", name: "Cross White Glow" },
-                { id: "cross_metal_texture", name: "Cross Metal Texture" }
-              ].find(w => w.id === id);
-
-              return (
-                <motion.div
-                  key={id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`relative cursor-pointer rounded-lg overflow-hidden border-4 transition-all ${
-                    wallpaper === id
-                      ? 'border-blue-600 shadow-lg ring-2 ring-blue-300'
-                      : 'border-transparent hover:border-slate-300'
-                  }`}
-                  onClick={() => handleWallpaperChange(id)}
-                >
-                  <img
-                    src={url}
-                    alt={wallpaperInfo?.name || id}
-                    className="w-full h-40 object-cover"
-                  />
-                  {wallpaper === id && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1">
-                      <CheckSquare className="w-4 h-4" />
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                    <p className="text-white text-sm font-medium">{wallpaperInfo?.name || id}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Desktop Grid */}
       <div className="absolute inset-0 p-8 pointer-events-none">

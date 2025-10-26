@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
 import { Calendar, CheckSquare, Briefcase } from "lucide-react";
 import { motion } from "framer-motion"; // Added framer-motion import
+import { useNavigate } from "react-router-dom"; // Added useNavigate for navigation
 
 const wallpapers = [
   {
@@ -50,6 +51,8 @@ export default function Settings() {
   const [selectedWallpaper, setSelectedWallpaper] = useState("cross_white_glow"); // Changed default wallpaper
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+
+  const navigate = useNavigate(); // Initialize useNavigate hook
 
   useEffect(() => {
     loadUser();
@@ -193,6 +196,12 @@ export default function Settings() {
     } catch (error) {
       toast.error("Failed to disconnect");
     }
+  };
+
+  const handleRearrangeIcons = () => {
+    // Assuming '/dashboard' is the correct path for the dashboard page.
+    // The query parameter 'edit=true' signals the dashboard to enter rearrangement mode.
+    navigate('/dashboard?edit=true'); 
   };
 
   if (loading) {
@@ -383,6 +392,24 @@ export default function Settings() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Desktop Layout</CardTitle>
+                <CardDescription>Customize your desktop icons</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Rearrange Desktop Icons</p>
+                    <p className="text-sm text-slate-500">Drag and drop icons to customize your layout</p>
+                  </div>
+                  <Button onClick={handleRearrangeIcons}>
+                    Rearrange Icons
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Other Appearance Settings</CardTitle>
                 <CardDescription>Customize how FBCA OS looks</CardDescription>
               </CardHeader>
@@ -394,7 +421,6 @@ export default function Settings() {
                   </div>
                   <Switch />
                 </div>
-                {/* Removed the 'Desktop Background' label and 'Coming soon' paragraph as it's now handled by the new wallpaper card. */}
               </CardContent>
             </Card>
           </TabsContent>
