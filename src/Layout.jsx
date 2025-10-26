@@ -50,13 +50,13 @@ const apps = [
   {
     name: "My Tasks",
     path: "MyTasks",
-    icon: ListChecks, // Changed from CheckSquare to ListChecks
+    icon: ListChecks,
     color: "text-indigo-500"
   },
   {
     name: "My Approvals",
     path: "MyApprovals",
-    icon: ClipboardCheck, // Changed from CheckSquare to ClipboardCheck
+    icon: ClipboardCheck,
     color: "text-orange-500"
   },
   {
@@ -71,7 +71,6 @@ const apps = [
     icon: UtensilsCrossed,
     color: "text-green-500"
   },
-  // Removed "Me" module
   {
     name: "Staff Directory",
     path: "StaffDirectory",

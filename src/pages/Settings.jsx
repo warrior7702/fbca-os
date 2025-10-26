@@ -118,6 +118,7 @@ export default function Settings() {
   const handleWallpaperChange = async (wallpaperId) => {
     setSelectedWallpaper(wallpaperId);
     try {
+      // Only update wallpaper, don't touch desktop_layout
       await base44.auth.updateMe({ wallpaper: wallpaperId });
       toast.success("Wallpaper updated!");
     } catch (error) {
