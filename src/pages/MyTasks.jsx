@@ -243,37 +243,12 @@ export default function MyTasks() {
     console.log('📧 Email webLink:', email.webLink);
     console.log('📧 Email messageId:', email.messageId);
     
-    if (email.messageId) {
-      // Try to open in desktop Outlook using the message ID
-      // Format: outlook:<message-id>
-      const messageId = email.messageId;
-      const outlookDesktopUrl = `outlook:${messageId}`;
-      
-      console.log('📧 Attempting desktop Outlook:', outlookDesktopUrl);
-      
-      // Create a hidden link and click it (better than window.location for protocols)
-      const link = document.createElement('a');
-      link.href = outlookDesktopUrl;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Show a toast with web fallback option
-      toast.info(
-        'Opening in Outlook desktop. Click here to open in web if it doesn\'t open.',
-        {
-          duration: 5000,
-          action: {
-            label: 'Open Web',
-            onClick: () => window.open(email.webLink, '_blank', 'noopener,noreferrer')
-          }
-        }
-      );
-    } else {
-      // No message ID, just open in web
-      console.log('📧 No messageId, opening in web');
+    // Just open in web Outlook - this was working
+    if (email.webLink) {
+      console.log('📧 Opening email in browser:', email.webLink);
       window.open(email.webLink, '_blank', 'noopener,noreferrer');
+    } else {
+      console.error('📧 No webLink found for email');
     }
   };
 
