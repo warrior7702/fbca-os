@@ -1,26 +1,22 @@
 
 import React, { useState, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Maximize2, List } from "lucide-react";
-import { format, addDays, startOfWeek, isToday, startOfDay } from "date-fns";
+import { ChevronLeft, ChevronRight, Maximize2, Calendar, CheckCircle, Circle, XCircle, Hourglass, AlertCircle } from "lucide-react";
+import { format, addDays, startOfWeek, isToday, startOfDay, isSameDay } from "date-fns";
 import { motion } from "framer-motion"; // Import motion from framer-motion
 
-export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+export default function TaskCalendar({ tasks, onTaskClick, onViewFullCalendar }) {
+  const [startDate, setStartDate] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
 
-  const generateTwoWeeks = () => {
-    const days = [];
-    for (let i = 0; i < 14; i++) {
-      days.push(addDays(currentWeekStart, i));
-    }
-    return days;
-  };
+  const days = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
+  }, [startDate]);
 
-  const twoWeeksDays = generateTwoWeeks();
+  const endDate = useMemo(() => addDays(startDate, 6), [startDate]);
 
   // Generate consistent colors for each list
   const getListColor = (listName) => {
@@ -47,241 +43,150 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Get ClickUp status color
-  const getStatusColor = (status) => {
+  // Get ClickUp status icon based on text
+  const getStatusIcon = (status) => {
     const statusLower = status?.toLowerCase() || '';
-    
-    // Match ClickUp's status colors
-    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500';
-    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500';
-    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500';
-    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return 'bg-purple-500';
-    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-400';
-    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500';
-    if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500';
-    
-    return 'bg-slate-400'; // Default
+    if (statusLower.includes('ready') || statusLower.includes('to do')) return CheckCircle;
+    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return Hourglass;
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return Circle; 
+    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return CheckCircle; 
+    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return XCircle;
+    if (statusLower.includes('review') || statusLower.includes('qa')) return AlertCircle; 
+    return Circle; // Default icon
   };
 
-  // Get unique lists and their colors
-  const listLegend = useMemo(() => {
-    const uniqueLists = [...new Set(tasks.map(t => t.list_name).filter(Boolean))];
-    return uniqueLists.map(listName => ({
-      name: listName,
-      color: getListColor(listName)
-    }));
+  // Pre-aggregate tasks by date for efficient lookup
+  const tasksByDate = useMemo(() => {
+    const groupedTasks = {};
+    tasks.forEach((task) => {
+      if (task.due_date) {
+        const dateKey = format(startOfDay(new Date(task.due_date)), 'yyyy-MM-dd');
+        if (!groupedTasks[dateKey]) {
+          groupedTasks[dateKey] = [];
+        }
+        groupedTasks[dateKey].push(task);
+      }
+    });
+    return groupedTasks;
   }, [tasks]);
 
-  const tasksByDate = {};
-  tasks.forEach((task) => {
-    if (task.due_date) {
-      const dateKey = format(startOfDay(new Date(task.due_date)), 'yyyy-MM-dd');
-      if (!tasksByDate[dateKey]) {
-        tasksByDate[dateKey] = [];
-      }
-      tasksByDate[dateKey].push(task);
-    }
-  });
-
-  const goToPreviousWeeks = () => {
-    setCurrentWeekStart(prev => addDays(prev, -14));
+  const getDayTasks = (day) => {
+    const dateKey = format(startOfDay(day), 'yyyy-MM-dd');
+    return tasksByDate[dateKey] || [];
   };
 
-  const goToNextWeeks = () => {
-    setCurrentWeekStart(prev => addDays(prev, 14));
-  };
-
-  const goToToday = () => {
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
-  };
-
-  const getPriorityIcon = (priority) => {
-    switch (priority) {
-      case 'urgent': return '🔴';
-      case 'high': return '🟠';
-      case 'normal': return '🔵';
-      case 'low': return '⚪';
-      default: return '⚫';
-    }
-  };
-
-  const week1 = twoWeeksDays.slice(0, 7);
-  const week2 = twoWeeksDays.slice(7, 14);
-
-  // Make sure task clicks are passed through properly
-  const handleTaskClick = (task, e) => {
-    e.stopPropagation();
-    if (onTaskClick) {
-      onTaskClick(task, e);
-    }
+  const changeWeek = (offset) => {
+    setStartDate(prev => addDays(prev, offset * 7));
   };
 
   return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between">
+    <Card className="shadow-lg">
+      <CardHeader className="flex flex-row items-center justify-between py-4 px-6 border-b">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Calendar className="w-5 h-5 text-gray-700" />
+            Task Calendar
+          </CardTitle>
+          <CardDescription className="text-sm text-gray-500">
+            Current week view of upcoming tasks
+          </CardDescription>
+        </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={goToPreviousWeeks} className="h-8">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => changeWeek(-1)}
+            className="h-8 w-8"
+          >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <Button variant="default" size="sm" onClick={goToToday} className="h-8 bg-blue-600 hover:bg-blue-700">
-            Today
-          </Button>
-          <Button variant="outline" size="sm" onClick={goToNextWeeks} className="h-8">
+          <span className="text-sm font-medium px-2 text-gray-700">
+            {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => changeWeek(1)}
+            className="h-8 w-8"
+          >
             <ChevronRight className="w-4 h-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onViewFullCalendar}
+            className="ml-4 h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <Maximize2 className="w-4 h-4 mr-1.5" />
+            Full Calendar
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={onOpenFullView} className="h-8">
-          <Maximize2 className="w-4 h-4 mr-2" />
-          Full View
-        </Button>
-      </div>
-
-      {/* List Legend */}
-      {listLegend.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <List className="w-4 h-4 text-slate-500" />
-          <span className="text-xs font-medium text-slate-600 mr-1">Lists:</span>
-          {listLegend.map((list) => (
-            <Badge key={list.name} variant="outline" className={`${list.color.bg} ${list.color.text} ${list.color.border} text-xs`}>
-              <div className={`w-2 h-2 rounded-full ${list.color.dot} mr-1.5`} />
-              {list.name}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Week 1 */}
-      <div className="grid grid-cols-7 gap-3">
-        {week1.map((day) => {
-          const dateKey = format(day, 'yyyy-MM-dd');
-          const dayTasks = tasksByDate[dateKey] || [];
-          const isTodayDate = isToday(day);
-
-          return (
-            <Card key={dateKey} className={`overflow-hidden transition-all hover:shadow-md ${isTodayDate ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
-              <CardContent className="p-0">
-                {/* Date Header */}
-                <div className={`p-3 text-center border-b ${isTodayDate ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
-                  <div className={`text-2xl font-bold ${isTodayDate ? 'text-blue-600' : 'text-slate-900'}`}>
-                    {format(day, 'd')}
-                  </div>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-7 gap-3">
+          {days.map((day, index) => {
+            const dayTasks = getDayTasks(day);
+            const today = new Date();
+            const isTodayDate = isSameDay(day, today);
+            
+            return (
+              <div
+                key={index}
+                className={`min-h-[160px] rounded-lg border-2 p-3 flex flex-col transition-all duration-200 ease-in-out hover:shadow-md ${
+                  isTodayDate 
+                    ? 'border-blue-500 bg-blue-50 shadow-md' 
+                    : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className={`text-sm font-semibold mb-2 ${
+                  isTodayDate ? 'text-blue-700' : 'text-slate-700'
+                }`}>
+                  {format(day, 'EEE d')}
                 </div>
                 
-                {/* Tasks */}
-                <div className="p-2 space-y-1.5 min-h-[120px]">
+                <div className="space-y-1 flex-grow overflow-hidden">
                   {dayTasks.slice(0, 3).map((task) => {
                     const listColor = getListColor(task.list_name);
-                    const statusColor = getStatusColor(task.status);
+                    const StatusIcon = getStatusIcon(task.status);
+                    
                     return (
-                      <motion.div
+                      <motion.button
                         key={task.id}
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        whileHover={{ scale: 1.05 }}
+                        onClick={() => onTaskClick(task)}
+                        whileHover={{ scale: 1.02, backgroundColor: listColor.bg }}
+                        whileTap={{ scale: 0.98 }}
                         transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                        onClick={(e) => handleTaskClick(task, e)}
-                        className="cursor-pointer"
+                        className="w-full text-left focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 rounded-md"
                       >
-                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
-                          <div className="flex items-start gap-1.5 mb-1">
-                            <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
-                            <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
-                              {task.title}
-                            </span>
-                          </div>
-                          {task.list_name && (
-                            <div className="text-[10px] text-slate-600 truncate ml-3.5">
-                              {task.list_name}
-                            </div>
-                          )}
+                        <div
+                          className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} flex items-center gap-1.5 group`}
+                        >
+                          <StatusIcon className={`w-3 h-3 flex-shrink-0 ${listColor.dot.replace('bg-', 'text-')}`} />
+                          <span className={`truncate flex-1 font-medium ${listColor.text} group-hover:underline`}>{task.title}</span>
                         </div>
-                      </motion.div>
+                      </motion.button>
                     );
                   })}
-                  {dayTasks.length > 3 && (
-                    <div className="text-xs text-slate-500 text-center font-medium pt-1">
-                      +{dayTasks.length - 3} more
-                    </div>
-                  )}
+                  
                   {dayTasks.length === 0 && (
-                    <div className="text-xs text-slate-300 text-center py-8">
+                    <div className="text-xs text-slate-300 text-center py-4">
                       No tasks
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Week 2 */}
-      <div className="grid grid-cols-7 gap-3">
-        {week2.map((day) => {
-          const dateKey = format(day, 'yyyy-MM-dd');
-          const dayTasks = tasksByDate[dateKey] || [];
-          const isTodayDate = isToday(day);
-
-          return (
-            <Card key={dateKey} className={`overflow-hidden transition-all hover:shadow-md ${isTodayDate ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
-              <CardContent className="p-0">
-                {/* Date Header */}
-                <div className={`p-3 text-center border-b ${isTodayDate ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
-                  <div className={`text-2xl font-bold ${isTodayDate ? 'text-blue-600' : 'text-slate-900'}`}>
-                    {format(day, 'd')}
-                  </div>
-                </div>
-                
-                {/* Tasks */}
-                <div className="p-2 space-y-1.5 min-h-[120px]">
-                  {dayTasks.slice(0, 3).map((task) => {
-                    const listColor = getListColor(task.list_name);
-                    const statusColor = getStatusColor(task.status);
-                    return (
-                      <motion.div
-                        key={task.id}
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                        onClick={(e) => handleTaskClick(task, e)}
-                        className="cursor-pointer"
-                      >
-                        <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
-                          <div className="flex items-start gap-1.5 mb-1">
-                            <div className={`w-2 h-2 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
-                            <span className={`flex-1 font-medium leading-tight ${listColor.text} group-hover:underline`}>
-                              {task.title}
-                            </span>
-                          </div>
-                          {task.list_name && (
-                            <div className="text-[10px] text-slate-600 truncate ml-3.5">
-                              {task.list_name}
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                  {dayTasks.length > 3 && (
-                    <div className="text-xs text-slate-500 text-center font-medium pt-1">
+                {dayTasks.length > 3 && (
+                    <button
+                      onClick={onViewFullCalendar} // Link to full calendar to see more tasks for the day
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-2 self-start"
+                    >
                       +{dayTasks.length - 3} more
-                    </div>
+                    </button>
                   )}
-                  {dayTasks.length === 0 && (
-                    <div className="text-xs text-slate-300 text-center py-8">
-                      No tasks
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

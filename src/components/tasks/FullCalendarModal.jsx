@@ -1,244 +1,235 @@
-
 import React, { useState, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, List } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday } from "date-fns";
-import { motion } from "framer-motion"; // Added framer-motion import
+import {
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  ArrowUpCircle,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  X
+} from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isSameMonth } from "date-fns";
+import { motion } from "framer-motion";
+import TaskDetailModal from "./TaskDetailModal";
 
-export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskClick }) {
+export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskUpdated }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [draggedTask, setDraggedTask] = useState(null);
 
-  // Generate consistent colors for each list
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  
+  // Get all days including padding for week alignment
+  const firstDayOfMonth = monthStart.getDay();
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const paddingDays = Array(firstDayOfMonth).fill(null);
+  const allDays = [...paddingDays, ...daysInMonth];
+
   const getListColor = (listName) => {
-    if (!listName) return { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', dot: 'bg-slate-500' };
+    if (!listName) return 'bg-slate-100 text-slate-700';
     
-    let hash = 0;
-    for (let i = 0; i < listName.length; i++) {
-      hash = listName.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    const colors = {
+      'Marketing': 'bg-purple-100 text-purple-700 border-purple-300',
+      'Facilities': 'bg-blue-100 text-blue-700 border-blue-300',
+      'IT': 'bg-green-100 text-green-700 border-green-300',
+      'Events': 'bg-pink-100 text-pink-700 border-pink-300',
+      'Worship': 'bg-indigo-100 text-indigo-700 border-indigo-300',
+    };
     
-    const colors = [
-      { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-400', dot: 'bg-blue-500' },
-      { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-400', dot: 'bg-purple-500' },
-      { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-400', dot: 'bg-pink-500' },
-      { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-400', dot: 'bg-green-500' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-400', dot: 'bg-yellow-500' },
-      { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-400', dot: 'bg-orange-500' },
-      { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-400', dot: 'bg-red-500' },
-      { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-400', dot: 'bg-teal-500' },
-      { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-400', dot: 'bg-indigo-500' },
-      { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-400', dot: 'bg-cyan-500' },
-    ];
+    const matchedColor = Object.entries(colors).find(([key]) => 
+      listName.toLowerCase().includes(key.toLowerCase())
+    );
     
-    return colors[Math.abs(hash) % colors.length];
+    return matchedColor ? matchedColor[1] : 'bg-slate-100 text-slate-700 border-slate-300';
   };
 
-  // Get ClickUp status color
-  const getStatusColor = (status) => {
+  const getStatusIcon = (status) => {
     const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('done') || statusLower.includes('complete')) return CheckCircle;
+    if (statusLower.includes('progress') || statusLower.includes('active')) return ArrowUpCircle;
+    if (statusLower.includes('awaiting') || statusLower.includes('review')) return AlertCircle;
+    if (statusLower.includes('ready') || statusLower.includes('to do')) return Circle;
+    return Clock;
+  };
+
+  const getDayTasks = (day) => {
+    if (!day) return [];
+    return tasks.filter(task => 
+      task.due_date && isSameDay(new Date(task.due_date), day)
+    );
+  };
+
+  const handleTaskClick = (task) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
+
+  const handleDragStart = (e, task) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, day) => {
+    e.preventDefault();
+    if (!draggedTask || !day) return;
+
+    // Update the task's due date
+    try {
+      await base44.functions.invoke('updateClickUpTaskDueDate', {
+        task_id: draggedTask.id,
+        due_date: day.toISOString()
+      });
+      
+      toast.success('Due date updated!');
+      if (onTaskUpdated) onTaskUpdated();
+    } catch (error) {
+      console.error('Failed to update due date:', error);
+      toast.error('Failed to update due date');
+    }
     
-    // Match ClickUp's status colors
-    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500';
-    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500';
-    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500';
-    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev')) return 'bg-purple-500';
-    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-400';
-    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500';
-    if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500';
-    
-    return 'bg-slate-400'; // Default
-  };
-
-  // Get unique lists and their colors
-  const listLegend = useMemo(() => {
-    const uniqueLists = [...new Set(tasks.map(t => t.list_name).filter(Boolean))];
-    return uniqueLists.map(listName => ({
-      name: listName,
-      color: getListColor(listName)
-    }));
-  }, [tasks]);
-
-  const generateMonthDays = () => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
-
-    const days = [];
-    let day = startDate;
-
-    while (day <= endDate) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-
-    return days;
-  };
-
-  const monthDays = generateMonthDays();
-
-  const tasksByDate = {};
-  tasks.forEach(task => {
-    if (task.due_date) {
-      const dateKey = format(new Date(task.due_date), 'yyyy-MM-dd');
-      if (!tasksByDate[dateKey]) {
-        tasksByDate[dateKey] = [];
-      }
-      tasksByDate[dateKey].push(task);
-    }
-  });
-
-  // This function is no longer used for the dot, but kept if needed elsewhere
-  const getPriorityIcon = (priority) => {
-    switch (priority) {
-      case 'urgent': return '🔴';
-      case 'high': return '🟠';
-      case 'normal': return '🔵';
-      case 'low': return '⚪';
-      default: return '⚫';
-    }
-  };
-
-  const weeks = [];
-  for (let i = 0; i < monthDays.length; i += 7) {
-    weeks.push(monthDays.slice(i, i + 7));
-  }
-
-  // Make sure task clicks are passed through
-  const handleTaskClick = (task, e) => {
-    e.stopPropagation();
-    if (onTaskClick) {
-      onTaskClick(task, e);
-    }
+    setDraggedTask(null);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-3xl font-bold">
-              {format(currentMonth, 'MMMM yyyy')}
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setCurrentMonth(new Date())}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Today
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-2xl">Task Calendar</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-lg font-semibold px-4">
+                  {format(currentMonth, 'MMMM yyyy')}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentMonth(new Date())}
+                  className="ml-2"
+                >
+                  Today
+                </Button>
+              </div>
             </div>
-          </div>
+          </DialogHeader>
 
-          {/* List Legend */}
-          {listLegend.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap p-3 bg-slate-50 rounded-lg border border-slate-200 mt-3">
-              <List className="w-4 h-4 text-slate-500" />
-              <span className="text-xs font-medium text-slate-600 mr-1">Lists:</span>
-              {listLegend.map((list) => (
-                <Badge key={list.name} variant="outline" className={`${list.color.bg} ${list.color.text} ${list.color.border} text-xs`}>
-                  <div className={`w-2 h-2 rounded-full ${list.color.dot} mr-1.5`} />
-                  {list.name}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </DialogHeader>
-
-        <div className="flex-1 overflow-auto mt-4">
-          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-            {/* Day Headers */}
-            <div className="grid grid-cols-7 bg-slate-50 border-b">
-              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                <div key={day} className="p-3 text-center font-semibold text-slate-700 border-r last:border-r-0 text-sm">
+          <div className="mt-4">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center font-semibold text-sm text-slate-600 p-2">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Calendar Weeks */}
-            {weeks.map((week, weekIdx) => (
-              <div key={weekIdx} className="grid grid-cols-7 border-b last:border-b-0">
-                {week.map((day, dayIdx) => {
-                  const dateKey = format(day, 'yyyy-MM-dd');
-                  const dayTasks = tasksByDate[dateKey] || [];
-                  const isTodayDate = isToday(day);
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-2">
+              {allDays.map((day, index) => {
+                if (!day) {
+                  return <div key={`empty-${index}`} className="min-h-[100px]" />;
+                }
 
-                  return (
-                    <div
-                      key={dayIdx}
-                      className={`min-h-[140px] p-2 border-r last:border-r-0 ${
-                        isTodayDate ? 'bg-blue-50 ring-2 ring-inset ring-blue-500' : isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div className={`text-base font-semibold mb-2 ${
-                        isTodayDate ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                      } flex items-center justify-between`}>
-                        <span>{format(day, 'd')}</span>
-                        {isTodayDate && (
-                          <Badge className="bg-blue-600 text-[8px] px-1.5 py-0">Today</Badge>
-                        )}
-                      </div>
+                const dayTasks = getDayTasks(day);
+                const isToday = isSameDay(day, new Date());
+                const isCurrentMonth = isSameMonth(day, currentMonth);
 
-                      <div className="space-y-1">
-                        {dayTasks.map((task, taskIdx) => {
-                          const listColor = getListColor(task.list_name);
-                          const statusColor = getStatusColor(task.status);
-                          return (
-                            <motion.div
-                              key={task.id || taskIdx} // Use task.id for unique key, fallback to taskIdx if no id
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              whileHover={{ scale: 1.02 }}
-                              onClick={(e) => handleTaskClick(task, e)}
-                              className="cursor-pointer"
-                            >
-                              <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all group`}>
-                                <div className="flex items-start gap-1 mb-0.5">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} mt-0.5 flex-shrink-0`} title={task.status} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className={`font-medium truncate ${listColor.text} group-hover:underline leading-tight`}>
-                                      {task.title}
-                                    </div>
-                                    {task.list_name && (
-                                      <div className="text-[9px] text-slate-600 truncate mt-0.5">
-                                        {task.list_name}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
+                return (
+                  <div
+                    key={index}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, day)}
+                    className={`min-h-[100px] rounded-lg border-2 p-2 transition-all ${
+                      isToday 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : isCurrentMonth
+                        ? 'border-slate-200 bg-white hover:bg-slate-50'
+                        : 'border-slate-100 bg-slate-50'
+                    } ${draggedTask ? 'hover:border-blue-400 hover:bg-blue-50' : ''}`}
+                  >
+                    <div className={`text-sm font-semibold mb-1 ${
+                      isToday 
+                        ? 'text-blue-600' 
+                        : isCurrentMonth
+                        ? 'text-slate-700'
+                        : 'text-slate-400'
+                    }`}>
+                      {format(day, 'd')}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+
+                    <div className="space-y-1">
+                      {dayTasks.map((task) => {
+                        const listColor = getListColor(task.list_name);
+                        const StatusIcon = getStatusIcon(task.status);
+
+                        return (
+                          <motion.button
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, task)}
+                            onClick={() => handleTaskClick(task)}
+                            whileHover={{ scale: 1.02 }}
+                            className="w-full text-left cursor-move"
+                          >
+                            <div
+                              className={`text-xs p-1.5 rounded border ${listColor} flex items-center gap-1 hover:shadow-sm transition-shadow`}
+                            >
+                              <StatusIcon className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate flex-1">{task.title}</span>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Detail Modal */}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          open={showTaskDetail}
+          onOpenChange={setShowTaskDetail}
+          onTaskUpdated={() => {
+            if (onTaskUpdated) onTaskUpdated();
+            setShowTaskDetail(false);
+          }}
+        />
+      )}
+    </>
   );
 }

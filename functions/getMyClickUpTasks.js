@@ -40,14 +40,14 @@ Deno.serve(async (req) => {
         const meData = await meResponse.json();
         const clickupUserId = meData.user.id;
 
-        // Fetch tasks from all teams
+        // Fetch tasks from all teams - EXPANDED to get MORE tasks
         let allTasks = [];
 
         for (const team of teamsData.teams) {
             try {
-                // Get tasks assigned to me with more details
+                // Get ALL tasks assigned to me (open and closed from last 30 days)
                 const tasksResponse = await fetch(
-                    `https://api.clickup.com/api/v2/team/${team.id}/task?assignees[]=${clickupUserId}&include_closed=false&subtasks=true`,
+                    `https://api.clickup.com/api/v2/team/${team.id}/task?assignees[]=${clickupUserId}&subtasks=true&include_closed=false&page=0`,
                     {
                         headers: {
                             'Authorization': user.clickup_access_token
@@ -64,6 +64,8 @@ Deno.serve(async (req) => {
             }
         }
 
+        console.log(`Fetched ${allTasks.length} total tasks for user ${user.email}`);
+
         // Format tasks with all details
         const formattedTasks = allTasks.map(task => ({
             id: task.id,
@@ -73,6 +75,7 @@ Deno.serve(async (req) => {
             due_date: task.due_date ? new Date(parseInt(task.due_date)).toISOString() : null,
             url: task.url,
             list_name: task.list?.name,
+            list_id: task.list?.id,
             folder_name: task.folder?.name,
             space_name: task.space?.name,
             description: task.description || task.text_content,
