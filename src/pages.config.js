@@ -13,6 +13,7 @@ import MyTasks from './pages/MyTasks';
 import AIHelper from './pages/AIHelper';
 import MyApprovals from './pages/MyApprovals';
 import TaskDetail from './pages/TaskDetail';
+import BrandAssets from './pages/BrandAssets';
 import Layout from './Layout.jsx';
 
 
@@ -32,6 +33,7 @@ export const PAGES = {
     "AIHelper": AIHelper,
     "MyApprovals": MyApprovals,
     "TaskDetail": TaskDetail,
+    "BrandAssets": BrandAssets,
 }
 
 export const pagesConfig = {

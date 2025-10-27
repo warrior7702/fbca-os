@@ -230,11 +230,12 @@ export default function Settings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger value="brand">Brand</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
 
@@ -452,6 +453,21 @@ export default function Settings() {
                   </div>
                   <Switch />
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="brand" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Brand Assets</CardTitle>
+                <CardDescription>Manage FBCA brand guidelines, logos, colors, and fonts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Assuming a route like '/brand-assets' exists for the Brand Assets Manager */}
+                <Button onClick={() => navigate('/brand-assets')}> 
+                  Open Brand Assets Manager
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
