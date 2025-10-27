@@ -12,6 +12,7 @@ import Onboarding from './pages/Onboarding';
 import MyTasks from './pages/MyTasks';
 import AIHelper from './pages/AIHelper';
 import MyApprovals from './pages/MyApprovals';
+import TaskDetail from './pages/TaskDetail';
 import Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "MyTasks": MyTasks,
     "AIHelper": AIHelper,
     "MyApprovals": MyApprovals,
+    "TaskDetail": TaskDetail,
 }
 
 export const pagesConfig = {

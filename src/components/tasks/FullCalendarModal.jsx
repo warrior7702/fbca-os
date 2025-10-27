@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Grip } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO } from "date-fns";
 import { toast } from "sonner";
 
 export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskClick, onTaskUpdate }) {
@@ -17,13 +17,11 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
   const monthDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
-    const firstDayOfMonth = start.getDay(); // 0-6 (Sun-Sat)
+    const firstDayOfMonth = start.getDay();
     
-    // Start from the previous Sunday
     const calendarStart = new Date(start);
     calendarStart.setDate(start.getDate() - firstDayOfMonth);
     
-    // Get 42 days (6 weeks) to fill the calendar grid
     const days = [];
     for (let i = 0; i < 42; i++) {
       const day = new Date(calendarStart);
@@ -93,6 +91,15 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
     }
   };
 
+  const isCurrentMonth = (day) => {
+    return day.getMonth() === currentMonth.getMonth();
+  };
+
+  const isToday = (day) => {
+    const today = new Date();
+    return day.toDateString() === today.toDateString();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
@@ -128,21 +135,18 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
         </DialogHeader>
 
         <div className="flex-1 overflow-auto">
-          {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2 h-full">
-            {/* Day Headers */}
             {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
               <div key={day} className="text-center text-sm font-semibold text-slate-700 py-3 border-b-2 border-slate-200">
                 {day}
               </div>
             ))}
 
-            {/* Day Cells */}
             {monthDays.map((day, index) => {
               const dayKey = format(day, 'yyyy-MM-dd');
               const dayTasks = tasksByDay.get(dayKey) || [];
-              const isCurrentDay = isToday(day);
-              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isCurrent = isToday(day);
+              const inMonth = isCurrentMonth(day);
 
               return (
                 <div
@@ -150,17 +154,17 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   className={`min-h-[120px] p-2 rounded-lg border-2 transition-all ${
-                    isCurrentDay
+                    isCurrent
                       ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200'
-                      : isCurrentMonth
+                      : inMonth
                       ? 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
                       : 'bg-slate-50 border-slate-100'
                   }`}
                 >
                   <div className={`text-sm font-semibold mb-2 ${
-                    isCurrentDay
+                    isCurrent
                       ? 'text-indigo-600'
-                      : isCurrentMonth
+                      : inMonth
                       ? 'text-slate-700'
                       : 'text-slate-400'
                   }`}>
