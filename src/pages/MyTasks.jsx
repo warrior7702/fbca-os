@@ -250,28 +250,9 @@ export default function MyTasks() {
     console.log('📧 Email webLink:', email.webLink);
     
     if (email.webLink) {
-      try {
-        // Convert web URL to desktop Outlook protocol
-        const outlookLink = email.webLink.replace(
-          /^https:\/\/outlook\.office\.com\/mail\//,
-          'outlook://'
-        );
-        
-        console.log('📧 Converted to desktop link:', outlookLink);
-        
-        // Try to open in desktop Outlook first
-        window.location.href = outlookLink;
-        
-        // Fallback: open web version after slight delay if desktop doesn't respond
-        setTimeout(() => {
-          console.log('📧 Fallback: opening in web');
-          window.open(email.webLink, '_blank', 'noopener,noreferrer');
-        }, 800);
-      } catch (error) {
-        console.error('📧 Error attempting to open desktop Outlook link:', error);
-        // If there's an error in construction or assignment, directly open web
-        window.open(email.webLink, '_blank', 'noopener,noreferrer');
-      }
+      // Just open the webLink directly - new Outlook will intercept if configured
+      // Settings → General → Link handling → "Open supported Outlook links in the new Outlook"
+      window.open(email.webLink, '_blank', 'noopener,noreferrer');
     } else {
       console.error('📧 No webLink found for email');
       toast.error('Could not open email');
