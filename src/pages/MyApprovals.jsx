@@ -86,6 +86,7 @@ function MyApprovalsContent() {
   const [syncStats, setSyncStats] = useState(null);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [debugging, setDebugging] = useState(false); // New state for debugging button
 
   useEffect(() => {
     loadData();
@@ -164,6 +165,41 @@ function MyApprovalsContent() {
       toast.error('Failed to resync. Please try again.');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // New debug function
+  const handleDebug = async () => {
+    setDebugging(true);
+    try {
+      const debugResponse = await base44.functions.invoke('debugPCOApprovals');
+      console.log('🐛 PCO Debug Results:', debugResponse.data);
+      
+      // Show results in a nice format
+      const results = debugResponse.data;
+      const message = `
+📊 PCO Debug Results:
+- Your PCO Person ID: ${results.summary.my_pco_person_id}
+- Your Approval Groups: ${results.summary.my_groups_count} (${results.my_groups.map(g => g.name).join(', ')})
+- Total Pending Requests in PCO: ${results.summary.total_pending_requests}
+- Requests in YOUR Groups: ${results.summary.requests_in_my_groups}
+- Requests in Other Groups: ${results.summary.requests_in_other_groups}
+
+Check browser console for full details.
+      `;
+      
+      alert(message);
+      
+      if (results.summary.requests_in_my_groups === 0 && results.summary.total_pending_requests > 0) {
+        toast.error('Found pending requests but none are in your approval groups. Check group membership in PCO.');
+      } else if (results.summary.requests_in_my_groups > 0) {
+        toast.success(`Found ${results.summary.requests_in_my_groups} approvals that should show up!`);
+      }
+    } catch (error) {
+      console.error('Debug error:', error);
+      toast.error('Debug failed: ' + error.message);
+    } finally {
+      setDebugging(false);
     }
   };
 
@@ -267,6 +303,23 @@ function MyApprovalsContent() {
           iconColor="from-orange-500 to-red-500"
           action={
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDebug}
+                disabled={debugging || !user?.pco_access_token}
+              >
+                {debugging ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Debugging...
+                  </>
+                ) : (
+                  <>
+                    🐛 Debug PCO
+                  </>
+                )}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
