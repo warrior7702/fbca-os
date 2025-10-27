@@ -31,13 +31,7 @@ const defaultApps = [
   { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" } // New Email app
 ];
 
-const wallpapers = {
-  church_steeple_night: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/c4c5d5f09_ChatGPTImageOct25202502_23_44AM.png",
-  church_building_blue: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/3e3148244_ChatGPTImageOct25202502_24_10AM.png",
-  cross_chrome_blue: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/ad26483c6_ChatGPTImageOct25202502_25_20AM.png",
-  cross_white_glow: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/a221e8e71_ChatGPTImageOct25202502_30_15AM.png",
-  cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
-};
+// Removed wallpapers object - now handled in Layout
 
 const COLS = 6;
 const ROWS = 4;
@@ -56,7 +50,7 @@ const getDefaultPositions = () => {
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [wallpaper, setWallpaper] = useState("cross_white_glow"); // Kept existing default wallpaper
+  // Removed wallpaper state - now handled in Layout
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
@@ -79,9 +73,7 @@ export default function Dashboard() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      if (currentUser.wallpaper) {
-        setWallpaper(currentUser.wallpaper);
-      }
+      // Removed wallpaper loading - now handled in Layout
       
       // IMPORTANT: Only set layout if it exists AND has actual data
       if (currentUser.desktop_layout && 
@@ -162,8 +154,7 @@ export default function Dashboard() {
     return defaultApps.find(app => app.id === appId);
   };
 
-  // Fixed wallpaper logic: ensure it falls back to a valid URL
-  const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
+  // Removed wallpaper logic: ensure it falls back to a valid URL
 
   console.log('Dashboard rendering with positions:', appPositions);
   console.log('Number of positioned apps:', Object.keys(appPositions).length);
@@ -171,9 +162,7 @@ export default function Dashboard() {
   return (
     <div 
       className="h-full relative overflow-hidden bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url('${wallpaperUrl}')`
-      }}
+      // Removed inline background style - now handled in Layout
     >
       {/* Edit Mode Indicator */}
       <AnimatePresence>

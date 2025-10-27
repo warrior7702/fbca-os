@@ -78,6 +78,15 @@ const apps = [
   }
 ];
 
+// Wallpaper URLs
+const wallpapers = {
+  church_steeple_night: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/c4c5d5f09_ChatGPTImageOct25202502_23_44AM.png",
+  church_building_blue: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/3e3148244_ChatGPTImageOct25202502_24_10AM.png",
+  cross_chrome_blue: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/ad26483c6_ChatGPTImageOct25202502_25_20AM.png",
+  cross_white_glow: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/a221e8e71_ChatGPTImageOct25202502_30_15AM.png",
+  cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
+};
+
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -92,12 +101,18 @@ export default function Layout({ children, currentPageName }) {
   const searchRef = useRef(null);
   const [hasConnectionAlert, setHasConnectionAlert] = useState(false);
   const [showLightBubble, setShowLightBubble] = useState(false);
+  const [wallpaper, setWallpaper] = useState("cross_white_glow"); // Initialize with a default wallpaper
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
+        
+        // Load wallpaper preference
+        if (currentUser.wallpaper) {
+          setWallpaper(currentUser.wallpaper);
+        }
         
         // Check if user needs to connect accounts
         const hasPCO = !!currentUser?.pco_access_token;
@@ -270,8 +285,16 @@ export default function Layout({ children, currentPageName }) {
     sessionStorage.setItem('lightBubbleDismissed', 'true');
   };
 
+  // Get wallpaper URL
+  const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
+
   return (
-    <div className="min-h-screen"> {/* Removed bg-slate-50 to allow underlying wallpaper/background */}
+    <div 
+      className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
+      style={{
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), url('${wallpaperUrl}')`
+      }}
+    >
       <style>{`
         .fbca-logo-taskbar {
           filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
