@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -25,23 +24,24 @@ import {
   Building2,
   Mail,
   Link as LinkIcon,
-  ChevronDown, // New icon for dropdowns
-  Circle, // New icon for status
-  ArrowUpCircle, // New icon for status
-  AlertCircle, // New icon for status
-  Loader2 // New icon for loading state
+  ChevronDown,
+  Circle,
+  ArrowUpCircle,
+  AlertCircle,
+  Loader2,
+  CheckCircle
 } from "lucide-react";
 import { format } from "date-fns";
-import { useMutation } from "@tanstack/react-query"; // New import
-import { base44 } from "@/api/base44Client"; // New import
-import { toast } from "react-hot-toast"; // Assuming react-hot-toast is used for notifications
+import { useMutation } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // New imports for dropdown
+} from "@/components/ui/dropdown-menu";
 
 export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdated }) {
   if (!task) return null;
@@ -99,7 +99,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
         }
         return field.value;
       case 'checkbox':
-        return field.value ? '✓ Yes' : null; // Only show if checked
+        return field.value ? '✓ Yes' : null;
       case 'date':
         try {
           return format(new Date(parseInt(field.value)), 'MMM d, yyyy h:mm a');
@@ -134,13 +134,11 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
     return FileText;
   };
 
-  // Filter out custom fields with no value and categorize them
   const customFieldsWithValues = task.custom_fields?.filter(field => {
     const value = formatCustomFieldValue(field);
     return value !== null && value !== '';
   }) || [];
 
-  // Separate important fields (like Buildings) from others
   const importantFields = customFieldsWithValues.filter(field => 
     field.name.toLowerCase().includes('building') || 
     field.name.toLowerCase().includes('requestor') ||
@@ -156,24 +154,25 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
   const statusIcons = {
     'to do': Circle,
     'in progress': ArrowUpCircle,
-    'ready': CheckSquare, // Using CheckSquare from existing imports, outline suggested CheckCircle but not imported
+    'ready': CheckCircle,
     'awaiting feedback': AlertCircle,
-    'closed': CheckSquare // Using CheckSquare
-    // Add other status mappings as needed
+    'closed': CheckSquare
   };
 
   const getStatusIconComponent = (status) => {
     const statusLower = status?.toLowerCase();
-    if (statusLower.includes('to do')) return Circle;
-    if (statusLower.includes('in progress')) return ArrowUpCircle;
-    if (statusLower.includes('ready') || statusLower.includes('done') || statusLower.includes('complete')) return CheckSquare;
-    if (statusLower.includes('awaiting') || statusLower.includes('pending') || statusLower.includes('review')) return AlertCircle;
-    return Circle; // Default icon
+    if (statusLower?.includes('to do')) return Circle;
+    if (statusLower?.includes('in progress')) return ArrowUpCircle;
+    if (statusLower?.includes('ready') || statusLower?.includes('done') || statusLower?.includes('complete')) return CheckCircle;
+    if (statusLower?.includes('awaiting') || statusLower?.includes('pending') || statusLower?.includes('review')) return AlertCircle;
+    return Circle;
   };
+
+  const StatusIcon = getStatusIconComponent(task.status);
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ task_id, status }) => 
-      base44.functions.invoke('updateClickUpTask', { taskId: task_id, status }), // Ensure parameter name matches backend
+      base44.functions.invoke('updateClickUpTask', { task_id, status }),
     onSuccess: () => {
       toast.success('Status updated!');
       if (onTaskUpdated) onTaskUpdated();
@@ -187,7 +186,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
 
   const closeTaskMutation = useMutation({
     mutationFn: ({ task_id, closed }) => 
-      base44.functions.invoke('updateClickUpTask', { taskId: task_id, closed }), // Ensure parameter name matches backend
+      base44.functions.invoke('updateClickUpTask', { task_id, closed }),
     onSuccess: () => {
       toast.success('Task closed!');
       if (onTaskUpdated) onTaskUpdated();
@@ -206,7 +205,6 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
   const handleCloseTask = () => {
     closeTaskMutation.mutate({ task_id: task.id, closed: true });
   };
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,7 +231,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="gap-2">
-                  {React.createElement(getStatusIconComponent(task.status), { className: "w-4 h-4" })}
+                  <StatusIcon className="w-4 h-4" />
                   {formatStatus(task.status)}
                   <ChevronDown className="w-4 h-4" />
                 </Button>
@@ -248,7 +246,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
                   In Progress
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleStatusChange('ready')}>
-                  <CheckSquare className="w-4 h-4 mr-2 text-green-500" />
+                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
                   Ready
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleStatusChange('awaiting feedback')}>
@@ -278,7 +276,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
             )}
           </div>
 
-          {/* Important Custom Fields (Buildings, Code, Requestor) - Highlighted */}
+          {/* Important Custom Fields */}
           {importantFields.length > 0 && (
             <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
               <div className="grid grid-cols-2 gap-3">
@@ -434,7 +432,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
             </div>
           )}
 
-          {/* Description - Only show if not empty */}
+          {/* Description */}
           {task.description && task.description.trim() && (
             <div className="border-t pt-4">
               <div className="flex items-center gap-2 mb-2">
