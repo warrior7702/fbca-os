@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -12,19 +13,22 @@ import {
   Users,
   ListChecks,
   ClipboardCheck,
-  Unlock
+  Unlock,
+  Mail // NEW: Import Mail icon for Email app
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 const defaultApps = [
-  { id: "mytasks", name: "My Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
-  { id: "myapprovals", name: "My Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals" },
+  // Renamed categories and added Email app
+  { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
+  { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals" },
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
-  { id: "foodservice", name: "Food Service", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
-  { id: "staffdir", name: "Staff Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
-  { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" }
+  { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
+  { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
+  { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
+  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" } // New Email app
 ];
 
 const wallpapers = {
@@ -41,6 +45,7 @@ const ROWS = 4;
 const getDefaultPositions = () => {
   const positions = {};
   defaultApps.forEach((app, index) => {
+    // Ensure new apps also get default positions
     positions[app.id] = {
       row: Math.floor(index / 2),
       col: index % 2
@@ -51,7 +56,7 @@ const getDefaultPositions = () => {
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [wallpaper, setWallpaper] = useState("cross_white_glow");
+  const [wallpaper, setWallpaper] = useState("cross_white_glow"); // Kept existing default wallpaper
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
@@ -157,6 +162,7 @@ export default function Dashboard() {
     return defaultApps.find(app => app.id === appId);
   };
 
+  // Fixed wallpaper logic: ensure it falls back to a valid URL
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
   console.log('Dashboard rendering with positions:', appPositions);
@@ -230,19 +236,36 @@ export default function Dashboard() {
                           </span>
                         </motion.div>
                       ) : (
-                        <Link to={createPageUrl(app.path)} className="block h-full">
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
-                          >
-                            <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
-                              <app.icon className="w-8 h-8 text-white" />
-                            </div>
-                            <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                              {app.name}
-                            </span>
-                          </motion.div>
-                        </Link>
+                        // Conditional rendering for mailto links vs internal links
+                        app.path.startsWith("mailto:") ? (
+                          <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                            >
+                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                                <app.icon className="w-8 h-8 text-white" />
+                              </div>
+                              <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                                {app.name}
+                              </span>
+                            </motion.div>
+                          </a>
+                        ) : (
+                          <Link to={createPageUrl(app.path)} className="block h-full">
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                            >
+                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                                <app.icon className="w-8 h-8 text-white" />
+                              </div>
+                              <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                                {app.name}
+                              </span>
+                            </motion.div>
+                          </Link>
+                        )
                       )}
                     </div>
                   )}
@@ -253,7 +276,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Desktop Shortcuts - Right Side */}
+      {/* Desktop Shortcuts - Right Side (Keeping existing as 'unnecessary sections' was not specific) */}
       <div className="absolute right-8 top-8 space-y-4 z-40">
         <motion.div
           initial={{ opacity: 0, x: 20 }}

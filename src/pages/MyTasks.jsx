@@ -3,26 +3,23 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   CheckSquare, 
   Calendar, 
   Mail, 
   ExternalLink, 
-  AlertCircle,
   Loader2,
   Paperclip,
   Tag,
   Maximize2,
   ListChecks
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
+import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -39,10 +36,12 @@ export default function MyTasks() {
   const [user, setUser] = useState(null);
   const [clickupTasks, setClickupTasks] = useState([]);
   const [todoTasks, setTodoTasks] = useState([]);
-  const [emails, setEmails] = useState({ focused: [], unread: [], categorized: {} });
+  const [emails, setEmails] = useState({ categorized: {} });
   const [loading, setLoading] = useState(true);
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -80,10 +79,10 @@ export default function MyTasks() {
           toast.error('Failed to load Microsoft To Do');
         }
 
-        // Load emails
+        // Load emails - only categorized
         try {
           const emailsResponse = await base44.functions.invoke('getCategorizedEmails');
-          setEmails(emailsResponse.data);
+          setEmails({ categorized: emailsResponse.data.categorized || {} });
         } catch (error) {
           console.error('Error fetching emails:', error);
           toast.error('Failed to load emails');
@@ -102,24 +101,14 @@ export default function MyTasks() {
   };
 
   const handleTaskClick = (task) => {
-    if (task.source === 'microsoft_todo') {
-      if (task.url) {
-        window.open(task.url, '_blank', 'noopener,noreferrer');
-      }
-      return;
-    }
+    // Open task detail modal instead of external link
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
 
-    if (!task?.url) {
-      toast.error('Task URL not available');
-      return;
-    }
-    
-    if (!/^https?:\/\//i.test(task.url)) {
-      toast.error('Invalid task URL');
-      return;
-    }
-    
-    window.open(task.url, '_blank', 'noopener,noreferrer');
+  const handleTaskUpdate = async () => {
+    // Reload tasks after update
+    await loadData();
   };
 
   // Combine all tasks
@@ -148,6 +137,14 @@ export default function MyTasks() {
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
+  };
+
+  // Convert Outlook webLink to desktop protocol
+  const getOutlookDesktopLink = (email) => {
+    // Extract message ID from webLink if possible
+    // Format: outlookmsgid:<message-id>
+    // For now, we'll use the webLink but with outlook: protocol
+    return email.webLink?.replace('https://outlook.office365.com', 'outlook:');
   };
 
   if (loading) {
@@ -219,9 +216,6 @@ export default function MyTasks() {
                           )}
                         </div>
                       </div>
-                      {task.url && (
-                        <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0 hover:text-blue-500" />
-                      )}
                     </div>
                   </div>
                 ))}
@@ -258,200 +252,74 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        {/* All Tasks Grid */}
-        <Card>
-          <CardHeader>
-            <CardTitle>All Tasks</CardTitle>
-            <CardDescription>{allTasks.length} total tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allTasks.map((task) => (
-                <TaskCard 
-                  key={`${task.source}-${task.id}`} 
-                  task={task} 
-                  onClick={() => handleTaskClick(task)}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Email Sections */}
-        {user?.microsoft_access_token && (
-          <>
-            {/* Highlighted / Focused Inbox */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  Highlighted
-                </CardTitle>
-                <CardDescription>Focused Inbox - Important unread emails</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingEmails ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
-                  </div>
-                ) : emails.focused && emails.focused.length > 0 ? (
-                  <div className="space-y-2">
-                    {emails.focused.slice(0, 10).map((email, idx) => (
-                      <a
-                        key={idx}
-                        href={email.webLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors block"
-                      >
-                        <Mail className="w-4 h-4 mt-1 flex-shrink-0 text-blue-600" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                              {email.subject || '(No Subject)'}
-                            </p>
-                            {email.hasAttachments && (
-                              <Paperclip className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 truncate">
-                            {email.fromName || email.from}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
-                          </p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500 text-center py-8">
-                    No highlighted emails
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Unread Emails */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-amber-600" />
-                  Unread
-                </CardTitle>
-                <CardDescription>All unread inbox messages</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingEmails ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-600" />
-                  </div>
-                ) : emails.unread && emails.unread.length > 0 ? (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {emails.unread.slice(0, 20).map((email, idx) => (
-                      <a
-                        key={idx}
-                        href={email.webLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors block"
-                      >
-                        <Mail className="w-4 h-4 mt-1 flex-shrink-0 text-amber-600" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                              {email.subject || '(No Subject)'}
-                            </p>
-                            {email.hasAttachments && (
-                              <Paperclip className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 truncate">
-                            {email.fromName || email.from}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
-                          </p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500 text-center py-8">
-                    No unread emails
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Categories */}
-            {emails.categorized && Object.keys(emails.categorized).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="w-5 h-5" />
-                    Categories
-                  </CardTitle>
-                  <CardDescription>
-                    {Object.keys(emails.categorized).length} categor{Object.keys(emails.categorized).length !== 1 ? 'ies' : 'y'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
-                      const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
-                      
-                      return (
-                        <Card key={category} className="bg-slate-50">
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <span 
-                                className="h-3 w-3 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: categoryColor }}
-                              />
-                              {category}
-                            </CardTitle>
-                            <CardDescription className="text-xs">
-                              {categoryEmails.length} email{categoryEmails.length !== 1 ? 's' : ''}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                              {categoryEmails.slice(0, 5).map((email, idx) => (
-                                <a
-                                  key={idx}
-                                  href={email.webLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2 bg-white rounded hover:bg-slate-50 transition-colors block"
-                                >
-                                  <p className={`text-xs truncate ${
-                                    email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
-                                  }`}>
-                                    {email.subject || '(No Subject)'}
-                                  </p>
-                                  <p className="text-[10px] text-slate-500 truncate mt-1">
-                                    {email.fromName || email.from}
-                                  </p>
-                                </a>
-                              ))}
-                              {categoryEmails.length > 5 && (
-                                <p className="text-[10px] text-slate-400 text-center pt-1">
-                                  +{categoryEmails.length - 5} more
+        {/* Categorized Emails */}
+        {user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="w-5 h-5" />
+                Categorized Emails
+              </CardTitle>
+              <CardDescription>
+                {Object.keys(emails.categorized).length} categor{Object.keys(emails.categorized).length !== 1 ? 'ies' : 'y'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingEmails ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
+                    const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
+                    
+                    return (
+                      <Card key={category} className="bg-slate-50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <span 
+                              className="h-3 w-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: categoryColor }}
+                            />
+                            {category}
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            {categoryEmails.length} email{categoryEmails.length !== 1 ? 's' : ''}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                            {categoryEmails.slice(0, 5).map((email, idx) => (
+                              <a
+                                key={idx}
+                                href={getOutlookDesktopLink(email)}
+                                className="p-2 bg-white rounded hover:bg-slate-50 transition-colors block"
+                              >
+                                <p className={`text-xs truncate ${
+                                  email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
+                                }`}>
+                                  {email.subject || '(No Subject)'}
                                 </p>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </>
+                                <p className="text-[10px] text-slate-500 truncate mt-1">
+                                  {email.fromName || email.from}
+                                </p>
+                              </a>
+                            ))}
+                            {categoryEmails.length > 5 && (
+                              <p className="text-[10px] text-slate-400 text-center pt-1">
+                                +{categoryEmails.length - 5} more
+                              </p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -474,6 +342,14 @@ export default function MyTasks() {
             throw error;
           }
         }}
+      />
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        open={showTaskDetail}
+        onOpenChange={setShowTaskDetail}
+        task={selectedTask}
+        onUpdate={handleTaskUpdate}
       />
     </div>
   );

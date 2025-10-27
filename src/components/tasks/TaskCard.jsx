@@ -54,21 +54,13 @@ export default function TaskCard({ task, onClick }) {
       whileHover={{ scale: 1.02 }}
     >
       <Card 
-        className="hover:shadow-lg transition-all relative"
+        className="hover:shadow-lg transition-all cursor-pointer"
         style={!isMicrosoftToDo ? { borderLeftWidth: '4px', borderLeftColor: listColor } : {}}
+        onClick={onClick}
       >
-        {/* Internal link covering whole card - only for ClickUp tasks */}
-        {!isMicrosoftToDo && (
-          <Link 
-            to={createPageUrl('TaskDetail') + `?id=${task.id}`}
-            className="absolute inset-0 z-0"
-            aria-label={`View ${task.title}`}
-          />
-        )}
-
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 relative z-10">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 {!isMicrosoftToDo && (
                   <div 
@@ -97,20 +89,6 @@ export default function TaskCard({ task, onClick }) {
                 <p className="text-xs text-slate-500 mt-2">{task.list_name}</p>
               )}
             </div>
-
-            {/* External link */}
-            {task.url && (
-              <a
-                href={task.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="relative z-10 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline flex-shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="w-3 h-3" />
-                {isMicrosoftToDo ? 'To Do' : 'ClickUp'}
-              </a>
-            )}
           </div>
         </CardContent>
       </Card>
