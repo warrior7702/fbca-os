@@ -101,27 +101,58 @@ export default function Dashboard() {
       console.log('Layout type:', typeof layout);
       console.log('Is array?', Array.isArray(layout));
       
+      // Start with defaults for ALL apps
+      const defaultPositions = getDefaultPositions();
+      
       // Fix corrupted array data or invalid data
-      if (!layout || Array.isArray(layout) || typeof layout !== 'object' || Object.keys(layout).length === 0) {
+      if (!layout || Array.isArray(layout) || typeof layout !== 'object') {
         console.log('❌ Invalid layout detected - using defaults and repairing');
-        const defaults = getDefaultPositions();
-        setAppPositions(defaults);
+        setAppPositions(defaultPositions);
         
         // Auto-repair the database
         try {
-          await base44.auth.updateMe({ desktop_layout: defaults });
+          await base44.auth.updateMe({ desktop_layout: defaultPositions });
           console.log('✅ Layout repaired in database');
         } catch (error) {
           console.error('Failed to repair layout:', error);
         }
       } else {
-        // Valid object with data
-        console.log('✅ Valid layout loaded:', layout);
-        setAppPositions(layout);
+        // Merge: Start with defaults, overlay saved positions
+        const mergedPositions = { ...defaultPositions };
+        
+        // Apply saved positions for apps that exist
+        Object.keys(layout).forEach(appId => {
+          // Only apply if this app still exists in defaultApps
+          if (defaultApps.find(app => app.id === appId)) {
+            mergedPositions[appId] = layout[appId];
+          }
+        });
+        
+        console.log('✅ Merged layout:', mergedPositions);
+        console.log('  - Default positions:', Object.keys(defaultPositions).length);
+        console.log('  - Saved positions:', Object.keys(layout).length);
+        console.log('  - Merged positions:', Object.keys(mergedPositions).length);
+        
+        setAppPositions(mergedPositions);
+        
+        // Save merged layout back if new apps were added or old apps were removed
+        // Only save if the merged layout is different from the original saved layout
+        const layoutKeys = Object.keys(layout);
+        const mergedKeys = Object.keys(mergedPositions);
+        const needsUpdate = mergedKeys.length !== layoutKeys.length ||
+                            mergedKeys.some(key => JSON.stringify(mergedPositions[key]) !== JSON.stringify(layout[key]));
+
+        if (needsUpdate) {
+          try {
+            await base44.auth.updateMe({ desktop_layout: mergedPositions });
+            console.log('✅ Updated layout in database with merged positions (e.g., new apps added or old removed)');
+          } catch (error) {
+            console.error('Failed to update layout:', error);
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading user:", error);
-      // On error, ensure we have default positions
       setAppPositions(getDefaultPositions());
     }
   };
