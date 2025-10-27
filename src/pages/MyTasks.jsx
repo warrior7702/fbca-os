@@ -55,6 +55,10 @@ export default function MyTasks() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
+      console.log('🔄 Starting data load...');
+      console.log('ClickUp connected:', !!currentUser.clickup_access_token);
+      console.log('Microsoft connected:', !!currentUser.microsoft_access_token);
+
       if (!currentUser.clickup_access_token && !currentUser.microsoft_access_token) {
         toast.error('Please connect ClickUp or Microsoft 365 in Settings');
       }
@@ -66,11 +70,14 @@ export default function MyTasks() {
         taskPromises.push(
           base44.functions.invoke('getMyClickUpTasks')
             .then(res => {
-              console.log('ClickUp tasks loaded:', res.data.tasks?.length || 0);
+              console.log('✅ ClickUp tasks loaded:', res.data.tasks?.length || 0);
+              if (res.data.tasks?.length > 0) {
+                console.log('Sample ClickUp task:', res.data.tasks[0]);
+              }
               return { type: 'clickup', data: res.data.tasks || [] };
             })
             .catch(error => {
-              console.error('Error fetching ClickUp tasks:', error);
+              console.error('❌ Error fetching ClickUp tasks:', error);
               toast.error('Failed to load ClickUp tasks');
               return { type: 'clickup', data: [] };
             })
@@ -81,11 +88,17 @@ export default function MyTasks() {
         taskPromises.push(
           base44.functions.invoke('getMicrosoftToDo')
             .then(res => {
-              console.log('Microsoft To Do tasks loaded:', res.data.tasks?.length || 0);
+              console.log('✅ Microsoft To Do tasks loaded:', res.data.tasks?.length || 0);
+              if (res.data.tasks?.length > 0) {
+                console.log('Sample To Do task:', res.data.tasks[0]);
+                console.log('All To Do tasks:', res.data.tasks);
+              } else {
+                console.log('⚠️ No To Do tasks returned from API');
+              }
               return { type: 'todo', data: res.data.tasks || [] };
             })
             .catch(error => {
-              console.error('Error fetching Microsoft To Do:', error);
+              console.error('❌ Error fetching Microsoft To Do:', error);
               toast.error('Failed to load Microsoft To Do');
               return { type: 'todo', data: [] };
             })
@@ -94,11 +107,11 @@ export default function MyTasks() {
         taskPromises.push(
           base44.functions.invoke('getCategorizedEmails')
             .then(res => {
-              console.log('Emails loaded:', res.data);
+              console.log('✅ Emails loaded');
               return { type: 'emails', data: res.data.categorized || {} };
             })
             .catch(error => {
-              console.error('Error fetching emails:', error);
+              console.error('❌ Error fetching emails:', error);
               toast.error('Failed to load emails');
               return { type: 'emails', data: {} };
             })
@@ -118,10 +131,11 @@ export default function MyTasks() {
         }
       });
 
+      console.log('✅ All data loaded successfully');
       setLoadingEmails(false);
 
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("❌ Error loading data:", error);
     } finally {
       setLoading(false);
     }
@@ -148,6 +162,8 @@ export default function MyTasks() {
 
   // Combine all tasks
   const allTasks = [...clickupTasks, ...todoTasks];
+  
+  console.log('📊 Total tasks:', allTasks.length, '(ClickUp:', clickupTasks.length, ', To Do:', todoTasks.length, ')');
   
   // My Day: Tasks due today from both ClickUp AND Microsoft To Do
   const myDayTasks = allTasks.filter(task => 
@@ -216,9 +232,15 @@ export default function MyTasks() {
           <ConnectionWarning />
         )}
 
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">My Tasks</h1>
-          <p className="text-slate-600">Welcome back, {displayName}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">My Tasks</h1>
+            <p className="text-slate-600">Welcome back, {displayName}</p>
+          </div>
+          <Button onClick={loadData} variant="outline" size="sm">
+            <Loader2 className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
         {/* My Day */}
@@ -276,6 +298,65 @@ export default function MyTasks() {
             )}
           </CardContent>
         </Card>
+
+        {/* Microsoft To Do Tasks - Show ALL */}
+        {user?.microsoft_access_token && todoTasks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-blue-600" />
+                Microsoft To Do
+              </CardTitle>
+              <CardDescription>{todoTasks.length} task{todoTasks.length !== 1 ? 's' : ''}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {todoTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => handleTaskClick(task)}
+                    className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                    style={{ borderLeftColor: '#0078d4' }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: '#0078d4' }}
+                          />
+                          <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={getStatusColor(task.status)}>
+                            {formatStatus(task.status)}
+                          </Badge>
+                          <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                          {task.due_date && (
+                            <span className="text-xs text-slate-400">
+                              Due: {format(new Date(task.due_date), 'MMM d')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Debug info */}
+        {user?.microsoft_access_token && todoTasks.length === 0 && (
+          <Card className="border-yellow-300 bg-yellow-50">
+            <CardContent className="p-4">
+              <p className="text-sm text-slate-700">
+                ℹ️ No Microsoft To Do tasks found. Check the console (F12) for details.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Task Calendar */}
         <Card>
