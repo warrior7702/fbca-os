@@ -203,15 +203,6 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  // Convert Outlook webLink to desktop protocol
-  const getOutlookDesktopLink = (email) => {
-    // Use outlook: protocol to open in desktop app
-    if (email.webLink) {
-      return email.webLink.replace('https://outlook.office365.com', 'outlook:');
-    }
-    return '#';
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -425,16 +416,14 @@ export default function MyTasks() {
                         <CardContent className="pt-0">
                           <div className="space-y-2 max-h-[200px] overflow-y-auto">
                             {categoryEmails.slice(0, 5).map((email, idx) => (
-                              <a
+                              <button
                                 key={idx}
-                                href={getOutlookDesktopLink(email)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer"
-                                onClick={(e) => {
-                                  console.log('Email clicked:', email);
-                                  console.log('Link:', getOutlookDesktopLink(email));
+                                onClick={() => {
+                                  // Open in desktop Outlook
+                                  const outlookUrl = `outlook:${email.messageId}`;
+                                  window.location.href = outlookUrl;
                                 }}
+                                className="w-full block p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer text-left"
                               >
                                 <p className={`text-xs truncate ${
                                   email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
@@ -444,7 +433,7 @@ export default function MyTasks() {
                                 <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
                                 </p>
-                              </a>
+                              </button>
                             ))}
                             {categoryEmails.length > 5 && (
                               <p className="text-[10px] text-slate-400 text-center pt-1">

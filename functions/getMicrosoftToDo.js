@@ -20,9 +20,12 @@ Deno.serve(async (req) => {
         let accessToken = user.microsoft_access_token;
 
         if (expiresAt <= now) {
+            console.log('Token expired, refreshing...');
             const refreshResponse = await base44.functions.invoke('refreshMicrosoftToken');
             accessToken = refreshResponse.data.access_token;
         }
+
+        console.log('Fetching To Do lists...');
 
         // Get all task lists
         const listsResponse = await fetch(
@@ -38,14 +41,21 @@ Deno.serve(async (req) => {
         if (!listsResponse.ok) {
             const errorText = await listsResponse.text();
             console.error('Failed to fetch To Do lists:', errorText);
-            return Response.json({ error: 'Failed to fetch To Do lists' }, { status: 500 });
+            return Response.json({ 
+                error: 'Failed to fetch To Do lists',
+                details: errorText 
+            }, { status: 500 });
         }
 
         const listsData = await listsResponse.json();
+        console.log('Found', listsData.value?.length || 0, 'To Do lists');
+        
         const allTasks = [];
 
         // Fetch tasks from each list
-        for (const list of listsData.value) {
+        for (const list of listsData.value || []) {
+            console.log('Fetching tasks from list:', list.displayName);
+            
             const tasksResponse = await fetch(
                 `https://graph.microsoft.com/v1.0/me/todo/lists/${list.id}/tasks?$filter=status ne 'completed'`,
                 {
@@ -58,7 +68,9 @@ Deno.serve(async (req) => {
 
             if (tasksResponse.ok) {
                 const tasksData = await tasksResponse.json();
-                const formattedTasks = tasksData.value.map(task => ({
+                console.log('Found', tasksData.value?.length || 0, 'tasks in', list.displayName);
+                
+                const formattedTasks = (tasksData.value || []).map(task => ({
                     id: task.id,
                     title: task.title,
                     body: task.body?.content,
@@ -68,12 +80,17 @@ Deno.serve(async (req) => {
                     created_date: task.createdDateTime,
                     list_name: list.displayName,
                     list_id: list.id,
-                    url: task.webUrl,
+                    url: `https://to-do.office.com/tasks/id/${task.id}/details`,
                     source: 'microsoft_todo'
                 }));
                 allTasks.push(...formattedTasks);
+            } else {
+                const errorText = await tasksResponse.text();
+                console.error('Failed to fetch tasks from list', list.displayName, ':', errorText);
             }
         }
+
+        console.log('Total tasks fetched:', allTasks.length);
 
         return Response.json({ 
             tasks: allTasks,
@@ -82,6 +99,9 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Get Microsoft To Do tasks error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ 
+            error: error.message,
+            stack: error.stack 
+        }, { status: 500 });
     }
 });
