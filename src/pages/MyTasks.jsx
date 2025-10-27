@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,29 +11,27 @@ import {
   ExternalLink, 
   AlertCircle,
   Flag,
-  Inbox, // Keep Inbox icon as it was used in the previous layout, might be useful if layout changes again.
   Loader2,
   Paperclip,
-  Tag
+  Tag,
+  Maximize2
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
+import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
-import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
 export default function MyTasks() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [emails, setEmails] = useState({ focused: [], flagged: [], categorized: {} });
+  const [emails, setEmails] = useState({ focused: [], categorized: {} });
   const [loading, setLoading] = useState(true);
-  const [loadingEmails, setLoadingEmails] = useState(true); // New state for email loading
+  const [loadingEmails, setLoadingEmails] = useState(true);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -42,7 +39,7 @@ export default function MyTasks() {
 
   const loadData = async () => {
     setLoading(true);
-    setLoadingEmails(true); // Set loading for emails when data starts loading
+    setLoadingEmails(true);
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -74,10 +71,10 @@ export default function MyTasks() {
           console.error('Error fetching emails:', error);
           toast.error('Failed to load emails');
         } finally {
-          setLoadingEmails(false); // Emails finished loading (success or error)
+          setLoadingEmails(false);
         }
       } else {
-        setLoadingEmails(false); // If no access token, emails aren't loaded, so set to false
+        setLoadingEmails(false);
       }
 
     } catch (error) {
@@ -87,15 +84,18 @@ export default function MyTasks() {
     }
   };
 
-  const handleTaskClick = (task, e) => {
-    e.preventDefault();
-    setSelectedTask(task);
-    setShowTaskDetail(true);
-  };
-
-  const handleTaskUpdated = () => {
-    // Reload tasks after an update
-    loadData();
+  const handleTaskClick = (task) => {
+    if (!task?.url) {
+      toast.error('Task URL not available');
+      return;
+    }
+    
+    if (!/^https?:\/\//i.test(task.url)) {
+      toast.error('Invalid task URL');
+      return;
+    }
+    
+    window.open(task.url, '_blank', 'noopener,noreferrer');
   };
 
   const todayTasks = tasks.filter(task => 
@@ -135,9 +135,6 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  // getCategoryColor function is no longer used in the updated email sections, so it's removed.
-  // The openOutlook function is no longer used in the updated email sections, so it's removed.
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -154,7 +151,6 @@ export default function MyTasks() {
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Connection Warning */}
         {(!user?.clickup_access_token || !user?.microsoft_access_token) && (
           <ConnectionWarning />
         )}
@@ -182,7 +178,7 @@ export default function MyTasks() {
                 {todayTasks.map((task) => (
                   <div
                     key={task.id}
-                    onClick={(e) => handleTaskClick(task, e)}
+                    onClick={() => handleTaskClick(task)}
                     className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -200,10 +196,8 @@ export default function MyTasks() {
                           )}
                         </div>
                       </div>
-                      {task.url && ( // Assuming task.url exists for ClickUp tasks
-                        <a href={task.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                          <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0 hover:text-blue-500" />
-                        </a>
+                      {task.url && (
+                        <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0 hover:text-blue-500" />
                       )}
                     </div>
                   </div>
@@ -214,22 +208,32 @@ export default function MyTasks() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Task Calendar - Next 2 Weeks
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Task Calendar - Next 2 Weeks
+              </CardTitle>
+              <CardDescription>Your upcoming tasks at a glance</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowFullCalendar(true)}
+            >
+              <Maximize2 className="w-4 h-4 mr-2" />
+              Full View
+            </Button>
           </CardHeader>
           <CardContent>
             <TaskCalendar 
               tasks={tasks} 
-              onOpenFullView={() => setShowFullCalendar(true)}
               onTaskClick={handleTaskClick}
+              weekCount={2}
             />
           </CardContent>
         </Card>
 
-        {/* Inbox Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -248,8 +252,6 @@ export default function MyTasks() {
                 {emails.focused.slice(0, 5).map((email, idx) => (
                   <div
                     key={idx}
-                    // No onClick handler to open Outlook explicitly, consistent with the outline.
-                    // Users can open their email client manually.
                     className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <Mail className={`w-4 h-4 mt-1 flex-shrink-0 ${
@@ -293,7 +295,6 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        {/* Email Categories */}
         {emails.categorized && Object.keys(emails.categorized).length > 0 && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(emails.categorized).map(([category, categoryEmails]) => (
@@ -310,7 +311,6 @@ export default function MyTasks() {
                     {categoryEmails.slice(0, 10).map((email, idx) => (
                       <div
                         key={idx}
-                        // No onClick handler to open Outlook explicitly, consistent with the outline.
                         className="p-2 rounded hover:bg-slate-50 transition-colors"
                       >
                         <p className={`text-sm truncate ${
@@ -339,13 +339,19 @@ export default function MyTasks() {
         onOpenChange={setShowFullCalendar}
         tasks={tasks}
         onTaskClick={handleTaskClick}
-      />
-
-      <TaskDetailModal
-        task={selectedTask}
-        open={showTaskDetail}
-        onOpenChange={setShowTaskDetail}
-        onTaskUpdated={handleTaskUpdated}
+        onTaskUpdate={async (taskId, updates) => {
+          try {
+            await base44.functions.invoke('updateClickUpTaskDueDate', {
+              task_id: taskId,
+              due_date: updates.due_date
+            });
+            toast.success('Task updated');
+            loadData();
+          } catch (error) {
+            toast.error('Failed to update task');
+            throw error;
+          }
+        }}
       />
     </div>
   );
