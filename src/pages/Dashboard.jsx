@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -11,8 +10,8 @@ import {
   Trash2,
   Settings,
   Users,
-  ListChecks, // Changed from CheckSquare
-  ClipboardCheck, // Changed from CheckSquare
+  ListChecks,
+  ClipboardCheck,
   Unlock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -164,20 +163,12 @@ export default function Dashboard() {
   console.log('Number of positioned apps:', Object.keys(appPositions).length);
 
   return (
-    <div className="h-full relative overflow-hidden">
-      {/* Desktop Background - FIXED: pointer-events-none to prevent click blocking */}
-      <div
-        className="fixed inset-0 z-0 pointer-events-none bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
-        style={{
-          backgroundImage: `url('${wallpaperUrl}')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      >
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-      </div>
-
+    <div 
+      className="h-full relative overflow-hidden bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url('${wallpaperUrl}')`
+      }}
+    >
       {/* Edit Mode Indicator */}
       <AnimatePresence>
         {editMode && (
@@ -185,7 +176,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
           >
             <div className="bg-white/90 text-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
               <Unlock className="w-4 h-4" />
@@ -203,8 +194,8 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Grid - FIXED: pointer-events-auto to ensure clicks work */}
-      <div className="absolute inset-0 p-8 z-10 pointer-events-auto">
+      {/* Desktop Grid */}
+      <div className="absolute inset-0 p-8 z-10">
         <div className="grid gap-4" style={{
           gridTemplateColumns: `repeat(${COLS}, 140px)`,
           gridTemplateRows: `repeat(${ROWS}, 140px)`
@@ -262,8 +253,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Desktop Shortcuts - Right Side - FIXED: pointer-events-auto */}
-      <div className="absolute right-8 top-8 space-y-4 z-40 pointer-events-auto">
+      {/* Desktop Shortcuts - Right Side */}
+      <div className="absolute right-8 top-8 space-y-4 z-40">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
