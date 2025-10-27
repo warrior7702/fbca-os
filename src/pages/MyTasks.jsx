@@ -238,30 +238,17 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  const handleEmailClick = (email, e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleEmailClick = (email) => {
+    console.log('📧 Email clicked:', email);
+    console.log('📧 Email webLink:', email.webLink);
+    console.log('📧 Email messageId:', email.messageId);
     
-    console.log('Email clicked:', email);
-    
-    // Try to open in desktop Outlook first using message ID
-    if (email.messageId) {
-      // Format: outlook:<message-id>
-      const outlookDesktopUrl = `outlook:${email.messageId}`;
-      console.log('Attempting to open in desktop Outlook:', outlookDesktopUrl);
-      window.location.href = outlookDesktopUrl;
-      
-      // Fallback to web after short delay if desktop doesn't open
-      // This timeout is a heuristic. If the desktop app launches, the browser might not
-      // get enough time to open the web link, which is the desired behavior.
-      // If the desktop app fails to launch, the web link will open.
-      setTimeout(() => {
-        window.open(email.webLink, '_blank', 'noopener,noreferrer');
-      }, 1000); // 1 second delay
-    } else {
-      // Just open in web if messageId is not available
-      console.log('Opening in web Outlook:', email.webLink);
+    // Just open in web Outlook - simplest approach
+    if (email.webLink) {
+      console.log('📧 Opening email in browser:', email.webLink);
       window.open(email.webLink, '_blank', 'noopener,noreferrer');
+    } else {
+      console.error('📧 No webLink found for email');
     }
   };
 
@@ -496,9 +483,9 @@ export default function MyTasks() {
                         <CardContent className="pt-0">
                           <div className="space-y-2 max-h-[200px] overflow-y-auto">
                             {categoryEmails.slice(0, 5).map((email, idx) => (
-                              <button
+                              <div
                                 key={idx}
-                                onClick={(e) => handleEmailClick(email, e)}
+                                onClick={() => handleEmailClick(email)}
                                 className="w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer text-left"
                               >
                                 <p className={`text-xs truncate ${
@@ -509,7 +496,7 @@ export default function MyTasks() {
                                 <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
                                 </p>
-                              </button>
+                              </div>
                             ))}
                             {categoryEmails.length > 5 && (
                               <p className="text-[10px] text-slate-400 text-center pt-1">
