@@ -88,14 +88,16 @@ export default function MyTasks() {
         taskPromises.push(
           base44.functions.invoke('getMicrosoftToDo')
             .then(res => {
-              console.log('✅ Microsoft To Do tasks loaded:', res.data.tasks?.length || 0);
-              if (res.data.tasks?.length > 0) {
-                console.log('Sample To Do task:', res.data.tasks[0]);
-                console.log('All To Do tasks:', res.data.tasks);
+              // Fix To Do API error: Check for 'tasks' property or if 'res.data' itself is the array
+              const tasks = res.data.tasks || res.data || []; 
+              console.log('✅ Microsoft To Do tasks loaded:', tasks.length || 0);
+              if (tasks.length > 0) {
+                console.log('Sample To Do task:', tasks[0]);
+                console.log('All To Do tasks:', tasks);
               } else {
                 console.log('⚠️ No To Do tasks returned from API');
               }
-              return { type: 'todo', data: res.data.tasks || [] };
+              return { type: 'todo', data: tasks };
             })
             .catch(error => {
               console.error('❌ Error fetching Microsoft To Do:', error);
@@ -416,13 +418,11 @@ export default function MyTasks() {
                         <CardContent className="pt-0">
                           <div className="space-y-2 max-h-[200px] overflow-y-auto">
                             {categoryEmails.slice(0, 5).map((email, idx) => (
-                              <button
+                              <a
                                 key={idx}
-                                onClick={() => {
-                                  // Open in desktop Outlook
-                                  const outlookUrl = `outlook:${email.messageId}`;
-                                  window.location.href = outlookUrl;
-                                }}
+                                href={email.webLink} // Use webLink for web access
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="w-full block p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer text-left"
                               >
                                 <p className={`text-xs truncate ${
@@ -433,7 +433,7 @@ export default function MyTasks() {
                                 <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
                                 </p>
-                              </button>
+                              </a>
                             ))}
                             {categoryEmails.length > 5 && (
                               <p className="text-[10px] text-slate-400 text-center pt-1">
