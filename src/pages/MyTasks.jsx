@@ -490,12 +490,8 @@ export default function MyTasks() {
                               key={email.messageId || email.id} // Use messageId or id as fallback
                               whileHover={{ scale: 1.01 }}
                               onClick={() => {
-                                // Open in Outlook Web
-                                if (email.webLink) {
-                                  window.open(email.webLink, '_blank', 'noopener,noreferrer');
-                                } else {
-                                  toast.error('Web link not available for this email.');
-                                }
+                                setSelectedEmail(email);
+                                setShowEmailDetail(true); // Open the detail modal
                               }}
                               className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                             >
@@ -519,18 +515,6 @@ export default function MyTasks() {
                                   {email.hasAttachments && (
                                     <Paperclip className="w-4 h-4 text-slate-400" />
                                   )}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation(); // Prevent card click from opening web link
-                                      setSelectedEmail(email);
-                                      setShowEmailDetail(true); // Open the detail modal
-                                    }}
-                                    className="h-6 w-6 p-0" // Make button small and circular-ish
-                                  >
-                                    <Info className="w-4 h-4" />
-                                  </Button>
                                 </div>
                               </div>
                             </motion.div>
