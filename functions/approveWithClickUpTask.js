@@ -64,12 +64,14 @@ Deno.serve(async (req) => {
 - Buildings: ${form_data.buildings.join(', ') || 'N/A'}
 - Doors: ${form_data.doors || 'N/A'}
 
+**Requestor:** ${form_data.requestor_email || 'N/A'}
+
 **Notes:** ${form_data.notes || 'N/A'}
 
 **PCO Request ID:** ${request_id}
         `.trim();
 
-        // Get custom field IDs from env or use defaults
+        // Map form data to ClickUp custom fields
         const customFields = [
             {
                 id: 'e3e1ee9a-fec5-4437-bbb5-bd59364b5587', // CODE
@@ -82,6 +84,10 @@ Deno.serve(async (req) => {
             {
                 id: '7e7622b9-af32-4f7e-8001-6209ed813835', // Note Info
                 value: form_data.notes || ''
+            },
+            {
+                id: '14d5ab42-3a2e-4a3f-a333-42e87378562d', // Requestor Email
+                value: form_data.requestor_email || ''
             }
         ];
 
@@ -90,6 +96,14 @@ Deno.serve(async (req) => {
             customFields.push({
                 id: '882b4a4f-4e8d-4ae2-9a11-c7c4f2a0845a', // Building(s) labels
                 value: form_data.buildings
+            });
+        }
+
+        // Add schedule if provided
+        if (form_data.schedule) {
+            customFields.push({
+                id: '0ae84f4d-9ebd-4c6c-871b-60a92ba70a14', // Schedule dropdown
+                value: form_data.schedule
             });
         }
 

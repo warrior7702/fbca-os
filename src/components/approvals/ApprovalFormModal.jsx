@@ -5,9 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -29,7 +27,36 @@ const buildingOptions = [
   { value: "Wade", label: "Wade", color: "#9b59b6" }
 ];
 
-export default function ApprovalFormModal({ open, onClose, approval, onSubmit, submitting }) {
+const scheduleOptions = [
+  { value: "advanced_unlock", label: "Advanced (Unlock)" },
+  { value: "weekly_event", label: "Weekly Event" },
+  { value: "committee_meetings", label: "Committee Meetings" },
+  { value: "rehearsals", label: "Rehearsals" },
+  { value: "bible_studies", label: "Bible Studies" },
+  { value: "other", label: "Other" }
+];
+
+// Extract email from text
+const extractEmail = (text) => {
+  if (!text) return "";
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+  const match = text.match(emailRegex);
+  return match ? match[0] : "";
+};
+
+// Find answer by question text (case-insensitive partial match)
+const findAnswer = (questions, answers, searchTerms) => {
+  if (!questions || !answers) return null;
+  
+  const question = questions.find(q => {
+    const questionText = (q.question || "").toLowerCase();
+    return searchTerms.some(term => questionText.includes(term.toLowerCase()));
+  });
+  
+  return question ? answers[question.id] : null;
+};
+
+export default function ApprovalFormModal({ open, onClose, approval, approvalDetails, onSubmit, submitting }) {
   const [formData, setFormData] = useState({
     access_type: "",
     entrance: "",
@@ -37,53 +64,109 @@ export default function ApprovalFormModal({ open, onClose, approval, onSubmit, s
     start_time: "",
     end_time: "",
     buildings: [],
+    schedule: "",
     personnel: "",
+    requestor_email: "",
     doors: "",
     notes: ""
   });
 
-  // Auto-fill data when approval changes
+  // Smart auto-fill when approval or details change
   useEffect(() => {
-    if (approval) {
-      // Try to extract building from resource name or event name
-      const resourceName = approval.resource_name || "";
-      const detectedBuildings = [];
-      
-      if (resourceName.includes("FBC") || resourceName.includes("Fellowship")) {
-        detectedBuildings.push("FBC");
-      }
-      if (resourceName.includes("PCB") || resourceName.includes("Preschool")) {
-        detectedBuildings.push("PCB");
-      }
-      if (resourceName.includes("Student") || resourceName.includes("Wade")) {
-        detectedBuildings.push("STUDENT_CENTER");
-      }
+    if (!approval) return;
 
-      // Pre-fill times from event
-      let startTime = "";
-      let endTime = "";
-      if (approval.event_starts_at) {
-        const start = new Date(approval.event_starts_at);
-        startTime = format(start, 'h:mm a');
-      }
-      if (approval.event_ends_at) {
-        const end = new Date(approval.event_ends_at);
-        endTime = format(end, 'h:mm a');
-      }
+    const details = approvalDetails || {};
+    const questions = details.questions || [];
+    const answers = details.answers || {};
+    const event = details.event || {};
 
-      setFormData({
-        access_type: "Door Code",
-        entrance: "",
-        badge_code: "",
-        start_time: startTime,
-        end_time: endTime,
-        buildings: detectedBuildings,
-        personnel: "",
-        doors: "",
-        notes: ""
-      });
+    // Extract email from event description or summary
+    let email = extractEmail(event.description) || extractEmail(event.summary) || "";
+
+    // Try to get answers from PCO questions
+    const accessType = findAnswer(questions, answers, ["type of access", "access type"]) || "Door Code";
+    const entrance = findAnswer(questions, answers, ["entrance", "enter"]) || "";
+    const badgeCode = findAnswer(questions, answers, ["badge", "code", "specific badge"]) || "";
+    const timeRange = findAnswer(questions, answers, ["time", "begin and end", "access time"]) || "";
+    const doorsAnswer = findAnswer(questions, answers, ["doors", "specific doors"]) || "";
+    const notesAnswer = findAnswer(questions, answers, ["notes", "additional", "comments"]) || event.description || "";
+
+    // Parse time range if provided (e.g., "7:00 am - 1:30 pm")
+    let startTime = "";
+    let endTime = "";
+    
+    if (timeRange && timeRange.includes("-")) {
+      const parts = timeRange.split("-").map(t => t.trim());
+      startTime = parts[0] || "";
+      endTime = parts[1] || "";
     }
-  }, [approval]);
+    
+    // Fallback to event times
+    if (!startTime && approval.event_starts_at) {
+      startTime = format(new Date(approval.event_starts_at), 'h:mm a');
+    }
+    if (!endTime && approval.event_ends_at) {
+      endTime = format(new Date(approval.event_ends_at), 'h:mm a');
+    }
+
+    // Detect buildings from resource name
+    const resourceName = approval.resource_name || "";
+    const detectedBuildings = [];
+    
+    if (resourceName.toLowerCase().includes("fbc") || resourceName.toLowerCase().includes("fellowship")) {
+      detectedBuildings.push("FBC");
+    }
+    if (resourceName.toLowerCase().includes("pcb") || resourceName.toLowerCase().includes("preschool")) {
+      detectedBuildings.push("PCB");
+    }
+    if (resourceName.toLowerCase().includes("student") || resourceName.toLowerCase().includes("wade")) {
+      detectedBuildings.push("STUDENT_CENTER");
+    }
+
+    // Detect schedule/personnel type from event name or description
+    let schedule = "";
+    let personnel = "";
+    const eventText = `${approval.event_name} ${event.description || ""}`.toLowerCase();
+    
+    if (eventText.includes("unlock") || eventText.includes("advanced")) {
+      schedule = "advanced_unlock";
+      personnel = "unlock";
+    } else if (eventText.includes("weekly")) {
+      schedule = "weekly_event";
+    } else if (eventText.includes("committee") || eventText.includes("meeting")) {
+      schedule = "committee_meetings";
+    } else if (eventText.includes("rehearsal")) {
+      schedule = "rehearsals";
+    } else if (eventText.includes("bible study")) {
+      schedule = "bible_studies";
+    } else if (eventText.includes("youth")) {
+      personnel = "youth";
+    } else if (eventText.includes("children")) {
+      personnel = "children";
+    } else if (eventText.includes("preschool")) {
+      personnel = "preschool";
+    } else if (eventText.includes("college")) {
+      personnel = "college";
+    } else if (eventText.includes("young adult")) {
+      personnel = "young_adult";
+    } else if (eventText.includes("global")) {
+      personnel = "global";
+    }
+
+    setFormData({
+      access_type: accessType,
+      entrance: entrance,
+      badge_code: badgeCode,
+      start_time: startTime,
+      end_time: endTime,
+      buildings: detectedBuildings,
+      schedule: schedule,
+      personnel: personnel,
+      requestor_email: email,
+      doors: doorsAnswer,
+      notes: notesAnswer
+    });
+  }, [approval, approvalDetails]);
 
   const handleBuildingToggle = (building) => {
     setFormData(prev => ({
@@ -103,56 +186,78 @@ export default function ApprovalFormModal({ open, onClose, approval, onSubmit, s
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
-            Approve Access Request
+            Building Access Request
           </DialogTitle>
           <div className="text-sm text-slate-600 mt-2">
             <p className="font-semibold">{approval.event_name}</p>
             {approval.event_starts_at && (
-              <p>{format(new Date(approval.event_starts_at), 'EEEE, MMMM d, yyyy')}</p>
+              <p>{format(new Date(approval.event_starts_at), 'EEEE, MMMM d, yyyy @ h:mm a')}</p>
             )}
           </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-          {/* Access Type */}
-          <div className="space-y-2">
-            <Label htmlFor="access_type">What type of access do you need? *</Label>
-            <Input
-              id="access_type"
-              value={formData.access_type}
-              onChange={(e) => setFormData({ ...formData, access_type: e.target.value })}
-              placeholder="e.g., Door Code"
-              required
-            />
+          {/* Row 1: Access Type & Code */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="access_type">What type of access do you need? *</Label>
+              <Input
+                id="access_type"
+                value={formData.access_type}
+                onChange={(e) => setFormData({ ...formData, access_type: e.target.value })}
+                placeholder="e.g., Door Code"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="badge_code">CODE (Badge or Code)</Label>
+              <Input
+                id="badge_code"
+                value={formData.badge_code}
+                onChange={(e) => setFormData({ ...formData, badge_code: e.target.value })}
+                placeholder="e.g., Quilter's Building Code"
+              />
+            </div>
           </div>
 
-          {/* Entrance */}
-          <div className="space-y-2">
-            <Label htmlFor="entrance">What entrance will your guest enter? *</Label>
-            <Input
-              id="entrance"
-              value={formData.entrance}
-              onChange={(e) => setFormData({ ...formData, entrance: e.target.value })}
-              placeholder="e.g., Courtyard - Fellowship Hall, South Entrance, PCB"
-              required
-            />
+          {/* Row 2: Entrance & Schedule */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="entrance">What entrance will your guest enter? *</Label>
+              <Input
+                id="entrance"
+                value={formData.entrance}
+                onChange={(e) => setFormData({ ...formData, entrance: e.target.value })}
+                placeholder="e.g., Courtyard - Fellowship Hall"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="schedule">Schedule / Event Type</Label>
+              <Select
+                value={formData.schedule}
+                onValueChange={(value) => setFormData({ ...formData, schedule: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select schedule type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {scheduleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Badge/Code */}
-          <div className="space-y-2">
-            <Label htmlFor="badge_code">Do you want a specific badge or code?</Label>
-            <Input
-              id="badge_code"
-              value={formData.badge_code}
-              onChange={(e) => setFormData({ ...formData, badge_code: e.target.value })}
-              placeholder="e.g., Quilter's Building Code"
-            />
-          </div>
-
-          {/* Time Range */}
+          {/* Row 3: Time Range */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_time">Start Time *</Label>
@@ -176,9 +281,9 @@ export default function ApprovalFormModal({ open, onClose, approval, onSubmit, s
             </div>
           </div>
 
-          {/* Buildings */}
+          {/* Row 4: Buildings */}
           <div className="space-y-2">
-            <Label>Building(s)</Label>
+            <Label>BUILDINGS</Label>
             <div className="flex flex-wrap gap-2">
               {buildingOptions.map((building) => (
                 <Badge
@@ -197,35 +302,48 @@ export default function ApprovalFormModal({ open, onClose, approval, onSubmit, s
             </div>
           </div>
 
-          {/* Personnel/Event Type */}
-          <div className="space-y-2">
-            <Label htmlFor="personnel">Personnel / Event Type</Label>
-            <Select
-              value={formData.personnel}
-              onValueChange={(value) => setFormData({ ...formData, personnel: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select event type..." />
-              </SelectTrigger>
-              <SelectContent>
-                {personnelOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: option.color }}
-                      />
-                      {option.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Row 5: Requestor Email & Personnel */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="requestor_email">REQUESTOR EMAIL</Label>
+              <Input
+                id="requestor_email"
+                type="email"
+                value={formData.requestor_email}
+                onChange={(e) => setFormData({ ...formData, requestor_email: e.target.value })}
+                placeholder="email@fbca.org"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="personnel">Personnel / Event Type</Label>
+              <Select
+                value={formData.personnel}
+                onValueChange={(value) => setFormData({ ...formData, personnel: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select event type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {personnelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: option.color }}
+                        />
+                        {option.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Doors */}
+          {/* Row 6: Doors */}
           <div className="space-y-2">
-            <Label htmlFor="doors">Specific Doors</Label>
+            <Label htmlFor="doors">Doors</Label>
             <Input
               id="doors"
               value={formData.doors}
@@ -234,15 +352,15 @@ export default function ApprovalFormModal({ open, onClose, approval, onSubmit, s
             />
           </div>
 
-          {/* Notes */}
+          {/* Row 7: Notes (Full Width) */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Additional Notes</Label>
+            <Label htmlFor="notes">Note Info</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Any additional information..."
-              rows={3}
+              rows={4}
             />
           </div>
 

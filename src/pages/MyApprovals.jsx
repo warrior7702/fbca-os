@@ -622,6 +622,7 @@ Check browser console for full details.
           setSelectedApprovalForForm(null);
         }}
         approval={selectedApprovalForForm}
+        approvalDetails={selectedApprovalForForm ? approvalDetails[selectedApprovalForForm.request_id] : null}
         onSubmit={handleApprovalFormSubmit}
         submitting={!!processingApproval}
       />
