@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,14 +7,74 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Calendar, Paperclip, ExternalLink, User, FileText } from "lucide-react";
+import { Mail, Calendar, Paperclip, ExternalLink, User, FileText, CheckSquare, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
+import { base44 } from "@/api/base44Client";
 
 export default function EmailDetailModal({ open, onOpenChange, email }) {
-  if (!email) return null;
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
 
-  // Debug: log email data
-  console.log('📧 Email detail modal data:', email);
+  useEffect(() => {
+    if (open && email?.bodyPreview) {
+      analyzeEmail();
+    }
+  }, [open, email]);
+
+  const analyzeEmail = async () => {
+    if (!email?.bodyPreview) return;
+    
+    setAnalyzing(true);
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Analyze this email and extract:
+1. Action items (things that need to be done)
+2. Important dates or deadlines mentioned
+3. Key people mentioned
+
+Email content:
+Subject: ${email.subject}
+From: ${email.fromName || email.from}
+Body: ${email.bodyPreview}
+
+Be concise and specific.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            action_items: {
+              type: "array",
+              items: { type: "string" },
+              description: "List of action items or tasks mentioned"
+            },
+            dates: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  date: { type: "string" },
+                  context: { type: "string" }
+                }
+              },
+              description: "Important dates with context"
+            },
+            people: {
+              type: "array",
+              items: { type: "string" },
+              description: "Key people mentioned"
+            }
+          }
+        }
+      });
+
+      setAnalysis(response);
+    } catch (error) {
+      console.error('Failed to analyze email:', error);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  if (!email) return null;
 
   const handleOpenInOutlook = () => {
     if (email.webLink) {
@@ -97,6 +156,87 @@ export default function EmailDetailModal({ open, onOpenChange, email }) {
               </div>
             )}
           </div>
+
+          {/* AI Analysis */}
+          {email.bodyPreview && (
+            <div className="border-t pt-4">
+              <label className="text-sm font-medium text-slate-500 flex items-center gap-1 mb-3">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                AI Analysis
+              </label>
+              
+              {analyzing ? (
+                <div className="flex items-center gap-2 text-sm text-slate-600 py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing email...
+                </div>
+              ) : analysis ? (
+                <div className="space-y-3">
+                  {/* Action Items */}
+                  {analysis.action_items && analysis.action_items.length > 0 && (
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-1">
+                        <CheckSquare className="w-4 h-4" />
+                        Action Items
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysis.action_items.map((item, idx) => (
+                          <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
+                            <span className="text-blue-600 mt-0.5">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Important Dates */}
+                  {analysis.dates && analysis.dates.length > 0 && (
+                    <div className="bg-amber-50 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        Important Dates
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysis.dates.map((item, idx) => (
+                          <li key={idx} className="text-sm text-amber-800 flex items-start gap-2">
+                            <span className="text-amber-600 mt-0.5">•</span>
+                            <span><strong>{item.date}</strong> - {item.context}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Key People */}
+                  {analysis.people && analysis.people.length > 0 && (
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <h4 className="text-sm font-semibold text-green-900 mb-2 flex items-center gap-1">
+                        <User className="w-4 h-4" />
+                        Key People
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.people.map((person, idx) => (
+                          <Badge key={idx} variant="outline" className="bg-white">
+                            {person}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No insights */}
+                  {(!analysis.action_items || analysis.action_items.length === 0) &&
+                   (!analysis.dates || analysis.dates.length === 0) &&
+                   (!analysis.people || analysis.people.length === 0) && (
+                    <p className="text-sm text-slate-500 italic">
+                      No action items, dates, or key people detected.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {/* Categories */}
           {email.categories && email.categories.length > 0 && (
