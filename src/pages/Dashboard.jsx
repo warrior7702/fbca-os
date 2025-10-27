@@ -79,11 +79,21 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      if (currentUser.desktop_layout && typeof currentUser.desktop_layout === 'object' && Object.keys(currentUser.desktop_layout).length > 0) {
+      // IMPORTANT: Only set layout if it exists AND has actual data
+      if (currentUser.desktop_layout && 
+          typeof currentUser.desktop_layout === 'object' && 
+          Object.keys(currentUser.desktop_layout).length > 0) {
+        console.log('Loading saved layout:', currentUser.desktop_layout);
         setAppPositions(currentUser.desktop_layout);
+      } else {
+        console.log('Using default layout');
+        // Make sure default positions are set
+        setAppPositions(getDefaultPositions());
       }
     } catch (error) {
       console.error("Error loading user:", error);
+      // On error, ensure we have default positions
+      setAppPositions(getDefaultPositions());
     }
   };
 
@@ -149,6 +159,9 @@ export default function Dashboard() {
   };
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
+
+  console.log('Dashboard rendering with positions:', appPositions);
+  console.log('Number of positioned apps:', Object.keys(appPositions).length);
 
   return (
     <div className="h-full relative overflow-hidden">
