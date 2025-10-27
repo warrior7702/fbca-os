@@ -245,64 +245,36 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  const handleEmailClick = (email, openIn) => {
+  const handleEmailClick = (email) => {
     console.log('📧 Email clicked:', email);
-    console.log('📧 Open in:', openIn);
-
-    if (openIn === 'web' && email.webLink) {
-      window.open(email.webLink, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    if (email.messageId && openIn === 'desktop') {
-      // Clean the message ID - remove angle brackets if present
-      let cleanMessageId = email.messageId;
-      if (cleanMessageId.startsWith('<') && cleanMessageId.endsWith('>')) {
-        cleanMessageId = cleanMessageId.slice(1, -1);
-      }
-
-      // Try multiple protocols for Windows 11 + Edge
-      const protocols = [
-        `ms-outlook://view/${cleanMessageId}`, // Modern Outlook protocol
-        `outlook:${cleanMessageId}`, // Classic protocol
-      ];
-
-      console.log('📧 Trying message ID:', cleanMessageId);
-      console.log('📧 Trying protocols:', protocols);
-
-      // Attempt to open the first protocol directly
-      // This will trigger the browser to ask to open the external app or fail silently
-      window.location.href = protocols[0];
-
-      // Fallback to web after 2 seconds if desktop doesn't open
-      // This timeout is a heuristic. If the desktop app opens, the browser might
-      // lose focus or navigate away, preventing the timeout from executing,
-      // or it might execute in the background. It's not a perfect solution
-      // but provides a reasonable fallback for cases where the protocol fails.
-      const fallbackTimeout = setTimeout(() => {
-        console.log('📧 Desktop app did not open via protocol, falling back to web link.');
-        if (email.webLink) {
+    console.log('📧 Email webLink:', email.webLink);
+    
+    if (email.webLink) {
+      try {
+        // Convert web URL to desktop Outlook protocol
+        const outlookLink = email.webLink.replace(
+          /^https:\/\/outlook\.office\.com\/mail\//,
+          'outlook://'
+        );
+        
+        console.log('📧 Converted to desktop link:', outlookLink);
+        
+        // Try to open in desktop Outlook first
+        window.location.href = outlookLink;
+        
+        // Fallback: open web version after slight delay if desktop doesn't respond
+        setTimeout(() => {
+          console.log('📧 Fallback: opening in web');
           window.open(email.webLink, '_blank', 'noopener,noreferrer');
-        } else {
-          console.error('📧 No webLink found for email to fall back to.');
-          toast.error('Could not open email.');
-        }
-      }, 2000); // 2 seconds
-
-      // Clear the timeout if the user navigates away or the page unloads
-      // (though this is less effective for `window.location.href` which is synchronous)
-      window.addEventListener('blur', () => clearTimeout(fallbackTimeout), { once: true });
-      window.addEventListener('beforeunload', () => clearTimeout(fallbackTimeout), { once: true });
-
-    } else {
-      // No message ID or 'openIn' is 'web' or unsupported, open in web (default behavior if no specific instruction)
-      console.log('📧 No message ID or desktop option, opening web link for email.');
-      if (email.webLink) {
+        }, 800);
+      } catch (error) {
+        console.error('📧 Error attempting to open desktop Outlook link:', error);
+        // If there's an error in construction or assignment, directly open web
         window.open(email.webLink, '_blank', 'noopener,noreferrer');
-      } else {
-        console.error('📧 No webLink found for email.');
-        toast.error('Could not open email.');
       }
+    } else {
+      console.error('📧 No webLink found for email');
+      toast.error('Could not open email');
     }
   };
 
@@ -519,13 +491,13 @@ export default function MyTasks() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
                     const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
-
+                    
                     return (
                       <Card key={category} className="bg-slate-50">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm flex items-center gap-2">
-                            <span
-                              className="h-3 w-3 rounded-full flex-shrink-0"
+                            <span 
+                              className="h-3 w-3 rounded-full flex-shrink-0" 
                               style={{ backgroundColor: categoryColor }}
                             />
                             {category}
@@ -539,24 +511,16 @@ export default function MyTasks() {
                             {categoryEmails.slice(0, 5).map((email, idx) => (
                               <div
                                 key={idx}
-                                className="w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all text-left"
+                                onClick={() => handleEmailClick(email)}
+                                className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                               >
                                 <div className="flex items-center justify-between">
-                                  <p className={`text-xs truncate flex-grow ${
+                                  <p className={`text-xs truncate flex-1 ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
                                   }`}>
                                     {email.subject || '(No Subject)'}
                                   </p>
-                                  {/* Select for opening email */}
-                                  <Select onValueChange={(value) => handleEmailClick(email, value)}>
-                                    <SelectTrigger className="w-[80px] h-6 text-[10px] ml-2 flex-shrink-0">
-                                      <SelectValue placeholder="Open" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {email.webLink && <SelectItem value="web">Web</SelectItem>}
-                                      {email.messageId && <SelectItem value="desktop">Desktop</SelectItem>}
-                                    </SelectContent>
-                                  </Select>
+                                  <Mail className="h-3 w-3 ml-2 opacity-50 group-hover:opacity-100 flex-shrink-0" />
                                 </div>
                                 <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
