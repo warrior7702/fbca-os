@@ -3,8 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-// Removed: import { useUser } from "@/hooks/useUser"; // Assuming useUser hook exists and provides user data
-import ConnectionWarning from "../components/shared/ConnectionWarning"; // Unified connection warning component
+import ConnectionWarning from "../components/shared/ConnectionWarning";
 import {
   Search as SearchIcon,
   FileText,
@@ -13,8 +12,7 @@ import {
   Loader2,
   Megaphone,
   UtensilsCrossed,
-  User, // User icon was present in original, keeping it
-  Settings,
+  User,
   LayoutDashboard,
   ExternalLink,
   Download,
@@ -25,7 +23,8 @@ import {
   Mail,
   Phone,
   MessageSquare,
-  CheckSquare // Added for "My Tasks" module
+  CheckSquare,
+  Settings
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
