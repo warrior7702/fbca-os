@@ -162,6 +162,34 @@ export default function MyTasks() {
     setShowTaskDetail(true);
   };
 
+  const handleCompleteTask = async (task, e) => {
+    e.stopPropagation(); // Prevent card click
+    
+    try {
+      if (task.source === 'microsoft_todo') {
+        // Complete Microsoft To Do task
+        await base44.functions.invoke('completeMicrosoftToDoTask', {
+          list_id: task.list_id,
+          task_id: task.id
+        });
+        toast.success('Task completed!');
+      } else {
+        // Complete ClickUp task
+        await base44.functions.invoke('updateClickUpTask', {
+          task_id: task.id,
+          closed: true
+        });
+        toast.success('Task closed!');
+      }
+      
+      // Reload data
+      await loadData();
+    } catch (error) {
+      console.error('Error completing task:', error);
+      toast.error('Failed to complete task');
+    }
+  };
+
   const handleTaskUpdate = async () => {
     // Reload tasks after update
     await loadData();
@@ -265,7 +293,7 @@ export default function MyTasks() {
                     <div
                       key={`${task.source}-${task.id}`}
                       onClick={() => handleTaskClick(task)}
-                      className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                      className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
                       style={{ borderLeftColor: listColor }}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -288,6 +316,15 @@ export default function MyTasks() {
                             )}
                           </div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => handleCompleteTask(task, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <CheckSquare className="w-4 h-4 mr-1" />
+                          Complete
+                        </Button>
                       </div>
                     </div>
                   );
@@ -296,65 +333,6 @@ export default function MyTasks() {
             )}
           </CardContent>
         </Card>
-
-        {/* Microsoft To Do Tasks - Show ALL */}
-        {user?.microsoft_access_token && todoTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ListChecks className="w-5 h-5 text-blue-600" />
-                Microsoft To Do
-              </CardTitle>
-              <CardDescription>{todoTasks.length} task{todoTasks.length !== 1 ? 's' : ''}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {todoTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => handleTaskClick(task)}
-                    className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                    style={{ borderLeftColor: '#0078d4' }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: '#0078d4' }}
-                          />
-                          <h3 className="font-semibold text-slate-900">{task.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={getStatusColor(task.status)}>
-                            {formatStatus(task.status)}
-                          </Badge>
-                          <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
-                          {task.due_date && (
-                            <span className="text-xs text-slate-400">
-                              Due: {format(new Date(task.due_date), 'MMM d')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Debug info */}
-        {user?.microsoft_access_token && todoTasks.length === 0 && (
-          <Card className="border-yellow-300 bg-yellow-50">
-            <CardContent className="p-4">
-              <p className="text-sm text-slate-700">
-                ℹ️ No Microsoft To Do tasks found. Check the console (F12) for details.
-              </p>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Task Calendar */}
         <Card>
@@ -383,6 +361,74 @@ export default function MyTasks() {
             />
           </CardContent>
         </Card>
+
+        {/* Microsoft To Do Tasks - ALL TASKS */}
+        {user?.microsoft_access_token && todoTasks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-blue-600" />
+                Microsoft To Do
+              </CardTitle>
+              <CardDescription>{todoTasks.length} task{todoTasks.length !== 1 ? 's' : ''}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {todoTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => handleTaskClick(task)}
+                    className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                    style={{ borderLeftColor: '#0078d4' }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: '#0078d4' }}
+                          />
+                          <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={getStatusColor(task.status)}>
+                            {formatStatus(task.status)}
+                          </Badge>
+                          <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                          {task.due_date && (
+                            <span className="text-xs text-slate-400">
+                              Due: {format(new Date(task.due_date), 'MMM d')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleCompleteTask(task, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <CheckSquare className="w-4 h-4 mr-1" />
+                        Complete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Debug info for Microsoft To Do */}
+        {user?.microsoft_access_token && todoTasks.length === 0 && (
+          <Card className="border-yellow-300 bg-yellow-50">
+            <CardContent className="p-4">
+              <p className="text-sm text-slate-700">
+                ℹ️ No Microsoft To Do tasks found. Check the console (F12) for details.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Categorized Emails */}
         {user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
@@ -425,7 +471,7 @@ export default function MyTasks() {
                             {categoryEmails.slice(0, 5).map((email, idx) => (
                               <a
                                 key={idx}
-                                href={email.webLink} // Use webLink for web access
+                                href={email.webLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full block p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer text-left"
