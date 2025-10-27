@@ -14,7 +14,11 @@ import {
   ListChecks,
   ClipboardCheck,
   Unlock,
-  Mail // NEW: Import Mail icon for Email app
+  Mail, // NEW: Import Mail icon for Email app
+  Ticket, // NEW: Import Ticket icon
+  Building2, // NEW: Import Building2 icon
+  Inbox, // NEW: Import Inbox icon
+  Video // NEW: Import Video icon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -28,7 +32,12 @@ const defaultApps = [
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
-  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" } // New Email app
+  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" }, // New Email app
+  // NEW: Added 4 placeholder apps
+  { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "#" },
+  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "#" },
+  { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "#" },
+  { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-cyan-500 to-blue-600", path: "#" }
 ];
 
 // Put wallpapers back in Dashboard
@@ -40,8 +49,8 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
-const COLS = 6;
-const ROWS = 4;
+const COLS = 8; // Increased from 6 to 8
+const ROWS = 6; // Increased from 4 to 6
 
 const getDefaultPositions = () => {
   const positions = {};
@@ -260,7 +269,7 @@ export default function Dashboard() {
                           </span>
                         </motion.div>
                       ) : (
-                        // Conditional rendering for mailto links vs internal links
+                        // Conditional rendering for mailto links vs internal links vs placeholder links
                         app.path.startsWith("mailto:") ? (
                           <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
                             <motion.div
@@ -275,6 +284,19 @@ export default function Dashboard() {
                               </span>
                             </motion.div>
                           </a>
+                        ) : app.path === "#" ? ( // Handle placeholder apps
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            onClick={() => toast.info(`${app.name} coming soon!`)}
+                            className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
+                          >
+                            <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                              <app.icon className="w-8 h-8 text-white" />
+                            </div>
+                            <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                              {app.name}
+                            </span>
+                          </motion.div>
                         ) : (
                           <Link to={createPageUrl(app.path)} className="block h-full">
                             <motion.div
@@ -300,7 +322,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Desktop Shortcuts - Right Side (Keeping existing as 'unnecessary sections' was not specific) */}
+      {/* Desktop Shortcuts - Right Side */}
       <div className="absolute right-8 top-8 space-y-4 z-40">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
