@@ -40,7 +40,6 @@ const defaultApps = [
   { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-cyan-500 to-blue-600", path: "#" }
 ];
 
-// Put wallpapers back in Dashboard
 const wallpapers = {
   church_steeple_night: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/c4c5d5f09_ChatGPTImageOct25202502_23_44AM.png",
   church_building_blue: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/3e3148244_ChatGPTImageOct25202502_24_10AM.png",
@@ -53,15 +52,26 @@ const COLS = 8; // Increased from 6 to 8
 const ROWS = 6; // Increased from 4 to 6
 
 const getDefaultPositions = () => {
-  const positions = {};
-  defaultApps.forEach((app, index) => {
-    // Ensure new apps also get default positions
-    positions[app.id] = {
-      row: Math.floor(index / 2),
-      col: index % 2
-    };
-  });
-  return positions;
+  return {
+    // Row 0 - Core work apps
+    mytasks: { row: 0, col: 0 },
+    myapprovals: { row: 0, col: 1 },
+    email: { row: 0, col: 2 },
+    
+    // Row 1 - Operational apps
+    marketing: { row: 1, col: 0 },
+    foodservice: { row: 1, col: 1 },
+    staffdir: { row: 1, col: 2 },
+    
+    // Row 2 - Utility apps (coming soon)
+    ticketing: { row: 2, col: 0 },
+    mydepartment: { row: 2, col: 1 },
+    inboxhelper: { row: 2, col: 2 },
+    mymeetings: { row: 2, col: 3 },
+    
+    // Bottom left - Settings (desktop convention)
+    settings: { row: 5, col: 0 }
+  };
 };
 
 export default function Dashboard() {
