@@ -21,8 +21,7 @@ import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
-import ApprovalFormModal from "../components/approvals/ApprovalFormModal"; // Added import
-// Removed ApprovalDetailModal import as it's no longer used in this file
+import ApprovalFormModal from "../components/approvals/ApprovalFormModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -78,7 +77,7 @@ class ErrorBoundary extends React.Component {
 function MyApprovalsContent() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
-  const [calendarEvents, setCalendarEvents] = useState([]); // This state is still present but not used in the final render based on the current logic
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
@@ -86,12 +85,12 @@ function MyApprovalsContent() {
   const [processingApproval, setProcessingApproval] = useState(null);
   const [syncStats, setSyncStats] = useState(null);
   const [debugging, setDebugging] = useState(false);
-  const [approvalDetails, setApprovalDetails] = useState({}); // Store questions/answers for each approval
+  const [approvalDetails, setApprovalDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState({});
-  const [showApprovalForm, setShowApprovalForm] = useState(false); // Added state
-  const [selectedApprovalForForm, setSelectedApprovalForForm] = useState(null); // Added state
+  const [showApprovalForm, setShowApprovalForm] = useState(false);
+  const [selectedApprovalForForm, setSelectedApprovalForForm] = useState(null);
 
-  const safeApprovals = A(approvals); // Moved up to be accessible by useEffect
+  const safeApprovals = A(approvals);
 
   useEffect(() => {
     loadData();
@@ -104,7 +103,7 @@ function MyApprovalsContent() {
         loadApprovalDetails(approval);
       });
     }
-  }, [approvals, user]); // Added user to dependencies in case pco_access_token changes
+  }, [approvals, user]);
 
   const loadData = async () => {
     setLoading(true);
@@ -151,10 +150,10 @@ function MyApprovalsContent() {
   };
 
   const loadApprovalDetails = async (approval) => {
-    if (!user?.pco_access_token) return; // Only load if connected to PCO
+    if (!user?.pco_access_token) return;
     if (!approval?.request_id || !approval?.resource_id || !approval?.event_id) return;
-    if (loadingDetails[approval.request_id]) return; // Already loading
-    if (approvalDetails[approval.request_id]) return; // Already loaded
+    if (loadingDetails[approval.request_id]) return;
+    if (approvalDetails[approval.request_id]) return;
 
     setLoadingDetails(prev => ({ ...prev, [approval.request_id]: true }));
 
@@ -171,7 +170,6 @@ function MyApprovalsContent() {
       }));
     } catch (error) {
       console.error(`Error loading approval details for request ${approval.request_id}:`, error);
-      // Optionally set an error state for this specific approval's details
     } finally {
       setLoadingDetails(prev => ({ ...prev, [approval.request_id]: false }));
     }
@@ -265,7 +263,7 @@ Check browser console for full details.
       toast.success('Request approved and ClickUp task created!');
       setShowApprovalForm(false);
       setSelectedApprovalForForm(null);
-      await loadData(); // Reload data to reflect approval
+      await loadData();
     } catch (error) {
       console.error('Error approving:', error);
       toast.error('Failed to approve request');
@@ -533,7 +531,7 @@ Check browser console for full details.
                             onClick={() => handleApprove(approval)}
                             disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
-                            {processingApproval === approval.request_id && selectedApprovalForForm ? ( // Only show loader if processing THIS approval
+                            {processingApproval === approval.request_id && selectedApprovalForForm ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
@@ -549,7 +547,7 @@ Check browser console for full details.
                             onClick={() => handleDeny(approval)}
                             disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
-                            {processingApproval === approval.request_id && !selectedApprovalForForm ? ( // Only show loader if processing THIS approval AND not via form
+                            {processingApproval === approval.request_id && !selectedApprovalForForm ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
@@ -626,7 +624,6 @@ Check browser console for full details.
         onSubmit={handleApprovalFormSubmit}
         submitting={!!processingApproval}
       />
-      {/* Removed ApprovalDetailModal rendering block */}
     </div>
   );
 }
