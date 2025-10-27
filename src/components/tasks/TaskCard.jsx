@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -33,16 +34,18 @@ export default function TaskCard({ task, onClick }) {
   const getStatusColor = (status) => {
     const statusLower = status?.toLowerCase() || '';
     
-    if (statusLower.includes('ready') || statusLower.includes('to do')) return 'bg-green-500 text-white';
+    if (statusLower.includes('ready') || statusLower.includes('to do') || statusLower.includes('notstarted')) return 'bg-green-500 text-white';
     if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500 text-white';
     if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500 text-white';
-    if (statusLower.includes('progress') || statusLower.includes('active')) return 'bg-purple-500 text-white';
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('inprogress')) return 'bg-purple-500 text-white';
     if (statusLower.includes('done') || statusLower.includes('complete')) return 'bg-gray-500 text-white';
     if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500 text-white';
     if (statusLower.includes('review') || statusLower.includes('qa')) return 'bg-orange-500 text-white';
     
     return 'bg-slate-400 text-white';
   };
+
+  const isMicrosoftToDo = task.source === 'microsoft_todo';
 
   return (
     <motion.div
@@ -52,33 +55,42 @@ export default function TaskCard({ task, onClick }) {
     >
       <Card 
         className="hover:shadow-lg transition-all relative"
-        style={{ borderLeftWidth: '4px', borderLeftColor: listColor }}
+        style={!isMicrosoftToDo ? { borderLeftWidth: '4px', borderLeftColor: listColor } : {}}
       >
-        {/* Internal link covering whole card */}
-        <Link 
-          to={createPageUrl('TaskDetail') + `?id=${task.id}`}
-          className="absolute inset-0 z-0"
-          aria-label={`View ${task.title}`}
-        />
+        {/* Internal link covering whole card - only for ClickUp tasks */}
+        {!isMicrosoftToDo && (
+          <Link 
+            to={createPageUrl('TaskDetail') + `?id=${task.id}`}
+            className="absolute inset-0 z-0"
+            aria-label={`View ${task.title}`}
+          />
+        )}
 
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0 relative z-10">
               <div className="flex items-center gap-2 mb-1">
-                <div 
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: listColor }}
-                />
+                {!isMicrosoftToDo && (
+                  <div 
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: listColor }}
+                  />
+                )}
                 <h3 className="font-medium text-slate-900">{task.title}</h3>
               </div>
               
               <div className="flex items-center gap-2 flex-wrap mt-2">
-                <Badge className={getPriorityBadge(task.priority)}>
-                  {task.priority === 'none' ? 'No Priority' : task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                </Badge>
+                {task.priority && task.priority !== 'none' && (
+                  <Badge className={getPriorityBadge(task.priority)}>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </Badge>
+                )}
                 <Badge className={getStatusColor(task.status)}>
                   {task.status}
                 </Badge>
+                {isMicrosoftToDo && (
+                  <Badge variant="outline" className="text-xs">Microsoft To Do</Badge>
+                )}
               </div>
 
               {task.list_name && (
@@ -86,7 +98,7 @@ export default function TaskCard({ task, onClick }) {
               )}
             </div>
 
-            {/* External ClickUp link */}
+            {/* External link */}
             {task.url && (
               <a
                 href={task.url}
@@ -96,7 +108,7 @@ export default function TaskCard({ task, onClick }) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="w-3 h-3" />
-                ClickUp
+                {isMicrosoftToDo ? 'To Do' : 'ClickUp'}
               </a>
             )}
           </div>
