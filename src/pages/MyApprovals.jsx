@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import AppHeader from "@/components/shared/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ import {
   AlertCircle,
   Loader2,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  ClipboardCheck
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -258,45 +260,47 @@ function MyApprovalsContent() {
           <ConnectionWarning />
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
-            <p className="text-slate-600">Welcome back, {displayName}</p>
-            {syncStats && syncStats.last_sync_after && (
-              <p className="text-xs text-slate-500 mt-1">
-                Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')} 
-                {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
-                {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleForceResync}
-              disabled={syncing || !user?.pco_access_token}
-            >
-              {syncing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Force Resync
-                </>
-              )}
-            </Button>
-            <Link to={createPageUrl("Settings") + "?tab=integrations"}>
-              <Button variant="outline" size="sm">
-                Manage Integrations
+        <AppHeader
+          icon={ClipboardCheck}
+          title="My Approvals"
+          description={`Welcome back, ${displayName}`}
+          iconColor="from-orange-500 to-red-500"
+          action={
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleForceResync}
+                disabled={syncing || !user?.pco_access_token}
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Force Resync
+                  </>
+                )}
               </Button>
-            </Link>
-          </div>
-        </div>
+              <Link to={createPageUrl("Settings") + "?tab=integrations"}>
+                <Button variant="outline" size="sm">
+                  Manage Integrations
+                </Button>
+              </Link>
+            </div>
+          }
+        />
+
+        {syncStats && syncStats.last_sync_after && (
+          <p className="text-xs text-slate-500">
+            Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')} 
+            {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
+            {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
+          </p>
+        )}
 
         {/* Pending Approvals Section */}
         <Card>

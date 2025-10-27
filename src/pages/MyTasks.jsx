@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import AppHeader from "@/components/shared/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,8 @@ import {
   Tag,
   Maximize2,
   ListChecks,
-  Info // Added Info icon
+  Info, // Added Info icon
+  RefreshCw // Added RefreshCw icon
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -271,16 +273,18 @@ export default function MyTasks() {
           <ConnectionWarning />
         )}
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Tasks</h1>
-            <p className="text-slate-600">Welcome back, {displayName}</p>
-          </div>
-          <Button onClick={loadData} variant="outline" size="sm">
-            <Loader2 className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <AppHeader
+          icon={ListChecks}
+          title="My Tasks"
+          description={`Welcome back, ${displayName}`}
+          iconColor="from-blue-500 to-indigo-500"
+          action={
+            <Button onClick={loadData} variant="outline" size="sm">
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          }
+        />
 
         {/* My Day */}
         <Card>

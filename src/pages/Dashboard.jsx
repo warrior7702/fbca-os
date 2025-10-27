@@ -33,11 +33,11 @@ const defaultApps = [
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
   { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" }, // New Email app
-  // NEW: Added 4 placeholder apps
-  { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "#" },
-  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "#" },
-  { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "#" },
-  { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-cyan-500 to-blue-600", path: "#" }
+  // NEW: Added 4 placeholder apps with updated paths
+  { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
+  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
+  { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "InboxHelper" },
+  { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-cyan-500 to-blue-600", path: "MyMeetings" }
 ];
 
 const wallpapers = {
@@ -63,7 +63,7 @@ const getDefaultPositions = () => {
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
     
-    // Row 2 - Utility apps (coming soon)
+    // Row 2 - Utility apps
     ticketing: { row: 2, col: 0 },
     mydepartment: { row: 2, col: 1 },
     inboxhelper: { row: 2, col: 2 },
@@ -124,7 +124,8 @@ export default function Dashboard() {
           await base44.auth.updateMe({ desktop_layout: defaultPositions });
           console.log('✅ Layout repaired in database');
         } catch (error) {
-          console.error('Failed to repair layout:', error);
+            console.error('Failed to repair layout:', error);
+            // Consider more robust error handling or user notification
         }
       } else {
         // Merge: Start with defaults, overlay saved positions
@@ -158,6 +159,7 @@ export default function Dashboard() {
             console.log('✅ Updated layout in database with merged positions (e.g., new apps added or old removed)');
           } catch (error) {
             console.error('Failed to update layout:', error);
+            // Consider more robust error handling or user notification
           }
         }
       }
@@ -310,7 +312,7 @@ export default function Dashboard() {
                           </span>
                         </motion.div>
                       ) : (
-                        // Conditional rendering for mailto links vs internal links vs placeholder links
+                        // Conditional rendering for mailto links vs internal links
                         app.path.startsWith("mailto:") ? (
                           <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
                             <motion.div
@@ -325,19 +327,6 @@ export default function Dashboard() {
                               </span>
                             </motion.div>
                           </a>
-                        ) : app.path === "#" ? ( // Handle placeholder apps
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            onClick={() => toast.info(`${app.name} coming soon!`)}
-                            className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
-                          >
-                            <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
-                              <app.icon className="w-8 h-8 text-white" />
-                            </div>
-                            <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                              {app.name}
-                            </span>
-                          </motion.div>
                         ) : (
                           <Link to={createPageUrl(app.path)} className="block h-full">
                             <motion.div

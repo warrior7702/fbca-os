@@ -14,6 +14,10 @@ import AIHelper from './pages/AIHelper';
 import MyApprovals from './pages/MyApprovals';
 import TaskDetail from './pages/TaskDetail';
 import BrandAssets from './pages/BrandAssets';
+import Ticketing from './pages/Ticketing';
+import MyDepartment from './pages/MyDepartment';
+import InboxHelper from './pages/InboxHelper';
+import MyMeetings from './pages/MyMeetings';
 import Layout from './Layout.jsx';
 
 
@@ -34,6 +38,10 @@ export const PAGES = {
     "MyApprovals": MyApprovals,
     "TaskDetail": TaskDetail,
     "BrandAssets": BrandAssets,
+    "Ticketing": Ticketing,
+    "MyDepartment": MyDepartment,
+    "InboxHelper": InboxHelper,
+    "MyMeetings": MyMeetings,
 }
 
 export const pagesConfig = {
