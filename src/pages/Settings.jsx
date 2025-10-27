@@ -217,11 +217,11 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-6 md:p-8 h-full overflow-auto">
+    <div className="h-full bg-gradient-to-br from-slate-50 to-gray-50 p-6 md:p-8 overflow-auto">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-slate-100 rounded-xl">
-            <SettingsIcon className="w-6 h-6 text-slate-600" />
+          <div className="p-3 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl shadow-lg">
+            <SettingsIcon className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Settings</h1>

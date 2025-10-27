@@ -25,7 +25,7 @@ export default function StaffDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMinistry, setSelectedMinistry] = useState("all");
   const [ministries, setMinistries] = useState([]);
-  const [user, setUser] = useState<any | null>(null); // State to hold user data for connection warning
+  const [user, setUser] = useState(null); // State to hold user data for connection warning
 
   useEffect(() => {
     loadStaff();
@@ -107,8 +107,8 @@ export default function StaffDirectory() {
     <div className="h-full bg-gradient-to-br from-teal-50 to-slate-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-blue-100 rounded-xl">
-            <Users className="w-6 h-6 text-blue-600" />
+          <div className="p-3 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl shadow-lg">
+            <Users className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Staff Directory</h1>

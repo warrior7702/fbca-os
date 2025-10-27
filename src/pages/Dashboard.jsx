@@ -53,21 +53,23 @@ const ROWS = 6; // Increased from 4 to 6
 
 const getDefaultPositions = () => {
   return {
-    // Row 0 - Core work apps
+    // Row 0 - Core work apps (left side)
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
     email: { row: 0, col: 2 },
     
-    // Row 1 - Operational apps
+    // Row 1 - Operational apps (left side)
     marketing: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
     
-    // Row 2 - Utility apps
+    // Row 2 - Utility apps (left side)
     ticketing: { row: 2, col: 0 },
     mydepartment: { row: 2, col: 1 },
     inboxhelper: { row: 2, col: 2 },
-    mymeetings: { row: 2, col: 3 },
+    
+    // Row 3 - Additional apps (left side)
+    mymeetings: { row: 3, col: 0 },
     
     // Bottom left - Settings (desktop convention)
     settings: { row: 5, col: 0 }
@@ -86,7 +88,6 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    // Check if edit mode is enabled in URL
     const params = new URLSearchParams(window.location.search);
     if (params.get('edit') === 'true') {
       setEditMode(true);
@@ -99,67 +100,44 @@ export default function Dashboard() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // Load wallpaper preference
       if (currentUser.wallpaper) {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // IMPORTANT: Validate and fix desktop_layout
       let layout = currentUser.desktop_layout;
       
       console.log('Raw layout from DB:', layout);
-      console.log('Layout type:', typeof layout);
-      console.log('Is array?', Array.isArray(layout));
       
-      // Start with defaults for ALL apps
       const defaultPositions = getDefaultPositions();
       
-      // Fix corrupted array data or invalid data
       if (!layout || Array.isArray(layout) || typeof layout !== 'object') {
-        console.log('❌ Invalid layout detected - using defaults and repairing');
+        console.log('❌ Invalid layout detected - using defaults');
         setAppPositions(defaultPositions);
         
-        // Auto-repair the database
         try {
           await base44.auth.updateMe({ desktop_layout: defaultPositions });
           console.log('✅ Layout repaired in database');
         } catch (error) {
-            console.error('Failed to repair layout:', error);
-            // Consider more robust error handling or user notification
+          console.error('Failed to repair layout:', error);
         }
       } else {
-        // Merge: Start with defaults, overlay saved positions
         const mergedPositions = { ...defaultPositions };
         
-        // Apply saved positions for apps that exist
         Object.keys(layout).forEach(appId => {
-          // Only apply if this app still exists in defaultApps
           if (defaultApps.find(app => app.id === appId)) {
             mergedPositions[appId] = layout[appId];
           }
         });
         
         console.log('✅ Merged layout:', mergedPositions);
-        console.log('  - Default positions:', Object.keys(defaultPositions).length);
-        console.log('  - Saved positions:', Object.keys(layout).length);
-        console.log('  - Merged positions:', Object.keys(mergedPositions).length);
-        
         setAppPositions(mergedPositions);
         
-        // Save merged layout back if new apps were added or old apps were removed
-        // Only save if the merged layout is different from the original saved layout
-        const layoutKeys = Object.keys(layout);
-        const mergedKeys = Object.keys(mergedPositions);
-        const needsUpdate = mergedKeys.length !== layoutKeys.length ||
-                            mergedKeys.some(key => JSON.stringify(mergedPositions[key]) !== JSON.stringify(layout[key]));
-
-        if (needsUpdate) {
+        if (Object.keys(mergedPositions).length !== Object.keys(layout).length) {
           try {
             await base44.auth.updateMe({ desktop_layout: mergedPositions });
-            console.log('✅ Updated layout in database with merged positions (e.g., new apps added or old removed)');
+            console.log('✅ Updated layout with merged positions');
           } catch (error) {
             console.error('Failed to update layout:', error);
-            // Consider more robust error handling or user notification
           }
         }
       }
@@ -317,7 +295,7 @@ export default function Dashboard() {
                           <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
                             <motion.div
                               whileHover={{ scale: 1.05 }}
-                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
                                 <app.icon className="w-8 h-8 text-white" />
@@ -331,7 +309,7 @@ export default function Dashboard() {
                           <Link to={createPageUrl(app.path)} className="block h-full">
                             <motion.div
                               whileHover={{ scale: 1.05 }}
-                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
                                 <app.icon className="w-8 h-8 text-white" />
