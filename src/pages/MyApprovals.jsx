@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -86,7 +85,7 @@ function MyApprovalsContent() {
   const [syncStats, setSyncStats] = useState(null);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [debugging, setDebugging] = useState(false); // New state for debugging button
+  const [debugging, setDebugging] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -101,9 +100,7 @@ function MyApprovalsContent() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      // Only attempt sync/calendar if PCO is connected, otherwise data will be empty
       if (currentUser?.pco_access_token) {
-        // Sync approvals (incremental)
         const syncResponse = await base44.functions.invoke('syncMyApprovals', {
           forceResync: false
         }).catch(err => {
@@ -115,7 +112,6 @@ function MyApprovalsContent() {
         setApprovals(A(responseData.pending_approvals));
         setSyncStats(responseData.sync_stats || null);
 
-        // Load calendar events
         try {
           const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
           setCalendarEvents(A(eventsResponse?.data?.events));
@@ -124,10 +120,9 @@ function MyApprovalsContent() {
           setCalendarEvents([]);
         }
       } else {
-        // If PCO is not connected, clear approvals and calendar events
         setApprovals([]);
         setCalendarEvents([]);
-        setSyncStats(null); // Clear sync stats as no sync happened
+        setSyncStats(null);
       }
 
     } catch (error) {
@@ -168,14 +163,12 @@ function MyApprovalsContent() {
     }
   };
 
-  // New debug function
   const handleDebug = async () => {
     setDebugging(true);
     try {
       const debugResponse = await base44.functions.invoke('debugPCOApprovals');
       console.log('🐛 PCO Debug Results:', debugResponse.data);
       
-      // Show results in a nice format
       const results = debugResponse.data;
       const message = `
 📊 PCO Debug Results:
@@ -291,7 +284,6 @@ Check browser console for full details.
   return (
     <div className="h-full bg-gradient-to-br from-orange-50 to-slate-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Connection Warning */}
         {!user?.pco_access_token && (
           <ConnectionWarning />
         )}
@@ -355,7 +347,6 @@ Check browser console for full details.
           </p>
         )}
 
-        {/* Pending Approvals Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -463,7 +454,6 @@ Check browser console for full details.
           </CardContent>
         </Card>
 
-        {/* Calendar Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -491,7 +481,6 @@ Check browser console for full details.
         </Card>
       </div>
 
-      {/* Modals */}
       <FullApprovalCalendarModal
         open={showFullCalendar}
         onClose={() => setShowFullCalendar(false)}
