@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail } from "lucide-react"; // Added Mail import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -284,6 +284,36 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-4">
+            {/* Microsoft 365 Reconnection Notice */}
+            {user?.microsoft_access_token && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">New: Microsoft To Do Support</h3>
+                    <p className="text-sm text-slate-600 mb-2">
+                      We've added Microsoft To Do integration! If you're getting permission errors, 
+                      disconnect and reconnect Microsoft 365 to grant Tasks access.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        handleDisconnectMicrosoft();
+                        setTimeout(() => {
+                          handleConnectMicrosoft();
+                        }, 500);
+                      }}
+                    >
+                      Reconnect Microsoft 365
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-1">
               <ConnectionStatusCard
                 title="Planning Center"

@@ -101,7 +101,12 @@ export default function MyTasks() {
             })
             .catch(error => {
               console.error('❌ Error fetching Microsoft To Do:', error);
-              toast.error('Failed to load Microsoft To Do');
+              // Check if it's a 403 permission error
+              if (error.response?.status === 403) {
+                toast.error('Microsoft To Do access denied. Please reconnect Microsoft 365 in Settings to grant Tasks permission.');
+              } else {
+                toast.error('Failed to load Microsoft To Do');
+              }
               return { type: 'todo', data: [] };
             })
         );
