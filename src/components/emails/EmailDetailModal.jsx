@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -12,6 +13,9 @@ import { format } from "date-fns";
 
 export default function EmailDetailModal({ open, onOpenChange, email }) {
   if (!email) return null;
+
+  // Debug: log email data
+  console.log('📧 Email detail modal data:', email);
 
   const handleOpenInOutlook = () => {
     if (email.webLink) {
@@ -74,19 +78,25 @@ export default function EmailDetailModal({ open, onOpenChange, email }) {
           )}
 
           {/* Email Preview/Summary */}
-          {email.bodyPreview && (
-            <div>
-              <label className="text-sm font-medium text-slate-500 flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                Preview
-              </label>
+          <div>
+            <label className="text-sm font-medium text-slate-500 flex items-center gap-1">
+              <FileText className="w-3 h-3" />
+              Preview
+            </label>
+            {email.bodyPreview ? (
               <div className="mt-1 p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <p className="text-sm text-slate-700 whitespace-pre-wrap">
                   {email.bodyPreview}
                 </p>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-1 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-500 italic">
+                  No preview available. Open in Outlook to view full content.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Categories */}
           {email.categories && email.categories.length > 0 && (
