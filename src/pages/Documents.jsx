@@ -22,16 +22,27 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ConnectionWarning from "@/components/shared/ConnectionWarning";
-import { useAuth } from "@/context/AuthContext"; // Assuming useAuth is available for user data
 
 export default function Documents() {
   const navigate = useNavigate();
-  const { user } = useAuth(); // Access user context to check for connection status
+  const [user, setUser] = useState(null); // Access user context to check for connection status
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentFolderId, setCurrentFolderId] = useState('root');
   const [breadcrumbs, setBreadcrumbs] = useState([{ id: 'root', name: 'OneDrive' }]);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
+      } catch (error) {
+        console.error("Error loading user:", error);
+      }
+    };
+    loadUser();
+  }, []); // Runs once on mount
 
   useEffect(() => {
     console.log('currentFolderId changed to:', currentFolderId);
