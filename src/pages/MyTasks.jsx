@@ -241,12 +241,55 @@ export default function MyTasks() {
   const handleEmailClick = (email) => {
     console.log('📧 Email clicked:', email);
     
-    // Open in web Outlook (desktop protocol not registered on your system)
-    if (email.webLink) {
-      window.open(email.webLink, '_blank', 'noopener,noreferrer');
+    if (email.messageId) {
+      // Clean the message ID - remove angle brackets if present
+      let cleanMessageId = email.messageId;
+      if (cleanMessageId.startsWith('<') && cleanMessageId.endsWith('>')) {
+        cleanMessageId = cleanMessageId.slice(1, -1);
+      }
+      
+      // Try multiple protocols for Windows 11 + Edge
+      const protocols = [
+        `ms-outlook://view/${cleanMessageId}`, // Modern Outlook protocol
+        `outlook:${cleanMessageId}`, // Classic protocol
+      ];
+      
+      console.log('📧 Trying message ID:', cleanMessageId);
+      console.log('📧 Trying protocols:', protocols);
+      
+      // Attempt to open the first protocol directly
+      // This will trigger the browser to ask to open the external app or fail silently
+      window.location.href = protocols[0];
+      
+      // Fallback to web after 2 seconds if desktop doesn't open
+      // This timeout is a heuristic. If the desktop app opens, the browser might
+      // lose focus or navigate away, preventing the timeout from executing,
+      // or it might execute in the background. It's not a perfect solution
+      // but provides a reasonable fallback for cases where the protocol fails.
+      const fallbackTimeout = setTimeout(() => {
+        console.log('📧 Desktop app did not open via protocol, falling back to web link.');
+        if (email.webLink) {
+          window.open(email.webLink, '_blank', 'noopener,noreferrer');
+        } else {
+          console.error('📧 No webLink found for email to fall back to.');
+          toast.error('Could not open email.');
+        }
+      }, 2000); // 2 seconds
+      
+      // Clear the timeout if the user navigates away or the page unloads
+      // (though this is less effective for `window.location.href` which is synchronous)
+      window.addEventListener('blur', () => clearTimeout(fallbackTimeout), { once: true });
+      window.addEventListener('beforeunload', () => clearTimeout(fallbackTimeout), { once: true });
+
     } else {
-      console.error('📧 No webLink found for email');
-      toast.error('Could not open email');
+      // No message ID, open in web
+      console.log('📧 No message ID, opening web link for email.');
+      if (email.webLink) {
+        window.open(email.webLink, '_blank', 'noopener,noreferrer');
+      } else {
+        console.error('📧 No webLink found for email.');
+        toast.error('Could not open email.');
+      }
     }
   };
 
