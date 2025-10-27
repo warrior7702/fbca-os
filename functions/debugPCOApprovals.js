@@ -125,57 +125,53 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 5. Analyze requests
-        const allRequests = [];
+        // 5. Filter requests to only those in my groups
         const myRequests = [];
+        const otherRequests = [];
         
         for (const request of requestsData.data || []) {
             const resourceId = request.relationships?.resource?.data?.id;
             const groupInfo = resourceToGroup[resourceId];
-            const isMyGroup = myGroups.some(g => g.id === groupInfo?.groupId);
+            const isMyGroup = groupInfo && myGroups.some(g => g.id === groupInfo.groupId);
             
             const requestInfo = {
                 id: request.id,
-                resource_id: resourceId,
                 approval_status: request.attributes?.approval_status,
+                quantity: request.attributes?.quantity,
                 created_at: request.attributes?.created_at,
-                approval_group: groupInfo?.groupName || 'Unknown',
-                approval_group_id: groupInfo?.groupId,
-                is_for_my_group: isMyGroup
+                resource_id: resourceId,
+                group_name: groupInfo?.groupName || 'No Group',
+                is_my_group: isMyGroup
             };
             
-            allRequests.push(requestInfo);
             if (isMyGroup) {
                 myRequests.push(requestInfo);
+            } else {
+                otherRequests.push(requestInfo);
             }
         }
 
         return Response.json({
-            my_pco_person_id: myPersonId,
-            my_email: currentUser.email,
-            approval_groups: {
-                total: allGroups.length,
-                i_am_member_of: myGroups.length,
-                all_groups: allGroups,
-                my_groups: myGroups
+            summary: {
+                my_pco_person_id: myPersonId,
+                total_groups: allGroups.length,
+                my_groups_count: myGroups.length,
+                total_pending_requests: requestsData.data?.length || 0,
+                requests_in_my_groups: myRequests.length,
+                requests_in_other_groups: otherRequests.length
             },
-            pending_requests: {
-                total_in_pco: allRequests.length,
-                assigned_to_my_groups: myRequests.length,
-                all_requests: allRequests,
-                my_requests: myRequests
-            },
-            resource_mapping: {
-                total_resources_mapped: Object.keys(resourceToGroup).length,
-                sample: Object.entries(resourceToGroup).slice(0, 5).map(([resourceId, group]) => ({
-                    resource_id: resourceId,
-                    group_name: group.groupName
-                }))
-            }
+            my_groups: myGroups,
+            all_groups: allGroups,
+            my_requests: myRequests,
+            other_requests: otherRequests.slice(0, 5), // Just show first 5
+            resource_to_group_mapping_count: Object.keys(resourceToGroup).length
         });
 
     } catch (error) {
         console.error('Debug error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ 
+            error: error.message,
+            stack: error.stack 
+        }, { status: 500 });
     }
 });
