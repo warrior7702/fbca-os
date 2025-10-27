@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
         // Get Categorized Messages - ONLY from Inbox folder
         const categorizedResponse = await fetch(
-            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink&$orderby=receivedDateTime desc",
+            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink,internetMessageId&$orderby=receivedDateTime desc",
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
                         hasAttachments: email.hasAttachments,
                         importance: email.importance,
                         categories: email.categories,
-                        webLink: email.webLink
+                        webLink: email.webLink,
+                        messageId: email.internetMessageId
                     });
                 });
             }

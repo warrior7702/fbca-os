@@ -65,7 +65,10 @@ export default function MyTasks() {
       if (currentUser.clickup_access_token) {
         taskPromises.push(
           base44.functions.invoke('getMyClickUpTasks')
-            .then(res => ({ type: 'clickup', data: res.data.tasks || [] }))
+            .then(res => {
+              console.log('ClickUp tasks loaded:', res.data.tasks?.length || 0);
+              return { type: 'clickup', data: res.data.tasks || [] };
+            })
             .catch(error => {
               console.error('Error fetching ClickUp tasks:', error);
               toast.error('Failed to load ClickUp tasks');
@@ -77,7 +80,10 @@ export default function MyTasks() {
       if (currentUser.microsoft_access_token) {
         taskPromises.push(
           base44.functions.invoke('getMicrosoftToDo')
-            .then(res => ({ type: 'todo', data: res.data.tasks || [] }))
+            .then(res => {
+              console.log('Microsoft To Do tasks loaded:', res.data.tasks?.length || 0);
+              return { type: 'todo', data: res.data.tasks || [] };
+            })
             .catch(error => {
               console.error('Error fetching Microsoft To Do:', error);
               toast.error('Failed to load Microsoft To Do');
@@ -87,7 +93,10 @@ export default function MyTasks() {
 
         taskPromises.push(
           base44.functions.invoke('getCategorizedEmails')
-            .then(res => ({ type: 'emails', data: res.data.categorized || {} }))
+            .then(res => {
+              console.log('Emails loaded:', res.data);
+              return { type: 'emails', data: res.data.categorized || {} };
+            })
             .catch(error => {
               console.error('Error fetching emails:', error);
               toast.error('Failed to load emails');
@@ -180,10 +189,11 @@ export default function MyTasks() {
 
   // Convert Outlook webLink to desktop protocol
   const getOutlookDesktopLink = (email) => {
-    // Extract message ID from webLink if possible
-    // Format: outlookmsgid:<message-id>
-    // For now, we'll use the webLink but with outlook: protocol
-    return email.webLink?.replace('https://outlook.office365.com', 'outlook:');
+    // Use outlook: protocol to open in desktop app
+    if (email.webLink) {
+      return email.webLink.replace('https://outlook.office365.com', 'outlook:');
+    }
+    return '#';
   };
 
   if (loading) {
@@ -337,7 +347,13 @@ export default function MyTasks() {
                               <a
                                 key={idx}
                                 href={getOutlookDesktopLink(email)}
-                                className="p-2 bg-white rounded hover:bg-slate-50 transition-colors block cursor-pointer"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer"
+                                onClick={(e) => {
+                                  console.log('Email clicked:', email);
+                                  console.log('Link:', getOutlookDesktopLink(email));
+                                }}
                               >
                                 <p className={`text-xs truncate ${
                                   email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
