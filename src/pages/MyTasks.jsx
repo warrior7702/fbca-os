@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -58,40 +59,57 @@ export default function MyTasks() {
         toast.error('Please connect ClickUp or Microsoft 365 in Settings');
       }
 
-      // Load ClickUp tasks
+      // Load tasks in parallel for faster loading
+      const taskPromises = [];
+      
       if (currentUser.clickup_access_token) {
-        try {
-          const tasksResponse = await base44.functions.invoke('getMyClickUpTasks');
-          setClickupTasks(tasksResponse.data.tasks || []);
-        } catch (error) {
-          console.error('Error fetching ClickUp tasks:', error);
-          toast.error('Failed to load ClickUp tasks');
-        }
+        taskPromises.push(
+          base44.functions.invoke('getMyClickUpTasks')
+            .then(res => ({ type: 'clickup', data: res.data.tasks || [] }))
+            .catch(error => {
+              console.error('Error fetching ClickUp tasks:', error);
+              toast.error('Failed to load ClickUp tasks');
+              return { type: 'clickup', data: [] };
+            })
+        );
       }
 
-      // Load Microsoft To Do tasks
       if (currentUser.microsoft_access_token) {
-        try {
-          const todoResponse = await base44.functions.invoke('getMicrosoftToDo');
-          setTodoTasks(todoResponse.data.tasks || []);
-        } catch (error) {
-          console.error('Error fetching Microsoft To Do:', error);
-          toast.error('Failed to load Microsoft To Do');
-        }
+        taskPromises.push(
+          base44.functions.invoke('getMicrosoftToDo')
+            .then(res => ({ type: 'todo', data: res.data.tasks || [] }))
+            .catch(error => {
+              console.error('Error fetching Microsoft To Do:', error);
+              toast.error('Failed to load Microsoft To Do');
+              return { type: 'todo', data: [] };
+            })
+        );
 
-        // Load emails - only categorized
-        try {
-          const emailsResponse = await base44.functions.invoke('getCategorizedEmails');
-          setEmails({ categorized: emailsResponse.data.categorized || {} });
-        } catch (error) {
-          console.error('Error fetching emails:', error);
-          toast.error('Failed to load emails');
-        } finally {
-          setLoadingEmails(false);
-        }
-      } else {
-        setLoadingEmails(false);
+        taskPromises.push(
+          base44.functions.invoke('getCategorizedEmails')
+            .then(res => ({ type: 'emails', data: res.data.categorized || {} }))
+            .catch(error => {
+              console.error('Error fetching emails:', error);
+              toast.error('Failed to load emails');
+              return { type: 'emails', data: {} };
+            })
+        );
       }
+
+      // Wait for all to complete in parallel
+      const results = await Promise.all(taskPromises);
+      
+      results.forEach(result => {
+        if (result.type === 'clickup') {
+          setClickupTasks(result.data);
+        } else if (result.type === 'todo') {
+          setTodoTasks(result.data);
+        } else if (result.type === 'emails') {
+          setEmails({ categorized: result.data });
+        }
+      });
+
+      setLoadingEmails(false);
 
     } catch (error) {
       console.error("Error loading data:", error);
@@ -118,6 +136,16 @@ export default function MyTasks() {
     task.due_date && isToday(new Date(task.due_date))
   );
 
+  const LIST_COLORS = {
+    'Special Event Master': '#22c55e', // green-500
+    'Facilities Work Orders': '#0ea5e9', // sky-500
+    'Marketing': '#f59e0b', // amber-500
+    'IT & Technology': '#8b5cf6', // violet-500
+    'Worship & Production': '#ec4899', // pink-500
+    'Admin & Operations': '#6366f1', // indigo-500
+    'default': '#94a3b8' // slate-400
+  };
+
   const getStatusColor = (status) => {
     const statusLower = status?.toLowerCase() || '';
     
@@ -133,8 +161,10 @@ export default function MyTasks() {
 
   const formatStatus = (status) => {
     if (!status) return 'No Status';
+    
+    // Split by spaces, hyphens, or underscores
     return status
-      .split(' ')
+      .split(/[\s_-]+/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   };
@@ -172,7 +202,7 @@ export default function MyTasks() {
           <p className="text-slate-600">Welcome back, {displayName}</p>
         </div>
 
-        {/* Today's Tasks - NO PRIORITY BADGES */}
+        {/* Today's Tasks */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -187,38 +217,43 @@ export default function MyTasks() {
             {todayTasks.length === 0 ? (
               <p className="text-slate-500 text-center py-4">No tasks due today! 🎉</p>
             ) : (
-              <div className="space-y-2">
-                {todayTasks.map((task) => (
-                  <div
-                    key={`${task.source}-${task.id}`}
-                    onClick={() => handleTaskClick(task)}
-                    className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          {task.source === 'microsoft_todo' ? (
-                            <ListChecks className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                          ) : (
-                            <CheckSquare className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                          )}
-                          <h3 className="font-medium text-slate-900">{task.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={getStatusColor(task.status)}>
-                            {formatStatus(task.status)}
-                          </Badge>
-                          {task.list_name && (
-                            <span className="text-xs text-slate-500">{task.list_name}</span>
-                          )}
-                          {task.source === 'microsoft_todo' && (
-                            <Badge variant="outline" className="text-xs">Microsoft To Do</Badge>
-                          )}
+              <div className="space-y-3">
+                {todayTasks.map((task) => {
+                  const listColor = LIST_COLORS[task.list_name] || LIST_COLORS.default;
+                  const isMicrosoftToDo = task.source === 'microsoft_todo';
+                  
+                  return (
+                    <div
+                      key={`${task.source}-${task.id}`}
+                      onClick={() => handleTaskClick(task)}
+                      className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                      style={{ borderLeftColor: listColor }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div 
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: listColor }}
+                            />
+                            <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={getStatusColor(task.status)}>
+                              {formatStatus(task.status)}
+                            </Badge>
+                            {task.list_name && (
+                              <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                            )}
+                            {isMicrosoftToDo && (
+                              <Badge variant="outline" className="text-xs">Microsoft To Do</Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

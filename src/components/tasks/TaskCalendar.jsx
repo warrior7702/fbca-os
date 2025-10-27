@@ -1,8 +1,18 @@
 import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Circle, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfWeek, addDays, isSameDay, isToday, parseISO } from "date-fns";
+import { format, startOfWeek, addDays, isSameDay, isToday, parseISO, isBefore, startOfDay } from "date-fns";
+
+const LIST_COLORS = {
+  'Special Event Master': '#22c55e',
+  'Facilities Work Orders': '#0ea5e9',
+  'Marketing': '#f59e0b',
+  'IT & Technology': '#8b5cf6',
+  'Worship & Production': '#ec4899',
+  'Admin & Operations': '#6366f1',
+  'default': '#94a3b8'
+};
 
 export default function TaskCalendar({ tasks, onTaskClick, weekCount = 2 }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(
@@ -45,14 +55,12 @@ export default function TaskCalendar({ tasks, onTaskClick, weekCount = 2 }) {
     setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return 'bg-red-500';
-      case 'high': return 'bg-orange-400';
-      case 'normal': return 'bg-blue-400';
-      case 'low': return 'bg-gray-300';
-      default: return 'bg-slate-300';
-    }
+  const getListColor = (listName) => {
+    return LIST_COLORS[listName] || LIST_COLORS.default;
+  };
+
+  const isPastDue = (day) => {
+    return isBefore(day, startOfDay(new Date())) && !isToday(day);
   };
 
   return (
@@ -76,10 +84,10 @@ export default function TaskCalendar({ tasks, onTaskClick, weekCount = 2 }) {
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-3">
         {/* Day Headers */}
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center text-xs font-semibold text-slate-600 py-2">
+          <div key={day} className="text-center text-xs font-bold text-slate-700 py-2 uppercase tracking-wide">
             {day}
           </div>
         ))}
@@ -89,41 +97,53 @@ export default function TaskCalendar({ tasks, onTaskClick, weekCount = 2 }) {
           const dayKey = format(day, 'yyyy-MM-dd');
           const dayTasks = tasksByDay.get(dayKey) || [];
           const isCurrentDay = isToday(day);
+          const isPast = isPastDue(day);
 
           return (
             <div
               key={dayKey}
-              className={`min-h-[100px] p-2 rounded-lg border transition-all ${
+              className={`min-h-[110px] p-3 rounded-xl border-2 transition-all ${
                 isCurrentDay
-                  ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200'
-                  : 'bg-white border-slate-200 hover:border-slate-300'
+                  ? 'bg-blue-50 border-blue-400 shadow-md'
+                  : isPast
+                  ? 'bg-slate-50 border-slate-200'
+                  : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
               }`}
             >
-              <div className={`text-sm font-semibold mb-2 ${
-                isCurrentDay ? 'text-indigo-600' : 'text-slate-700'
+              <div className={`text-sm font-bold mb-2 ${
+                isCurrentDay
+                  ? 'text-blue-600'
+                  : isPast
+                  ? 'text-slate-400'
+                  : 'text-slate-700'
               }`}>
                 {format(day, 'd')}
               </div>
 
-              <div className="space-y-1">
-                {dayTasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTaskClick?.(task);
-                    }}
-                    className="group cursor-pointer"
-                  >
-                    <div className={`text-xs p-1.5 rounded truncate transition-all ${
-                      getPriorityColor(task.priority)
-                    } text-white group-hover:shadow-md`}>
-                      {task.title}
+              <div className="space-y-1.5">
+                {dayTasks.slice(0, 3).map((task) => {
+                  const listColor = getListColor(task.list_name);
+                  
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTaskClick?.(task);
+                      }}
+                      className="group cursor-pointer"
+                    >
+                      <div 
+                        className="text-xs p-2 rounded-lg border-l-4 bg-white shadow-sm hover:shadow-md transition-all truncate font-medium"
+                        style={{ borderLeftColor: listColor }}
+                      >
+                        {task.title}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {dayTasks.length > 3 && (
-                  <div className="text-xs text-slate-500 pl-1.5">
+                  <div className="text-xs text-slate-500 font-medium pl-2">
                     +{dayTasks.length - 3} more
                   </div>
                 )}

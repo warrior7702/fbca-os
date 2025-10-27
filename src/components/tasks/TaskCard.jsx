@@ -1,10 +1,6 @@
-
 import React from "react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 
 const LIST_COLORS = {
@@ -45,6 +41,15 @@ export default function TaskCard({ task, onClick }) {
     return 'bg-slate-400 text-white';
   };
 
+  const formatStatus = (status) => {
+    if (!status) return 'No Status';
+    
+    return status
+      .split(/[\s_-]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const isMicrosoftToDo = task.source === 'microsoft_todo';
 
   return (
@@ -54,31 +59,29 @@ export default function TaskCard({ task, onClick }) {
       whileHover={{ scale: 1.02 }}
     >
       <Card 
-        className="hover:shadow-lg transition-all cursor-pointer"
-        style={!isMicrosoftToDo ? { borderLeftWidth: '4px', borderLeftColor: listColor } : {}}
+        className="hover:shadow-lg transition-all cursor-pointer border-l-4"
+        style={{ borderLeftColor: listColor }}
         onClick={onClick}
       >
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                {!isMicrosoftToDo && (
-                  <div 
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: listColor }}
-                  />
-                )}
-                <h3 className="font-medium text-slate-900">{task.title}</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <div 
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: listColor }}
+                />
+                <h3 className="font-semibold text-slate-900">{task.title}</h3>
               </div>
               
-              <div className="flex items-center gap-2 flex-wrap mt-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {task.priority && task.priority !== 'none' && (
                   <Badge className={getPriorityBadge(task.priority)}>
                     {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                   </Badge>
                 )}
                 <Badge className={getStatusColor(task.status)}>
-                  {task.status}
+                  {formatStatus(task.status)}
                 </Badge>
                 {isMicrosoftToDo && (
                   <Badge variant="outline" className="text-xs">Microsoft To Do</Badge>
@@ -86,7 +89,7 @@ export default function TaskCard({ task, onClick }) {
               </div>
 
               {task.list_name && (
-                <p className="text-xs text-slate-500 mt-2">{task.list_name}</p>
+                <p className="text-xs text-slate-500 mt-2 font-medium">{task.list_name}</p>
               )}
             </div>
           </div>

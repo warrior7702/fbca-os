@@ -24,29 +24,9 @@ Deno.serve(async (req) => {
             accessToken = refreshResponse.data.access_token;
         }
 
-        // 1. Get Focused Inbox (Highlighted)
-        const focusedResponse = await fetch(
-            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=inferenceClassification eq 'focused' and isRead eq false&$top=25&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink&$orderby=receivedDateTime desc",
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            }
-        );
-
-        // 2. Get All Unread Messages
-        const unreadResponse = await fetch(
-            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$top=50&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink&$orderby=receivedDateTime desc",
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            }
-        );
-
-        // 3. Get Categorized Messages
+        // Get Categorized Messages - ONLY from Inbox folder
         const categorizedResponse = await fetch(
-            'https://graph.microsoft.com/v1.0/me/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink&$orderby=receivedDateTime desc',
+            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink&$orderby=receivedDateTime desc",
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -54,8 +34,6 @@ Deno.serve(async (req) => {
             }
         );
 
-        const focused = focusedResponse.ok ? (await focusedResponse.json()).value : [];
-        const unread = unreadResponse.ok ? (await unreadResponse.json()).value : [];
         const categorized = categorizedResponse.ok ? (await categorizedResponse.json()).value : [];
 
         // Group categorized emails by category
@@ -82,28 +60,6 @@ Deno.serve(async (req) => {
         });
 
         return Response.json({
-            focused: focused.map(email => ({
-                subject: email.subject,
-                from: email.from?.emailAddress?.address,
-                fromName: email.from?.emailAddress?.name,
-                receivedAt: email.receivedDateTime,
-                isRead: email.isRead,
-                hasAttachments: email.hasAttachments,
-                importance: email.importance,
-                categories: email.categories || [],
-                webLink: email.webLink
-            })),
-            unread: unread.map(email => ({
-                subject: email.subject,
-                from: email.from?.emailAddress?.address,
-                fromName: email.from?.emailAddress?.name,
-                receivedAt: email.receivedDateTime,
-                isRead: email.isRead,
-                hasAttachments: email.hasAttachments,
-                importance: email.importance,
-                categories: email.categories || [],
-                webLink: email.webLink
-            })),
             categorized: emailsByCategory
         });
 
