@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -23,11 +24,26 @@ import {
   MessageSquare,
   Building2,
   Mail,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ChevronDown, // New icon for dropdowns
+  Circle, // New icon for status
+  ArrowUpCircle, // New icon for status
+  AlertCircle, // New icon for status
+  Loader2 // New icon for loading state
 } from "lucide-react";
 import { format } from "date-fns";
+import { useMutation } from "@tanstack/react-query"; // New import
+import { base44 } from "@/api/base44Client"; // New import
+import { toast } from "react-hot-toast"; // Assuming react-hot-toast is used for notifications
 
-export default function TaskDetailModal({ task, open, onOpenChange }) {
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // New imports for dropdown
+
+export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdated }) {
   if (!task) return null;
 
   const getPriorityColor = (priority) => {
@@ -137,28 +153,127 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
     !field.name.toLowerCase().includes('code')
   );
 
+  const statusIcons = {
+    'to do': Circle,
+    'in progress': ArrowUpCircle,
+    'ready': CheckSquare, // Using CheckSquare from existing imports, outline suggested CheckCircle but not imported
+    'awaiting feedback': AlertCircle,
+    'closed': CheckSquare // Using CheckSquare
+    // Add other status mappings as needed
+  };
+
+  const getStatusIconComponent = (status) => {
+    const statusLower = status?.toLowerCase();
+    if (statusLower.includes('to do')) return Circle;
+    if (statusLower.includes('in progress')) return ArrowUpCircle;
+    if (statusLower.includes('ready') || statusLower.includes('done') || statusLower.includes('complete')) return CheckSquare;
+    if (statusLower.includes('awaiting') || statusLower.includes('pending') || statusLower.includes('review')) return AlertCircle;
+    return Circle; // Default icon
+  };
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ task_id, status }) => 
+      base44.functions.invoke('updateClickUpTask', { taskId: task_id, status }), // Ensure parameter name matches backend
+    onSuccess: () => {
+      toast.success('Status updated!');
+      if (onTaskUpdated) onTaskUpdated();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      console.error('Update status error:', error);
+      toast.error('Failed to update status');
+    }
+  });
+
+  const closeTaskMutation = useMutation({
+    mutationFn: ({ task_id, closed }) => 
+      base44.functions.invoke('updateClickUpTask', { taskId: task_id, closed }), // Ensure parameter name matches backend
+    onSuccess: () => {
+      toast.success('Task closed!');
+      if (onTaskUpdated) onTaskUpdated();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      console.error('Close task error:', error);
+      toast.error('Failed to close task');
+    }
+  });
+
+  const handleStatusChange = (newStatus) => {
+    updateStatusMutation.mutate({ task_id: task.id, status: newStatus });
+  };
+
+  const handleCloseTask = () => {
+    closeTaskMutation.mutate({ task_id: task.id, closed: true });
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold pr-8">
-            {task.title}
-          </DialogTitle>
+          <div className="flex items-start justify-between gap-4">
+            <DialogTitle className="text-xl pr-8">
+              {task.title}
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => window.open(task.url, '_blank')}
+              className="flex-shrink-0"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Status and Priority */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge className={getStatusColor(task.status)}>
-              {formatStatus(task.status)}
-            </Badge>
-            <Badge className={getPriorityColor(task.priority)}>
+          {/* Status and Priority Section */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  {React.createElement(getStatusIconComponent(task.status), { className: "w-4 h-4" })}
+                  {formatStatus(task.status)}
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleStatusChange('to do')}>
+                  <Circle className="w-4 h-4 mr-2 text-gray-400" />
+                  To Do
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusChange('in progress')}>
+                  <ArrowUpCircle className="w-4 h-4 mr-2 text-blue-500" />
+                  In Progress
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusChange('ready')}>
+                  <CheckSquare className="w-4 h-4 mr-2 text-green-500" />
+                  Ready
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusChange('awaiting feedback')}>
+                  <AlertCircle className="w-4 h-4 mr-2 text-pink-500" />
+                  Awaiting Feedback
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Badge className={getPriorityColor(task.priority) + " flex items-center gap-1"}>
+              <Flag className="w-3 h-3" />
               {task.priority === 'none' ? 'No Priority' : task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
             </Badge>
+
             {task.time_estimate && (
               <Badge variant="outline" className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {formatTimeEstimate(task.time_estimate)}
+              </Badge>
+            )}
+
+            {task.due_date && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {format(new Date(task.due_date), 'MMM d, yyyy')}
               </Badge>
             )}
           </div>
@@ -198,18 +313,6 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
 
           {/* Main Details Grid */}
           <div className="grid grid-cols-2 gap-4">
-            {task.due_date && (
-              <div className="flex items-start gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-slate-500 mt-0.5" />
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Due Date</div>
-                  <div className="text-slate-900">
-                    {format(new Date(task.due_date), 'MMM d, yyyy h:mm a')}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {task.list_name && (
               <div className="flex items-start gap-2 text-sm">
                 <Layers className="w-4 h-4 text-slate-500 mt-0.5" />
@@ -343,17 +446,36 @@ export default function TaskDetailModal({ task, open, onOpenChange }) {
               </div>
             </div>
           )}
-        </div>
 
-        <DialogFooter>
-          <Button
-            onClick={() => window.open(task.url, '_blank')}
-            className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            View Full Task in ClickUp
-          </Button>
-        </DialogFooter>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              onClick={handleCloseTask}
+              disabled={closeTaskMutation.isPending}
+              className="flex-1 bg-green-600 hover:bg-green-700"
+            >
+              {closeTaskMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Closing...
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  Close Task
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open(task.url, '_blank')}
+              className="flex-1"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open in ClickUp
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Maximize2, List } from "lucide-react";
 import { format, addDays, startOfWeek, isToday, startOfDay } from "date-fns";
+import { motion } from "framer-motion"; // Import motion from framer-motion
 
 export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
@@ -23,7 +24,7 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
 
   // Generate consistent colors for each list
   const getListColor = (listName) => {
-    if (!listName) return { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', ring: 'ring-slate-200' };
+    if (!listName) return { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', ring: 'ring-slate-200', dot: 'bg-slate-500' };
     
     let hash = 0;
     for (let i = 0; i < listName.length; i++) {
@@ -107,6 +108,14 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
   const week1 = twoWeeksDays.slice(0, 7);
   const week2 = twoWeeksDays.slice(7, 14);
 
+  // Make sure task clicks are passed through properly
+  const handleTaskClick = (task, e) => {
+    e.stopPropagation();
+    if (onTaskClick) {
+      onTaskClick(task, e);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -166,9 +175,13 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
                     const listColor = getListColor(task.list_name);
                     const statusColor = getStatusColor(task.status);
                     return (
-                      <div
+                      <motion.div
                         key={task.id}
-                        onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                        onClick={(e) => handleTaskClick(task, e)}
                         className="cursor-pointer"
                       >
                         <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
@@ -184,7 +197,7 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
                             </div>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
                   {dayTasks.length > 3 && (
@@ -228,9 +241,13 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
                     const listColor = getListColor(task.list_name);
                     const statusColor = getStatusColor(task.status);
                     return (
-                      <div
+                      <motion.div
                         key={task.id}
-                        onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                        onClick={(e) => handleTaskClick(task, e)}
                         className="cursor-pointer"
                       >
                         <div className={`text-xs p-2 rounded-md ${listColor.bg} border ${listColor.border} hover:shadow-md transition-all group`}>
@@ -246,7 +263,7 @@ export default function TaskCalendar({ tasks, onOpenFullView, onTaskClick }) {
                             </div>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
                   {dayTasks.length > 3 && (

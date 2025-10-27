@@ -87,6 +87,11 @@ export default function MyTasks() {
     setShowTaskDetail(true);
   };
 
+  const handleTaskUpdated = () => {
+    // Reload tasks after an update
+    loadData();
+  };
+
   const todayTasks = tasks.filter(task => 
     task.due_date && isToday(new Date(task.due_date))
   );
@@ -380,6 +385,7 @@ export default function MyTasks() {
         task={selectedTask}
         open={showTaskDetail}
         onOpenChange={setShowTaskDetail}
+        onTaskUpdated={handleTaskUpdated}
       />
     </div>
   );

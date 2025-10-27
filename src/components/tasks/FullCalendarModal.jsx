@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, List } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday } from "date-fns";
+import { motion } from "framer-motion"; // Added framer-motion import
 
 export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskClick }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -105,6 +106,14 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
     weeks.push(monthDays.slice(i, i + 7));
   }
 
+  // Make sure task clicks are passed through
+  const handleTaskClick = (task, e) => {
+    e.stopPropagation();
+    if (onTaskClick) {
+      onTaskClick(task, e);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
@@ -195,9 +204,12 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
                           const listColor = getListColor(task.list_name);
                           const statusColor = getStatusColor(task.status);
                           return (
-                            <div
-                              key={taskIdx}
-                              onClick={(e) => onTaskClick && onTaskClick(task, e)}
+                            <motion.div
+                              key={task.id || taskIdx} // Use task.id for unique key, fallback to taskIdx if no id
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              whileHover={{ scale: 1.02 }}
+                              onClick={(e) => handleTaskClick(task, e)}
                               className="cursor-pointer"
                             >
                               <div className={`text-xs p-1.5 rounded-md border ${listColor.bg} ${listColor.border} hover:shadow-md transition-all group`}>
@@ -215,7 +227,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </motion.div>
                           );
                         })}
                       </div>
