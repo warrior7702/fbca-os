@@ -21,6 +21,7 @@ import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
+import ApprovalFormModal from "../components/approvals/ApprovalFormModal"; // Added import
 // Removed ApprovalDetailModal import as it's no longer used in this file
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
@@ -87,6 +88,8 @@ function MyApprovalsContent() {
   const [debugging, setDebugging] = useState(false);
   const [approvalDetails, setApprovalDetails] = useState({}); // Store questions/answers for each approval
   const [loadingDetails, setLoadingDetails] = useState({});
+  const [showApprovalForm, setShowApprovalForm] = useState(false); // Added state
+  const [selectedApprovalForForm, setSelectedApprovalForForm] = useState(null); // Added state
 
   const safeApprovals = A(approvals); // Moved up to be accessible by useEffect
 
@@ -235,20 +238,34 @@ Check browser console for full details.
     }
   };
 
-  const handleApprove = async (approval) => {
+  const handleApprove = (approval) => {
     if (!approval?.request_id) return;
     if (!user?.pco_access_token) {
       toast.error('Planning Center is not connected. Cannot approve.');
       return;
     }
+    
+    // Open the approval form instead of immediately approving
+    setSelectedApprovalForForm(approval);
+    setShowApprovalForm(true);
+  };
 
-    setProcessingApproval(approval.request_id);
+  const handleApprovalFormSubmit = async (formData) => {
+    if (!selectedApprovalForForm) return;
+    
+    setProcessingApproval(selectedApprovalForForm.request_id);
+    
     try {
-      await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id
+      await base44.functions.invoke('approveWithClickUpTask', {
+        request_id: selectedApprovalForForm.request_id,
+        approval: selectedApprovalForForm,
+        form_data: formData
       });
-      toast.success('Request approved in Planning Center!');
-      await loadData();
+      
+      toast.success('Request approved and ClickUp task created!');
+      setShowApprovalForm(false);
+      setSelectedApprovalForForm(null);
+      await loadData(); // Reload data to reflect approval
     } catch (error) {
       console.error('Error approving:', error);
       toast.error('Failed to approve request');
@@ -315,275 +332,273 @@ Check browser console for full details.
 
   return (
     <div className="h-full bg-gradient-to-br from-orange-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {!user?.pco_access_token && (
-          <ConnectionWarning />
-        )}
+      {!user?.pco_access_token && (
+        <ConnectionWarning />
+      )}
 
-        <AppHeader
-          icon={ClipboardCheck}
-          title="My Approvals"
-          description={`Welcome back, ${displayName}`}
-          iconColor="from-orange-500 to-red-500"
-          action={
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDebug}
-                disabled={debugging || !user?.pco_access_token}
-              >
-                {debugging ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Debugging...
-                  </>
-                ) : (
-                  <>
-                    🐛 Debug PCO
-                  </>
-                )}
+      <AppHeader
+        icon={ClipboardCheck}
+        title="My Approvals"
+        description={`Welcome back, ${displayName}`}
+        iconColor="from-orange-500 to-red-500"
+        action={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDebug}
+              disabled={debugging || !user?.pco_access_token}
+            >
+              {debugging ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Debugging...
+                </>
+              ) : (
+                <>
+                  🐛 Debug PCO
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleForceResync}
+              disabled={syncing || !user?.pco_access_token}
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Force Resync
+                </>
+              )}
+            </Button>
+            <Link to={createPageUrl("Settings") + "?tab=integrations"}>
+              <Button variant="outline" size="sm">
+                Manage Integrations
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleForceResync}
-                disabled={syncing || !user?.pco_access_token}
-              >
-                {syncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Force Resync
-                  </>
-                )}
-              </Button>
-              <Link to={createPageUrl("Settings") + "?tab=integrations"}>
-                <Button variant="outline" size="sm">
-                  Manage Integrations
-                </Button>
-              </Link>
+            </Link>
+          </div>
+        }
+      />
+
+      {syncStats && syncStats.last_sync_after && (
+        <p className="text-xs text-slate-500">
+          Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')}
+          {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
+          {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
+        </p>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-orange-500" />
+              Pending Approvals
+            </CardTitle>
+            <Badge className="bg-red-500 text-white">
+              {safeApprovals.length} pending
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {safeApprovals.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No pending approvals</p>
+              <p className="text-sm text-slate-400 mt-2">You're all caught up!</p>
             </div>
-          }
-        />
+          ) : (
+            <div className="space-y-4">
+              {safeApprovals.map((approval) => {
+                if (!approval) return null;
 
-        {syncStats && syncStats.last_sync_after && (
-          <p className="text-xs text-slate-500">
-            Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')}
-            {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
-            {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
-          </p>
-        )}
+                const details = approvalDetails[approval.request_id];
+                const isLoadingDetails = loadingDetails[approval.request_id];
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-orange-500" />
-                Pending Approvals
-              </CardTitle>
-              <Badge className="bg-red-500 text-white">
-                {safeApprovals.length} pending
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {safeApprovals.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">No pending approvals</p>
-                <p className="text-sm text-slate-400 mt-2">You're all caught up!</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {safeApprovals.map((approval) => {
-                  if (!approval) return null;
-
-                  const details = approvalDetails[approval.request_id];
-                  const isLoadingDetails = loadingDetails[approval.request_id];
-
-                  return (
-                    <Card
-                      key={approval.request_id || Math.random()}
-                      id={approval.request_id ? `approval-${approval.request_id}` : undefined}
-                      className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 shadow-md hover:shadow-lg transition-all"
-                    >
-                      <CardContent className="p-6">
-                        <div className="space-y-4">
-                          {/* Header */}
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <h3 className="font-bold text-xl text-slate-900 mb-2">
-                                {approval.event_name || 'Unnamed Event'}
-                              </h3>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge className="bg-orange-500 text-white">
-                                  {approval.approval_group_name || 'Unknown Group'}
+                return (
+                  <Card
+                    key={approval.request_id || Math.random()}
+                    id={approval.request_id ? `approval-${approval.request_id}` : undefined}
+                    className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 shadow-md hover:shadow-lg transition-all"
+                  >
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-xl text-slate-900 mb-2">
+                              {approval.event_name || 'Unnamed Event'}
+                            </h3>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className="bg-orange-500 text-white">
+                                {approval.approval_group_name || 'Unknown Group'}
+                              </Badge>
+                              <Badge variant="outline" className="bg-white">
+                                {approval.resource_name || 'Unknown Resource'}
+                              </Badge>
+                              {approval.quantity > 1 && (
+                                <Badge variant="secondary">
+                                  Qty: {approval.quantity}
                                 </Badge>
-                                <Badge variant="outline" className="bg-white">
-                                  {approval.resource_name || 'Unknown Resource'}
-                                </Badge>
-                                {approval.quantity > 1 && (
-                                  <Badge variant="secondary">
-                                    Qty: {approval.quantity}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Event Details */}
-                          <div className="bg-white rounded-lg p-4 border border-orange-100 space-y-3">
-                            {approval.event_starts_at && (
-                              <div className="flex items-center gap-2 text-slate-700">
-                                <Calendar className="w-5 h-5 text-orange-500 flex-shrink-0" />
-                                <div>
-                                  <p className="font-semibold">
-                                    {format(parseISO(approval.event_starts_at), 'EEEE, MMMM d, yyyy')}
-                                  </p>
-                                  <p className="text-sm text-slate-600">
-                                    {format(parseISO(approval.event_starts_at), 'h:mm a')}
-                                    {approval.event_ends_at && ` - ${format(parseISO(approval.event_ends_at), 'h:mm a')}`}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-
-                            {approval.pco_created_at && (
-                              <p className="text-sm text-slate-500">
-                                Requested {format(parseISO(approval.pco_created_at), 'PPp')}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 text-sm">
-                                <ExternalLink className="w-4 h-4 text-blue-500" />
-                                <a
-                                  href={`https://calendar.planningcenteronline.com/events/${approval.event_id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  View in PCO
-                                </a>
-                              </div>
-
-                            {/* Event Description */}
-                            {details?.event?.description && (
-                              <div className="pt-2 border-t border-slate-200">
-                                <p className="font-semibold text-sm mb-1">Event Description:</p>
-                                <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                                  {details.event.description}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Questions & Answers */}
-                          {isLoadingDetails ? (
-                            <div className="flex items-center justify-center py-4">
-                              <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-                            </div>
-                          ) : details?.questions && details.questions.length > 0 ? (
-                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                              <p className="text-sm font-semibold text-slate-700 mb-3">
-                                {details.questions.length} Question{details.questions.length !== 1 ? 's' : ''}
-                              </p>
-                              <div className="space-y-3">
-                                {details.questions.map((q, idx) => {
-                                  const answer = details.answers?.[q.id];
-                                  return (
-                                    <div key={q.id || idx} className="text-sm">
-                                      <p className="font-medium text-slate-900 mb-1">
-                                        {q.question}
-                                      </p>
-                                      <p className="text-slate-600 pl-3 border-l-2 border-orange-300">
-                                        {answer || '(No answer provided)'}
-                                      </p>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {/* Action Buttons */}
-                          <div className="flex gap-3 pt-2">
-                            <Button
-                              size="lg"
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => handleApprove(approval)}
-                              disabled={processingApproval === approval.request_id || !user?.pco_access_token}
-                            >
-                              {processingApproval === approval.request_id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-5 h-5 mr-2" />
-                                  Approve
-                                </>
                               )}
-                            </Button>
-                            <Button
-                              size="lg"
-                              variant="outline"
-                              className="flex-1 text-red-600 border-red-600 hover:bg-red-50"
-                              onClick={() => handleDeny(approval)}
-                              disabled={processingApproval === approval.request_id || !user?.pco_access_token}
-                            >
-                              {processingApproval === approval.request_id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <XCircle className="w-5 h-5 mr-2" />
-                                  Deny
-                                </>
-                              )}
-                            </Button>
+                            </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                Calendar - Next 2 Weeks
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFullCalendar(true)}
-                disabled={!user?.pco_access_token}
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Full View
-              </Button>
+                        {/* Event Details */}
+                        <div className="bg-white rounded-lg p-4 border border-orange-100 space-y-3">
+                          {approval.event_starts_at && (
+                            <div className="flex items-center gap-2 text-slate-700">
+                              <Calendar className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                              <div>
+                                <p className="font-semibold">
+                                  {format(parseISO(approval.event_starts_at), 'EEEE, MMMM d, yyyy')}
+                                </p>
+                                <p className="text-sm text-slate-600">
+                                  {format(parseISO(approval.event_starts_at), 'h:mm a')}
+                                  {approval.event_ends_at && ` - ${format(parseISO(approval.event_ends_at), 'h:mm a')}`}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {approval.pco_created_at && (
+                            <p className="text-sm text-slate-500">
+                              Requested {format(parseISO(approval.pco_created_at), 'PPp')}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 text-sm">
+                              <ExternalLink className="w-4 h-4 text-blue-500" />
+                              <a
+                                href={`https://calendar.planningcenteronline.com/events/${approval.event_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                View in PCO
+                              </a>
+                            </div>
+
+                          {/* Event Description */}
+                          {details?.event?.description && (
+                            <div className="pt-2 border-t border-slate-200">
+                              <p className="font-semibold text-sm mb-1">Event Description:</p>
+                              <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                {details.event.description}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Questions & Answers */}
+                        {isLoadingDetails ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                          </div>
+                        ) : details?.questions && details.questions.length > 0 ? (
+                          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <p className="text-sm font-semibold text-slate-700 mb-3">
+                              {details.questions.length} Question{details.questions.length !== 1 ? 's' : ''}
+                            </p>
+                            <div className="space-y-3">
+                              {details.questions.map((q, idx) => {
+                                const answer = details.answers?.[q.id];
+                                return (
+                                  <div key={q.id || idx} className="text-sm">
+                                    <p className="font-medium text-slate-900 mb-1">
+                                      {q.question}
+                                    </p>
+                                    <p className="text-slate-600 pl-3 border-l-2 border-orange-300">
+                                      {answer || '(No answer provided)'}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-2">
+                          <Button
+                            size="lg"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleApprove(approval)}
+                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
+                          >
+                            {processingApproval === approval.request_id && selectedApprovalForForm ? ( // Only show loader if processing THIS approval
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-5 h-5 mr-2" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="lg"
+                            variant="outline"
+                            className="flex-1 text-red-600 border-red-600 hover:bg-red-50"
+                            onClick={() => handleDeny(approval)}
+                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
+                          >
+                            {processingApproval === approval.request_id && !selectedApprovalForForm ? ( // Only show loader if processing THIS approval AND not via form
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <XCircle className="w-5 h-5 mr-2" />
+                                Deny
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-          </CardHeader>
-          <CardContent>
-            <ApprovalCalendar
-              approvals={safeApprovals}
-              onApprovalClick={(approval) => {
-                const element = document.getElementById(`approval-${approval.request_id}`);
-                if (element) {
-                  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              Calendar - Next 2 Weeks
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFullCalendar(true)}
+              disabled={!user?.pco_access_token}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Full View
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ApprovalCalendar
+            approvals={safeApprovals}
+            onApprovalClick={(approval) => {
+              const element = document.getElementById(`approval-${approval.request_id}`);
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+          />
+        </CardContent>
+      </Card>
 
       <FullApprovalCalendarModal
         open={showFullCalendar}
@@ -598,6 +613,17 @@ Check browser console for full details.
             }
           }, 100);
         }}
+      />
+
+      <ApprovalFormModal
+        open={showApprovalForm}
+        onClose={() => {
+          setShowApprovalForm(false);
+          setSelectedApprovalForForm(null);
+        }}
+        approval={selectedApprovalForForm}
+        onSubmit={handleApprovalFormSubmit}
+        submitting={!!processingApproval}
       />
       {/* Removed ApprovalDetailModal rendering block */}
     </div>
