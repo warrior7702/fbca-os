@@ -4,11 +4,18 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  CheckSquare, 
-  Calendar, 
-  Mail, 
-  ExternalLink, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  CheckSquare,
+  Calendar,
+  Mail,
+  ExternalLink,
   Loader2,
   Paperclip,
   Tag,
@@ -65,7 +72,7 @@ export default function MyTasks() {
 
       // Load tasks in parallel for faster loading
       const taskPromises = [];
-      
+
       if (currentUser.clickup_access_token) {
         taskPromises.push(
           base44.functions.invoke('getMyClickUpTasks')
@@ -89,7 +96,7 @@ export default function MyTasks() {
           base44.functions.invoke('getMicrosoftToDo')
             .then(res => {
               // Fix To Do API error: Check for 'tasks' property or if 'res.data' itself is the array
-              const tasks = res.data.tasks || res.data || []; 
+              const tasks = res.data.tasks || res.data || [];
               console.log('✅ Microsoft To Do tasks loaded:', tasks.length || 0);
               if (tasks.length > 0) {
                 console.log('Sample To Do task:', tasks[0]);
@@ -127,7 +134,7 @@ export default function MyTasks() {
 
       // Wait for all to complete in parallel
       const results = await Promise.all(taskPromises);
-      
+
       results.forEach(result => {
         if (result.type === 'clickup') {
           setClickupTasks(result.data);
@@ -164,7 +171,7 @@ export default function MyTasks() {
 
   const handleCompleteTask = async (task, e) => {
     e.stopPropagation(); // Prevent card click
-    
+
     try {
       if (task.source === 'microsoft_todo') {
         // Complete Microsoft To Do task
@@ -181,7 +188,7 @@ export default function MyTasks() {
         });
         toast.success('Task closed!');
       }
-      
+
       // Reload data
       await loadData();
     } catch (error) {
@@ -197,11 +204,11 @@ export default function MyTasks() {
 
   // Combine all tasks
   const allTasks = [...clickupTasks, ...todoTasks];
-  
+
   console.log('📊 Total tasks:', allTasks.length, '(ClickUp:', clickupTasks.length, ', To Do:', todoTasks.length, ')');
-  
+
   // My Day: Tasks due today from both ClickUp AND Microsoft To Do
-  const myDayTasks = allTasks.filter(task => 
+  const myDayTasks = allTasks.filter(task =>
     task.due_date && isToday(new Date(task.due_date))
   );
 
@@ -217,20 +224,20 @@ export default function MyTasks() {
 
   const getStatusColor = (status) => {
     const statusLower = status?.toLowerCase() || '';
-    
+
     if (statusLower.includes('ready') || statusLower.includes('to do') || statusLower.includes('notstarted')) return 'bg-green-500 text-white border-green-600';
     if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500 text-white border-pink-600';
     if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500 text-white border-blue-600';
     if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev') || statusLower.includes('inprogress')) return 'bg-purple-500 text-white border-purple-600';
     if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-500 text-white border-gray-600';
     if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500 text-white border-red-600';
-    
+
     return 'bg-slate-400 text-white border-slate-500';
   };
 
   const formatStatus = (status) => {
     if (!status) return 'No Status';
-    
+
     // Split by spaces, hyphens, or underscores
     return status
       .split(/[\s_-]+/)
@@ -238,29 +245,35 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  const handleEmailClick = (email) => {
+  const handleEmailClick = (email, openIn) => {
     console.log('📧 Email clicked:', email);
-    
-    if (email.messageId) {
+    console.log('📧 Open in:', openIn);
+
+    if (openIn === 'web' && email.webLink) {
+      window.open(email.webLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (email.messageId && openIn === 'desktop') {
       // Clean the message ID - remove angle brackets if present
       let cleanMessageId = email.messageId;
       if (cleanMessageId.startsWith('<') && cleanMessageId.endsWith('>')) {
         cleanMessageId = cleanMessageId.slice(1, -1);
       }
-      
+
       // Try multiple protocols for Windows 11 + Edge
       const protocols = [
         `ms-outlook://view/${cleanMessageId}`, // Modern Outlook protocol
         `outlook:${cleanMessageId}`, // Classic protocol
       ];
-      
+
       console.log('📧 Trying message ID:', cleanMessageId);
       console.log('📧 Trying protocols:', protocols);
-      
+
       // Attempt to open the first protocol directly
       // This will trigger the browser to ask to open the external app or fail silently
       window.location.href = protocols[0];
-      
+
       // Fallback to web after 2 seconds if desktop doesn't open
       // This timeout is a heuristic. If the desktop app opens, the browser might
       // lose focus or navigate away, preventing the timeout from executing,
@@ -275,15 +288,15 @@ export default function MyTasks() {
           toast.error('Could not open email.');
         }
       }, 2000); // 2 seconds
-      
+
       // Clear the timeout if the user navigates away or the page unloads
       // (though this is less effective for `window.location.href` which is synchronous)
       window.addEventListener('blur', () => clearTimeout(fallbackTimeout), { once: true });
       window.addEventListener('beforeunload', () => clearTimeout(fallbackTimeout), { once: true });
 
     } else {
-      // No message ID, open in web
-      console.log('📧 No message ID, opening web link for email.');
+      // No message ID or 'openIn' is 'web' or unsupported, open in web (default behavior if no specific instruction)
+      console.log('📧 No message ID or desktop option, opening web link for email.');
       if (email.webLink) {
         window.open(email.webLink, '_blank', 'noopener,noreferrer');
       } else {
@@ -343,7 +356,7 @@ export default function MyTasks() {
                 {myDayTasks.map((task) => {
                   const isMicrosoftToDo = task.source === 'microsoft_todo';
                   const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
-                  
+
                   return (
                     <div
                       key={`${task.source}-${task.id}`}
@@ -354,7 +367,7 @@ export default function MyTasks() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
-                            <div 
+                            <div
                               className="w-3 h-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: listColor }}
                             />
@@ -399,8 +412,8 @@ export default function MyTasks() {
               </CardTitle>
               <CardDescription>Your upcoming tasks</CardDescription>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowFullCalendar(true)}
             >
@@ -409,8 +422,8 @@ export default function MyTasks() {
             </Button>
           </CardHeader>
           <CardContent>
-            <TaskCalendar 
-              tasks={allTasks} 
+            <TaskCalendar
+              tasks={allTasks}
               onTaskClick={handleTaskClick}
               weekCount={2}
             />
@@ -439,7 +452,7 @@ export default function MyTasks() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: '#0078d4' }}
                           />
@@ -506,13 +519,13 @@ export default function MyTasks() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
                     const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
-                    
+
                     return (
                       <Card key={category} className="bg-slate-50">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm flex items-center gap-2">
-                            <span 
-                              className="h-3 w-3 rounded-full flex-shrink-0" 
+                            <span
+                              className="h-3 w-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: categoryColor }}
                             />
                             {category}
@@ -526,14 +539,25 @@ export default function MyTasks() {
                             {categoryEmails.slice(0, 5).map((email, idx) => (
                               <div
                                 key={idx}
-                                onClick={() => handleEmailClick(email)}
-                                className="w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all cursor-pointer text-left"
+                                className="w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all text-left"
                               >
-                                <p className={`text-xs truncate ${
-                                  email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
-                                }`}>
-                                  {email.subject || '(No Subject)'}
-                                </p>
+                                <div className="flex items-center justify-between">
+                                  <p className={`text-xs truncate flex-grow ${
+                                    email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
+                                  }`}>
+                                    {email.subject || '(No Subject)'}
+                                  </p>
+                                  {/* Select for opening email */}
+                                  <Select onValueChange={(value) => handleEmailClick(email, value)}>
+                                    <SelectTrigger className="w-[80px] h-6 text-[10px] ml-2 flex-shrink-0">
+                                      <SelectValue placeholder="Open" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {email.webLink && <SelectItem value="web">Web</SelectItem>}
+                                      {email.messageId && <SelectItem value="desktop">Desktop</SelectItem>}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                                 <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
                                 </p>
