@@ -21,7 +21,7 @@ import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
-import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
+// Removed ApprovalDetailModal import as it's no longer used in this file
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -77,20 +77,31 @@ class ErrorBoundary extends React.Component {
 function MyApprovalsContent() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
-  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]); // This state is still present but not used in the final render based on the current logic
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [processingApproval, setProcessingApproval] = useState(null);
   const [syncStats, setSyncStats] = useState(null);
-  const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [debugging, setDebugging] = useState(false);
+  const [approvalDetails, setApprovalDetails] = useState({}); // Store questions/answers for each approval
+  const [loadingDetails, setLoadingDetails] = useState({});
+
+  const safeApprovals = A(approvals); // Moved up to be accessible by useEffect
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    // Load details for all approvals
+    if (safeApprovals.length > 0) {
+      safeApprovals.forEach(approval => {
+        loadApprovalDetails(approval);
+      });
+    }
+  }, [approvals, user]); // Added user to dependencies in case pco_access_token changes
 
   const loadData = async () => {
     setLoading(true);
@@ -133,6 +144,33 @@ function MyApprovalsContent() {
     } finally {
       setLoading(false);
       setSyncing(false);
+    }
+  };
+
+  const loadApprovalDetails = async (approval) => {
+    if (!user?.pco_access_token) return; // Only load if connected to PCO
+    if (!approval?.request_id || !approval?.resource_id || !approval?.event_id) return;
+    if (loadingDetails[approval.request_id]) return; // Already loading
+    if (approvalDetails[approval.request_id]) return; // Already loaded
+
+    setLoadingDetails(prev => ({ ...prev, [approval.request_id]: true }));
+
+    try {
+      const response = await base44.functions.invoke('getApprovalDetails', {
+        request_id: approval.request_id,
+        resource_id: approval.resource_id,
+        event_id: approval.event_id
+      });
+
+      setApprovalDetails(prev => ({
+        ...prev,
+        [approval.request_id]: response.data
+      }));
+    } catch (error) {
+      console.error(`Error loading approval details for request ${approval.request_id}:`, error);
+      // Optionally set an error state for this specific approval's details
+    } finally {
+      setLoadingDetails(prev => ({ ...prev, [approval.request_id]: false }));
     }
   };
 
@@ -209,7 +247,7 @@ Check browser console for full details.
       await base44.functions.invoke('approveResourceRequest', {
         request_id: approval.request_id
       });
-      toast.success('Request approved!');
+      toast.success('Request approved in Planning Center!');
       await loadData();
     } catch (error) {
       console.error('Error approving:', error);
@@ -231,7 +269,7 @@ Check browser console for full details.
       await base44.functions.invoke('denyResourceRequest', {
         request_id: approval.request_id
       });
-      toast.success('Request denied');
+      toast.success('Request denied in Planning Center');
       await loadData();
     } catch (error) {
       console.error('Error denying:', error);
@@ -241,19 +279,7 @@ Check browser console for full details.
     }
   };
 
-  const handleViewDetails = (approval) => {
-    if (!approval) return;
-    setSelectedApproval(approval);
-    setShowDetailModal(true);
-  };
-
-  const handleViewInPCO = (approval) => {
-    if (!approval?.event_id) return;
-    // Open the event in PCO Calendar
-    const pcoUrl = `https://calendar.planningcenteronline.com/events/${approval.event_id}`;
-    window.open(pcoUrl, '_blank');
-    toast.info('Opening in Planning Center...');
-  };
+  const displayName = user?.display_name || user?.full_name || 'User';
 
   if (loading) {
     return (
@@ -286,9 +312,6 @@ Check browser console for full details.
       </div>
     );
   }
-
-  const displayName = user?.display_name || user?.full_name || 'User';
-  const safeApprovals = A(approvals);
 
   return (
     <div className="h-full bg-gradient-to-br from-orange-50 to-slate-50 overflow-auto">
@@ -380,9 +403,13 @@ Check browser console for full details.
                 {safeApprovals.map((approval) => {
                   if (!approval) return null;
 
+                  const details = approvalDetails[approval.request_id];
+                  const isLoadingDetails = loadingDetails[approval.request_id];
+
                   return (
                     <Card
                       key={approval.request_id || Math.random()}
+                      id={approval.request_id ? `approval-${approval.request_id}` : undefined}
                       className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 shadow-md hover:shadow-lg transition-all"
                     >
                       <CardContent className="p-6">
@@ -410,10 +437,10 @@ Check browser console for full details.
                           </div>
 
                           {/* Event Details */}
-                          {approval.event_starts_at && (
-                            <div className="bg-white rounded-lg p-4 border border-orange-100">
+                          <div className="bg-white rounded-lg p-4 border border-orange-100 space-y-3">
+                            {approval.event_starts_at && (
                               <div className="flex items-center gap-2 text-slate-700">
-                                <Calendar className="w-5 h-5 text-orange-500" />
+                                <Calendar className="w-5 h-5 text-orange-500 flex-shrink-0" />
                                 <div>
                                   <p className="font-semibold">
                                     {format(parseISO(approval.event_starts_at), 'EEEE, MMMM d, yyyy')}
@@ -424,20 +451,68 @@ Check browser console for full details.
                                   </p>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {/* Request Info */}
-                          {approval.pco_created_at && (
-                            <p className="text-sm text-slate-500">
-                              Requested {format(parseISO(approval.pco_created_at), 'PPp')}
-                            </p>
-                          )}
+                            {approval.pco_created_at && (
+                              <p className="text-sm text-slate-500">
+                                Requested {format(parseISO(approval.pco_created_at), 'PPp')}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 text-sm">
+                                <ExternalLink className="w-4 h-4 text-blue-500" />
+                                <a
+                                  href={`https://calendar.planningcenteronline.com/events/${approval.event_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  View in PCO
+                                </a>
+                              </div>
+
+                            {/* Event Description */}
+                            {details?.event?.description && (
+                              <div className="pt-2 border-t border-slate-200">
+                                <p className="font-semibold text-sm mb-1">Event Description:</p>
+                                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                  {details.event.description}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Questions & Answers */}
+                          {isLoadingDetails ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                            </div>
+                          ) : details?.questions && details.questions.length > 0 ? (
+                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                              <p className="text-sm font-semibold text-slate-700 mb-3">
+                                {details.questions.length} Question{details.questions.length !== 1 ? 's' : ''}
+                              </p>
+                              <div className="space-y-3">
+                                {details.questions.map((q, idx) => {
+                                  const answer = details.answers?.[q.id];
+                                  return (
+                                    <div key={q.id || idx} className="text-sm">
+                                      <p className="font-medium text-slate-900 mb-1">
+                                        {q.question}
+                                      </p>
+                                      <p className="text-slate-600 pl-3 border-l-2 border-orange-300">
+                                        {answer || '(No answer provided)'}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
 
                           {/* Action Buttons */}
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-3 pt-2">
                             <Button
-                              size="sm"
+                              size="lg"
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => handleApprove(approval)}
                               disabled={processingApproval === approval.request_id || !user?.pco_access_token}
@@ -446,13 +521,13 @@ Check browser console for full details.
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <>
-                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  <CheckCircle className="w-5 h-5 mr-2" />
                                   Approve
                                 </>
                               )}
                             </Button>
                             <Button
-                              size="sm"
+                              size="lg"
                               variant="outline"
                               className="flex-1 text-red-600 border-red-600 hover:bg-red-50"
                               onClick={() => handleDeny(approval)}
@@ -462,26 +537,10 @@ Check browser console for full details.
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <>
-                                  <XCircle className="w-4 h-4 mr-2" />
+                                  <XCircle className="w-5 h-5 mr-2" />
                                   Deny
                                 </>
                               )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewDetails(approval)}
-                            >
-                              Details
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewInPCO(approval)}
-                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              View in PCO
                             </Button>
                           </div>
                         </div>
@@ -515,7 +574,12 @@ Check browser console for full details.
           <CardContent>
             <ApprovalCalendar
               approvals={safeApprovals}
-              onApprovalClick={handleViewDetails}
+              onApprovalClick={(approval) => {
+                const element = document.getElementById(`approval-${approval.request_id}`);
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }}
             />
           </CardContent>
         </Card>
@@ -525,21 +589,17 @@ Check browser console for full details.
         open={showFullCalendar}
         onClose={() => setShowFullCalendar(false)}
         approvals={safeApprovals}
-        onApprovalClick={handleViewDetails}
+        onApprovalClick={(approval) => {
+          setShowFullCalendar(false);
+          setTimeout(() => {
+            const element = document.getElementById(`approval-${approval.request_id}`);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
+        }}
       />
-
-      {selectedApproval && (
-        <ApprovalDetailModal
-          approval={selectedApproval}
-          open={showDetailModal}
-          onClose={() => {
-            setShowDetailModal(false);
-            setSelectedApproval(null);
-          }}
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-        />
-      )}
+      {/* Removed ApprovalDetailModal rendering block */}
     </div>
   );
 }
