@@ -51,35 +51,7 @@ Deno.serve(async (req) => {
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // Test 1: Calendar Event Resource Requests (what we currently use)
-        const calendarRequests = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=25',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        let calendarData = null;
-        if (calendarRequests.ok) {
-            calendarData = await calendarRequests.json();
-        }
-
-        // Test 2: Resources API Approval Requests (what you're describing)
-        const resourcesRequests = await fetch(
-            'https://api.planningcenteronline.com/resources/v2/approval_requests?where[approval_status]=P&per_page=25',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        let resourcesData = null;
-        let resourcesError = null;
-        if (resourcesRequests.ok) {
-            resourcesData = await resourcesRequests.json();
-        } else {
-            resourcesError = {
-                status: resourcesRequests.status,
-                message: await resourcesRequests.text()
-            };
-        }
-
-        // Test 3: Get my PCO person ID
+        // 1. Get my PCO person ID
         const meResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/me',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -91,26 +63,113 @@ Deno.serve(async (req) => {
             myPersonId = meData.data?.id;
         }
 
+        // 2. Get ALL approval groups
+        const groupsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        const groupsData = await groupsResponse.json();
+        const allGroups = [];
+        const myGroups = [];
+        
+        for (const group of groupsData.data || []) {
+            const groupInfo = {
+                id: group.id,
+                name: group.attributes?.name,
+                is_member: false
+            };
+            
+            // Check if I'm a member
+            const membersResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (membersResponse.ok) {
+                const membersData = await membersResponse.json();
+                groupInfo.is_member = membersData.data?.some(person => person.id === myPersonId);
+                groupInfo.member_count = membersData.data?.length || 0;
+            }
+            
+            allGroups.push(groupInfo);
+            if (groupInfo.is_member) {
+                myGroups.push(groupInfo);
+            }
+        }
+
+        // 3. Get ALL pending event resource requests
+        const requestsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        const requestsData = await requestsResponse.json();
+        
+        // 4. Build resource to group mapping
+        const resourceToGroup = {};
+        for (const group of groupsData.data || []) {
+            const resourcesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                for (const resource of resourcesData.data || []) {
+                    resourceToGroup[resource.id] = {
+                        groupId: group.id,
+                        groupName: group.attributes?.name
+                    };
+                }
+            }
+        }
+
+        // 5. Analyze requests
+        const allRequests = [];
+        const myRequests = [];
+        
+        for (const request of requestsData.data || []) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const groupInfo = resourceToGroup[resourceId];
+            const isMyGroup = myGroups.some(g => g.id === groupInfo?.groupId);
+            
+            const requestInfo = {
+                id: request.id,
+                resource_id: resourceId,
+                approval_status: request.attributes?.approval_status,
+                created_at: request.attributes?.created_at,
+                approval_group: groupInfo?.groupName || 'Unknown',
+                approval_group_id: groupInfo?.groupId,
+                is_for_my_group: isMyGroup
+            };
+            
+            allRequests.push(requestInfo);
+            if (isMyGroup) {
+                myRequests.push(requestInfo);
+            }
+        }
+
         return Response.json({
             my_pco_person_id: myPersonId,
-            calendar_api: {
-                endpoint: '/calendar/v2/event_resource_requests',
-                count: calendarData?.data?.length || 0,
-                sample: calendarData?.data?.slice(0, 3).map(r => ({
-                    id: r.id,
-                    approval_status: r.attributes?.approval_status,
-                    resource: r.relationships?.resource?.data?.id,
-                    event: r.relationships?.event?.data?.id
-                }))
+            my_email: currentUser.email,
+            approval_groups: {
+                total: allGroups.length,
+                i_am_member_of: myGroups.length,
+                all_groups: allGroups,
+                my_groups: myGroups
             },
-            resources_api: {
-                endpoint: '/resources/v2/approval_requests',
-                count: resourcesData?.data?.length || 0,
-                error: resourcesError,
-                sample: resourcesData?.data?.slice(0, 3).map(r => ({
-                    id: r.id,
-                    approval_status: r.attributes?.approval_status,
-                    details: r.attributes
+            pending_requests: {
+                total_in_pco: allRequests.length,
+                assigned_to_my_groups: myRequests.length,
+                all_requests: allRequests,
+                my_requests: myRequests
+            },
+            resource_mapping: {
+                total_resources_mapped: Object.keys(resourceToGroup).length,
+                sample: Object.entries(resourceToGroup).slice(0, 5).map(([resourceId, group]) => ({
+                    resource_id: resourceId,
+                    group_name: group.groupName
                 }))
             }
         });
