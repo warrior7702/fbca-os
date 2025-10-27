@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
             accessToken = refreshResponse.data.access_token;
         }
 
-        // Get focused inbox (important emails) - expanded selection
+        // Get focused inbox (important emails) - ACTUAL focused inbox
         const focusedResponse = await fetch(
-            'https://graph.microsoft.com/v1.0/me/messages?$filter=inferenceClassification eq \'focused\'&$top=10&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories&$orderby=receivedDateTime desc',
+            'https://graph.microsoft.com/v1.0/me/messages?$filter=inferenceClassification eq \'focused\'&$top=20&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories&$orderby=receivedDateTime desc',
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -34,19 +34,9 @@ Deno.serve(async (req) => {
             }
         );
 
-        // Get flagged emails - expanded selection
-        const flaggedResponse = await fetch(
-            'https://graph.microsoft.com/v1.0/me/messages?$filter=flag/flagStatus eq \'flagged\'&$top=10&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories&$orderby=receivedDateTime desc',
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            }
-        );
-
-        // Get categorized emails
+        // Get categorized emails - ALL categories
         const categorizedResponse = await fetch(
-            'https://graph.microsoft.com/v1.0/me/messages?$filter=categories/any(c: c ne null)&$top=20&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories&$orderby=receivedDateTime desc',
+            'https://graph.microsoft.com/v1.0/me/messages?$filter=categories/any(c: c ne null)&$top=50&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories&$orderby=receivedDateTime desc',
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -55,7 +45,6 @@ Deno.serve(async (req) => {
         );
 
         const focused = focusedResponse.ok ? (await focusedResponse.json()).value : [];
-        const flagged = flaggedResponse.ok ? (await flaggedResponse.json()).value : [];
         const categorized = categorizedResponse.ok ? (await categorizedResponse.json()).value : [];
 
         // Group categorized emails by category
@@ -82,16 +71,6 @@ Deno.serve(async (req) => {
 
         return Response.json({
             focused: focused.map(email => ({
-                subject: email.subject,
-                from: email.from?.emailAddress?.address,
-                fromName: email.from?.emailAddress?.name,
-                receivedAt: email.receivedDateTime,
-                isRead: email.isRead,
-                hasAttachments: email.hasAttachments,
-                importance: email.importance,
-                categories: email.categories || []
-            })),
-            flagged: flagged.map(email => ({
                 subject: email.subject,
                 from: email.from?.emailAddress?.address,
                 fromName: email.from?.emailAddress?.name,

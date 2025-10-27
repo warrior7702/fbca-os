@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,14 +12,14 @@ import {
   ExternalLink, 
   AlertCircle,
   Flag,
-  Inbox,
+  Inbox, // Keep Inbox icon as it was used in the previous layout, might be useful if layout changes again.
   Loader2,
   Paperclip,
   Tag
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { format, isToday, parseISO } from "date-fns";
+import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
@@ -31,6 +31,7 @@ export default function MyTasks() {
   const [tasks, setTasks] = useState([]);
   const [emails, setEmails] = useState({ focused: [], flagged: [], categorized: {} });
   const [loading, setLoading] = useState(true);
+  const [loadingEmails, setLoadingEmails] = useState(true); // New state for email loading
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
@@ -41,6 +42,7 @@ export default function MyTasks() {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadingEmails(true); // Set loading for emails when data starts loading
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -71,7 +73,11 @@ export default function MyTasks() {
         } catch (error) {
           console.error('Error fetching emails:', error);
           toast.error('Failed to load emails');
+        } finally {
+          setLoadingEmails(false); // Emails finished loading (success or error)
         }
+      } else {
+        setLoadingEmails(false); // If no access token, emails aren't loaded, so set to false
       }
 
     } catch (error) {
@@ -129,25 +135,8 @@ export default function MyTasks() {
       .join(' ');
   };
 
-  const getCategoryColor = (category) => {
-    const categoryLower = category?.toLowerCase() || '';
-    
-    if (categoryLower.includes('action') || categoryLower.includes('needed')) return 'bg-orange-500 text-white';
-    if (categoryLower.includes('followup') || categoryLower.includes('follow')) return 'bg-purple-500 text-white';
-    if (categoryLower.includes('network') || categoryLower.includes('networking')) return 'bg-yellow-400 text-black';
-    if (categoryLower.includes('pending') || categoryLower.includes('order')) return 'bg-teal-500 text-white';
-    if (categoryLower.includes('important') || categoryLower.includes('urgent')) return 'bg-red-500 text-white';
-    if (categoryLower.includes('personal') || categoryLower.includes('private')) return 'bg-blue-500 text-white';
-    if (categoryLower.includes('project') || categoryLower.includes('work')) return 'bg-indigo-500 text-white';
-    
-    return 'bg-slate-500 text-white';
-  };
-
-  const openOutlook = () => {
-    window.open('https://outlook.office.com/mail/', '_blank');
-  };
-
-  const unreadFocusedCount = emails.focused?.filter(e => !e.isRead).length || 0;
+  // getCategoryColor function is no longer used in the updated email sections, so it's removed.
+  // The openOutlook function is no longer used in the updated email sections, so it's removed.
 
   if (loading) {
     return (
@@ -211,7 +200,11 @@ export default function MyTasks() {
                           )}
                         </div>
                       </div>
-                      <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      {task.url && ( // Assuming task.url exists for ClickUp tasks
+                        <a href={task.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink className="w-4 h-4 text-slate-400 flex-shrink-0 hover:text-blue-500" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -236,137 +229,104 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Inbox className="w-5 h-5 text-blue-600" />
-                Focused Inbox
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-6 bg-blue-50 rounded-lg border border-blue-200">
-                <div>
-                  <div className="text-4xl font-bold text-blue-600 mb-1">{unreadFocusedCount}</div>
-                  <p className="text-sm text-slate-600">Unread messages</p>
-                </div>
-                <Button onClick={openOutlook} className="bg-blue-600 hover:bg-blue-700">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Open Outlook
-                </Button>
+        {/* Inbox Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-blue-600" />
+              Focused Inbox
+            </CardTitle>
+            <CardDescription>Important emails requiring attention</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingEmails ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Flag className="w-5 h-5 text-orange-600" />
-                Flagged
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!emails.flagged || emails.flagged.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-4">No flagged emails</p>
-              ) : (
-                <div className="space-y-2">
-                  {emails.flagged.slice(0, 5).map((email, idx) => (
-                    <div
-                      key={idx}
-                      onClick={openOutlook}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                        email.isRead 
-                          ? 'bg-white border-slate-200' 
-                          : 'bg-orange-50 border-orange-300 shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className={`text-sm flex-1 ${email.isRead ? 'font-normal text-slate-700' : 'font-bold text-slate-900'}`}>
+            ) : emails.focused && emails.focused.length > 0 ? (
+              <div className="space-y-2">
+                {emails.focused.slice(0, 5).map((email, idx) => (
+                  <div
+                    key={idx}
+                    // No onClick handler to open Outlook explicitly, consistent with the outline.
+                    // Users can open their email client manually.
+                    className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <Mail className={`w-4 h-4 mt-1 flex-shrink-0 ${
+                      email.isRead ? 'text-slate-400' : 'text-blue-600'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className={`text-sm truncate ${
+                          email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
+                        }`}>
                           {email.subject || '(No Subject)'}
                         </p>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Flag className="w-3 h-3 text-orange-600" />
-                          {!email.isRead && (
-                            <div className="w-2 h-2 bg-orange-600 rounded-full" title="Unread" />
-                          )}
-                          {email.hasAttachments && (
-                            <Paperclip className="w-3 h-3 text-slate-400" />
-                          )}
-                        </div>
+                        {email.hasAttachments && (
+                          <Paperclip className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                        )}
                       </div>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <p className="text-xs text-slate-600">{email.fromName || email.from}</p>
-                        <div className="flex items-center gap-2">
-                          {email.categories && email.categories.length > 0 && (
-                            <div className="flex gap-1">
-                              {email.categories.slice(0, 2).map((cat, i) => (
-                                <Badge key={i} className={`text-[10px] px-1.5 py-0 ${getCategoryColor(cat)}`}>
-                                  {cat}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          <p className="text-xs text-slate-500">
-                            {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
-                          </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {email.fromName || email.from}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
+                      </p>
+                      {email.categories && email.categories.length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {email.categories.map((cat, i) => (
+                            <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                              {cat}
+                            </Badge>
+                          ))}
                         </div>
-                      </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 text-center py-8">
+                No focused emails
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
+        {/* Email Categories */}
         {emails.categorized && Object.keys(emails.categorized).length > 0 && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(emails.categorized).slice(0, 4).map(([category, categoryEmails]) => (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(emails.categorized).map(([category, categoryEmails]) => (
               <Card key={category}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="w-5 h-5" />
-                    <Badge className={getCategoryColor(category)}>{category}</Badge>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Tag className="w-4 h-4" />
+                    {category}
                   </CardTitle>
+                  <CardDescription>{categoryEmails.length} email{categoryEmails.length !== 1 ? 's' : ''}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {!categoryEmails || categoryEmails.length === 0 ? (
-                    <p className="text-slate-500 text-sm">No emails in this category</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {categoryEmails.slice(0, 3).map((email, idx) => (
-                        <div
-                          key={idx}
-                          onClick={openOutlook}
-                          className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                            email.isRead 
-                              ? 'bg-white border-slate-200' 
-                              : 'bg-slate-50 border-slate-300 shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className={`text-sm flex-1 ${email.isRead ? 'font-normal text-slate-700' : 'font-bold text-slate-900'}`}>
-                              {email.subject || '(No Subject)'}
-                            </p>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {!email.isRead && (
-                                <div className="w-2 h-2 bg-blue-600 rounded-full" title="Unread" />
-                              )}
-                              {email.hasAttachments && (
-                                <Paperclip className="w-3 h-3 text-slate-400" />
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-slate-600">{email.fromName || email.from}</p>
-                            <p className="text-xs text-slate-500">
-                              {format(parseISO(email.receivedAt), 'MMM d, h:mm a')}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {categoryEmails.slice(0, 10).map((email, idx) => (
+                      <div
+                        key={idx}
+                        // No onClick handler to open Outlook explicitly, consistent with the outline.
+                        className="p-2 rounded hover:bg-slate-50 transition-colors"
+                      >
+                        <p className={`text-sm truncate ${
+                          email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
+                        }`}>
+                          {email.subject || '(No Subject)'}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {email.fromName || email.from}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             ))}
