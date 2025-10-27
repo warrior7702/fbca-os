@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -5,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  CheckCircle, 
-  XCircle, 
+import {
+  CheckCircle,
+  XCircle,
   Calendar,
   AlertCircle,
   Loader2,
@@ -53,9 +54,9 @@ class ErrorBoundary extends React.Component {
                 <div className="space-y-2">
                   <p className="font-semibold">Something went wrong</p>
                   <p className="text-sm">{this.state.error?.message || 'Unknown error'}</p>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => window.location.reload()}
                     className="mt-2"
                   >
@@ -95,7 +96,7 @@ function MyApprovalsContent() {
     setLoading(true);
     setSyncing(true);
     setError(null);
-    
+
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -139,7 +140,7 @@ function MyApprovalsContent() {
     setSyncing(true);
     setError(null);
     toast.info('Force resyncing approvals...');
-    
+
     try {
       if (!user?.pco_access_token) {
         toast.error('Planning Center is not connected. Cannot resync.');
@@ -168,7 +169,7 @@ function MyApprovalsContent() {
     try {
       const debugResponse = await base44.functions.invoke('debugPCOApprovals');
       console.log('🐛 PCO Debug Results:', debugResponse.data);
-      
+
       const results = debugResponse.data;
       const message = `
 📊 PCO Debug Results:
@@ -180,9 +181,9 @@ function MyApprovalsContent() {
 
 Check browser console for full details.
       `;
-      
+
       alert(message);
-      
+
       if (results.summary.requests_in_my_groups === 0 && results.summary.total_pending_requests > 0) {
         toast.error('Found pending requests but none are in your approval groups. Check group membership in PCO.');
       } else if (results.summary.requests_in_my_groups > 0) {
@@ -202,7 +203,7 @@ Check browser console for full details.
       toast.error('Planning Center is not connected. Cannot approve.');
       return;
     }
-    
+
     setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('approveResourceRequest', {
@@ -224,7 +225,7 @@ Check browser console for full details.
       toast.error('Planning Center is not connected. Cannot deny.');
       return;
     }
-    
+
     setProcessingApproval(approval.request_id);
     try {
       await base44.functions.invoke('denyResourceRequest', {
@@ -244,6 +245,14 @@ Check browser console for full details.
     if (!approval) return;
     setSelectedApproval(approval);
     setShowDetailModal(true);
+  };
+
+  const handleViewInPCO = (approval) => {
+    if (!approval?.event_id) return;
+    // Open the event in PCO Calendar
+    const pcoUrl = `https://calendar.planningcenteronline.com/events/${approval.event_id}`;
+    window.open(pcoUrl, '_blank');
+    toast.info('Opening in Planning Center...');
   };
 
   if (loading) {
@@ -341,7 +350,7 @@ Check browser console for full details.
 
         {syncStats && syncStats.last_sync_after && (
           <p className="text-xs text-slate-500">
-            Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')} 
+            Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')}
             {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
             {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
           </p>
@@ -367,86 +376,117 @@ Check browser console for full details.
                 <p className="text-sm text-slate-400 mt-2">You're all caught up!</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {safeApprovals.map((approval) => {
                   if (!approval) return null;
-                  
+
                   return (
-                    <div
+                    <Card
                       key={approval.request_id || Math.random()}
-                      className="bg-white border-2 border-orange-200 rounded-lg p-4 hover:border-orange-300 transition-colors"
+                      className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 shadow-md hover:shadow-lg transition-all"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Calendar className="w-4 h-4 text-slate-400" />
-                            <h3 className="font-semibold text-lg text-slate-900">
-                              {approval.event_name || 'Unnamed Event'}
-                            </h3>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className="bg-orange-100 text-orange-700 border-orange-300">
-                                {approval.resource_name || 'Unknown Resource'}
-                              </Badge>
-                              <span className="text-sm text-slate-600">
-                                Qty: {approval.quantity || 0}
-                              </span>
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <h3 className="font-bold text-xl text-slate-900 mb-2">
+                                {approval.event_name || 'Unnamed Event'}
+                              </h3>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="bg-orange-500 text-white">
+                                  {approval.approval_group_name || 'Unknown Group'}
+                                </Badge>
+                                <Badge variant="outline" className="bg-white">
+                                  {approval.resource_name || 'Unknown Resource'}
+                                </Badge>
+                                {approval.quantity > 1 && (
+                                  <Badge variant="secondary">
+                                    Qty: {approval.quantity}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                            {approval.event_starts_at && (
-                              <p className="text-sm text-slate-600">
-                                Event: {format(parseISO(approval.event_starts_at), 'PPP p')}
-                              </p>
-                            )}
-                            {approval.pco_created_at && (
-                              <p className="text-xs text-slate-500">
-                                Requested: {format(parseISO(approval.pco_created_at), 'PPp')}
-                              </p>
-                            )}
-                            <button
-                              onClick={() => handleViewDetails(approval)}
-                              className="text-sm text-blue-600 hover:underline"
+                          </div>
+
+                          {/* Event Details */}
+                          {approval.event_starts_at && (
+                            <div className="bg-white rounded-lg p-4 border border-orange-100">
+                              <div className="flex items-center gap-2 text-slate-700">
+                                <Calendar className="w-5 h-5 text-orange-500" />
+                                <div>
+                                  <p className="font-semibold">
+                                    {format(parseISO(approval.event_starts_at), 'EEEE, MMMM d, yyyy')}
+                                  </p>
+                                  <p className="text-sm text-slate-600">
+                                    {format(parseISO(approval.event_starts_at), 'h:mm a')}
+                                    {approval.event_ends_at && ` - ${format(parseISO(approval.event_ends_at), 'h:mm a')}`}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Request Info */}
+                          {approval.pco_created_at && (
+                            <p className="text-sm text-slate-500">
+                              Requested {format(parseISO(approval.pco_created_at), 'PPp')}
+                            </p>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => handleApprove(approval)}
+                              disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                             >
-                              Click to view details and resource questions →
-                            </button>
+                              {processingApproval === approval.request_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Approve
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-red-600 border-red-600 hover:bg-red-50"
+                              onClick={() => handleDeny(approval)}
+                              disabled={processingApproval === approval.request_id || !user?.pco_access_token}
+                            >
+                              {processingApproval === approval.request_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <XCircle className="w-4 h-4 mr-2" />
+                                  Deny
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewDetails(approval)}
+                            >
+                              Details
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewInPCO(approval)}
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              View in PCO
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-600 hover:bg-green-50"
-                            onClick={() => handleApprove(approval)}
-                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
-                          >
-                            {processingApproval === approval.request_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Approve
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 border-red-600 hover:bg-red-50"
-                            onClick={() => handleDeny(approval)}
-                            disabled={processingApproval === approval.request_id || !user?.pco_access_token}
-                          >
-                            {processingApproval === approval.request_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Deny
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
@@ -473,7 +513,7 @@ Check browser console for full details.
             </div>
           </CardHeader>
           <CardContent>
-            <ApprovalCalendar 
+            <ApprovalCalendar
               approvals={safeApprovals}
               onApprovalClick={handleViewDetails}
             />
