@@ -240,15 +240,30 @@ export default function MyTasks() {
 
   const handleEmailClick = (email) => {
     console.log('📧 Email clicked:', email);
-    console.log('📧 Email webLink:', email.webLink);
-    console.log('📧 Email messageId:', email.messageId);
     
-    // Just open in web Outlook - this was working
-    if (email.webLink) {
-      console.log('📧 Opening email in browser:', email.webLink);
+    if (email.messageId) {
+      // Try desktop Outlook first using outlook: protocol
+      try {
+        window.location.href = `outlook:${email.messageId}`;
+        console.log('📧 Attempted desktop Outlook with:', `outlook:${email.messageId}`);
+      } catch (error) {
+        // This catch block might not fire for protocol handler failures, as they are often
+        // handled by the OS/browser security, not JS runtime errors.
+        console.error('📧 Desktop Outlook attempt failed or protocol not registered:', error);
+        if (email.webLink) {
+          console.log('📧 Falling back to web Outlook with:', email.webLink);
+          window.open(email.webLink, '_blank', 'noopener,noreferrer');
+        } else {
+          console.error('📧 No webLink found to fall back to for email:', email);
+        }
+      }
+    } else if (email.webLink) {
+      // No message ID, open in web
+      console.log('📧 No messageId, opening in web Outlook:', email.webLink);
       window.open(email.webLink, '_blank', 'noopener,noreferrer');
     } else {
-      console.error('📧 No webLink found for email');
+      console.error('📧 Cannot open email: Neither messageId nor webLink found.', email);
+      toast.error('Could not open email.');
     }
   };
 
