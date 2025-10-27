@@ -28,20 +28,9 @@ import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
+import EmailDetailModal from "../components/emails/EmailDetailModal"; // New import
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-
-// Helper to build reliable email links
-const buildEmailHref = (email) => {
-  // Prefer Graph webLink if available
-  if (email?.webLink) return email.webLink;
-
-  // Fallback: deep-link by Internet-Message-Id
-  if (email?.messageId) {
-    return `https://outlook.office.com/mail/search/id/${encodeURIComponent(email.messageId)}`;
-  }
-  return null;
-};
 
 const CATEGORY_COLORS = {
   'Action Needed': '#c43e00',
@@ -62,6 +51,8 @@ export default function MyTasks() {
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState(null); // New state
+  const [showEmailDetail, setShowEmailDetail] = useState(false); // New state
 
   useEffect(() => {
     loadData();
@@ -212,6 +203,11 @@ export default function MyTasks() {
   const handleTaskUpdate = async () => {
     // Reload tasks after update
     await loadData();
+  };
+
+  const handleEmailClick = (email) => {
+    setSelectedEmail(email);
+    setShowEmailDetail(true);
   };
 
   // Combine all tasks
@@ -490,20 +486,10 @@ export default function MyTasks() {
                             {categoryEmails.slice(0, 5).map((email, idx) => (
                               <div
                                 key={idx}
-                                className="group relative w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                                onClick={() => handleEmailClick(email)} // Changed to open modal
+                                className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                               >
-                                {/* Stretched link - OS/browser handles natively */}
-                                {buildEmailHref(email) && (
-                                  <a
-                                    href={buildEmailHref(email)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="absolute inset-0 z-10"
-                                    aria-label={`Open email: ${email.subject || 'message'}`}
-                                  />
-                                )}
-                                
-                                <div className="flex items-center justify-between relative z-0">
+                                <div className="flex items-center justify-between">
                                   <p className={`text-xs truncate flex-1 ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
                                   }`}>
@@ -511,7 +497,7 @@ export default function MyTasks() {
                                   </p>
                                   <Mail className="h-3 w-3 ml-2 opacity-50 group-hover:opacity-100 flex-shrink-0" />
                                 </div>
-                                <p className="text-[10px] text-slate-500 truncate mt-1 relative z-0">
+                                <p className="text-[10px] text-slate-500 truncate mt-1">
                                   {email.fromName || email.from}
                                 </p>
                               </div>
@@ -560,6 +546,13 @@ export default function MyTasks() {
         onOpenChange={setShowTaskDetail}
         task={selectedTask}
         onUpdate={handleTaskUpdate}
+      />
+
+      {/* Email Detail Modal */}
+      <EmailDetailModal
+        open={showEmailDetail}
+        onOpenChange={setShowEmailDetail}
+        email={selectedEmail}
       />
     </div>
   );
