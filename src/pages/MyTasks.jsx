@@ -20,7 +20,8 @@ import {
   Paperclip,
   Tag,
   Maximize2,
-  ListChecks
+  ListChecks,
+  Info // Added Info icon
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -28,7 +29,7 @@ import TaskCalendar from "../components/tasks/TaskCalendar";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
-import EmailDetailModal from "../components/emails/EmailDetailModal"; // New import
+import EmailDetailModal from "../components/emails/EmailDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -51,8 +52,8 @@ export default function MyTasks() {
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
-  const [selectedEmail, setSelectedEmail] = useState(null); // New state
-  const [showEmailDetail, setShowEmailDetail] = useState(false); // New state
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [showEmailDetail, setShowEmailDetail] = useState(false); // Re-used for new modal trigger
 
   useEffect(() => {
     loadData();
@@ -205,10 +206,7 @@ export default function MyTasks() {
     await loadData();
   };
 
-  const handleEmailClick = (email) => {
-    setSelectedEmail(email);
-    setShowEmailDetail(true);
-  };
+  // handleEmailClick function removed as per new logic
 
   // Combine all tasks
   const allTasks = [...clickupTasks, ...todoTasks];
@@ -447,75 +445,105 @@ export default function MyTasks() {
 
         {/* Categorized Emails */}
         {user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="w-5 h-5" />
-                Categorized Emails
-              </CardTitle>
-              <CardDescription>
-                {Object.keys(emails.categorized).length} categor{Object.keys(emails.categorized).length !== 1 ? 'ies' : 'y'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingEmails ? (
-                <div className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
-                    const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
-                    
-                    return (
-                      <Card key={category} className="bg-slate-50">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm flex items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4" // Added space-y-4 for separation between the main title and category cards
+          >
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Mail className="w-5 h-5 text-blue-600" />
+              Categorized Emails
+            </h2>
+            {loadingEmails ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
+                  const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default; // Still useful for the color dot
+                  
+                  return (
+                    <Card key={category} className="bg-slate-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            {/* Re-added color dot for category as per original styling, alongside Tag icon */}
                             <span 
                               className="h-3 w-3 rounded-full flex-shrink-0" 
                               style={{ backgroundColor: categoryColor }}
                             />
                             {category}
-                          </CardTitle>
-                          <CardDescription className="text-xs">
-                            {categoryEmails.length} email{categoryEmails.length !== 1 ? 's' : ''}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                            {categoryEmails.slice(0, 5).map((email, idx) => (
-                              <div
-                                key={idx}
-                                onClick={() => handleEmailClick(email)} // Changed to open modal
-                                className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <p className={`text-xs truncate flex-1 ${
+                          </span>
+                          <Badge variant="secondary">{categoryEmails.length}</Badge>
+                        </CardTitle>
+                        {/* Removed CardDescription here as it's now part of CardTitle */}
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2"> {/* Added pr-2 to prevent scrollbar overlap */}
+                          {categoryEmails.slice(0, 5).map((email, idx) => (
+                            <motion.div
+                              key={email.messageId || email.id} // Use messageId or id as fallback
+                              whileHover={{ scale: 1.01 }}
+                              onClick={() => {
+                                // Open in Outlook Web
+                                if (email.webLink) {
+                                  window.open(email.webLink, '_blank', 'noopener,noreferrer');
+                                } else {
+                                  toast.error('Web link not available for this email.');
+                                }
+                              }}
+                              className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-xs truncate ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
                                   }`}>
                                     {email.subject || '(No Subject)'}
                                   </p>
-                                  <Mail className="h-3 w-3 ml-2 opacity-50 group-hover:opacity-100 flex-shrink-0" />
+                                  <p className="text-[10px] text-slate-500 truncate mt-1">
+                                    From: {email.fromName || email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown Sender"}
+                                  </p>
+                                  {email.bodyPreview && (
+                                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                                      {email.bodyPreview}
+                                    </p>
+                                  )}
                                 </div>
-                                <p className="text-[10px] text-slate-500 truncate mt-1">
-                                  {email.fromName || email.from}
-                                </p>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {email.hasAttachments && (
+                                    <Paperclip className="w-4 h-4 text-slate-400" />
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent card click from opening web link
+                                      setSelectedEmail(email);
+                                      setShowEmailDetail(true); // Open the detail modal
+                                    }}
+                                    className="h-6 w-6 p-0" // Make button small and circular-ish
+                                  >
+                                    <Info className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
-                            ))}
-                            {categoryEmails.length > 5 && (
-                              <p className="text-[10px] text-slate-400 text-center pt-1">
-                                +{categoryEmails.length - 5} more
-                              </p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                            </motion.div>
+                          ))}
+                          {categoryEmails.length > 5 && (
+                            <p className="text-[10px] text-slate-400 text-center pt-1">
+                              +{categoryEmails.length - 5} more emails
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
         )}
       </div>
 
