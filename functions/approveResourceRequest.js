@@ -19,7 +19,9 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Missing request_id' }, { status: 400 });
         }
 
-        // Approve the resource request
+        console.log('Approving request:', request_id);
+
+        // Approve the resource request in PCO
         const response = await fetch(
             `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
             {
@@ -43,10 +45,11 @@ Deno.serve(async (req) => {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('PCO approval failed:', errorText);
-            return Response.json({ error: 'Failed to approve request' }, { status: 500 });
+            return Response.json({ error: 'Failed to approve in PCO' }, { status: 500 });
         }
 
         const data = await response.json();
+        console.log('PCO approval successful:', data);
 
         return Response.json({ 
             success: true,

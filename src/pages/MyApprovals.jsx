@@ -21,7 +21,6 @@ import { createPageUrl } from "@/utils";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalendarModal";
-import ApprovalFormModal from "../components/approvals/ApprovalFormModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -87,8 +86,6 @@ function MyApprovalsContent() {
   const [debugging, setDebugging] = useState(false);
   const [approvalDetails, setApprovalDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState({});
-  const [showApprovalForm, setShowApprovalForm] = useState(false);
-  const [selectedApprovalForForm, setSelectedApprovalForForm] = useState(null);
 
   const safeApprovals = A(approvals);
 
@@ -236,59 +233,82 @@ Check browser console for full details.
     }
   };
 
-  const handleApprove = (approval) => {
-    if (!approval?.request_id) return;
+  const handleApprove = async (approval) => {
+    if (!approval?.request_id) {
+      toast.error('Invalid approval - missing request ID');
+      return;
+    }
+
     if (!user?.pco_access_token) {
       toast.error('Planning Center is not connected. Cannot approve.');
       return;
     }
-    
-    // Open the approval form instead of immediately approving
-    setSelectedApprovalForForm(approval);
-    setShowApprovalForm(true);
-  };
 
-  const handleApprovalFormSubmit = async (formData) => {
-    if (!selectedApprovalForForm) return;
-    
-    setProcessingApproval(selectedApprovalForForm.request_id);
-    
+    const confirmed = window.confirm(
+      `Approve this request?\n\n` +
+      `Event: ${approval.event_name}\n` +
+      `Resource: ${approval.resource_name}\n` +
+      `Date: ${approval.event_starts_at ? format(parseISO(approval.event_starts_at), 'PPP') : 'N/A'}`
+    );
+
+    if (!confirmed) return;
+
+    setProcessingApproval(approval.request_id);
+    console.log('🟢 Attempting to approve request:', approval.request_id);
+
     try {
-      await base44.functions.invoke('approveWithClickUpTask', {
-        request_id: selectedApprovalForForm.request_id,
-        approval: selectedApprovalForForm,
-        form_data: formData
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id
       });
-      
-      toast.success('Request approved and ClickUp task created!');
-      setShowApprovalForm(false);
-      setSelectedApprovalForForm(null);
+
+      console.log('✅ Approval response:', response);
+      toast.success('Request approved in Planning Center!');
+
+      // Reload data to refresh the list
       await loadData();
     } catch (error) {
-      console.error('Error approving:', error);
-      toast.error('Failed to approve request');
+      console.error('❌ Error approving:', error);
+      toast.error(`Failed to approve: ${error.message}`);
     } finally {
       setProcessingApproval(null);
     }
   };
 
   const handleDeny = async (approval) => {
-    if (!approval?.request_id) return;
+    if (!approval?.request_id) {
+      toast.error('Invalid approval - missing request ID');
+      return;
+    }
+
     if (!user?.pco_access_token) {
       toast.error('Planning Center is not connected. Cannot deny.');
       return;
     }
 
+    const confirmed = window.confirm(
+      `Deny this request?\n\n` +
+      `Event: ${approval.event_name}\n` +
+      `Resource: ${approval.resource_name}`
+    );
+
+    if (!confirmed) return;
+
     setProcessingApproval(approval.request_id);
+    console.log('🔴 Attempting to deny request:', approval.request_id);
+
     try {
-      await base44.functions.invoke('denyResourceRequest', {
+      const response = await base44.functions.invoke('denyResourceRequest', {
         request_id: approval.request_id
       });
+
+      console.log('✅ Deny response:', response);
       toast.success('Request denied in Planning Center');
+
+      // Reload data to refresh the list
       await loadData();
     } catch (error) {
-      console.error('Error denying:', error);
-      toast.error('Failed to deny request');
+      console.error('❌ Error denying:', error);
+      toast.error(`Failed to deny: ${error.message}`);
     } finally {
       setProcessingApproval(null);
     }
@@ -386,14 +406,14 @@ Check browser console for full details.
       />
 
       {syncStats && syncStats.last_sync_after && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 px-6 mt-4">
           Last sync: {format(parseISO(syncStats.last_sync_after), 'PPp')}
           {syncStats.new_upserts > 0 && ` • ${syncStats.new_upserts} new`}
           {syncStats.removed > 0 && ` • ${syncStats.removed} closed`}
         </p>
       )}
 
-      <Card>
+      <Card className="mt-4 mx-6">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -531,7 +551,7 @@ Check browser console for full details.
                             onClick={() => handleApprove(approval)}
                             disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
-                            {processingApproval === approval.request_id && selectedApprovalForForm ? (
+                            {processingApproval === approval.request_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
@@ -547,7 +567,7 @@ Check browser console for full details.
                             onClick={() => handleDeny(approval)}
                             disabled={processingApproval === approval.request_id || !user?.pco_access_token}
                           >
-                            {processingApproval === approval.request_id && !selectedApprovalForForm ? (
+                            {processingApproval === approval.request_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
@@ -567,7 +587,7 @@ Check browser console for full details.
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mt-4 mx-6 mb-6">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -611,18 +631,6 @@ Check browser console for full details.
             }
           }, 100);
         }}
-      />
-
-      <ApprovalFormModal
-        open={showApprovalForm}
-        onClose={() => {
-          setShowApprovalForm(false);
-          setSelectedApprovalForForm(null);
-        }}
-        approval={selectedApprovalForForm}
-        approvalDetails={selectedApprovalForForm ? approvalDetails[selectedApprovalForForm.request_id] : null}
-        onSubmit={handleApprovalFormSubmit}
-        submitting={!!processingApproval}
       />
     </div>
   );
