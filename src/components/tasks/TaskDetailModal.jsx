@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,46 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdated }) {
+  const [availableStatuses, setAvailableStatuses] = useState([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+
+  useEffect(() => {
+    // Load statuses only when the modal is open and a task with a list_id is provided
+    if (task && task.list_id && open) {
+      loadStatuses();
+    }
+  }, [task?.list_id, open]);
+
+  const loadStatuses = async () => {
+    if (!task?.list_id) return;
+    
+    setLoadingStatuses(true);
+    try {
+      const response = await base44.functions.invoke('getClickUpListStatuses', {
+        list_id: task.list_id
+      });
+      // ClickUp API typically returns status objects with 'status' (the name) and 'color' properties.
+      // We map it to 'name' for consistency with the component's outline logic.
+      const mappedStatuses = (response.data.statuses || []).map(s => ({
+        name: s.status,
+        type: s.type, // e.g., 'open', 'custom', 'closed'
+        color: s.color
+      }));
+      setAvailableStatuses(mappedStatuses);
+    } catch (error) {
+      console.error('Failed to load statuses:', error);
+      // Fallback to generic statuses if API call fails
+      setAvailableStatuses([
+        { name: 'To Do', type: 'open', color: '#d3d3d3' },
+        { name: 'In Progress', type: 'custom', color: '#4194f6' },
+        { name: 'Awaiting Feedback', type: 'custom', color: '#ffb246' },
+        { name: 'Complete', type: 'closed', color: '#6bc950' }
+      ]);
+    } finally {
+      setLoadingStatuses(false);
+    }
+  };
+
   if (!task) return null;
 
   const getPriorityColor = (priority) => {
@@ -151,18 +192,10 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
     !field.name.toLowerCase().includes('code')
   );
 
-  const statusIcons = {
-    'to do': Circle,
-    'in progress': ArrowUpCircle,
-    'ready': CheckCircle,
-    'awaiting feedback': AlertCircle,
-    'closed': CheckSquare
-  };
-
   const getStatusIconComponent = (status) => {
     const statusLower = status?.toLowerCase();
-    if (statusLower?.includes('to do')) return Circle;
-    if (statusLower?.includes('in progress')) return ArrowUpCircle;
+    if (statusLower?.includes('to do') || statusLower?.includes('open')) return Circle;
+    if (statusLower?.includes('in progress') || statusLower?.includes('active')) return ArrowUpCircle;
     if (statusLower?.includes('ready') || statusLower?.includes('done') || statusLower?.includes('complete')) return CheckCircle;
     if (statusLower?.includes('awaiting') || statusLower?.includes('pending') || statusLower?.includes('review')) return AlertCircle;
     return Circle;
@@ -230,29 +263,42 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
           <div className="flex items-center gap-3 flex-wrap">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <StatusIcon className="w-4 h-4" />
+                <Button variant="outline" className="gap-2" disabled={loadingStatuses || updateStatusMutation.isPending}>
+                  {loadingStatuses ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <StatusIcon className="w-4 h-4" />
+                  )}
                   {formatStatus(task.status)}
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleStatusChange('to do')}>
-                  <Circle className="w-4 h-4 mr-2 text-gray-400" />
-                  To Do
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStatusChange('in progress')}>
-                  <ArrowUpCircle className="w-4 h-4 mr-2 text-blue-500" />
-                  In Progress
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStatusChange('ready')}>
-                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                  Ready
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStatusChange('awaiting feedback')}>
-                  <AlertCircle className="w-4 h-4 mr-2 text-pink-500" />
-                  Awaiting Feedback
-                </DropdownMenuItem>
+                {loadingStatuses ? (
+                  <DropdownMenuItem disabled className="flex items-center">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading statuses...
+                  </DropdownMenuItem>
+                ) : availableStatuses.length > 0 ? (
+                  availableStatuses.map((status) => {
+                    const Icon = getStatusIconComponent(status.name);
+                    return (
+                      <DropdownMenuItem 
+                        key={status.name}
+                        onClick={() => handleStatusChange(status.name)}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        <Icon className="w-4 h-4 mr-2" style={{ color: status.color }} />
+                        {formatStatus(status.name)}
+                        {status.type === 'closed' && (
+                          <Badge variant="outline" className="ml-2 text-xs">Closed</Badge>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })
+                ) : (
+                  <DropdownMenuItem disabled>No statuses found</DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -418,7 +464,7 @@ export default function TaskDetailModal({ task, open, onOpenChange, onTaskUpdate
                             {value}
                           </a>
                         ) : field.type === 'email' ? (
-                          <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
+                            <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
                             {value}
                           </a>
                         ) : (
