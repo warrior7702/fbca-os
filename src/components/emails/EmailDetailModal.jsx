@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, Calendar, Paperclip, ExternalLink, User, FileText, CheckSquare, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { base44 } from "@/api/base44Client";
+import { toast } from "sonner"; // Assuming sonner is used for toasts, add this import
 
 export default function EmailDetailModal({ open, onOpenChange, email }) {
   const [analyzing, setAnalyzing] = useState(false);
@@ -17,6 +19,8 @@ export default function EmailDetailModal({ open, onOpenChange, email }) {
 
   useEffect(() => {
     if (open && email?.bodyPreview) {
+      // Reset analysis when modal opens with a new email or body
+      setAnalysis(null); 
       analyzeEmail();
     }
   }, [open, email]);
@@ -69,6 +73,7 @@ Be concise and specific.`,
       setAnalysis(response);
     } catch (error) {
       console.error('Failed to analyze email:', error);
+      toast.error('Failed to analyze email. Please try again.');
     } finally {
       setAnalyzing(false);
     }
@@ -77,14 +82,39 @@ Be concise and specific.`,
   if (!email) return null;
 
   const handleOpenInOutlook = () => {
+    if (!email) return;
+
     if (email.webLink) {
-      window.open(email.webLink, '_blank', 'noopener,noreferrer');
+      // Format: ms-outlook:ofv|u|{webUrl}
+      const desktopProtocol = `ms-outlook:ofv|u|${email.webLink}`;
+      
+      // Try desktop first by creating an invisible iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = desktopProtocol;
+      document.body.appendChild(iframe);
+      
+      // Fallback to web after 500ms if desktop doesn't open
+      // Remove iframe after attempting to open desktop app
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        // If user is still here and desktop app didn't launch, open in browser as fallback
+        // This is a heuristic; if the desktop app opens, the browser might not necessarily open if the user clicks "cancel" on the prompt.
+        // But if the desktop app isn't installed or the protocol isn't handled, this provides a seamless fallback.
+        window.open(email.webLink, '_blank', 'noopener,noreferrer');
+      }, 500);
+      
+      toast.info('Attempting to open in Outlook desktop app, falling back to web if unsuccessful...');
     } else if (email.messageId) {
+      // Fallback if no webLink but messageId is available
       window.open(
         `https://outlook.office.com/mail/search/id/${encodeURIComponent(email.messageId)}`,
         '_blank',
         'noopener,noreferrer'
       );
+      toast.info('Opening in Outlook Web...');
+    } else {
+      toast.error('Could not find a link to open this email in Outlook.');
     }
   };
 
@@ -160,29 +190,29 @@ Be concise and specific.`,
           {/* AI Analysis */}
           {email.bodyPreview && (
             <div className="border-t pt-4">
-              <label className="text-sm font-medium text-slate-500 flex items-center gap-1 mb-3">
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                AI Analysis
-              </label>
-              
               {analyzing ? (
-                <div className="flex items-center gap-2 text-sm text-slate-600 py-4">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing email...
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600 mr-2" />
+                  <span className="text-sm text-slate-600">Analyzing email...</span>
                 </div>
               ) : analysis ? (
-                <div className="space-y-3">
+                <div className="space-y-3 p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-700 font-semibold mb-3">
+                    <Sparkles className="w-4 h-4" />
+                    AI Analysis
+                  </div>
+
                   {/* Action Items */}
                   {analysis.action_items && analysis.action_items.length > 0 && (
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-1">
-                        <CheckSquare className="w-4 h-4" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1">
+                        <CheckSquare className="w-3 h-3 text-blue-600" />
                         Action Items
-                      </h4>
+                      </p>
                       <ul className="space-y-1">
                         {analysis.action_items.map((item, idx) => (
-                          <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
-                            <span className="text-blue-600 mt-0.5">•</span>
+                          <li key={idx} className="text-sm text-slate-600 pl-4 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">•</span>
                             <span>{item}</span>
                           </li>
                         ))}
@@ -192,45 +222,44 @@ Be concise and specific.`,
 
                   {/* Important Dates */}
                   {analysis.dates && analysis.dates.length > 0 && (
-                    <div className="bg-amber-50 rounded-lg p-3">
-                      <h4 className="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-purple-600" />
                         Important Dates
-                      </h4>
+                      </p>
                       <ul className="space-y-1">
-                        {analysis.dates.map((item, idx) => (
-                          <li key={idx} className="text-sm text-amber-800 flex items-start gap-2">
-                            <span className="text-amber-600 mt-0.5">•</span>
-                            <span><strong>{item.date}</strong> - {item.context}</span>
+                        {analysis.dates.map((dateInfo, idx) => (
+                          <li key={idx} className="text-sm text-slate-600 pl-4 flex items-start gap-2">
+                            <span className="text-purple-500 mt-1">•</span>
+                            <span><strong>{dateInfo.date}</strong> - {dateInfo.context}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
-                  {/* Key People */}
+                  {/* People Mentioned */}
                   {analysis.people && analysis.people.length > 0 && (
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <h4 className="text-sm font-semibold text-green-900 mb-2 flex items-center gap-1">
-                        <User className="w-4 h-4" />
-                        Key People
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1">
+                        <User className="w-3 h-3 text-green-600" />
+                        People Mentioned
+                      </p>
+                      <div className="flex flex-wrap gap-1">
                         {analysis.people.map((person, idx) => (
-                          <Badge key={idx} variant="outline" className="bg-white">
+                          <Badge key={idx} variant="secondary" className="text-xs">
                             {person}
                           </Badge>
                         ))}
                       </div>
                     </div>
                   )}
-
                   {/* No insights */}
                   {(!analysis.action_items || analysis.action_items.length === 0) &&
                    (!analysis.dates || analysis.dates.length === 0) &&
                    (!analysis.people || analysis.people.length === 0) && (
                     <p className="text-sm text-slate-500 italic">
-                      No action items, dates, or key people detected.
+                      No specific action items, dates, or key people detected.
                     </p>
                   )}
                 </div>
@@ -290,6 +319,7 @@ Be concise and specific.`,
               <ExternalLink className="w-4 h-4 mr-2" />
               Open in Outlook
             </Button>
+            {/* The close button was removed from the outline, but keeping it makes sense for user experience unless explicitly asked to remove */}
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
