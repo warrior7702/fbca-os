@@ -85,16 +85,30 @@ export default function Dashboard() {
         setWallpaper(currentUser.wallpaper);
       }
       
-      // IMPORTANT: Only set layout if it exists AND has actual data
-      if (currentUser.desktop_layout && 
-          typeof currentUser.desktop_layout === 'object' && 
-          Object.keys(currentUser.desktop_layout).length > 0) {
-        console.log('Loading saved layout:', currentUser.desktop_layout);
-        setAppPositions(currentUser.desktop_layout);
+      // IMPORTANT: Validate and fix desktop_layout
+      let layout = currentUser.desktop_layout;
+      
+      console.log('Raw layout from DB:', layout);
+      console.log('Layout type:', typeof layout);
+      console.log('Is array?', Array.isArray(layout));
+      
+      // Fix corrupted array data or invalid data
+      if (!layout || Array.isArray(layout) || typeof layout !== 'object' || Object.keys(layout).length === 0) {
+        console.log('❌ Invalid layout detected - using defaults and repairing');
+        const defaults = getDefaultPositions();
+        setAppPositions(defaults);
+        
+        // Auto-repair the database
+        try {
+          await base44.auth.updateMe({ desktop_layout: defaults });
+          console.log('✅ Layout repaired in database');
+        } catch (error) {
+          console.error('Failed to repair layout:', error);
+        }
       } else {
-        console.log('Using default layout');
-        // Make sure default positions are set
-        setAppPositions(getDefaultPositions());
+        // Valid object with data
+        console.log('✅ Valid layout loaded:', layout);
+        setAppPositions(layout);
       }
     } catch (error) {
       console.error("Error loading user:", error);
@@ -132,12 +146,17 @@ export default function Dashboard() {
       [draggedApp.id]: { row, col }
     };
     
+    console.log('💾 Saving new positions:', newPositions);
+    console.log('Is object?', typeof newPositions === 'object');
+    console.log('Keys:', Object.keys(newPositions));
+    
     setAppPositions(newPositions);
     setDraggedApp(null);
     
     try {
       await base44.auth.updateMe({ desktop_layout: newPositions });
       toast.success('Icon moved!');
+      console.log('✅ Layout saved successfully');
     } catch (error) {
       console.error("Error saving layout:", error);
       toast.error('Failed to save layout');
@@ -166,8 +185,12 @@ export default function Dashboard() {
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
-  console.log('Dashboard rendering with positions:', appPositions);
-  console.log('Number of positioned apps:', Object.keys(appPositions).length);
+  console.log('📊 Dashboard rendering:');
+  console.log('  Positions:', appPositions);
+  console.log('  Type:', typeof appPositions);
+  console.log('  Is array?', Array.isArray(appPositions));
+  console.log('  Keys:', Object.keys(appPositions));
+  console.log('  Number of apps:', Object.keys(appPositions).length);
 
   return (
     <div 
