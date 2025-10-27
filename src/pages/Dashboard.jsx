@@ -165,16 +165,17 @@ export default function Dashboard() {
 
   return (
     <div className="h-full relative overflow-hidden">
-      {/* Desktop Background */}
+      {/* Desktop Background - FIXED: pointer-events-none to prevent click blocking */}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 z-0"
+        className="fixed inset-0 z-0 pointer-events-none bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"
         style={{
           backgroundImage: `url('${wallpaperUrl}')`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center'
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
         }}
       >
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
       </div>
 
       {/* Edit Mode Indicator */}
@@ -184,7 +185,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto"
           >
             <div className="bg-white/90 text-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
               <Unlock className="w-4 h-4" />
@@ -202,8 +203,8 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Grid */}
-      <div className="absolute inset-0 p-8 z-10">
+      {/* Desktop Grid - FIXED: pointer-events-auto to ensure clicks work */}
+      <div className="absolute inset-0 p-8 z-10 pointer-events-auto">
         <div className="grid gap-4" style={{
           gridTemplateColumns: `repeat(${COLS}, 140px)`,
           gridTemplateRows: `repeat(${ROWS}, 140px)`
@@ -261,8 +262,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Desktop Shortcuts - Right Side */}
-      <div className="absolute right-8 top-8 space-y-4 z-40">
+      {/* Desktop Shortcuts - Right Side - FIXED: pointer-events-auto */}
+      <div className="absolute right-8 top-8 space-y-4 z-40 pointer-events-auto">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
