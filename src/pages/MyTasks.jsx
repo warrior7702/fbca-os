@@ -31,6 +31,18 @@ import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
+// Helper to build reliable email links
+const buildEmailHref = (email) => {
+  // Prefer Graph webLink if available
+  if (email?.webLink) return email.webLink;
+
+  // Fallback: deep-link by Internet-Message-Id
+  if (email?.messageId) {
+    return `https://outlook.office.com/mail/search/id/${encodeURIComponent(email.messageId)}`;
+  }
+  return null;
+};
+
 const CATEGORY_COLORS = {
   'Action Needed': '#c43e00',
   'Followup': '#6f42c1',
@@ -243,20 +255,6 @@ export default function MyTasks() {
       .split(/[\s_-]+/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
-  };
-
-  const handleEmailClick = (email) => {
-    console.log('📧 Email clicked:', email);
-    console.log('📧 Email webLink:', email.webLink);
-    
-    if (email.webLink) {
-      // Just open the webLink directly - new Outlook will intercept if configured
-      // Settings → General → Link handling → "Open supported Outlook links in the new Outlook"
-      window.open(email.webLink, '_blank', 'noopener,noreferrer');
-    } else {
-      console.error('📧 No webLink found for email');
-      toast.error('Could not open email');
-    }
   };
 
   if (loading) {
@@ -492,10 +490,20 @@ export default function MyTasks() {
                             {categoryEmails.slice(0, 5).map((email, idx) => (
                               <div
                                 key={idx}
-                                onClick={() => handleEmailClick(email)}
-                                className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                                className="group relative w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                               >
-                                <div className="flex items-center justify-between">
+                                {/* Stretched link - OS/browser handles natively */}
+                                {buildEmailHref(email) && (
+                                  <a
+                                    href={buildEmailHref(email)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute inset-0 z-10"
+                                    aria-label={`Open email: ${email.subject || 'message'}`}
+                                  />
+                                )}
+                                
+                                <div className="flex items-center justify-between relative z-0">
                                   <p className={`text-xs truncate flex-1 ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
                                   }`}>
@@ -503,7 +511,7 @@ export default function MyTasks() {
                                   </p>
                                   <Mail className="h-3 w-3 ml-2 opacity-50 group-hover:opacity-100 flex-shrink-0" />
                                 </div>
-                                <p className="text-[10px] text-slate-500 truncate mt-1">
+                                <p className="text-[10px] text-slate-500 truncate mt-1 relative z-0">
                                   {email.fromName || email.from}
                                 </p>
                               </div>
