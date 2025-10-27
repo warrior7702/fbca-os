@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 Deno.serve(async (req) => {
@@ -25,9 +24,9 @@ Deno.serve(async (req) => {
             accessToken = refreshResponse.data.access_token;
         }
 
-        // Get Categorized Messages - ONLY from Inbox folder
+        // Get Categorized Messages - ONLY from Inbox folder, now including bodyPreview
         const categorizedResponse = await fetch(
-            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink,internetMessageId&$orderby=receivedDateTime desc",
+            "https://graph.microsoft.com/v1.0/me/mailFolders('Inbox')/messages?$filter=categories/any()&$top=100&$select=subject,from,receivedDateTime,isRead,hasAttachments,importance,categories,webLink,internetMessageId,bodyPreview&$orderby=receivedDateTime desc",
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -55,7 +54,8 @@ Deno.serve(async (req) => {
                         importance: email.importance,
                         categories: email.categories,
                         webLink: email.webLink,
-                        messageId: email.internetMessageId
+                        messageId: email.internetMessageId,
+                        bodyPreview: email.bodyPreview
                     });
                 });
             }

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Calendar, Paperclip, ExternalLink, User } from "lucide-react";
+import { Mail, Calendar, Paperclip, ExternalLink, User, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 export default function EmailDetailModal({ open, onOpenChange, email }) {
@@ -70,6 +70,21 @@ export default function EmailDetailModal({ open, onOpenChange, email }) {
               <p className="text-slate-900 mt-1">
                 {format(new Date(email.receivedAt), 'PPpp')}
               </p>
+            </div>
+          )}
+
+          {/* Email Preview/Summary */}
+          {email.bodyPreview && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 flex items-center gap-1">
+                <FileText className="w-3 h-3" />
+                Preview
+              </label>
+              <div className="mt-1 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                  {email.bodyPreview}
+                </p>
+              </div>
             </div>
           )}
 
