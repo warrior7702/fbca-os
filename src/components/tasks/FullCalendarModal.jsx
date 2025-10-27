@@ -6,9 +6,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Grip } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameMonth, isToday } from "date-fns";
 import { toast } from "sonner";
+
+const LIST_COLORS = {
+  'Special Event Master': '#22c55e',
+  'Facilities Work Orders': '#0ea5e9',
+  'Marketing': '#f59e0b',
+  'IT & Technology': '#8b5cf6',
+  'Worship & Production': '#ec4899',
+  'Admin & Operations': '#6366f1',
+  'default': '#94a3b8'
+};
 
 export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskClick, onTaskUpdate }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -81,23 +92,33 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return 'bg-red-500 border-red-600';
-      case 'high': return 'bg-orange-400 border-orange-500';
-      case 'normal': return 'bg-blue-400 border-blue-500';
-      case 'low': return 'bg-gray-300 border-gray-400';
-      default: return 'bg-slate-300 border-slate-400';
-    }
+  const getStatusColor = (status) => {
+    const statusLower = status?.toLowerCase() || '';
+    
+    if (statusLower.includes('ready') || statusLower.includes('to do') || statusLower.includes('notstarted')) return 'bg-green-500 text-white border-green-600';
+    if (statusLower.includes('awaiting') || statusLower.includes('waiting')) return 'bg-pink-500 text-white border-pink-600';
+    if (statusLower.includes('reminder') || statusLower.includes('pending')) return 'bg-blue-500 text-white border-blue-600';
+    if (statusLower.includes('progress') || statusLower.includes('active') || statusLower.includes('in dev') || statusLower.includes('inprogress')) return 'bg-purple-500 text-white border-purple-600';
+    if (statusLower.includes('done') || statusLower.includes('complete') || statusLower.includes('closed')) return 'bg-gray-500 text-white border-gray-600';
+    if (statusLower.includes('blocked') || statusLower.includes('stuck')) return 'bg-red-500 text-white border-red-600';
+    
+    return 'bg-slate-400 text-white border-slate-500';
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return 'No Status';
+    return status
+      .split(/[\s_-]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   const isCurrentMonth = (day) => {
-    return day.getMonth() === currentMonth.getMonth();
+    return isSameMonth(day, currentMonth);
   };
 
-  const isToday = (day) => {
-    const today = new Date();
-    return day.toDateString() === today.toDateString();
+  const isTodayDate = (day) => {
+    return isToday(day);
   };
 
   return (
@@ -137,7 +158,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
         <div className="flex-1 overflow-auto">
           <div className="grid grid-cols-7 gap-2 h-full">
             {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-              <div key={day} className="text-center text-sm font-semibold text-slate-700 py-3 border-b-2 border-slate-200">
+              <div key={day} className="text-center text-xs font-bold text-slate-700 py-3 border-b-2 border-slate-200 uppercase tracking-wide">
                 {day}
               </div>
             ))}
@@ -145,7 +166,7 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
             {monthDays.map((day, index) => {
               const dayKey = format(day, 'yyyy-MM-dd');
               const dayTasks = tasksByDay.get(dayKey) || [];
-              const isCurrent = isToday(day);
+              const isCurrent = isTodayDate(day);
               const inMonth = isCurrentMonth(day);
 
               return (
@@ -153,17 +174,17 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
                   key={index}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
-                  className={`min-h-[120px] p-2 rounded-lg border-2 transition-all ${
+                  className={`min-h-[120px] p-2 rounded-xl border-2 transition-all ${
                     isCurrent
-                      ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200'
+                      ? 'bg-blue-50 border-blue-400 shadow-md'
                       : inMonth
                       ? 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
                       : 'bg-slate-50 border-slate-100'
                   }`}
                 >
-                  <div className={`text-sm font-semibold mb-2 ${
+                  <div className={`text-sm font-bold mb-2 ${
                     isCurrent
-                      ? 'text-indigo-600'
+                      ? 'text-blue-600'
                       : inMonth
                       ? 'text-slate-700'
                       : 'text-slate-400'
@@ -172,27 +193,36 @@ export default function FullCalendarModal({ open, onOpenChange, tasks, onTaskCli
                   </div>
 
                   <div className="space-y-1 overflow-y-auto max-h-[90px]">
-                    {dayTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task)}
-                        onClick={() => onTaskClick?.(task)}
-                        className={`text-xs p-2 rounded border-l-4 cursor-move group transition-all ${
-                          getPriorityColor(task.priority)
-                        } text-white hover:shadow-lg hover:scale-105`}
-                      >
-                        <div className="flex items-start gap-1">
-                          <Grip className="w-3 h-3 flex-shrink-0 opacity-50 group-hover:opacity-100" />
-                          <span className="flex-1 line-clamp-2">{task.title}</span>
-                        </div>
-                        {task.list_name && (
-                          <div className="text-[10px] opacity-75 mt-1 truncate">
-                            {task.list_name}
+                    {dayTasks.map((task) => {
+                      const isMicrosoftToDo = task.source === 'microsoft_todo';
+                      const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          draggable={!isMicrosoftToDo}
+                          onDragStart={(e) => !isMicrosoftToDo && handleDragStart(e, task)}
+                          onClick={() => onTaskClick?.(task)}
+                          className="text-xs p-2 rounded-lg border-l-4 bg-white hover:shadow-md cursor-pointer transition-all group"
+                          style={{ borderLeftColor: listColor }}
+                        >
+                          <div className="flex items-start gap-1">
+                            <div 
+                              className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
+                              style={{ backgroundColor: listColor }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-slate-900 truncate">
+                                {task.title}
+                              </div>
+                              <Badge className={`${getStatusColor(task.status)} text-[10px] px-1 py-0 mt-1`}>
+                                {formatStatus(task.status)}
+                              </Badge>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

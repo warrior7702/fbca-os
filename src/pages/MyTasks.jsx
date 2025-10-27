@@ -119,7 +119,15 @@ export default function MyTasks() {
   };
 
   const handleTaskClick = (task) => {
-    // Open task detail modal instead of external link
+    // Microsoft To Do tasks open in browser
+    if (task.source === 'microsoft_todo') {
+      if (task.url) {
+        window.open(task.url, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
+
+    // ClickUp tasks open modal
     setSelectedTask(task);
     setShowTaskDetail(true);
   };
@@ -132,7 +140,8 @@ export default function MyTasks() {
   // Combine all tasks
   const allTasks = [...clickupTasks, ...todoTasks];
   
-  const todayTasks = allTasks.filter(task => 
+  // My Day: Tasks due today from both ClickUp AND Microsoft To Do
+  const myDayTasks = allTasks.filter(task => 
     task.due_date && isToday(new Date(task.due_date))
   );
 
@@ -202,25 +211,25 @@ export default function MyTasks() {
           <p className="text-slate-600">Welcome back, {displayName}</p>
         </div>
 
-        {/* Today's Tasks */}
+        {/* My Day */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <CheckSquare className="w-5 h-5" />
-                Today's Tasks
+                My Day
               </CardTitle>
-              <Badge variant="secondary">{todayTasks.length} task{todayTasks.length !== 1 ? 's' : ''}</Badge>
+              <Badge variant="secondary">{myDayTasks.length} task{myDayTasks.length !== 1 ? 's' : ''}</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            {todayTasks.length === 0 ? (
+            {myDayTasks.length === 0 ? (
               <p className="text-slate-500 text-center py-4">No tasks due today! 🎉</p>
             ) : (
               <div className="space-y-3">
-                {todayTasks.map((task) => {
-                  const listColor = LIST_COLORS[task.list_name] || LIST_COLORS.default;
+                {myDayTasks.map((task) => {
                   const isMicrosoftToDo = task.source === 'microsoft_todo';
+                  const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
                   
                   return (
                     <div
@@ -242,11 +251,10 @@ export default function MyTasks() {
                             <Badge className={getStatusColor(task.status)}>
                               {formatStatus(task.status)}
                             </Badge>
-                            {task.list_name && (
+                            {isMicrosoftToDo ? (
+                              <span className="text-xs text-slate-500 font-medium">From To Do</span>
+                            ) : task.list_name && (
                               <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
-                            )}
-                            {isMicrosoftToDo && (
-                              <Badge variant="outline" className="text-xs">Microsoft To Do</Badge>
                             )}
                           </div>
                         </div>
@@ -329,7 +337,7 @@ export default function MyTasks() {
                               <a
                                 key={idx}
                                 href={getOutlookDesktopLink(email)}
-                                className="p-2 bg-white rounded hover:bg-slate-50 transition-colors block"
+                                className="p-2 bg-white rounded hover:bg-slate-50 transition-colors block cursor-pointer"
                               >
                                 <p className={`text-xs truncate ${
                                   email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
