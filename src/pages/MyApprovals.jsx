@@ -104,44 +104,73 @@ function MyApprovalsContent() {
 
   const loadData = async () => {
     setLoading(true);
-    setSyncing(true);
     setError(null);
 
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      if (currentUser?.pco_access_token) {
-        const syncResponse = await base44.functions.invoke('syncMyApprovals', {
-          forceResync: false
-        }).catch(err => {
-          console.error('Sync error:', err);
-          return { data: { pending_approvals: [], count: 0 } };
-        });
-
-        const responseData = syncResponse?.data || {};
-        setApprovals(A(responseData.pending_approvals));
-        setSyncStats(responseData.sync_stats || null);
-
-        try {
-          const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-          setCalendarEvents(A(eventsResponse?.data?.events));
-        } catch (err) {
-          console.error('Calendar error:', err);
-          setCalendarEvents([]);
-        }
-      } else {
+      if (!currentUser?.pco_access_token) {
+        setError('Planning Center not connected');
+        setLoading(false);
         setApprovals([]);
         setCalendarEvents([]);
         setSyncStats(null);
+        return;
       }
 
+      // Always do a full sync on load
+      await performSync(false);
+      
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error('Error loading data:', error);
       setError(error.message || 'Failed to load approvals');
       toast.error('Failed to load approvals. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const performSync = async (forceResync = false) => {
+    setSyncing(true);
+    setError(null);
+    
+    try {
+      console.log('🔄 Starting sync, force:', forceResync);
+      
+      const response = await base44.functions.invoke('syncMyApprovals', {
+        forceResync
+      });
+
+      console.log('✅ Sync response:', response.data);
+
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      const syncedApprovals = A(response.data.pending_approvals);
+      
+      setApprovals(syncedApprovals);
+      setSyncStats(response.data.sync_stats || null);
+      
+      // Build calendar events
+      const events = syncedApprovals.map(approval => ({
+        id: approval.request_id,
+        title: approval.event_name,
+        start: approval.event_starts_at,
+        end: approval.event_ends_at,
+        extendedProps: { approval }
+      }));
+      
+      setCalendarEvents(events);
+
+      toast.success(`Synced ${syncedApprovals.length} pending approvals.`);
+      
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+      setError(error.message || 'Failed to sync approvals');
+      toast.error(`Sync failed: ${error.message}`);
+    } finally {
       setSyncing(false);
     }
   };
@@ -172,32 +201,8 @@ function MyApprovalsContent() {
     }
   };
 
-  const handleForceResync = async () => {
-    setSyncing(true);
-    setError(null);
-    toast.info('Force resyncing approvals...');
-
-    try {
-      if (!user?.pco_access_token) {
-        toast.error('Planning Center is not connected. Cannot resync.');
-        setSyncing(false);
-        return;
-      }
-      const syncResponse = await base44.functions.invoke('syncMyApprovals', {
-        forceResync: true
-      });
-
-      const responseData = syncResponse?.data || {};
-      setApprovals(A(responseData.pending_approvals));
-      setSyncStats(responseData.sync_stats || null);
-      toast.success(`Resync complete! Found ${responseData.count || 0} pending approvals.`);
-    } catch (error) {
-      console.error('Force resync error:', error);
-      setError(error.message || 'Failed to resync');
-      toast.error('Failed to resync. Please try again.');
-    } finally {
-      setSyncing(false);
-    }
+  const handleForceResync = () => {
+    performSync(true);
   };
 
   const handleDebug = async () => {
@@ -261,14 +266,26 @@ Check browser console for full details.
         request_id: approval.request_id
       });
 
-      console.log('✅ Approval response:', response);
+      console.log('✅ Approval response:', response.data);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
       toast.success('Request approved in Planning Center!');
 
-      // Reload data to refresh the list
-      await loadData();
+      // Only remove from UI after successful approval
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      setCalendarEvents(prev => prev.filter(e => e.id !== approval.request_id));
+      
+      // Optionally resync to get fresh data after a short delay
+      setTimeout(() => performSync(false), 2000);
+      
     } catch (error) {
       console.error('❌ Error approving:', error);
-      toast.error(`Failed to approve: ${error.message}`);
+      toast.error(`Failed to approve: ${error.response?.data?.error || error.message}`);
+      
+      // Don't remove from UI if it failed
     } finally {
       setProcessingApproval(null);
     }
@@ -301,14 +318,26 @@ Check browser console for full details.
         request_id: approval.request_id
       });
 
-      console.log('✅ Deny response:', response);
+      console.log('✅ Deny response:', response.data);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
       toast.success('Request denied in Planning Center');
 
-      // Reload data to refresh the list
-      await loadData();
+      // Only remove from UI after successful denial
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      setCalendarEvents(prev => prev.filter(e => e.id !== approval.request_id));
+
+      // Optionally resync after a short delay
+      setTimeout(() => performSync(false), 2000);
+      
     } catch (error) {
       console.error('❌ Error denying:', error);
-      toast.error(`Failed to deny: ${error.message}`);
+      toast.error(`Failed to deny: ${error.response?.data?.error || error.message}`);
+      
+      // Don't remove from UI if it failed
     } finally {
       setProcessingApproval(null);
     }
