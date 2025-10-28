@@ -120,6 +120,9 @@ function MyApprovalsContent() {
       return;
     }
 
+    console.log('🔵 Approve clicked for:', approval.request_id);
+    console.log('🔵 Token available:', !!user.pco_access_token);
+
     const confirmed = window.confirm(
       `Approve this request?\n\n` +
       `Event: ${approval.event_name}\n` +
@@ -132,7 +135,9 @@ function MyApprovalsContent() {
     setProcessingIds(prev => new Set(prev).add(approval.request_id));
     
     try {
-      console.log('✅ Approving request:', approval.request_id);
+      console.log('✅ Sending approve request to Vercel API');
+      console.log('Request ID:', approval.request_id);
+      console.log('API URL:', `${VERCEL_API}/pco-approve`);
       
       const response = await fetch(`${VERCEL_API}/pco-approve`, {
         method: 'POST',
@@ -147,9 +152,12 @@ function MyApprovalsContent() {
         })
       });
 
+      console.log('Response status:', response.status);
+      const responseData = await response.json().catch(() => ({}));
+      console.log('Response data:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to approve (${response.status})`);
+        throw new Error(responseData.error || `Failed to approve (${response.status})`);
       }
 
       toast.success('Request approved!');
@@ -178,6 +186,8 @@ function MyApprovalsContent() {
       return;
     }
 
+    console.log('🔴 Deny clicked for:', approval.request_id);
+
     const confirmed = window.confirm(
       `Deny this request?\n\n` +
       `Event: ${approval.event_name}\n` +
@@ -189,7 +199,7 @@ function MyApprovalsContent() {
     setProcessingIds(prev => new Set(prev).add(approval.request_id));
     
     try {
-      console.log('❌ Denying request:', approval.request_id);
+      console.log('❌ Sending deny request to Vercel API');
       
       const response = await fetch(`${VERCEL_API}/pco-approve`, {
         method: 'POST',
@@ -204,9 +214,12 @@ function MyApprovalsContent() {
         })
       });
 
+      console.log('Response status:', response.status);
+      const responseData = await response.json().catch(() => ({}));
+      console.log('Response data:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to deny (${response.status})`);
+        throw new Error(responseData.error || `Failed to deny (${response.status})`);
       }
 
       toast.success('Request denied');
