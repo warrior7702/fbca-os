@@ -24,7 +24,12 @@ Deno.serve(async (req) => {
 
         if (!code || !state) {
             console.error('Missing code or state');
-            return Response.json({ error: 'Missing code or state' }, { status: 400 });
+            return new Response(null, {
+                status: 302,
+                headers: {
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=missing_params`
+                }
+            });
         }
 
         const base44 = createClientFromRequest(req);
@@ -50,7 +55,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=pco_token_failed`
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=token_exchange_failed`
                 }
             });
         }
@@ -61,7 +66,7 @@ Deno.serve(async (req) => {
         // Calculate expiration time
         const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
 
-        // Update user with tokens using service role (since this is an OAuth callback)
+        // Update user with tokens using service role
         await base44.asServiceRole.entities.User.update(state, {
             pco_access_token: tokens.access_token,
             pco_refresh_token: tokens.refresh_token,
@@ -83,7 +88,7 @@ Deno.serve(async (req) => {
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=pco_callback_failed`
+                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=callback_failed`
             }
         });
     }
