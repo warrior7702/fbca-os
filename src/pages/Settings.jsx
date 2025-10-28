@@ -132,9 +132,9 @@ export default function Settings() {
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
     const settingsUrl = `${appUrl}/Settings`;
-    const state = user.id;
     
-    window.location.href = `${vercelUrl}/api/pco-auth2?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
+    // Match Vercel's expected params: user_id and back
+    window.location.href = `${vercelUrl}/api/pco-auth?user_id=${user.id}&back=${encodeURIComponent(settingsUrl)}`;
   };
 
   const handleDisconnectPCO = async () => {
