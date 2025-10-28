@@ -26,7 +26,9 @@ Deno.serve(async (req) => {
     try {
         const { user_id, access_token, refresh_token, expires_at } = await req.json();
 
-        console.log('savePCOTokens called for user:', user_id);
+        console.log('savePCOTokens called');
+        console.log('user_id:', user_id);
+        console.log('user_id type:', typeof user_id);
 
         if (!user_id || !access_token || !refresh_token || !expires_at) {
             return Response.json({ 
@@ -40,14 +42,39 @@ Deno.serve(async (req) => {
 
         const base44 = createClientFromRequest(req);
 
-        // Use service role to update user (since this is called from Vercel, not from user session)
+        // First, verify the user exists
+        console.log('Checking if user exists...');
+        let existingUser;
+        try {
+            existingUser = await base44.asServiceRole.entities.User.get(user_id);
+            console.log('User found:', existingUser.email);
+        } catch (error) {
+            console.error('User lookup failed:', error.message);
+            
+            // Try to find user by filtering all users (in case ID format is wrong)
+            console.log('Attempting to find user by filtering...');
+            const allUsers = await base44.asServiceRole.entities.User.list();
+            console.log('Total users in system:', allUsers.length);
+            console.log('First 3 user IDs:', allUsers.slice(0, 3).map(u => ({ id: u.id, email: u.email })));
+            
+            return Response.json({ 
+                error: 'User not found',
+                user_id_received: user_id,
+                suggestion: 'Check that the user ID from the frontend matches the Base44 user ID format'
+            }, { 
+                status: 404, 
+                headers: corsHeaders 
+            });
+        }
+
+        // Use service role to update user
         await base44.asServiceRole.entities.User.update(user_id, {
             pco_access_token: access_token,
             pco_refresh_token: refresh_token,
             pco_token_expires_at: expires_at
         });
 
-        console.log('Tokens saved successfully for user:', user_id);
+        console.log('Tokens saved successfully for user:', existingUser.email);
 
         return Response.json({ 
             success: true 
