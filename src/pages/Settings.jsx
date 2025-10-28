@@ -134,7 +134,7 @@ export default function Settings() {
     const settingsUrl = `${appUrl}/Settings`;
     const state = user.id;
     
-    window.location.href = `${vercelUrl}/api/pco-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
+    window.location.href = `${vercelUrl}/api/pco-auth2?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
   };
 
   const handleDisconnectPCO = async () => {
