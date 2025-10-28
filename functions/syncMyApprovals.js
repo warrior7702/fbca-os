@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 // Safe array coercion
@@ -59,6 +60,11 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
         console.log('🔄 Starting clean sync for:', currentUser.email);
+
+        // Get lookback days (default 90)
+        const lookbackDays = parseInt(Deno.env.get('PCO_PENDING_LOOKBACK_DAYS') || '90');
+        const cutoffDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+        console.log('📅 Filtering approvals newer than:', cutoffDate.toISOString());
 
         // 1) Get my PCO person ID
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
@@ -163,7 +169,7 @@ Deno.serve(async (req) => {
 
         console.log('📥 Fetched', allRequests.length, 'pending requests');
 
-        // 4) Hard filter: only status=P, only my groups
+        // 4) Hard filter: only status=P, only my groups, only recent
         const myApprovals = [];
         const seenIds = new Set(); // Dedupe
         
@@ -174,6 +180,13 @@ Deno.serve(async (req) => {
                 
                 // Hard filter: MUST be pending
                 if (request.attributes?.approval_status !== 'P') continue;
+                
+                // Hard filter: MUST be recent (within lookback window)
+                const createdAt = new Date(request.attributes?.created_at);
+                if (createdAt < cutoffDate) {
+                    console.log('⏳ Skipping old approval:', request.id, 'created:', createdAt.toISOString());
+                    continue;
+                }
                 
                 const resourceId = request.relationships?.resource?.data?.id;
                 const groupInfo = resourceToGroupMap[resourceId];
@@ -228,7 +241,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log('✅ Found', myApprovals.length, 'approvals for my groups');
+        console.log('✅ Found', myApprovals.length, 'recent approvals for my groups (within', lookbackDays, 'days)');
 
         // 5) Clear and recreate all approvals (always fresh)
         const existingApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
