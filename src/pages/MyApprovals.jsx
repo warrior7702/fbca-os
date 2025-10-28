@@ -86,11 +86,21 @@ function MyApprovalsContent() {
   const [debugging, setDebugging] = useState(false);
   const [approvalDetails, setApprovalDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState({});
+  // New state variables
+  const [selectedApproval, setSelectedApproval] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(false);
 
   const safeApprovals = A(approvals);
 
   useEffect(() => {
     loadData();
+
+    // Auto-sync every 2 minutes
+    const interval = setInterval(() => {
+      performSync(false);
+    }, 120000); // 2 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -110,21 +120,19 @@ function MyApprovalsContent() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      if (!currentUser?.pco_access_token) {
+      if (!currentUser?.pco_access_token) { // Preserving optional chaining to prevent runtime errors if currentUser is null
         setError('Planning Center not connected');
         setLoading(false);
-        setApprovals([]);
-        setCalendarEvents([]);
-        setSyncStats(null);
+        // Removed setApprovals, setCalendarEvents, setSyncStats clearing as per outline.
         return;
       }
 
-      // Always do a full sync on load
+      // Always sync on load
       await performSync(false);
-      
+
     } catch (error) {
       console.error('Error loading data:', error);
-      setError(error.message || 'Failed to load approvals');
+      setError(error.message); // Changed as per outline
       toast.error('Failed to load approvals. Please try again.');
     } finally {
       setLoading(false);
@@ -134,10 +142,10 @@ function MyApprovalsContent() {
   const performSync = async (forceResync = false) => {
     setSyncing(true);
     setError(null);
-    
+
     try {
       console.log('🔄 Starting sync, force:', forceResync);
-      
+
       const response = await base44.functions.invoke('syncMyApprovals', {
         forceResync
       });
@@ -149,10 +157,19 @@ function MyApprovalsContent() {
       }
 
       const syncedApprovals = A(response.data.pending_approvals);
-      
+
       setApprovals(syncedApprovals);
-      setSyncStats(response.data.sync_stats || null);
-      
+      // Modified setSyncStats based on outline, but including existing UI fields for functionality preservation.
+      setSyncStats({
+        count: response.data.count,
+        my_groups_count: response.data.my_groups_count,
+        total_fetched: response.data.total_fetched,
+        // Assuming these fields are now at the top-level of response.data for backward compatibility of UI
+        last_sync_after: response.data.last_sync_after,
+        new_upserts: response.data.new_upserts,
+        removed: response.data.removed,
+      });
+
       // Build calendar events
       const events = syncedApprovals.map(approval => ({
         id: approval.request_id,
@@ -161,11 +178,16 @@ function MyApprovalsContent() {
         end: approval.event_ends_at,
         extendedProps: { approval }
       }));
-      
+
       setCalendarEvents(events);
 
-      toast.success(`Synced ${syncedApprovals.length} pending approvals.`);
-      
+      // Modified toast messages as per outline
+      if (!forceResync) {
+        toast.success(`Loaded ${syncedApprovals.length} pending approvals`);
+      } else {
+        toast.success(`Resynced ${syncedApprovals.length} pending approvals`);
+      }
+
     } catch (error) {
       console.error('❌ Sync error:', error);
       setError(error.message || 'Failed to sync approvals');
@@ -267,7 +289,7 @@ Check browser console for full details.
       });
 
       console.log('✅ Approval response:', response.data);
-      
+
       if (response.data.error) {
         throw new Error(response.data.error);
       }
@@ -277,14 +299,14 @@ Check browser console for full details.
       // Only remove from UI after successful approval
       setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
       setCalendarEvents(prev => prev.filter(e => e.id !== approval.request_id));
-      
+
       // Optionally resync to get fresh data after a short delay
       setTimeout(() => performSync(false), 2000);
-      
+
     } catch (error) {
       console.error('❌ Error approving:', error);
       toast.error(`Failed to approve: ${error.response?.data?.error || error.message}`);
-      
+
       // Don't remove from UI if it failed
     } finally {
       setProcessingApproval(null);
@@ -319,7 +341,7 @@ Check browser console for full details.
       });
 
       console.log('✅ Deny response:', response.data);
-      
+
       if (response.data.error) {
         throw new Error(response.data.error);
       }
@@ -332,11 +354,11 @@ Check browser console for full details.
 
       // Optionally resync after a short delay
       setTimeout(() => performSync(false), 2000);
-      
+
     } catch (error) {
       console.error('❌ Error denying:', error);
       toast.error(`Failed to deny: ${error.response?.data?.error || error.message}`);
-      
+
       // Don't remove from UI if it failed
     } finally {
       setProcessingApproval(null);

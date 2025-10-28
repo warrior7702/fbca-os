@@ -5,17 +5,6 @@ const A = (x) => Array.isArray(x) ? x : [];
 // Safe number coercion
 const N = (x) => Number.isFinite(Number(x)) ? Number(x) : 0;
 
-// Stable empty response
-const emptyResponse = () => ({
-    pending_approvals: [],
-    count: 0,
-    my_groups: [],
-    my_groups_count: 0,
-    total_fetched: 0,
-    sync_stats: null,
-    cache_bust: Date.now()
-});
-
 async function refreshTokenIfNeeded(base44, user) {
     const expiresAt = new Date(user.pco_token_expires_at);
     const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
@@ -55,10 +44,7 @@ Deno.serve(async (req) => {
         const currentUser = await base44.auth.me();
 
         if (!currentUser) {
-            return Response.json({ 
-                error: 'Unauthorized',
-                ...emptyResponse()
-            }, { status: 401 });
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { forceResync } = await req.json().catch(() => ({ forceResync: false }));
@@ -69,32 +55,14 @@ Deno.serve(async (req) => {
         if (!user || !user.pco_access_token) {
             return Response.json({ 
                 error: 'PCO not connected',
-                ...emptyResponse()
+                pending_approvals: [],
+                count: 0
             }, { status: 400 });
         }
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // Get sync state
-        const syncStates = await base44.asServiceRole.entities.ApprovalSyncState.filter({ 
-            user_email: currentUser.email 
-        }).catch(() => []);
-        let syncState = A(syncStates)[0];
-        
-        let lastSync = null;
-        if (!forceResync && syncState?.last_sync) {
-            lastSync = new Date(syncState.last_sync);
-        } else if (forceResync) {
-            // Force resync: go back 90 days
-            lastSync = new Date();
-            lastSync.setDate(lastSync.getDate() - 90);
-        }
-
-        console.log('🔄 Sync started:', {
-            user: currentUser.email,
-            lastSync: lastSync?.toISOString() || 'full sync',
-            forceResync
-        });
+        console.log('🔄 Starting sync for:', currentUser.email, 'Force:', forceResync);
 
         // Get my PCO person ID
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
@@ -102,28 +70,22 @@ Deno.serve(async (req) => {
         });
 
         if (!meResponse.ok) {
-            console.error('Failed to get PCO user');
-            return Response.json({ 
-                error: 'Failed to get PCO user',
-                ...emptyResponse()
-            });
+            throw new Error('Failed to get PCO user');
         }
         
         const meData = await meResponse.json();
         const myPcoPersonId = meData.data?.id;
 
-        // Get all approval groups and find which ones I'm in
+        console.log('👤 My PCO Person ID:', myPcoPersonId);
+
+        // Get ALL approval groups and check membership
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
         if (!groupsResponse.ok) {
-            console.error('Failed to fetch approval groups');
-            return Response.json({ 
-                error: 'Failed to fetch approval groups',
-                ...emptyResponse()
-            });
+            throw new Error('Failed to fetch approval groups');
         }
 
         const groupsData = await groupsResponse.json();
@@ -131,10 +93,12 @@ Deno.serve(async (req) => {
         const myGroupNames = {};
         const resourceToGroupMap = {};
         
+        // Check each group for membership and map resources
         for (const group of A(groupsData.data)) {
             try {
+                // Check membership
                 const membersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people`,
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
                 
@@ -145,9 +109,11 @@ Deno.serve(async (req) => {
                     if (isMember) {
                         myGroupIds.push(group.id);
                         myGroupNames[group.id] = group.attributes?.name;
+                        console.log('✅ Member of group:', group.attributes?.name);
                     }
                 }
 
+                // Map resources to this group
                 const resourcesResponse = await fetch(
                     `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -164,55 +130,33 @@ Deno.serve(async (req) => {
                 }
             } catch (error) {
                 console.error('Error processing group:', group.id, error);
-                // Continue to next group instead of failing completely
             }
         }
 
-        // Build URL with incremental sync filter
-        let baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource&order=updated_at`;
-        
-        if (lastSync) {
-            const filterDate = lastSync.toISOString();
-            baseUrl += `&where[updated_at][gt]=${encodeURIComponent(filterDate)}`;
-        }
+        console.log('📋 I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
+        console.log('📋 Mapped', Object.keys(resourceToGroupMap).length, 'resources');
 
-        // Fetch all pages with error handling
+        // Fetch ALL pending requests (no date filtering - get everything)
         const eventMap = {};
         const resourceMap = {};
         let allRequests = [];
-        let nextUrl = baseUrl;
-        let maxUpdatedAt = lastSync || new Date(0);
+        let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource&order=-created_at`;
         
-        while (nextUrl) {
+        console.log('📥 Fetching pending requests...');
+        
+        while (nextUrl && allRequests.length < 500) {
             try {
                 const requestsResponse = await fetch(nextUrl, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
 
                 if (!requestsResponse.ok) {
-                    if (requestsResponse.status === 429) {
-                        // Rate limit - wait and retry
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        continue;
-                    }
-                    console.error('Failed to fetch page, skipping...');
-                    break; // Skip this page, continue with what we have
+                    console.error('Failed to fetch page, status:', requestsResponse.status);
+                    break;
                 }
 
                 const requestsData = await requestsResponse.json();
                 allRequests = allRequests.concat(A(requestsData.data));
-                
-                // Track max updated_at
-                A(requestsData.data).forEach(req => {
-                    try {
-                        const updatedAt = new Date(req.attributes?.updated_at);
-                        if (updatedAt > maxUpdatedAt) {
-                            maxUpdatedAt = updatedAt;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing date:', e);
-                    }
-                });
                 
                 // Build maps from included data
                 if (requestsData.included) {
@@ -230,15 +174,15 @@ Deno.serve(async (req) => {
                 }
                 
                 nextUrl = requestsData.links?.next || null;
-                
-                if (allRequests.length >= 500) break;
             } catch (error) {
                 console.error('Error fetching page:', error);
-                break; // Continue with what we have
+                break;
             }
         }
 
-        // Filter to my groups and fetch event instances
+        console.log('📥 Fetched', allRequests.length, 'total pending requests');
+
+        // Filter to only my groups and build approval objects
         const myApprovals = [];
         
         for (const request of A(allRequests)) {
@@ -290,101 +234,50 @@ Deno.serve(async (req) => {
                 }
             } catch (error) {
                 console.error('Error processing request:', error);
-                // Continue to next request
             }
         }
 
-        // Reconciliation: Upsert new/updated approvals
-        let newUpserts = 0;
+        console.log('✅ Found', myApprovals.length, 'approvals for my groups');
+
+        // Clear and recreate all approvals (simpler than diffing)
+        const existingApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
+            user_email: currentUser.email
+        }).catch(() => []);
+
+        // Delete all existing
+        for (const existing of A(existingApprovals)) {
+            try {
+                await base44.asServiceRole.entities.PendingApproval.delete(existing.id);
+            } catch (error) {
+                console.error('Error deleting approval:', error);
+            }
+        }
+
+        // Create all current
         for (const approval of A(myApprovals)) {
             try {
-                const existing = await base44.asServiceRole.entities.PendingApproval.filter({
-                    user_email: currentUser.email,
-                    request_id: approval.request_id
-                }).catch(() => []);
-
-                if (A(existing).length > 0) {
-                    await base44.asServiceRole.entities.PendingApproval.update(existing[0].id, approval);
-                } else {
-                    await base44.asServiceRole.entities.PendingApproval.create(approval);
-                    newUpserts++;
-                }
+                await base44.asServiceRole.entities.PendingApproval.create(approval);
             } catch (error) {
-                console.error('Error upserting approval:', error);
+                console.error('Error creating approval:', error);
             }
         }
 
-        // Remove closed approvals
-        const currentPendingIds = new Set(A(myApprovals).map(a => a.request_id));
-        const allStoredApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
-            user_email: currentUser.email
-        }).catch(() => []);
-        
-        let removed = 0;
-        for (const stored of A(allStoredApprovals)) {
-            try {
-                if (!currentPendingIds.has(stored.request_id)) {
-                    await base44.asServiceRole.entities.PendingApproval.delete(stored.id);
-                    removed++;
-                }
-            } catch (error) {
-                console.error('Error removing approval:', error);
-            }
-        }
-
-        // Update sync state
-        const syncData = {
-            user_email: currentUser.email,
-            last_sync: maxUpdatedAt.toISOString(),
-            total_fetched: N(allRequests.length),
-            new_upserts: N(newUpserts),
-            removed: N(removed),
-            my_groups: A(Object.values(myGroupNames))
-        };
-
-        try {
-            if (syncState) {
-                await base44.asServiceRole.entities.ApprovalSyncState.update(syncState.id, syncData);
-            } else {
-                await base44.asServiceRole.entities.ApprovalSyncState.create(syncData);
-            }
-        } catch (error) {
-            console.error('Error updating sync state:', error);
-        }
-
-        // Fetch and return sorted approvals
-        const finalApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
-            user_email: currentUser.email
-        }).catch(() => []);
-
-        A(finalApprovals).sort((a, b) => {
+        // Sort by event date
+        A(myApprovals).sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.pco_created_at || 0);
             const dateB = new Date(b.event_starts_at || b.pco_created_at || 0);
             return dateA - dateB;
         });
 
-        console.log('✅ Sync complete:', {
-            user: currentUser.email,
-            total_fetched: allRequests.length,
-            new_upserts: newUpserts,
-            removed: removed,
-            pending_count: finalApprovals.length
-        });
+        console.log('✅ Sync complete:', myApprovals.length, 'pending approvals');
 
         return Response.json({
             success: true,
-            pending_approvals: A(finalApprovals),
-            count: N(A(finalApprovals).length),
+            pending_approvals: A(myApprovals),
+            count: N(A(myApprovals).length),
             my_groups: A(Object.values(myGroupNames)),
             my_groups_count: N(myGroupIds.length),
             total_fetched: N(allRequests.length),
-            sync_stats: {
-                total_fetched: N(allRequests.length),
-                new_upserts: N(newUpserts),
-                removed: N(removed),
-                last_sync_before: syncState?.last_sync,
-                last_sync_after: maxUpdatedAt.toISOString()
-            },
             cache_bust: Date.now()
         });
 
@@ -392,7 +285,8 @@ Deno.serve(async (req) => {
         console.error('❌ Sync error:', error);
         return Response.json({ 
             error: error.message,
-            ...emptyResponse()
+            pending_approvals: [],
+            count: 0
         }, { status: 500 });
     }
 });
