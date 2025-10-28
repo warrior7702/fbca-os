@@ -2,8 +2,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 // Safe array coercion
 const A = (x) => Array.isArray(x) ? x : [];
-// Safe number coercion
-const N = (x) => Number.isFinite(Number(x)) ? Number(x) : 0;
 
 async function refreshTokenIfNeeded(base44, user) {
     const expiresAt = new Date(user.pco_token_expires_at);
@@ -47,8 +45,6 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { forceResync } = await req.json().catch(() => ({ forceResync: false }));
-
         const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
         const user = A(users)[0];
 
@@ -62,9 +58,9 @@ Deno.serve(async (req) => {
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        console.log('🔄 Starting sync for:', currentUser.email, 'Force:', forceResync);
+        console.log('🔄 Starting clean sync for:', currentUser.email);
 
-        // Get my PCO person ID
+        // 1) Get my PCO person ID
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
@@ -78,7 +74,7 @@ Deno.serve(async (req) => {
 
         console.log('👤 My PCO Person ID:', myPcoPersonId);
 
-        // Get ALL approval groups and check membership
+        // 2) Get ALL approval groups and check membership
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -89,7 +85,7 @@ Deno.serve(async (req) => {
         }
 
         const groupsData = await groupsResponse.json();
-        const myGroupIds = [];
+        const myGroupIds = new Set();
         const myGroupNames = {};
         const resourceToGroupMap = {};
         
@@ -107,7 +103,7 @@ Deno.serve(async (req) => {
                     const isMember = A(membersData.data).some(person => person.id === myPcoPersonId);
                     
                     if (isMember) {
-                        myGroupIds.push(group.id);
+                        myGroupIds.add(group.id);
                         myGroupNames[group.id] = group.attributes?.name;
                         console.log('✅ Member of group:', group.attributes?.name);
                     }
@@ -133,105 +129,100 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log('📋 I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
-        console.log('📋 Mapped', Object.keys(resourceToGroupMap).length, 'resources');
+        console.log('📋 I am in', myGroupIds.size, 'groups:', Object.values(myGroupNames));
 
-        // Fetch ALL pending requests (no date filtering - get everything)
+        // 3) Fetch ONLY PENDING requests (fresh pull, no cursor)
         const eventMap = {};
         const resourceMap = {};
         let allRequests = [];
-        let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource&order=-created_at`;
         
         console.log('📥 Fetching pending requests...');
         
-        while (nextUrl && allRequests.length < 500) {
-            try {
-                const requestsResponse = await fetch(nextUrl, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
+        const requestsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource&order=-created_at',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
 
-                if (!requestsResponse.ok) {
-                    console.error('Failed to fetch page, status:', requestsResponse.status);
-                    break;
-                }
-
-                const requestsData = await requestsResponse.json();
-                allRequests = allRequests.concat(A(requestsData.data));
-                
-                // Build maps from included data
-                if (requestsData.included) {
-                    A(requestsData.included).forEach(item => {
-                        try {
-                            if (item.type === 'Event') {
-                                if (!eventMap[item.id]) eventMap[item.id] = item;
-                            } else if (item.type === 'Resource') {
-                                if (!resourceMap[item.id]) resourceMap[item.id] = item;
-                            }
-                        } catch (e) {
-                            console.error('Error processing included item:', e);
-                        }
-                    });
-                }
-                
-                nextUrl = requestsData.links?.next || null;
-            } catch (error) {
-                console.error('Error fetching page:', error);
-                break;
-            }
+        if (!requestsResponse.ok) {
+            throw new Error('Failed to fetch pending requests');
         }
 
-        console.log('📥 Fetched', allRequests.length, 'total pending requests');
+        const requestsData = await requestsResponse.json();
+        allRequests = A(requestsData.data);
+        
+        // Build maps from included data
+        if (requestsData.included) {
+            A(requestsData.included).forEach(item => {
+                if (item.type === 'Event') {
+                    eventMap[item.id] = item;
+                } else if (item.type === 'Resource') {
+                    resourceMap[item.id] = item;
+                }
+            });
+        }
 
-        // Filter to only my groups and build approval objects
+        console.log('📥 Fetched', allRequests.length, 'pending requests');
+
+        // 4) Hard filter: only status=P, only my groups
         const myApprovals = [];
+        const seenIds = new Set(); // Dedupe
         
         for (const request of A(allRequests)) {
             try {
+                // Skip if already seen (dedupe)
+                if (seenIds.has(request.id)) continue;
+                
+                // Hard filter: MUST be pending
+                if (request.attributes?.approval_status !== 'P') continue;
+                
                 const resourceId = request.relationships?.resource?.data?.id;
                 const groupInfo = resourceToGroupMap[resourceId];
                 
-                if (groupInfo && myGroupIds.includes(groupInfo.groupId)) {
-                    const eventId = request.relationships?.event?.data?.id;
-                    const event = eventMap[eventId];
-                    const resource = resourceMap[resourceId];
+                // Hard filter: MUST be in my groups
+                if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) continue;
+                
+                seenIds.add(request.id);
+                
+                const eventId = request.relationships?.event?.data?.id;
+                const event = eventMap[eventId];
+                const resource = resourceMap[resourceId];
+                
+                // Fetch event instance for dates
+                let eventStartsAt = null;
+                let eventEndsAt = null;
+                
+                try {
+                    const instancesResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    );
                     
-                    // Fetch event instance for dates
-                    let eventStartsAt = null;
-                    let eventEndsAt = null;
-                    
-                    try {
-                        const instancesResponse = await fetch(
-                            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
-                            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                        );
-                        
-                        if (instancesResponse.ok) {
-                            const instancesData = await instancesResponse.json();
-                            if (A(instancesData.data).length > 0) {
-                                eventStartsAt = instancesData.data[0].attributes?.starts_at;
-                                eventEndsAt = instancesData.data[0].attributes?.ends_at;
-                            }
+                    if (instancesResponse.ok) {
+                        const instancesData = await instancesResponse.json();
+                        if (A(instancesData.data).length > 0) {
+                            eventStartsAt = instancesData.data[0].attributes?.starts_at;
+                            eventEndsAt = instancesData.data[0].attributes?.ends_at;
                         }
-                    } catch (err) {
-                        console.error('Error fetching event instance:', err);
                     }
-                    
-                    myApprovals.push({
-                        user_email: currentUser.email,
-                        request_id: request.id,
-                        event_id: eventId,
-                        event_name: event?.attributes?.name || 'Unknown Event',
-                        event_starts_at: eventStartsAt,
-                        event_ends_at: eventEndsAt,
-                        resource_id: resourceId,
-                        resource_name: resource?.attributes?.name || 'Unknown Resource',
-                        approval_group_name: groupInfo.groupName,
-                        quantity: N(request.attributes?.quantity) || 1,
-                        approval_status: request.attributes?.approval_status || 'P',
-                        pco_created_at: request.attributes?.created_at,
-                        pco_updated_at: request.attributes?.updated_at
-                    });
+                } catch (err) {
+                    console.error('Error fetching event instance:', err);
                 }
+                
+                myApprovals.push({
+                    user_email: currentUser.email,
+                    request_id: request.id,
+                    event_id: eventId,
+                    event_name: event?.attributes?.name || 'Unknown Event',
+                    event_starts_at: eventStartsAt,
+                    event_ends_at: eventEndsAt,
+                    resource_id: resourceId,
+                    resource_name: resource?.attributes?.name || 'Unknown Resource',
+                    approval_group_name: groupInfo.groupName,
+                    quantity: request.attributes?.quantity || 1,
+                    approval_status: 'P',
+                    pco_created_at: request.attributes?.created_at,
+                    pco_updated_at: request.attributes?.updated_at
+                });
             } catch (error) {
                 console.error('Error processing request:', error);
             }
@@ -239,7 +230,7 @@ Deno.serve(async (req) => {
 
         console.log('✅ Found', myApprovals.length, 'approvals for my groups');
 
-        // Clear and recreate all approvals (simpler than diffing)
+        // 5) Clear and recreate all approvals (always fresh)
         const existingApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
             user_email: currentUser.email
         }).catch(() => []);
@@ -274,11 +265,9 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             pending_approvals: A(myApprovals),
-            count: N(A(myApprovals).length),
-            my_groups: A(Object.values(myGroupNames)),
-            my_groups_count: N(myGroupIds.length),
-            total_fetched: N(allRequests.length),
-            cache_bust: Date.now()
+            count: myApprovals.length,
+            my_groups: Array.from(myGroupIds).map(id => myGroupNames[id]),
+            my_groups_count: myGroupIds.size
         });
 
     } catch (error) {
