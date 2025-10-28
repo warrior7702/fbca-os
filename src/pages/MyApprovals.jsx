@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Calendar, RefreshCw, Loader2, ExternalLink, AlertCircle, Clock } from "lucide-react";
+import { Calendar, RefreshCw, Loader2, ExternalLink, AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,14 +14,16 @@ import FullApprovalCalendarModal from "../components/approvals/FullApprovalCalen
 
 const A = (x) => Array.isArray(x) ? x : [];
 
+const VERCEL_API = "https://pco-webhook.vercel.app/api";
+
 function MyApprovalsContent() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [processingIds, setProcessingIds] = useState(new Set());
 
   const safeApprovals = A(approvals);
 
@@ -34,13 +36,13 @@ function MyApprovalsContent() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      if (!currentUser.pco_access_token) {
+      if (!currentUser?.pco_access_token) {
         setError('Planning Center not connected');
         setLoading(false);
         return;
       }
 
-      await performSync();
+      await loadMyApprovals(currentUser.pco_access_token);
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -50,44 +52,186 @@ function MyApprovalsContent() {
     }
   };
 
-  const performSync = async () => {
-    setSyncing(true);
-    setError(null);
-    
+  const loadMyApprovals = async (token) => {
     try {
-      console.log('🔄 Starting sync');
+      console.log('🔄 Fetching my approvals from Vercel API');
       
-      const response = await base44.functions.invoke('syncMyApprovals', {});
+      const response = await fetch(`${VERCEL_API}/pco-my-approvals`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      console.log('✅ Sync response:', response.data);
-
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API returned ${response.status}`);
       }
 
-      const syncedApprovals = A(response.data.pending_approvals);
+      const data = await response.json();
+      console.log('✅ Received approvals:', data);
+
+      // Transform the data to match our UI format
+      const transformedApprovals = A(data.events).flatMap(event => 
+        A(event.requests).map(request => ({
+          request_id: request.id,
+          event_id: event.id,
+          event_name: event.name,
+          event_starts_at: event.starts_at,
+          event_ends_at: event.ends_at,
+          resource_name: request.resource_name,
+          resource_id: request.resource_id,
+          approval_group_name: request.approval_group_name,
+          quantity: request.quantity || 1,
+          approval_status: request.status,
+          pco_created_at: request.created_at,
+          pco_updated_at: request.updated_at
+        }))
+      );
       
-      setApprovals(syncedApprovals);
+      setApprovals(transformedApprovals);
       
       // Build calendar events
-      const events = syncedApprovals.map(approval => ({
-        id: approval.request_id,
-        title: approval.event_name,
-        start: approval.event_starts_at,
-        end: approval.event_ends_at,
-        extendedProps: { approval }
+      const events = A(data.events).map(event => ({
+        id: event.id,
+        title: event.name,
+        start: event.starts_at,
+        end: event.ends_at,
+        extendedProps: { 
+          requestCount: A(event.requests).length,
+          requests: event.requests
+        }
       }));
       
       setCalendarEvents(events);
 
-      toast.success(`Synced ${syncedApprovals.length} pending approvals`);
+      toast.success(`Loaded ${transformedApprovals.length} pending approvals`);
       
     } catch (error) {
-      console.error('❌ Sync error:', error);
+      console.error('❌ Load error:', error);
       setError(error.message);
-      toast.error(`Sync failed: ${error.message}`);
+      toast.error(`Failed to load: ${error.message}`);
+    }
+  };
+
+  const handleApprove = async (approval) => {
+    if (!user?.pco_access_token) {
+      toast.error('Not connected to Planning Center');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Approve this request?\n\n` +
+      `Event: ${approval.event_name}\n` +
+      `Resource: ${approval.resource_name}\n` +
+      `Date: ${approval.event_starts_at ? format(new Date(approval.event_starts_at), 'PPP') : 'N/A'}`
+    );
+
+    if (!confirmed) return;
+    
+    setProcessingIds(prev => new Set(prev).add(approval.request_id));
+    
+    try {
+      console.log('✅ Approving request:', approval.request_id);
+      
+      const response = await fetch(`${VERCEL_API}/pco-approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.pco_access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: approval.request_id,
+          action: 'approve',
+          note: 'Approved via FBCA OS'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to approve (${response.status})`);
+      }
+
+      toast.success('Request approved!');
+      
+      // Remove from local state
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      
+      // Reload fresh data
+      setTimeout(() => loadMyApprovals(user.pco_access_token), 1000);
+      
+    } catch (error) {
+      console.error('❌ Approve error:', error);
+      toast.error(`Failed to approve: ${error.message}`);
     } finally {
-      setSyncing(false);
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(approval.request_id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeny = async (approval) => {
+    if (!user?.pco_access_token) {
+      toast.error('Not connected to Planning Center');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Deny this request?\n\n` +
+      `Event: ${approval.event_name}\n` +
+      `Resource: ${approval.resource_name}`
+    );
+
+    if (!confirmed) return;
+    
+    setProcessingIds(prev => new Set(prev).add(approval.request_id));
+    
+    try {
+      console.log('❌ Denying request:', approval.request_id);
+      
+      const response = await fetch(`${VERCEL_API}/pco-approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.pco_access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: approval.request_id,
+          action: 'deny',
+          note: 'Denied via FBCA OS'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to deny (${response.status})`);
+      }
+
+      toast.success('Request denied');
+      
+      // Remove from local state
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      
+      // Reload fresh data
+      setTimeout(() => loadMyApprovals(user.pco_access_token), 1000);
+      
+    } catch (error) {
+      console.error('❌ Deny error:', error);
+      toast.error(`Failed to deny: ${error.message}`);
+    } finally {
+      setProcessingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(approval.request_id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRefresh = () => {
+    if (user?.pco_access_token) {
+      loadMyApprovals(user.pco_access_token);
     }
   };
 
@@ -131,12 +275,11 @@ function MyApprovalsContent() {
           
           <div className="flex gap-2">
             <Button
-              onClick={performSync}
-              disabled={syncing}
+              onClick={handleRefresh}
               variant="outline"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Refresh'}
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
             </Button>
           </div>
         </div>
@@ -177,62 +320,96 @@ function MyApprovalsContent() {
             </Card>
           )}
 
-          {safeApprovals.map((approval) => (
-            <Card key={approval.request_id} className="hover:shadow-lg transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {approval.event_name}
-                      </h3>
-                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                        Pending
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {approval.event_starts_at
-                            ? format(new Date(approval.event_starts_at), 'PPP p')
-                            : 'Date TBD'}
-                        </span>
+          {safeApprovals.map((approval) => {
+            const isProcessing = processingIds.has(approval.request_id);
+            
+            return (
+              <Card key={approval.request_id} className="hover:shadow-lg transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {approval.event_name}
+                        </h3>
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                          Pending
+                        </Badge>
                       </div>
 
-                      <div>
-                        <span className="font-medium">Resource:</span> {approval.resource_name}
-                        {approval.quantity > 1 && ` (×${approval.quantity})`}
-                      </div>
-
-                      <div>
-                        <span className="font-medium">Group:</span> {approval.approval_group_name}
-                      </div>
-
-                      {approval.pco_created_at && (
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <Clock className="w-3 h-3" />
-                          Requested {format(new Date(approval.pco_created_at), 'PPP')}
+                      <div className="space-y-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>
+                            {approval.event_starts_at
+                              ? format(new Date(approval.event_starts_at), 'PPP p')
+                              : 'Date TBD'}
+                          </span>
                         </div>
-                      )}
+
+                        <div>
+                          <span className="font-medium">Resource:</span> {approval.resource_name}
+                          {approval.quantity > 1 && ` (×${approval.quantity})`}
+                        </div>
+
+                        <div>
+                          <span className="font-medium">Group:</span> {approval.approval_group_name}
+                        </div>
+
+                        {approval.pco_created_at && (
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Clock className="w-3 h-3" />
+                            Requested {format(new Date(approval.pco_created_at), 'PPP')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`https://calendar.planningcenteronline.com/`, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View in PCO
+                      </Button>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(approval)}
+                          disabled={isProcessing}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Approve
+                        </Button>
+                        
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeny(approval)}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Deny
+                        </Button>
+                      </div>
                     </div>
                   </div>
-
-                  <div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`https://calendar.planningcenteronline.com/`, '_blank')}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View in PCO
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
