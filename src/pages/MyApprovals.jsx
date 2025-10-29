@@ -36,10 +36,10 @@ export default function MyApprovals() {
   }, []);
 
   useEffect(() => {
-    // Only load approvals if user is connected
     if (user?.pco_access_token) {
       loadApprovals();
-    } else {
+    } else if (user && !user.pco_access_token) {
+      console.log('User loaded but PCO not connected');
       setLoading(false);
     }
   }, [user]);
@@ -47,6 +47,8 @@ export default function MyApprovals() {
   const loadUser = async () => {
     try {
       const currentUser = await base44.auth.me();
+      console.log('User loaded:', currentUser?.email);
+      console.log('Has PCO token:', !!currentUser?.pco_access_token);
       setUser(currentUser);
     } catch (error) {
       console.error("Error loading user:", error);
@@ -63,14 +65,14 @@ export default function MyApprovals() {
     setLoading(true);
     setError(null);
     try {
-      console.log('Loading approvals from Vercel...');
+      console.log('🔄 Loading approvals from Vercel...');
       
-      // Call Vercel API via pcoClient
       const response = await getApprovalsLite("mygroups");
       
-      console.log('Approvals loaded:', response);
+      console.log('✅ Raw response:', response);
+      console.log('✅ Response data length:', response.data?.length);
+      console.log('✅ First item:', response.data?.[0]);
       
-      // Transform data to match our UI format
       const transformedApprovals = (response.data || []).map(item => ({
         id: item.id,
         request_id: item.id,
@@ -86,12 +88,17 @@ export default function MyApprovals() {
         pco_updated_at: item.updated_at
       }));
       
+      console.log('✅ Transformed approvals:', transformedApprovals);
       setApprovals(transformedApprovals);
-      console.log('Transformed approvals:', transformedApprovals.length);
+      
+      if (transformedApprovals.length === 0) {
+        console.log('ℹ️ No approvals found - you may not be in any approval groups or there are no pending requests');
+      }
     } catch (error) {
-      console.error("Failed to load approvals:", error);
+      console.error("❌ Failed to load approvals:", error);
+      console.error("❌ Error details:", error.message);
       setError(error.message);
-      toast.error("Failed to load approvals");
+      toast.error("Failed to load approvals: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -104,7 +111,6 @@ export default function MyApprovals() {
       
       toast.success('Request approved!');
       
-      // Remove from local state
       setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Approval failed:", error);
@@ -121,7 +127,6 @@ export default function MyApprovals() {
       
       toast.success('Request denied');
       
-      // Remove from local state
       setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Denial failed:", error);
@@ -190,7 +195,11 @@ export default function MyApprovals() {
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <ClipboardCheck className="w-16 h-16 text-slate-300 mb-4" />
                     <p className="text-slate-600 text-lg mb-2">No pending approvals</p>
-                    <p className="text-slate-500 text-sm">All caught up! New approvals will appear here.</p>
+                    <p className="text-slate-500 text-sm">
+                      {user?.pco_access_token 
+                        ? "All caught up! New approvals will appear here."
+                        : "Connect Planning Center in Settings to see approvals."}
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
