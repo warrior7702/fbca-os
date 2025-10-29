@@ -1,115 +1,144 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
+
+/**
+ * getApprovalDetails
+ * Retrieves resource questions, answers, and event info for a Planning Center approval.
+ * Works even when answers are nested under resource_bookings or event_resource_requests.
+ */
 
 Deno.serve(async (req) => {
   const diag = [];
-
   try {
     const base44 = createClientFromRequest(req);
-    const currentUser = await base44.auth.me();
+    const user = await base44.auth.me();
+    diag.push({ step: "auth", user_email: user?.email });
 
-    if (!currentUser) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user?.pco_access_token) {
+      diag.push({ step: "auth", error: "missing pco_access_token" });
+      return Response.json({ ok: false, error: "Unauthorized", diag }, { status: 401 });
     }
 
-    const { event_id, resource_id, request_id } = await req.json();
-
+    const { request_id, resource_id, event_id } = await req.json();
     if (!event_id || !resource_id) {
       return Response.json({
         ok: false,
-        error: "Missing event_id or resource_id"
+        error: "Missing event_id or resource_id",
+        diag,
       }, { status: 400 });
     }
 
-    // 🔑 Get Planning Center access token
-    const tokenResponse = await base44.functions.invoke("getPCOToken");
-    const access_token = tokenResponse.data.access_token;
-    const headers = { Authorization: `Bearer ${access_token}` };
+    const headers = {
+      Authorization: `Bearer ${user.pco_access_token}`,
+      "Content-Type": "application/json",
+    };
 
-    // 🧩 Step 1: Fetch event with includes
-    const eventUrl =
-      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}` +
-      `?include=resource_bookings,resource_bookings.resource,` +
-      `resource_bookings.resource_question_answers.resource_question,` +
-      `resource_bookings.resource_question_answers.choice`;
-
-    const eventRes = await fetch(eventUrl, { headers });
-    const eventJson = await eventRes.json();
-    diag.push({
-      step: "event",
-      status: eventRes.status,
-      included: eventJson.included?.length || 0
-    });
-
-    const included = Object.fromEntries((eventJson.included || []).map(x => [x.id, x]));
-    let answers = (eventJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
-
-    // 🧩 Step 2: If no answers found, fetch bookings directly
-    if (!answers.length) {
-      const bookUrl =
-        `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/resource_bookings` +
-        `?include=resource,resource_question_answers.resource_question,resource_question_answers.choice`;
-
-      const bookRes = await fetch(bookUrl, { headers });
-      const bookJson = await bookRes.json();
-      answers = (bookJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
-      diag.push({
-        step: "bookings",
-        status: bookRes.status,
-        answersFound: answers.length
-      });
-    }
-
-    // 🧩 Step 3: Get resource questions for this resource
+    // 🔹 Step 1: Fetch Resource Questions
     const qUrl = `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions`;
     const qRes = await fetch(qUrl, { headers });
-    const qJson = await qRes.json();
-    const questions = (qJson.data || []).map(q => ({
+    const questionsData = qRes.ok ? await qRes.json() : { data: [] };
+
+    const questions = (questionsData.data || []).map(q => ({
       id: q.id,
       question: q.attributes.question,
       description: q.attributes.description,
-      required: q.attributes.required
+      kind: q.attributes.kind,
+      choices: q.attributes.choices,
+      multiple_select: q.attributes.multiple_select,
+      optional: q.attributes.optional,
     }));
     diag.push({ step: "questions", count: questions.length });
 
-    // 🧩 Step 4: Map answers to question IDs
-    const mappedAnswers = {};
-    for (const a of answers) {
-      const qid = a.relationships?.resource_question?.data?.id;
-      const val =
-        a.attributes?.answer_text ||
-        a.attributes?.answer_number ||
-        a.attributes?.answer_boolean ||
-        a.attributes?.answer_choice ||
-        null;
-      if (qid && val !== null) mappedAnswers[qid] = val;
+    // 🔹 Step 2: Try to fetch Answers by request
+    const aUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers`;
+    const aRes = await fetch(aUrl, { headers });
+
+    const answers = {};
+    if (aRes.ok) {
+      const aData = await aRes.json();
+      diag.push({ step: "answers", count: aData.data?.length || 0 });
+
+      (aData.data || []).forEach((a) => {
+        const qid = a.relationships?.resource_question?.data?.id;
+        if (!qid) return;
+        let val =
+          a.attributes?.answer_text ??
+          a.attributes?.answer_number ??
+          a.attributes?.answer_boolean ??
+          a.attributes?.answer_choice ??
+          a.attributes?.answer ??
+          null;
+        if (typeof val === "object" && val?.attributes?.name) val = val.attributes.name;
+        if (qid && val !== null) answers[qid] = val;
+      });
+    } else {
+      diag.push({ step: "answers", status: aRes.status });
+    }
+
+    // 🔹 Step 3: If no answers, fetch via event bookings fallback
+    if (Object.keys(answers).length === 0) {
+      const bookingsUrl = `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/resource_bookings?include=resource_question_answers.resource_question,resource_question_answers.choice`;
+      const bRes = await fetch(bookingsUrl, { headers });
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        const included = bData.included || [];
+        const answerItems = included.filter(i => i.type === "ResourceQuestionAnswer");
+
+        diag.push({ step: "bookings-fallback", answersFound: answerItems.length });
+
+        for (const a of answerItems) {
+          const qid = a.relationships?.resource_question?.data?.id;
+          if (!qid) continue;
+          let val =
+            a.attributes?.answer_text ??
+            a.attributes?.answer_number ??
+            a.attributes?.answer_boolean ??
+            a.attributes?.answer_choice ??
+            a.attributes?.answer ??
+            null;
+          if (typeof val === "object" && val?.attributes?.name) val = val.attributes.name;
+          if (qid && val !== null) answers[qid] = val;
+        }
+      }
+    }
+
+    // 🔹 Step 4: Fetch Event Summary
+    const eUrl = `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`;
+    const eRes = await fetch(eUrl, { headers });
+    let event = null;
+    if (eRes.ok) {
+      const eData = await eRes.json();
+      event = {
+        id: eData.data?.id,
+        name: eData.data?.attributes?.name,
+        starts_at: eData.data?.attributes?.starts_at,
+        ends_at: eData.data?.attributes?.ends_at,
+        summary: eData.data?.attributes?.summary,
+        description: eData.data?.attributes?.description,
+        percent_approved: eData.data?.attributes?.percent_approved,
+      };
     }
 
     diag.push({
-      step: "map",
-      mapped: Object.keys(mappedAnswers).length
-    });
-
-    // ✅ Return clean JSON
-    return Response.json({
-      ok: true,
-      event: eventJson.data || null,
-      questions,
-      answers: mappedAnswers,
+      step: "return",
       totals: {
         questions: questions.length,
-        answers: Object.keys(mappedAnswers).length
+        answers: Object.keys(answers).length,
       },
-      diag
     });
 
-  } catch (err) {
-    console.error("❌ getApprovalDetails failed:", err);
+    return Response.json({
+      ok: true,
+      event,
+      questions,
+      answers,
+      diag,
+    });
+  } catch (error) {
+    console.error("❌ getApprovalDetails error:", error);
     return Response.json({
       ok: false,
-      error: String(err),
-      diag
-    }, {
-      status: 500
-    });
+      error: String(error),
+      diag,
+    }, { status: 500 });
   }
 });
