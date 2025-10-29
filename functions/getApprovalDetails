@@ -80,9 +80,9 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        console.log("🔍 getApprovalDetails (instance-aware):", { request_id, event_id, resource_id });
+        console.log("🔍 getApprovalDetails (nested bookings approach):", { request_id, event_id, resource_id });
 
-        // 1) Resource → questions (+choices)
+        // 1) Get resource questions first
         const qUrl = `${PCO}/calendar/v2/resources/${resource_id}/resource_questions?per_page=100&include=choices`;
         diag.urls.resource_questions = qUrl;
         const qJson = await pcoJson(qUrl, token);
@@ -108,164 +108,135 @@ Deno.serve(async (req) => {
         diag.steps.push({ msg: `Found ${questions.length} resource questions` });
         console.log(`✅ Found ${questions.length} questions`);
 
-        // 2) Request → figure out the correct event_instance
-        const reqUrl = `${PCO}/calendar/v2/event_resource_requests/${request_id}`
-            + `?include=event,event_instance,requested_resources,requested_resources.resource,requested_resources.location`;
-        diag.urls.request = reqUrl;
-
-        const reqJson = await pcoJson(reqUrl, token);
-        const reqInc = indexIncluded(reqJson.included || []);
-
-        const reqData = reqJson?.data;
-        const instanceRel = reqData?.relationships?.event_instance?.data || null;
-        let instance_id = instanceRel?.id || null;
-
-        // Capture requested location
-        let requested_location_id = null;
-        const rrRel0 = (reqData?.relationships?.requested_resources?.data || [])[0];
-        if (rrRel0) {
-            const rr = reqInc(rrRel0.type, rrRel0.id);
-            const locRel = rr?.relationships?.location?.data;
-            requested_location_id = locRel?.id || null;
+        // 2) Try getting bookings from event first
+        console.log('📥 Step 1: Fetching event with bookings...');
+        const eventInclude = "resource_bookings,resource_bookings.resource,resource_bookings.resource_question_answers,resource_bookings.resource_question_answers.resource_question,resource_bookings.resource_question_answers.choice";
+        const eventUrl = `${PCO}/calendar/v2/events/${event_id}?include=${encodeURIComponent(eventInclude)}`;
+        diag.urls.event_with_bookings = eventUrl;
+        
+        const eventJson = await pcoJson(eventUrl, token);
+        const eventInc = indexIncluded(eventJson.included || []);
+        
+        const bookingsFromEvent = (eventJson.included || []).filter(x => x.type === "ResourceBooking");
+        console.log(`✅ Found ${bookingsFromEvent.length} bookings from event endpoint`);
+        
+        // Check if we have any answers in these bookings
+        let hasAnswers = false;
+        for (const booking of bookingsFromEvent) {
+            const ansRel = booking?.relationships?.resource_question_answers?.data || [];
+            if (ansRel.length > 0) {
+                hasAnswers = true;
+                break;
+            }
         }
-
-        console.log(`✅ Instance ID from request: ${instance_id}, Location ID: ${requested_location_id}`);
-
-        // 3) If no instance_id on request, find the next future instance for this event
-        if (!instance_id) {
-            console.log('⚠️ No event_instance on request - fetching future instances...');
-            const instancesUrl = `${PCO}/calendar/v2/events/${event_id}/event_instances?filter=future&per_page=1&order=starts_at`;
-            diag.urls.event_instances = instancesUrl;
+        
+        console.log(`   ${hasAnswers ? '✅' : '⚠️'} Answers found in event bookings: ${hasAnswers}`);
+        
+        let bookings = bookingsFromEvent;
+        let included = eventJson.included || [];
+        
+        // 3) If no answers, fetch bookings directly (this is the key!)
+        if (!hasAnswers) {
+            console.log('📥 Step 2: No answers in event - fetching bookings endpoint directly...');
+            const bookingsInclude = "resource,resource_question_answers,resource_question_answers.resource_question,resource_question_answers.choice";
+            const bookingsUrl = `${PCO}/calendar/v2/events/${event_id}/resource_bookings?per_page=100&include=${encodeURIComponent(bookingsInclude)}`;
+            diag.urls.resource_bookings = bookingsUrl;
             
-            const instancesJson = await pcoJson(instancesUrl, token);
-            if (instancesJson.data && instancesJson.data.length > 0) {
-                instance_id = instancesJson.data[0].id;
-                console.log(`✅ Found next future instance: ${instance_id}`);
-                diag.steps.push({ msg: "Using next future instance", instance_id });
-            } else {
-                console.log('❌ No future instances found for this event');
-                diag.steps.push({ msg: "No future instances found" });
-            }
+            const bookingsJson = await pcoJson(bookingsUrl, token);
+            bookings = bookingsJson.data || [];
+            included = bookingsJson.included || [];
+            
+            console.log(`✅ Found ${bookings.length} bookings from bookings endpoint`);
+            diag.steps.push({ msg: "Fetched bookings separately", count: bookings.length });
         }
-
-        // 4) Load the event instance with bookings + answers
-        let bookingAnswers = [];
-        let bookingFound = false;
-        let instanceCore = null;
-
-        if (instance_id) {
-            const inc = [
-                "resource_bookings",
-                "resource_bookings.resource",
-                "resource_bookings.location",
-                "resource_bookings.resource_question_answers",
-                "resource_bookings.resource_question_answers.resource_question",
-                "resource_bookings.resource_question_answers.choice",
-            ].join(",");
-            const instUrl = `${PCO}/calendar/v2/event_instances/${instance_id}?include=${encodeURIComponent(inc)}`;
-            diag.urls.event_instance = instUrl;
-
-            console.log('📥 Fetching event instance with bookings...');
-            const instJson = await pcoJson(instUrl, token);
-            const incFind = indexIncluded(instJson.included || []);
-
-            instanceCore = {
-                id: instJson?.data?.id,
-                starts_at: instJson?.data?.attributes?.starts_at,
-                ends_at: instJson?.data?.attributes?.ends_at
-            };
-
-            const bookings = (instJson.included || []).filter(x => x.type === "ResourceBooking");
-            console.log(`✅ Found ${bookings.length} bookings on instance`);
-
-            // Match booking by resource_id + location_id (when provided)
-            let booking = null;
-            if (requested_location_id) {
-                booking = bookings.find(b => {
-                    const resRel = b?.relationships?.resource?.data;
-                    const locRel = b?.relationships?.location?.data;
-                    return resRel?.id === String(resource_id) && locRel?.id === String(requested_location_id);
-                }) || null;
-            }
-            // Fallback to resource_id only
-            if (!booking) {
-                booking = bookings.find(b => {
-                    const resRel = b?.relationships?.resource?.data;
-                    return resRel?.id === String(resource_id);
-                }) || null;
-            }
-
-            if (booking) {
-                bookingFound = true;
-                console.log(`✅ Matched booking: ${booking.id}`);
-                
-                const ansRel = booking?.relationships?.resource_question_answers?.data || [];
-                console.log(`✅ Found ${ansRel.length} answer relationships`);
-                
-                bookingAnswers = ansRel.map(rel => {
-                    const ans = incFind(rel.type, rel.id);
-                    const qRel = ans?.relationships?.resource_question?.data;
-                    const chRel = ans?.relationships?.choice?.data;
-                    const q = qRel ? incFind(qRel.type, qRel.id) : null;
-                    const ch = chRel ? incFind(chRel.type, chRel.id) : null;
-
-                    const answerValue = ch?.attributes?.name || ans?.attributes?.value_text || ans?.attributes?.value || "";
-                    console.log(`   📝 Q${q?.id}: "${answerValue}"`);
-
-                    return {
-                        answer_id: ans?.id,
-                        question_id: q?.id || null,
-                        question: q?.attributes?.name || null,
-                        value: answerValue
-                    };
-                });
-            } else {
-                console.log('⚠️ No matching booking found on instance');
-                diag.steps.push({ msg: "No matching booking found", bookings_len: bookings.length });
-            }
+        
+        const bookingInc = indexIncluded(included);
+        
+        // 4) Match the booking for our resource
+        const targetBooking = bookings.find(b => {
+            const resRel = b?.relationships?.resource?.data;
+            return resRel?.id === String(resource_id);
+        });
+        
+        if (!targetBooking) {
+            console.log('⚠️ No booking found for this resource');
+            diag.steps.push({ msg: "No booking matched", resource_id });
         } else {
-            console.log('❌ Could not determine event_instance');
-            diag.steps.push({ msg: "Could not determine event_instance" });
+            console.log(`✅ Matched booking: ${targetBooking.id}`);
         }
-
-        // 5) Build answers map keyed by question_id
+        
+        // 5) Extract answers from the matched booking
         const answersMap = {};
-        for (const a of bookingAnswers) {
-            if (!a.question_id) continue;
-            answersMap[a.question_id] = a.value;
+        
+        if (targetBooking) {
+            const ansRel = targetBooking?.relationships?.resource_question_answers?.data || [];
+            console.log(`✅ Found ${ansRel.length} answer relationships on booking`);
+            
+            for (const rel of ansRel) {
+                const ans = bookingInc(rel.type, rel.id);
+                if (!ans) continue;
+                
+                const qRel = ans?.relationships?.resource_question?.data;
+                const chRel = ans?.relationships?.choice?.data;
+                const q = qRel ? bookingInc(qRel.type, qRel.id) : null;
+                const ch = chRel ? bookingInc(chRel.type, chRel.id) : null;
+                
+                // Try multiple possible answer fields
+                let answerValue = ch?.attributes?.name 
+                    || ans?.attributes?.value_text 
+                    || ans?.attributes?.value 
+                    || ans?.attributes?.answer_text
+                    || ans?.attributes?.answer_number
+                    || ans?.attributes?.answer_boolean
+                    || ans?.attributes?.answer_choice
+                    || "";
+                
+                // Handle boolean answers
+                if (typeof answerValue === 'boolean') {
+                    answerValue = answerValue ? 'Yes' : 'No';
+                }
+                
+                // Handle number answers
+                if (typeof answerValue === 'number') {
+                    answerValue = String(answerValue);
+                }
+                
+                const questionId = q?.id || qRel?.id;
+                if (questionId && answerValue) {
+                    answersMap[questionId] = answerValue;
+                    console.log(`   📝 Q${questionId}: "${answerValue}"`);
+                }
+            }
         }
-
+        
         console.log(`✅ Total answers mapped: ${Object.keys(answersMap).length}`);
-
-        // 6) Get event info for modal header
-        const evUrl = `${PCO}/calendar/v2/events/${event_id}`;
-        diag.urls.event = evUrl;
-        const evJson = await pcoJson(evUrl, token);
+        diag.steps.push({ msg: "Answers extracted", count: Object.keys(answersMap).length });
+        
+        // 6) Get event details for modal header
         const event = {
-            id: evJson?.data?.id,
-            name: evJson?.data?.attributes?.name,
-            approval_status: evJson?.data?.attributes?.approval_status,
-            starts_at: instanceCore?.starts_at || evJson?.data?.attributes?.starts_at,
-            ends_at: instanceCore?.ends_at || evJson?.data?.attributes?.ends_at,
-            summary: evJson?.data?.attributes?.summary,
-            description: evJson?.data?.attributes?.description
+            id: eventJson?.data?.id,
+            name: eventJson?.data?.attributes?.name,
+            approval_status: eventJson?.data?.attributes?.approval_status,
+            starts_at: eventJson?.data?.attributes?.starts_at,
+            ends_at: eventJson?.data?.attributes?.ends_at,
+            summary: eventJson?.data?.attributes?.summary,
+            description: eventJson?.data?.attributes?.description
         };
-
+        
         const payload = {
             questions,
             answers: answersMap,
             event,
-            instance: instanceCore,
-            booking_found: bookingFound,
+            booking_found: !!targetBooking,
             diag: {
                 ...diag,
                 duration_ms: Date.now() - started,
                 answers_found: Object.keys(answersMap).length
             }
         };
-
+        
         console.log("✅ getApprovalDetails complete:", { 
-            bookingFound, 
+            booking_found: !!targetBooking, 
             answers: Object.keys(answersMap).length 
         });
         
