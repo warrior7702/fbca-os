@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -135,6 +136,14 @@ export default function PCODebug() {
         console.log('✅ I am in', data.my_groups.length, 'groups');
       }
 
+      // Build resource to group map
+      const resourceToGroupMap = {};
+      for (const group of data.my_groups) {
+        for (const resource of group.resources) {
+          resourceToGroupMap[resource.id] = group.name;
+        }
+      }
+
       // Get all pending requests
       const requestsResponse = await fetch(
         'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource',
@@ -159,16 +168,44 @@ export default function PCODebug() {
           });
         }
 
-        // Process all requests
+        // Process all requests with future filtering
         for (const request of requestsData.data || []) {
           const resourceId = request.relationships?.resource?.data?.id;
           const eventId = request.relationships?.event?.data?.id;
           const event = eventMap[eventId];
           const resource = resourceMap[resourceId];
 
+          // Check if event has future instances
+          let hasFutureInstance = false;
+          let eventStartsAt = null;
+          
+          try {
+            const instancesResponse = await fetch(
+              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
+              { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            
+            if (instancesResponse.ok) {
+              const instancesData = await instancesResponse.json();
+              if (instancesData.data && instancesData.data.length > 0) {
+                hasFutureInstance = true;
+                eventStartsAt = instancesData.data[0].attributes?.starts_at;
+              }
+            }
+          } catch (err) {
+            console.error('Error checking event instance:', err);
+          }
+
+          // Skip if no future instance
+          if (!hasFutureInstance) {
+            console.log('⏭️ Skipping past event:', event?.attributes?.name);
+            continue;
+          }
+
           const requestInfo = {
             id: request.id,
             event_name: event?.attributes?.name || 'Unknown',
+            event_starts_at: eventStartsAt,
             resource_id: resourceId,
             resource_name: resource?.attributes?.name || 'Unknown',
             status: request.attributes?.approval_status,
@@ -178,16 +215,13 @@ export default function PCODebug() {
           data.pending_requests.push(requestInfo);
 
           // Check if this is in my groups
-          const isMyGroup = data.my_groups.some(g => 
-            g.resources.some(r => r.id === resourceId)
-          );
-
+          const isMyGroup = resourceToGroupMap[resourceId];
           if (isMyGroup) {
             data.my_pending_requests.push(requestInfo);
           }
         }
 
-        console.log('✅ Found', data.my_pending_requests.length, 'requests in my groups');
+        console.log('✅ Found', data.my_pending_requests.length, 'future requests in my groups');
       }
 
       // Get all resources
@@ -384,7 +418,7 @@ export default function PCODebug() {
                               <div>
                                 <p className="font-medium text-slate-900">{request.event_name}</p>
                                 <p className="text-sm text-slate-600">Resource: {request.resource_name}</p>
-                                <p className="text-xs text-slate-500">{new Date(request.created_at).toLocaleDateString()}</p>
+                                <p className="text-xs text-slate-500">Starts: {request.event_starts_at ? new Date(request.event_starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</p>
                               </div>
                               {isMyGroup && (
                                 <Badge className="bg-orange-600 text-white">
@@ -453,7 +487,7 @@ export default function PCODebug() {
                   </p>
                   <p className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-blue-600" />
-                    <span><strong>{debugData.pending_requests.length}</strong> total pending requests in the system</span>
+                    <span><strong>{debugData.pending_requests.length}</strong> total pending requests in the system (future events only)</span>
                   </p>
                   
                   {debugData.my_groups.length === 0 && (
