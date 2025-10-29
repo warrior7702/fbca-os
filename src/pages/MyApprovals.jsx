@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { getApprovalsLite, approveRequest, denyRequest } from "@/lib/pcoClient.js";
+import { getApprovalsLite, approveRequest, denyRequest } from "@/lib/pcoClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -107,7 +107,7 @@ export default function MyApprovals() {
   const handleApprove = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      await approveRequest(approval.request_id, "Approved from FBCA Hub");
+      await approveRequest(approval.request_id);
       
       toast.success('Request approved!');
       
@@ -123,7 +123,7 @@ export default function MyApprovals() {
   const handleDeny = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      await denyRequest(approval.request_id, "Denied from FBCA Hub");
+      await denyRequest(approval.request_id);
       
       toast.success('Request denied');
       

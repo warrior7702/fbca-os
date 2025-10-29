@@ -1,27 +1,55 @@
-export const pagesConfig = {
-  routes: [
-    { path: '/Loading', component: 'Loading' },
-    { path: '/Dashboard', component: 'Dashboard' },
-    { path: '/Marketing', component: 'Marketing' },
-    { path: '/FoodService', component: 'FoodService' },
-    { path: '/Settings', component: 'Settings' },
-    { path: '/IntegrationTest', component: 'IntegrationTest' },
-    { path: '/Documents', component: 'Documents' },
-    { path: '/Search', component: 'Search' },
-    { path: '/StaffDirectory', component: 'StaffDirectory' },
-    { path: '/MicrosoftLogin', component: 'MicrosoftLogin' },
-    { path: '/Onboarding', component: 'Onboarding' },
-    { path: '/MyTasks', component: 'MyTasks' },
-    { path: '/AIHelper', component: 'AIHelper' },
-    { path: '/MyApprovals', component: 'MyApprovals' },
-    { path: '/TaskDetail', component: 'TaskDetail' },
-    { path: '/BrandAssets', component: 'BrandAssets' },
-    { path: '/Ticketing', component: 'Ticketing' },
-    { path: '/MyDepartment', component: 'MyDepartment' },
-    { path: '/InboxHelper', component: 'InboxHelper' },
-    { path: '/MyMeetings', component: 'MyMeetings' },
-    { path: '/PCODebug', component: 'PCODebug' }
-  ]
-};
+import Loading from './pages/Loading';
+import Dashboard from './pages/Dashboard';
+import Marketing from './pages/Marketing';
+import FoodService from './pages/FoodService';
+import Settings from './pages/Settings';
+import IntegrationTest from './pages/IntegrationTest';
+import Documents from './pages/Documents';
+import Search from './pages/Search';
+import StaffDirectory from './pages/StaffDirectory';
+import MicrosoftLogin from './pages/MicrosoftLogin';
+import Onboarding from './pages/Onboarding';
+import MyTasks from './pages/MyTasks';
+import AIHelper from './pages/AIHelper';
+import MyApprovals from './pages/MyApprovals';
+import TaskDetail from './pages/TaskDetail';
+import BrandAssets from './pages/BrandAssets';
+import Ticketing from './pages/Ticketing';
+import MyDepartment from './pages/MyDepartment';
+import InboxHelper from './pages/InboxHelper';
+import MyMeetings from './pages/MyMeetings';
+import PCODebug from './pages/PCODebug';
+import  from './pages/';
+import Layout from './Layout.jsx';
 
-export default pagesConfig;
+
+export const PAGES = {
+    "Loading": Loading,
+    "Dashboard": Dashboard,
+    "Marketing": Marketing,
+    "FoodService": FoodService,
+    "Settings": Settings,
+    "IntegrationTest": IntegrationTest,
+    "Documents": Documents,
+    "Search": Search,
+    "StaffDirectory": StaffDirectory,
+    "MicrosoftLogin": MicrosoftLogin,
+    "Onboarding": Onboarding,
+    "MyTasks": MyTasks,
+    "AIHelper": AIHelper,
+    "MyApprovals": MyApprovals,
+    "TaskDetail": TaskDetail,
+    "BrandAssets": BrandAssets,
+    "Ticketing": Ticketing,
+    "MyDepartment": MyDepartment,
+    "InboxHelper": InboxHelper,
+    "MyMeetings": MyMeetings,
+    "PCODebug": PCODebug,
+    "": ,
+}
+
+export const pagesConfig = {
+    mainPage: "Loading",
+    Pages: PAGES,
+    Layout: Layout,
+};
