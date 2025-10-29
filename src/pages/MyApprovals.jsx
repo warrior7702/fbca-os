@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,11 +70,14 @@ export default function MyApprovals() {
       const response = await base44.functions.invoke('getMyPendingApprovals', {});
       
       console.log('✅ Response:', response.data);
+      console.log('📊 Total fetched from PCO:', response.data.total_fetched);
+      console.log('📊 After filtering:', response.data.count, 'approvals');
+      console.log('📅 Approvals data:', response.data.pending_approvals);
       
       setApprovals(response.data.pending_approvals || []);
       
       if (response.data.pending_approvals?.length === 0) {
-        console.log('ℹ️ No approvals found');
+        console.log('ℹ️ No approvals found (all past events filtered out)');
       }
     } catch (error) {
       console.error("❌ Failed to load approvals:", error);
