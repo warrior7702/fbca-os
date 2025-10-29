@@ -15,8 +15,9 @@ import {
   MessageSquare
 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
-export default function ApprovalDetailModal({ approval, onClose, onApprove, onDeny }) {
+export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,7 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
     } catch (error) {
       console.error('❌ Failed to load details:', error);
       console.error('❌ Error details:', error.response?.data);
+      toast.error('Failed to load approval details');
     } finally {
       setLoading(false);
     }
@@ -60,10 +62,14 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
   const handleApprove = async () => {
     setProcessing(true);
     try {
-      await onApprove(approval);
-      onClose();
+      await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id
+      });
+      toast.success('Approved successfully!');
+      onComplete();
     } catch (error) {
       console.error('Approval failed:', error);
+      toast.error('Failed to approve request');
     } finally {
       setProcessing(false);
     }
@@ -72,10 +78,14 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
   const handleDeny = async () => {
     setProcessing(true);
     try {
-      await onDeny(approval);
-      onClose();
+      await base44.functions.invoke('denyResourceRequest', {
+        request_id: approval.request_id
+      });
+      toast.success('Request denied');
+      onComplete();
     } catch (error) {
       console.error('Denial failed:', error);
+      toast.error('Failed to deny request');
     } finally {
       setProcessing(false);
     }
