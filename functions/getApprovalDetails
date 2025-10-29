@@ -86,8 +86,12 @@ Deno.serve(async (req) => {
             console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
-        // Fetch answers for this specific request
-        const answersResponse = await fetch(
+        // Fetch answers - TRY BOTH ENDPOINTS
+        let answersData = null;
+        
+        // Try endpoint 1: with include parameter
+        console.log('\n🔍 Trying answers endpoint WITH include...');
+        const answersResponse1 = await fetch(
             `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100&include=resource_question`,
             {
                 headers: {
@@ -97,18 +101,47 @@ Deno.serve(async (req) => {
             }
         );
 
+        if (answersResponse1.ok) {
+            answersData = await answersResponse1.json();
+            console.log('✅ Endpoint 1 succeeded');
+        } else {
+            console.log('❌ Endpoint 1 failed:', answersResponse1.status);
+        }
+
+        // Try endpoint 2: without include parameter
+        if (!answersData || !answersData.data || answersData.data.length === 0) {
+            console.log('\n🔍 Trying answers endpoint WITHOUT include...');
+            const answersResponse2 = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (answersResponse2.ok) {
+                answersData = await answersResponse2.json();
+                console.log('✅ Endpoint 2 succeeded');
+            } else {
+                console.log('❌ Endpoint 2 failed:', answersResponse2.status);
+            }
+        }
+
         const answers = {};
-        if (answersResponse.ok) {
-            const answersData = await answersResponse.json();
-            console.log('📋 Raw answers response:', JSON.stringify(answersData, null, 2));
-            console.log('📋 Total answers found:', answersData.data?.length || 0);
+        const debugInfo = {
+            raw_response: answersData,
+            total_items: answersData?.data?.length || 0,
+            included_items: answersData?.included?.length || 0
+        };
+        
+        if (answersData && answersData.data) {
+            console.log('📋 Total answers found:', answersData.data.length);
+            console.log('📋 Raw response:', JSON.stringify(answersData, null, 2));
             
-            answersData.data?.forEach((answer, index) => {
-                console.log(`\n📌 Answer ${index + 1}:`, {
-                    answer_id: answer.id,
-                    value: answer.attributes?.value,
-                    relationships: answer.relationships
-                });
+            answersData.data.forEach((answer, index) => {
+                console.log(`\n📌 Answer ${index + 1}:`, JSON.stringify(answer, null, 2));
                 
                 const questionId = answer.relationships?.resource_question?.data?.id;
                 const answerValue = answer.attributes?.value;
@@ -116,19 +149,18 @@ Deno.serve(async (req) => {
                 console.log(`   → Question ID: ${questionId}`);
                 console.log(`   → Answer Value: ${answerValue}`);
                 
-                if (questionId && answerValue) {
+                if (questionId && answerValue !== null && answerValue !== undefined) {
                     answers[questionId] = answerValue;
                     console.log(`   ✅ Mapped: answers["${questionId}"] = "${answerValue}"`);
                 } else {
-                    console.log(`   ❌ Skipped - missing questionId or value`);
+                    console.log(`   ❌ Skipped - questionId: ${questionId}, value: ${answerValue}`);
                 }
             });
             
             console.log('\n✅ Final answers object:', JSON.stringify(answers, null, 2));
             console.log('✅ Total answers mapped:', Object.keys(answers).length);
         } else {
-            const errorText = await answersResponse.text();
-            console.log('❌ Failed to fetch answers:', errorText);
+            console.log('❌ No answers data found in response');
         }
 
         // Fetch event details
@@ -165,7 +197,8 @@ Deno.serve(async (req) => {
         return Response.json({
             questions,
             answers,
-            event
+            event,
+            debug: debugInfo // TEMPORARY: return debug info
         });
 
     } catch (error) {
