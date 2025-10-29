@@ -1,58 +1,48 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { motion, AnimatePresence } from "framer-motion";
 import {
+  X,
   Calendar,
   Clock,
+  MapPin,
   User,
   CheckCircle,
   XCircle,
   Loader2,
-  AlertCircle,
-  MessageSquare
+  FileText,
+  AlertCircle
 } from "lucide-react";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
 export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [approving, setApproving] = useState(false);
+  const [denying, setDenying] = useState(false);
 
   useEffect(() => {
     loadDetails();
-  }, [approval.request_id]);
+  }, [approval]);
 
   const loadDetails = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Loading approval details for request:', approval.request_id);
-      console.log('   Resource ID:', approval.resource_id);
-      console.log('   Event ID:', approval.event_id);
-      
-      const response = await base44.functions.invoke('getApprovalDetails', {
+      console.log('📋 Loading approval details for:', approval.request_id);
+      const response = await base44.functions.invoke('getApprovalDetailsV2', {
         request_id: approval.request_id,
-        resource_id: approval.resource_id,
-        event_id: approval.event_id
+        event_id: approval.event_id,
+        resource_id: approval.resource_id
       });
-
-      console.log('📦 Full response:', response);
-      console.log('📦 Response data:', response.data);
-      console.log('❓ Questions received:', response.data.questions);
-      console.log('💬 Answers received:', response.data.answers);
       
-      setQuestions(response.data.questions || []);
-      setAnswers(response.data.answers || {});
-      
-      console.log('✅ Set', response.data.questions?.length || 0, 'questions');
-      console.log('✅ Set', Object.keys(response.data.answers || {}).length, 'answers');
+      console.log('✅ Details loaded:', response.data);
+      setDetails(response.data);
     } catch (error) {
       console.error('❌ Failed to load details:', error);
-      console.error('❌ Error details:', error.response?.data);
       toast.error('Failed to load approval details');
     } finally {
       setLoading(false);
@@ -60,23 +50,23 @@ export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
   };
 
   const handleApprove = async () => {
-    setProcessing(true);
+    setApproving(true);
     try {
       await base44.functions.invoke('approveResourceRequest', {
         request_id: approval.request_id
       });
-      toast.success('Approved successfully!');
+      toast.success('Request approved successfully!');
       onComplete();
     } catch (error) {
-      console.error('Approval failed:', error);
+      console.error('Approval error:', error);
       toast.error('Failed to approve request');
     } finally {
-      setProcessing(false);
+      setApproving(false);
     }
   };
 
   const handleDeny = async () => {
-    setProcessing(true);
+    setDenying(true);
     try {
       await base44.functions.invoke('denyResourceRequest', {
         request_id: approval.request_id
@@ -84,146 +74,249 @@ export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
       toast.success('Request denied');
       onComplete();
     } catch (error) {
-      console.error('Denial failed:', error);
+      console.error('Denial error:', error);
       toast.error('Failed to deny request');
     } finally {
-      setProcessing(false);
+      setDenying(false);
     }
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">{approval.event_name}</DialogTitle>
-          <DialogDescription>
-            Review resource request details and answers
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Event Details */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-slate-500" />
-              <span className="font-medium">
-                {approval.event_starts_at
-                  ? format(new Date(approval.event_starts_at), 'PPP p')
-                  : 'No date set'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <User className="w-4 h-4 text-slate-500" />
-              <span>{approval.resource_name}</span>
-              {approval.quantity > 1 && (
-                <Badge variant="outline">Qty: {approval.quantity}</Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-slate-500" />
-              <span className="text-slate-600">
-                Requested {format(new Date(approval.pco_created_at), 'PP')}
-              </span>
-            </div>
-
-            <Badge className="bg-orange-100 text-orange-700">
-              {approval.approval_group_name}
-            </Badge>
-          </div>
-
-          <Separator />
-
-          {/* Resource Questions & Answers */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-            </div>
-          ) : questions.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-slate-600" />
-                <h3 className="font-semibold text-slate-900">
-                  Resource Questions ({questions.length})
-                </h3>
-              </div>
-
-              {questions.map((question) => (
-                <div key={question.id} className="p-4 bg-slate-50 rounded-lg space-y-2">
-                  <p className="font-medium text-slate-900">{question.question}</p>
-                  {question.description && (
-                    <p className="text-sm text-slate-600">{question.description}</p>
-                  )}
-                  <div className="pt-2">
-                    {answers[question.id] ? (
-                      <div className="flex items-start gap-2">
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                        <p className="text-slate-700">{answers[question.id]}</p>
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 italic">No answer provided</p>
-                    )}
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.95, y: 20 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 text-white">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold mb-2">{approval.event_name}</h2>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-white/90">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {approval.event_starts_at
+                        ? new Date(approval.event_starts_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                        : 'Date TBD'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>
+                      {approval.event_starts_at
+                        ? new Date(approval.event_starts_at).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })
+                        : 'Time TBD'}
+                    </span>
                   </div>
                 </div>
-              ))}
-              
-              <div className="text-xs text-slate-500 mt-2">
-                Showing {Object.keys(answers).length} of {questions.length} answers
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-250px)]">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              </div>
+            ) : !details || !details.ok ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Failed to load approval details. Please try again.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-6">
+                {/* Resource Info */}
+                <Card>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-slate-900 mb-3">Resource Request</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">Resource</p>
+                        <p className="font-medium text-slate-900">{approval.resource_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Approval Group</p>
+                        <p className="font-medium text-slate-900">{approval.approval_group_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Quantity</p>
+                        <p className="font-medium text-slate-900">{approval.quantity}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Requested</p>
+                        <p className="font-medium text-slate-900">
+                          {new Date(approval.pco_created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Questions & Answers */}
+                {details.questions && details.questions.length > 0 ? (
+                  <Card>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Resource Questions
+                        {!details.booking_found && (
+                          <Badge variant="outline" className="text-xs">
+                            Not yet answered
+                          </Badge>
+                        )}
+                      </h3>
+                      <div className="space-y-4">
+                        {details.questions.map((question) => (
+                          <div key={question.id} className="border-l-2 border-orange-300 pl-4">
+                            <p className="font-medium text-slate-900 mb-1">
+                              {question.question}
+                              {question.required && <span className="text-red-500 ml-1">*</span>}
+                            </p>
+                            {question.description && (
+                              <p className="text-sm text-slate-500 mb-2">{question.description}</p>
+                            )}
+                            <div className="bg-slate-50 rounded-lg p-3">
+                              {details.answers && details.answers[question.id] ? (
+                                <p className="text-slate-900">{details.answers[question.id]}</p>
+                              ) : (
+                                <p className="text-slate-400 italic">Not answered yet</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      No resource questions for this request
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Event Details */}
+                {details.event && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-slate-900 mb-3">Event Details</h3>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <p className="text-slate-500">Event Name</p>
+                          <p className="font-medium text-slate-900">{details.event.name}</p>
+                        </div>
+                        {details.event.starts_at && (
+                          <div>
+                            <p className="text-slate-500">Time</p>
+                            <p className="font-medium text-slate-900">
+                              {new Date(details.event.starts_at).toLocaleString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                              {details.event.ends_at && (
+                                <span> - {new Date(details.event.ends_at).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit'
+                                })}</span>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="border-t border-slate-200 p-6 bg-slate-50">
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                onClick={onClose}
+                variant="outline"
+                disabled={approving || denying}
+              >
+                Close
+              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleDeny}
+                  disabled={approving || denying || loading}
+                  variant="outline"
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  {denying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Denying...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Deny
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleApprove}
+                  disabled={approving || denying || loading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {approving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Approving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Approve
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p>No resource questions for this request</p>
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3">
-            <Button
-              onClick={onClose}
-              variant="outline"
-              disabled={processing}
-            >
-              Close
-            </Button>
-            
-            <Button
-              onClick={handleDeny}
-              disabled={processing}
-              variant="outline"
-              className="text-red-600 hover:bg-red-50"
-            >
-              {processing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Deny
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={handleApprove}
-              disabled={processing}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {processing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Approve
-                </>
-              )}
-            </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
