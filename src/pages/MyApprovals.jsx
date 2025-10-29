@@ -33,8 +33,16 @@ export default function MyApprovals() {
 
   useEffect(() => {
     loadUser();
-    loadApprovals();
   }, []);
+
+  useEffect(() => {
+    // Only load approvals if user is connected
+    if (user?.pco_access_token) {
+      loadApprovals();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadUser = async () => {
     try {
@@ -42,10 +50,16 @@ export default function MyApprovals() {
       setUser(currentUser);
     } catch (error) {
       console.error("Error loading user:", error);
+      setLoading(false);
     }
   };
 
   const loadApprovals = async () => {
+    if (!user?.pco_access_token) {
+      console.log('PCO not connected, skipping approval load');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
