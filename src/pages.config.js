@@ -18,6 +18,7 @@ import Ticketing from './pages/Ticketing';
 import MyDepartment from './pages/MyDepartment';
 import InboxHelper from './pages/InboxHelper';
 import MyMeetings from './pages/MyMeetings';
+import PCODebug from './pages/PCODebug';
 import Layout from './Layout.jsx';
 
 
@@ -42,6 +43,7 @@ export const PAGES = {
     "MyDepartment": MyDepartment,
     "InboxHelper": InboxHelper,
     "MyMeetings": MyMeetings,
+    "PCODebug": PCODebug,
 }
 
 export const pagesConfig = {
