@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug } from "lucide-react"; // Added Bug import
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
 import { Calendar, CheckSquare, Briefcase } from "lucide-react";
-import { motion } from "framer-motion"; // Added framer-motion import
-import { useNavigate } from "react-router-dom"; // Added useNavigate for navigation
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 const wallpapers = [
   {
@@ -48,20 +48,18 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [department, setDepartment] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
-  const [selectedWallpaper, setSelectedWallpaper] = useState("cross_white_glow"); // Changed default wallpaper
+  const [selectedWallpaper, setSelectedWallpaper] = useState("cross_white_glow");
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
-  const navigate = useNavigate(); // Initialize useNavigate hook
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadUser();
     
-    // Check for OAuth callback success/error messages OR direct tab navigation
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     
-    // If there's a tab param or OAuth callback, switch tabs accordingly
     if (tabParam) {
       setActiveTab(tabParam);
     } else if (urlParams.get('connected') || urlParams.get('error')) {
@@ -77,7 +75,6 @@ export default function Settings() {
         toast.error('Connection failed. Please try again.');
       }
       
-      // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -89,7 +86,7 @@ export default function Settings() {
       setDisplayName(currentUser.display_name || "");
       setDepartment(currentUser.department || "");
       setRoleTitle(currentUser.role_title || "");
-      setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow"); // Load user's wallpaper preference, updated default
+      setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow");
     } catch (error) {
       console.error("Error loading user:", error);
       toast.error("Failed to load settings");
@@ -118,7 +115,6 @@ export default function Settings() {
   const handleWallpaperChange = async (wallpaperId) => {
     setSelectedWallpaper(wallpaperId);
     try {
-      // Only update wallpaper, don't touch desktop_layout
       await base44.auth.updateMe({ wallpaper: wallpaperId });
       toast.success("Wallpaper updated!");
     } catch (error) {
@@ -127,13 +123,11 @@ export default function Settings() {
     }
   };
 
-  // Planning Center OAuth - Via Vercel
   const handleConnectPCO = () => {
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
     const settingsUrl = `${appUrl}/Settings`;
     
-    // Match Vercel's expected params: user_id and back
     window.location.href = `${vercelUrl}/api/pco-auth?user_id=${user.id}&back=${encodeURIComponent(settingsUrl)}`;
   };
 
@@ -151,7 +145,6 @@ export default function Settings() {
     }
   };
 
-  // ClickUp OAuth - Via Vercel
   const handleConnectClickUp = () => {
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
@@ -175,7 +168,6 @@ export default function Settings() {
     }
   };
 
-  // Microsoft OAuth
   const handleConnectMicrosoft = () => {
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
@@ -200,9 +192,7 @@ export default function Settings() {
   };
 
   const handleRearrangeIcons = () => {
-    // Assuming '/dashboard' is the correct path for the dashboard page.
-    // The query parameter 'edit=true' signals the dashboard to enter rearrangement mode.
-    navigate('/dashboard?edit=true'); 
+    navigate(createPageUrl('Dashboard') + '?edit=true'); 
   };
 
   if (loading) {
@@ -285,7 +275,6 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-4">
-            {/* Microsoft 365 Reconnection Notice */}
             {user?.microsoft_access_token && (
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -347,7 +336,6 @@ export default function Settings() {
               />
             </div>
 
-            {/* PCO Debug Link */}
             {user?.pco_access_token && (
               <Card className="border-purple-200 bg-purple-50 mt-4">
                 <CardHeader>
@@ -361,7 +349,7 @@ export default function Settings() {
                     Having issues with approvals not showing? Use the diagnostics tool to see your approval groups, pending requests, and connection status.
                   </p>
                   <Button
-                    onClick={() => navigate('/PCODebug')}
+                    onClick={() => navigate(createPageUrl('PCODebug'))}
                     variant="outline"
                     className="border-purple-300 hover:bg-purple-100"
                   >
@@ -489,8 +477,7 @@ export default function Settings() {
                 <CardDescription>Manage FBCA brand guidelines, logos, colors, and fonts</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Assuming a route like '/brand-assets' exists for the Brand Assets Manager */}
-                <Button onClick={() => navigate('/brand-assets')}> 
+                <Button onClick={() => navigate(createPageUrl('BrandAssets'))}> 
                   Open Brand Assets Manager
                 </Button>
               </CardContent>
