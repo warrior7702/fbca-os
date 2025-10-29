@@ -121,90 +121,94 @@ Deno.serve(async (req) => {
 
         console.log('📋 I am in', myGroupIds.size, 'approval groups');
 
-        // Get pending requests
-        const requestsResponse = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&order=-created_at&per_page=100&include=event,resource',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        if (!requestsResponse.ok) throw new Error('Failed to fetch pending requests');
-
-        const requestsData = await requestsResponse.json();
+        // Get pending requests - fetch MORE pages
+        let allRequests = [];
+        let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource';
         
-        // Build maps
         const eventMap = {};
         const resourceMap = {};
         
-        if (requestsData.included) {
-            A(requestsData.included).forEach(item => {
-                if (item.type === 'Event') {
-                    eventMap[item.id] = item;
-                } else if (item.type === 'Resource') {
-                    resourceMap[item.id] = item;
-                }
+        while (nextUrl && allRequests.length < 1000) {
+            const requestsResponse = await fetch(nextUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
+
+            if (!requestsResponse.ok) throw new Error('Failed to fetch pending requests');
+
+            const requestsData = await requestsResponse.json();
+            allRequests = allRequests.concat(A(requestsData.data));
+            
+            // Build maps from included data
+            if (requestsData.included) {
+                A(requestsData.included).forEach(item => {
+                    if (item.type === 'Event') {
+                        if (!eventMap[item.id]) eventMap[item.id] = item;
+                    } else if (item.type === 'Resource') {
+                        if (!resourceMap[item.id]) resourceMap[item.id] = item;
+                    }
+                });
+            }
+            
+            nextUrl = requestsData.links?.next || null;
         }
 
-        console.log('📥 Fetched', A(requestsData.data).length, 'total pending requests');
+        console.log('📥 Fetched', allRequests.length, 'total pending requests');
 
         // Filter to my groups only
         const myApprovals = [];
-        const lookbackDays = 90;
-        const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
         
-        for (const request of A(requestsData.data)) {
+        for (const request of allRequests) {
             // Must be pending
-            if (request.attributes?.approval_status !== 'P') continue;
-            
-            // Must be recent
-            const createdAt = new Date(request.attributes?.created_at).getTime();
-            if (createdAt < cutoff) continue;
+            if (request.attributes?.approval_status !== 'P') {
+                console.log(`⏭️ Request ${request.id}: Not pending (status: ${request.attributes?.approval_status})`);
+                continue;
+            }
             
             const resourceId = request.relationships?.resource?.data?.id;
             const groupInfo = resourceToGroupMap[resourceId];
             
             // Must be in my groups
-            if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) continue;
+            if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) {
+                continue;
+            }
             
             const eventId = request.relationships?.event?.data?.id;
             const event = eventMap[eventId];
             const resource = resourceMap[resourceId];
             
-            console.log(`\n🔍 Checking request ${request.id} for event: ${event?.attributes?.name} (ID: ${eventId})`);
+            console.log(`\n📝 Processing request ${request.id} for event: ${event?.attributes?.name} (ID: ${eventId})`);
             
-            // Get event instance for dates
+            // Get event instance for dates - try FUTURE first, then ANY
             let eventStartsAt = null;
             let eventEndsAt = null;
             
             try {
-                const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`;
-                console.log(`   → Fetching: ${instancesUrl}`);
+                // Try future instances first
+                let instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`;
+                console.log(`   🔍 Checking for future instances...`);
                 
-                const instancesResponse = await fetch(instancesUrl, {
+                let instancesResponse = await fetch(instancesUrl, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 
-                console.log(`   → Response status: ${instancesResponse.status}`);
-                
                 if (instancesResponse.ok) {
                     const instancesData = await instancesResponse.json();
-                    console.log(`   → Found ${A(instancesData.data).length} future instances`);
                     
                     if (A(instancesData.data).length > 0) {
                         eventStartsAt = instancesData.data[0].attributes?.starts_at;
                         eventEndsAt = instancesData.data[0].attributes?.ends_at;
-                        console.log(`   ✅ Event starts: ${eventStartsAt}`);
+                        console.log(`   ✅ Found future instance: ${eventStartsAt}`);
                     } else {
-                        console.log(`   ⚠️ No future instances found - checking ALL instances...`);
+                        // No future - try ANY instance
+                        console.log(`   ⚠️ No future instances - checking ALL instances...`);
                         
-                        // Try without filter
-                        const allInstancesResponse = await fetch(
-                            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?per_page=1&order=-starts_at`,
-                            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                        );
+                        instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?per_page=1&order=-starts_at`;
+                        instancesResponse = await fetch(instancesUrl, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
                         
-                        if (allInstancesResponse.ok) {
-                            const allInstancesData = await allInstancesResponse.json();
+                        if (instancesResponse.ok) {
+                            const allInstancesData = await instancesResponse.json();
                             if (A(allInstancesData.data).length > 0) {
                                 eventStartsAt = allInstancesData.data[0].attributes?.starts_at;
                                 eventEndsAt = allInstancesData.data[0].attributes?.ends_at;
@@ -212,16 +216,14 @@ Deno.serve(async (req) => {
                             }
                         }
                     }
-                } else {
-                    console.log(`   ❌ Failed to fetch instances: ${await instancesResponse.text()}`);
                 }
             } catch (err) {
                 console.error(`   ❌ Error checking instances:`, err.message);
             }
             
+            // INCLUDE EVEN WITHOUT DATE - better to show than hide
             if (!eventStartsAt) {
-                console.log(`   ⏭️ Skipping - no instance date found`);
-                continue;
+                console.log(`   ⚠️ No instance found but INCLUDING anyway`);
             }
             
             myApprovals.push({
@@ -240,10 +242,10 @@ Deno.serve(async (req) => {
                 pco_updated_at: request.attributes?.updated_at
             });
             
-            console.log(`   ✅ Added to approvals list`);
+            console.log(`   ✅ Added to sync list (total: ${myApprovals.length})`);
         }
 
-        // Sort by event date
+        // Sort by event date (nulls last)
         myApprovals.sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.pco_created_at || 0);
             const dateB = new Date(b.event_starts_at || b.pco_created_at || 0);
@@ -257,6 +259,8 @@ Deno.serve(async (req) => {
             user_email: currentUser.email
         }).catch(() => []);
 
+        console.log('🗑️ Deleting', A(existingApprovals).length, 'existing approvals');
+
         for (const existing of A(existingApprovals)) {
             try {
                 await base44.asServiceRole.entities.PendingApproval.delete(existing.id);
@@ -265,6 +269,8 @@ Deno.serve(async (req) => {
             }
         }
 
+        console.log('💾 Creating', myApprovals.length, 'new approvals');
+
         for (const approval of myApprovals) {
             try {
                 await base44.asServiceRole.entities.PendingApproval.create(approval);
@@ -272,6 +278,8 @@ Deno.serve(async (req) => {
                 console.error('Error creating approval:', error);
             }
         }
+
+        console.log('✅ Sync complete!');
 
         return Response.json({
             success: true,
