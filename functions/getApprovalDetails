@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         diag.steps.push({ msg: `Found ${questions.length} resource questions` });
         console.log(`✅ Found ${questions.length} questions`);
 
-        // 2) Request → figure out the correct event_instance (THIS IS KEY!)
+        // 2) Request → figure out the correct event_instance
         const reqUrl = `${PCO}/calendar/v2/event_resource_requests/${request_id}`
             + `?include=event,event_instance,requested_resources,requested_resources.resource,requested_resources.location`;
         diag.urls.request = reqUrl;
@@ -118,9 +118,9 @@ Deno.serve(async (req) => {
 
         const reqData = reqJson?.data;
         const instanceRel = reqData?.relationships?.event_instance?.data || null;
-        const instance_id = instanceRel?.id || null;
+        let instance_id = instanceRel?.id || null;
 
-        // Capture requested location (helps pick the right booking)
+        // Capture requested location
         let requested_location_id = null;
         const rrRel0 = (reqData?.relationships?.requested_resources?.data || [])[0];
         if (rrRel0) {
@@ -129,11 +129,26 @@ Deno.serve(async (req) => {
             requested_location_id = locRel?.id || null;
         }
 
-        diag.steps.push({ msg: "Request inspected", instance_id, requested_location_id });
-        console.log(`✅ Instance ID: ${instance_id}, Location ID: ${requested_location_id}`);
+        console.log(`✅ Instance ID from request: ${instance_id}, Location ID: ${requested_location_id}`);
 
-        // 3) Load the event instance (not just the event!)
-        //    Include bookings + answers chains ON THE INSTANCE
+        // 3) If no instance_id on request, find the next future instance for this event
+        if (!instance_id) {
+            console.log('⚠️ No event_instance on request - fetching future instances...');
+            const instancesUrl = `${PCO}/calendar/v2/events/${event_id}/event_instances?filter=future&per_page=1&order=starts_at`;
+            diag.urls.event_instances = instancesUrl;
+            
+            const instancesJson = await pcoJson(instancesUrl, token);
+            if (instancesJson.data && instancesJson.data.length > 0) {
+                instance_id = instancesJson.data[0].id;
+                console.log(`✅ Found next future instance: ${instance_id}`);
+                diag.steps.push({ msg: "Using next future instance", instance_id });
+            } else {
+                console.log('❌ No future instances found for this event');
+                diag.steps.push({ msg: "No future instances found" });
+            }
+        }
+
+        // 4) Load the event instance with bookings + answers
         let bookingAnswers = [];
         let bookingFound = false;
         let instanceCore = null;
@@ -209,11 +224,11 @@ Deno.serve(async (req) => {
                 diag.steps.push({ msg: "No matching booking found", bookings_len: bookings.length });
             }
         } else {
-            console.log('⚠️ No event_instance on request');
-            diag.steps.push({ msg: "No event_instance on request" });
+            console.log('❌ Could not determine event_instance');
+            diag.steps.push({ msg: "Could not determine event_instance" });
         }
 
-        // 4) Build answers map keyed by question_id
+        // 5) Build answers map keyed by question_id
         const answersMap = {};
         for (const a of bookingAnswers) {
             if (!a.question_id) continue;
@@ -222,7 +237,7 @@ Deno.serve(async (req) => {
 
         console.log(`✅ Total answers mapped: ${Object.keys(answersMap).length}`);
 
-        // 5) Get event info for modal header
+        // 6) Get event info for modal header
         const evUrl = `${PCO}/calendar/v2/events/${event_id}`;
         diag.urls.event = evUrl;
         const evJson = await pcoJson(evUrl, token);
