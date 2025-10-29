@@ -1,0 +1,163 @@
+// Base44 Function: getApprovalDetailsV2
+// Endpoint: POST /functions/getApprovalDetailsV2
+
+import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
+
+const PCO_BASE = "https://api.planningcenteronline.com";
+
+async function refreshServiceToken(base44, user) {
+  const expiresAt = new Date(user.pco_token_expires_at);
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+  if (expiresAt > fiveMinutesFromNow) {
+    return user.pco_access_token;
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: user.pco_refresh_token,
+    client_id: Deno.env.get("PCO_CLIENT_ID"),
+    client_secret: Deno.env.get("PCO_CLIENT_SECRET"),
+  });
+  const r = await fetch(`${PCO_BASE}/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error(`service refresh failed ${r.status} :: ${JSON.stringify(j)}`);
+  
+  // Update user tokens
+  const newExpiresAt = new Date(Date.now() + (j.expires_in * 1000)).toISOString();
+  await base44.asServiceRole.entities.User.update(user.id, {
+    pco_access_token: j.access_token,
+    pco_refresh_token: j.refresh_token,
+    pco_token_expires_at: newExpiresAt
+  });
+  
+  return j.access_token;
+}
+
+async function pcoJson(url, token) {
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const txt = await r.text();
+  let j = {};
+  try { j = txt ? JSON.parse(txt) : {}; } catch { j = { non_json: true, body: txt }; }
+  if (!r.ok) throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(j).slice(0,300)}`);
+  return j;
+}
+
+function indexIncluded(arr = []) {
+  const m = new Map();
+  for (const x of arr) m.set(`${x.type}:${x.id}`, x);
+  return (t, id) => m.get(`${t}:${id}`) || null;
+}
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const currentUser = await base44.auth.me();
+
+    if (!currentUser) {
+      return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+    const user = users[0];
+
+    if (!user || !user.pco_access_token) {
+      return Response.json({ ok: false, error: 'PCO not connected' }, { status: 400 });
+    }
+
+    const { request_id, event_id, resource_id } = await req.json();
+    if (!event_id || !resource_id) {
+      return Response.json({ 
+        ok: false, 
+        error: "event_id and resource_id are required"
+      }, { status: 400 });
+    }
+
+    const token = await refreshServiceToken(base44, user);
+
+    // 1) Resource → questions (+choices)
+    const qUrl = `${PCO_BASE}/calendar/v2/resources/${resource_id}/resource_questions?per_page=100&include=choices`;
+    const qJson = await pcoJson(qUrl, token);
+    const qInc = indexIncluded(qJson.included || []);
+    const questions = (qJson.data || []).map(q => {
+      const choicesRel = q?.relationships?.choices?.data || [];
+      const choices = choicesRel.map(rel => {
+        const c = qInc(rel.type, rel.id);
+        return { id: c?.id, name: c?.attributes?.name };
+      });
+      return {
+        id: q.id,
+        question: q?.attributes?.name || "",
+        description: q?.attributes?.description || "",
+        type: q?.attributes?.question_type || "",
+        required: !!q?.attributes?.required,
+        choices
+      };
+    });
+
+    // 2) Event (bookings+answers)
+    const include = [
+      "resource_bookings",
+      "resource_bookings.resource",
+      "resource_bookings.resource_question_answers",
+      "resource_bookings.resource_question_answers.resource_question",
+      "resource_bookings.resource_question_answers.choice",
+    ].join(",");
+    const evUrl = `${PCO_BASE}/calendar/v2/events/${event_id}?include=${encodeURIComponent(include)}`;
+    const evJson = await pcoJson(evUrl, token);
+    const inc = indexIncluded(evJson.included || []);
+
+    // Find the booking for this resource
+    const bookings = (evJson.included || []).filter(x => x.type === "ResourceBooking");
+    const booking = bookings.find(b => {
+      const resRel = b?.relationships?.resource?.data;
+      return resRel?.id === String(resource_id);
+    });
+
+    const answersMap = {};
+    if (booking) {
+      const ansRel = booking?.relationships?.resource_question_answers?.data || [];
+      for (const rel of ansRel) {
+        const ans = inc(rel.type, rel.id);
+        const qRel = ans?.relationships?.resource_question?.data;
+        const chRel = ans?.relationships?.choice?.data;
+        const q = qRel ? inc(qRel.type, qRel.id) : null;
+        const ch = chRel ? inc(chRel.type, chRel.id) : null;
+
+        const qid = q?.id;
+        if (!qid) continue;
+
+        // Prefer selected choice label when present, else value_text (free text / date / number)
+        const label = ch?.attributes?.name || ans?.attributes?.value_text || "";
+        answersMap[qid] = label;
+      }
+    }
+
+    // Optional: include event core info for your header
+    const event = {
+      id: evJson?.data?.id,
+      name: evJson?.data?.attributes?.name,
+      approval_status: evJson?.data?.attributes?.approval_status,
+      starts_at: evJson?.data?.attributes?.starts_at,
+      ends_at: evJson?.data?.attributes?.ends_at
+    };
+
+    return Response.json({
+      ok: true,
+      event,
+      questions,
+      answers: answersMap,
+      booking_found: !!booking
+    });
+  } catch (error) {
+    console.error('❌ Error:', error);
+    return Response.json({ 
+      ok: false,
+      error: error.message 
+    }, { status: 500 });
+  }
+});
