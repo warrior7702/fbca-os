@@ -1,255 +1,115 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-const PCO = "https://api.planningcenteronline.com";
-
-async function refreshTokenIfNeeded(base44, user) {
-    const expiresAt = new Date(user.pco_token_expires_at);
-    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-
-    if (expiresAt > fiveMinutesFromNow) {
-        return user.pco_access_token;
-    }
-
-    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: user.pco_refresh_token,
-            client_id: Deno.env.get('PCO_CLIENT_ID'),
-            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-        })
-    });
-
-    if (!tokenResponse.ok) throw new Error('Token refresh failed');
-
-    const tokens = await tokenResponse.json();
-    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-    await base44.asServiceRole.entities.User.update(user.id, {
-        pco_access_token: tokens.access_token,
-        pco_refresh_token: tokens.refresh_token,
-        pco_token_expires_at: newExpiresAt
-    });
-
-    return tokens.access_token;
-}
-
-async function pcoJson(url, token) {
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    const txt = await r.text();
-    let j = {};
-    try { j = txt ? JSON.parse(txt) : {}; } catch { j = { non_json: true, body: txt }; }
-    if (!r.ok) throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(j).slice(0, 300)}`);
-    return j;
-}
-
-function indexIncluded(arr = []) {
-    const m = new Map();
-    for (const x of arr) m.set(`${x.type}:${x.id}`, x);
-    return (t, id) => m.get(`${t}:${id}`) || null;
-}
-
 Deno.serve(async (req) => {
-    const started = Date.now();
-    const diag = { steps: [], urls: {} };
+  const diag = [];
 
-    try {
-        const base44 = createClientFromRequest(req);
-        const currentUser = await base44.auth.me();
+  try {
+    const base44 = createClientFromRequest(req);
+    const currentUser = await base44.auth.me();
 
-        if (!currentUser) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-        const user = users[0];
-
-        if (!user || !user.pco_access_token) {
-            return Response.json({ error: 'PCO not connected' }, { status: 400 });
-        }
-
-        const token = await refreshTokenIfNeeded(base44, user);
-
-        const { request_id, event_id, resource_id } = await req.json();
-        
-        if (!request_id || !event_id || !resource_id) {
-            return Response.json({ 
-                ok: false, 
-                error: "request_id, event_id, resource_id are required" 
-            }, { status: 400 });
-        }
-
-        console.log("🔍 getApprovalDetails (nested bookings approach):", { request_id, event_id, resource_id });
-
-        // 1) Get resource questions first
-        const qUrl = `${PCO}/calendar/v2/resources/${resource_id}/resource_questions?per_page=100&include=choices`;
-        diag.urls.resource_questions = qUrl;
-        const qJson = await pcoJson(qUrl, token);
-        const qInc = indexIncluded(qJson.included || []);
-        
-        const questions = (qJson.data || []).map(q => {
-            const choicesRel = q?.relationships?.choices?.data || [];
-            const choices = choicesRel.map(rel => {
-                const c = qInc(rel.type, rel.id);
-                return { id: c?.id, name: c?.attributes?.name };
-            });
-            return {
-                id: q.id,
-                question: q?.attributes?.name || q?.attributes?.question || "",
-                description: q?.attributes?.description || "",
-                kind: q?.attributes?.kind || q?.attributes?.question_type || "",
-                multiple_select: q?.attributes?.multiple_select || false,
-                optional: q?.attributes?.optional !== false,
-                choices
-            };
-        });
-        
-        diag.steps.push({ msg: `Found ${questions.length} resource questions` });
-        console.log(`✅ Found ${questions.length} questions`);
-
-        // 2) Try getting bookings from event first
-        console.log('📥 Step 1: Fetching event with bookings...');
-        const eventInclude = "resource_bookings,resource_bookings.resource,resource_bookings.resource_question_answers,resource_bookings.resource_question_answers.resource_question,resource_bookings.resource_question_answers.choice";
-        const eventUrl = `${PCO}/calendar/v2/events/${event_id}?include=${encodeURIComponent(eventInclude)}`;
-        diag.urls.event_with_bookings = eventUrl;
-        
-        const eventJson = await pcoJson(eventUrl, token);
-        const eventInc = indexIncluded(eventJson.included || []);
-        
-        const bookingsFromEvent = (eventJson.included || []).filter(x => x.type === "ResourceBooking");
-        console.log(`✅ Found ${bookingsFromEvent.length} bookings from event endpoint`);
-        
-        // Check if we have any answers in these bookings
-        let hasAnswers = false;
-        for (const booking of bookingsFromEvent) {
-            const ansRel = booking?.relationships?.resource_question_answers?.data || [];
-            if (ansRel.length > 0) {
-                hasAnswers = true;
-                break;
-            }
-        }
-        
-        console.log(`   ${hasAnswers ? '✅' : '⚠️'} Answers found in event bookings: ${hasAnswers}`);
-        
-        let bookings = bookingsFromEvent;
-        let included = eventJson.included || [];
-        
-        // 3) If no answers, fetch bookings directly (this is the key!)
-        if (!hasAnswers) {
-            console.log('📥 Step 2: No answers in event - fetching bookings endpoint directly...');
-            const bookingsInclude = "resource,resource_question_answers,resource_question_answers.resource_question,resource_question_answers.choice";
-            const bookingsUrl = `${PCO}/calendar/v2/events/${event_id}/resource_bookings?per_page=100&include=${encodeURIComponent(bookingsInclude)}`;
-            diag.urls.resource_bookings = bookingsUrl;
-            
-            const bookingsJson = await pcoJson(bookingsUrl, token);
-            bookings = bookingsJson.data || [];
-            included = bookingsJson.included || [];
-            
-            console.log(`✅ Found ${bookings.length} bookings from bookings endpoint`);
-            diag.steps.push({ msg: "Fetched bookings separately", count: bookings.length });
-        }
-        
-        const bookingInc = indexIncluded(included);
-        
-        // 4) Match the booking for our resource
-        const targetBooking = bookings.find(b => {
-            const resRel = b?.relationships?.resource?.data;
-            return resRel?.id === String(resource_id);
-        });
-        
-        if (!targetBooking) {
-            console.log('⚠️ No booking found for this resource');
-            diag.steps.push({ msg: "No booking matched", resource_id });
-        } else {
-            console.log(`✅ Matched booking: ${targetBooking.id}`);
-        }
-        
-        // 5) Extract answers from the matched booking
-        const answersMap = {};
-        
-        if (targetBooking) {
-            const ansRel = targetBooking?.relationships?.resource_question_answers?.data || [];
-            console.log(`✅ Found ${ansRel.length} answer relationships on booking`);
-            
-            for (const rel of ansRel) {
-                const ans = bookingInc(rel.type, rel.id);
-                if (!ans) continue;
-                
-                const qRel = ans?.relationships?.resource_question?.data;
-                const chRel = ans?.relationships?.choice?.data;
-                const q = qRel ? bookingInc(qRel.type, qRel.id) : null;
-                const ch = chRel ? bookingInc(chRel.type, chRel.id) : null;
-                
-                // Try multiple possible answer fields
-                let answerValue = ch?.attributes?.name 
-                    || ans?.attributes?.value_text 
-                    || ans?.attributes?.value 
-                    || ans?.attributes?.answer_text
-                    || ans?.attributes?.answer_number
-                    || ans?.attributes?.answer_boolean
-                    || ans?.attributes?.answer_choice
-                    || "";
-                
-                // Handle boolean answers
-                if (typeof answerValue === 'boolean') {
-                    answerValue = answerValue ? 'Yes' : 'No';
-                }
-                
-                // Handle number answers
-                if (typeof answerValue === 'number') {
-                    answerValue = String(answerValue);
-                }
-                
-                const questionId = q?.id || qRel?.id;
-                if (questionId && answerValue) {
-                    answersMap[questionId] = answerValue;
-                    console.log(`   📝 Q${questionId}: "${answerValue}"`);
-                }
-            }
-        }
-        
-        console.log(`✅ Total answers mapped: ${Object.keys(answersMap).length}`);
-        diag.steps.push({ msg: "Answers extracted", count: Object.keys(answersMap).length });
-        
-        // 6) Get event details for modal header
-        const event = {
-            id: eventJson?.data?.id,
-            name: eventJson?.data?.attributes?.name,
-            approval_status: eventJson?.data?.attributes?.approval_status,
-            starts_at: eventJson?.data?.attributes?.starts_at,
-            ends_at: eventJson?.data?.attributes?.ends_at,
-            summary: eventJson?.data?.attributes?.summary,
-            description: eventJson?.data?.attributes?.description
-        };
-        
-        const payload = {
-            questions,
-            answers: answersMap,
-            event,
-            booking_found: !!targetBooking,
-            diag: {
-                ...diag,
-                duration_ms: Date.now() - started,
-                answers_found: Object.keys(answersMap).length
-            }
-        };
-        
-        console.log("✅ getApprovalDetails complete:", { 
-            booking_found: !!targetBooking, 
-            answers: Object.keys(answersMap).length 
-        });
-        
-        return Response.json(payload);
-
-    } catch (error) {
-        console.error("❌ getApprovalDetails error:", error);
-        return Response.json({ 
-            error: String(error),
-            questions: [],
-            answers: {},
-            event: null,
-            diag 
-        }, { status: 500 });
+    if (!currentUser) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { event_id, resource_id, request_id } = await req.json();
+
+    if (!event_id || !resource_id) {
+      return Response.json({
+        ok: false,
+        error: "Missing event_id or resource_id"
+      }, { status: 400 });
+    }
+
+    // 🔑 Get Planning Center access token
+    const tokenResponse = await base44.functions.invoke("getPCOToken");
+    const access_token = tokenResponse.data.access_token;
+    const headers = { Authorization: `Bearer ${access_token}` };
+
+    // 🧩 Step 1: Fetch event with includes
+    const eventUrl =
+      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}` +
+      `?include=resource_bookings,resource_bookings.resource,` +
+      `resource_bookings.resource_question_answers.resource_question,` +
+      `resource_bookings.resource_question_answers.choice`;
+
+    const eventRes = await fetch(eventUrl, { headers });
+    const eventJson = await eventRes.json();
+    diag.push({
+      step: "event",
+      status: eventRes.status,
+      included: eventJson.included?.length || 0
+    });
+
+    const included = Object.fromEntries((eventJson.included || []).map(x => [x.id, x]));
+    let answers = (eventJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
+
+    // 🧩 Step 2: If no answers found, fetch bookings directly
+    if (!answers.length) {
+      const bookUrl =
+        `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/resource_bookings` +
+        `?include=resource,resource_question_answers.resource_question,resource_question_answers.choice`;
+
+      const bookRes = await fetch(bookUrl, { headers });
+      const bookJson = await bookRes.json();
+      answers = (bookJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
+      diag.push({
+        step: "bookings",
+        status: bookRes.status,
+        answersFound: answers.length
+      });
+    }
+
+    // 🧩 Step 3: Get resource questions for this resource
+    const qUrl = `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions`;
+    const qRes = await fetch(qUrl, { headers });
+    const qJson = await qRes.json();
+    const questions = (qJson.data || []).map(q => ({
+      id: q.id,
+      question: q.attributes.question,
+      description: q.attributes.description,
+      required: q.attributes.required
+    }));
+    diag.push({ step: "questions", count: questions.length });
+
+    // 🧩 Step 4: Map answers to question IDs
+    const mappedAnswers = {};
+    for (const a of answers) {
+      const qid = a.relationships?.resource_question?.data?.id;
+      const val =
+        a.attributes?.answer_text ||
+        a.attributes?.answer_number ||
+        a.attributes?.answer_boolean ||
+        a.attributes?.answer_choice ||
+        null;
+      if (qid && val !== null) mappedAnswers[qid] = val;
+    }
+
+    diag.push({
+      step: "map",
+      mapped: Object.keys(mappedAnswers).length
+    });
+
+    // ✅ Return clean JSON
+    return Response.json({
+      ok: true,
+      event: eventJson.data || null,
+      questions,
+      answers: mappedAnswers,
+      totals: {
+        questions: questions.length,
+        answers: Object.keys(mappedAnswers).length
+      },
+      diag
+    });
+
+  } catch (err) {
+    console.error("❌ getApprovalDetails failed:", err);
+    return Response.json({
+      ok: false,
+      error: String(err),
+      diag
+    }, {
+      status: 500
+    });
+  }
 });
