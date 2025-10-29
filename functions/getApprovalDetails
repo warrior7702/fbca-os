@@ -81,18 +81,14 @@ Deno.serve(async (req) => {
                 optional: q.attributes.optional
             }));
             console.log('✅ Found', questions.length, 'questions for resource');
-            console.log('📝 Question IDs:', questions.map(q => q.id));
         } else {
             console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
-        // Fetch answers - TRY BOTH ENDPOINTS
-        let answersData = null;
-        
-        // Try endpoint 1: with include parameter
-        console.log('\n🔍 Trying answers endpoint WITH include...');
-        const answersResponse1 = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100&include=resource_question`,
+        // Try fetching the request WITH resource_answers included
+        console.log('\n🔍 Fetching request with resource_answers included...');
+        const requestResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=resource_answers`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -101,66 +97,38 @@ Deno.serve(async (req) => {
             }
         );
 
-        if (answersResponse1.ok) {
-            answersData = await answersResponse1.json();
-            console.log('✅ Endpoint 1 succeeded');
-        } else {
-            console.log('❌ Endpoint 1 failed:', answersResponse1.status);
-        }
-
-        // Try endpoint 2: without include parameter
-        if (!answersData || !answersData.data || answersData.data.length === 0) {
-            console.log('\n🔍 Trying answers endpoint WITHOUT include...');
-            const answersResponse2 = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (answersResponse2.ok) {
-                answersData = await answersResponse2.json();
-                console.log('✅ Endpoint 2 succeeded');
-            } else {
-                console.log('❌ Endpoint 2 failed:', answersResponse2.status);
-            }
-        }
-
         const answers = {};
-        const debugInfo = {
-            raw_response: answersData,
-            total_items: answersData?.data?.length || 0,
-            included_items: answersData?.included?.length || 0
-        };
         
-        if (answersData && answersData.data) {
-            console.log('📋 Total answers found:', answersData.data.length);
-            console.log('📋 Raw response:', JSON.stringify(answersData, null, 2));
+        if (requestResponse.ok) {
+            const requestData = await requestResponse.json();
+            console.log('✅ Request data fetched');
+            console.log('📋 Included items:', requestData.included?.length || 0);
             
-            answersData.data.forEach((answer, index) => {
-                console.log(`\n📌 Answer ${index + 1}:`, JSON.stringify(answer, null, 2));
+            // Look for resource_answers in the included array
+            if (requestData.included) {
+                const resourceAnswers = requestData.included.filter(item => item.type === 'ResourceAnswer');
+                console.log('📝 Found', resourceAnswers.length, 'resource answers in included data');
                 
-                const questionId = answer.relationships?.resource_question?.data?.id;
-                const answerValue = answer.attributes?.value;
-                
-                console.log(`   → Question ID: ${questionId}`);
-                console.log(`   → Answer Value: ${answerValue}`);
-                
-                if (questionId && answerValue !== null && answerValue !== undefined) {
-                    answers[questionId] = answerValue;
-                    console.log(`   ✅ Mapped: answers["${questionId}"] = "${answerValue}"`);
-                } else {
-                    console.log(`   ❌ Skipped - questionId: ${questionId}, value: ${answerValue}`);
-                }
-            });
+                resourceAnswers.forEach((answer, index) => {
+                    console.log(`\n📌 Answer ${index + 1}:`, JSON.stringify(answer, null, 2));
+                    
+                    const questionId = answer.relationships?.resource_question?.data?.id;
+                    const answerValue = answer.attributes?.value;
+                    
+                    console.log(`   → Question ID: ${questionId}`);
+                    console.log(`   → Answer Value: ${answerValue}`);
+                    
+                    if (questionId && answerValue !== null && answerValue !== undefined) {
+                        answers[questionId] = answerValue;
+                        console.log(`   ✅ Mapped: answers["${questionId}"] = "${answerValue}"`);
+                    }
+                });
+            }
             
             console.log('\n✅ Final answers object:', JSON.stringify(answers, null, 2));
             console.log('✅ Total answers mapped:', Object.keys(answers).length);
         } else {
-            console.log('❌ No answers data found in response');
+            console.log('❌ Failed to fetch request:', requestResponse.status, await requestResponse.text());
         }
 
         // Fetch event details
@@ -188,17 +156,14 @@ Deno.serve(async (req) => {
 
         console.log('\n🎯 Returning:', {
             questions: questions.length,
-            question_ids: questions.map(q => q.id),
             answers_count: Object.keys(answers).length,
-            answer_keys: Object.keys(answers),
             event: !!event
         });
 
         return Response.json({
             questions,
             answers,
-            event,
-            debug: debugInfo // TEMPORARY: return debug info
+            event
         });
 
     } catch (error) {
