@@ -81,13 +81,14 @@ Deno.serve(async (req) => {
                 optional: q.attributes.optional
             }));
             console.log('✅ Found', questions.length, 'questions for resource');
+            console.log('📝 Question IDs:', questions.map(q => q.id));
         } else {
             console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
         // Fetch answers for this specific request
         const answersResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100`,
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100&include=resource_question`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -99,17 +100,35 @@ Deno.serve(async (req) => {
         const answers = {};
         if (answersResponse.ok) {
             const answersData = await answersResponse.json();
-            console.log('📋 Raw answers data:', answersData.data);
-            answersData.data.forEach(answer => {
+            console.log('📋 Raw answers response:', JSON.stringify(answersData, null, 2));
+            console.log('📋 Total answers found:', answersData.data?.length || 0);
+            
+            answersData.data?.forEach((answer, index) => {
+                console.log(`\n📌 Answer ${index + 1}:`, {
+                    answer_id: answer.id,
+                    value: answer.attributes?.value,
+                    relationships: answer.relationships
+                });
+                
                 const questionId = answer.relationships?.resource_question?.data?.id;
-                if (questionId) {
-                    answers[questionId] = answer.attributes.value;
-                    console.log('✅ Answer for question', questionId, ':', answer.attributes.value);
+                const answerValue = answer.attributes?.value;
+                
+                console.log(`   → Question ID: ${questionId}`);
+                console.log(`   → Answer Value: ${answerValue}`);
+                
+                if (questionId && answerValue) {
+                    answers[questionId] = answerValue;
+                    console.log(`   ✅ Mapped: answers["${questionId}"] = "${answerValue}"`);
+                } else {
+                    console.log(`   ❌ Skipped - missing questionId or value`);
                 }
             });
-            console.log('✅ Processed', Object.keys(answers).length, 'answers');
+            
+            console.log('\n✅ Final answers object:', JSON.stringify(answers, null, 2));
+            console.log('✅ Total answers mapped:', Object.keys(answers).length);
         } else {
-            console.log('❌ Failed to fetch answers:', await answersResponse.text());
+            const errorText = await answersResponse.text();
+            console.log('❌ Failed to fetch answers:', errorText);
         }
 
         // Fetch event details
@@ -135,9 +154,11 @@ Deno.serve(async (req) => {
             };
         }
 
-        console.log('✅ Returning:', {
+        console.log('\n🎯 Returning:', {
             questions: questions.length,
-            answers: Object.keys(answers).length,
+            question_ids: questions.map(q => q.id),
+            answers_count: Object.keys(answers).length,
+            answer_keys: Object.keys(answers),
             event: !!event
         });
 
