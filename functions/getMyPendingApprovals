@@ -1,0 +1,247 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    console.log('Refreshing token...');
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ 
+                pending_approvals: [], 
+                message: 'PCO not connected' 
+            });
+        }
+
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
+        // Get my PCO person ID
+        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!meResponse.ok) throw new Error('Failed to get PCO user');
+        
+        const meData = await meResponse.json();
+        const myPcoPersonId = meData.data?.id;
+
+        console.log('My PCO Person ID:', myPcoPersonId);
+
+        // Get all approval groups and find which ones I'm in
+        const groupsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
+
+        const groupsData = await groupsResponse.json();
+        const myGroupIds = [];
+        const myGroupNames = {};
+        
+        // Build a map of resources to approval groups
+        const resourceToGroupMap = {};
+        
+        for (const group of groupsData.data || []) {
+            // Check if I'm in this group
+            const membersResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (membersResponse.ok) {
+                const membersData = await membersResponse.json();
+                const isMember = membersData.data?.some(person => person.id === myPcoPersonId);
+                
+                if (isMember) {
+                    myGroupIds.push(group.id);
+                    myGroupNames[group.id] = group.attributes?.name;
+                    console.log('✓ Member of group:', group.attributes?.name);
+                }
+            }
+
+            // Get all resources in this group
+            const resourcesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                for (const resource of resourcesData.data || []) {
+                    resourceToGroupMap[resource.id] = {
+                        groupId: group.id,
+                        groupName: group.attributes?.name
+                    };
+                }
+            }
+        }
+
+        console.log('I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
+        console.log('Mapped', Object.keys(resourceToGroupMap).length, 'resources to groups');
+
+        // Initialize maps for events and resources
+        const eventMap = {};
+        const resourceMap = {};
+
+        // Get ALL pending requests - fetch multiple pages if needed
+        let allRequests = [];
+        let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`;
+        
+        while (nextUrl) {
+            const requestsResponse = await fetch(nextUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!requestsResponse.ok) throw new Error('Failed to fetch requests');
+
+            const requestsData = await requestsResponse.json();
+            allRequests = allRequests.concat(requestsData.data || []);
+            
+            // Build maps from included data
+            if (requestsData.included) {
+                requestsData.included.forEach(item => {
+                    if (item.type === 'Event') {
+                        if (!eventMap[item.id]) eventMap[item.id] = item;
+                    } else if (item.type === 'Resource') {
+                        if (!resourceMap[item.id]) resourceMap[item.id] = item;
+                    }
+                });
+            }
+            
+            // Check for next page
+            nextUrl = requestsData.links?.next || null;
+            
+            // Safety limit
+            if (allRequests.length >= 500) break;
+        }
+
+        console.log('Fetched', allRequests.length, 'total pending requests');
+
+        const myApprovals = [];
+        const now = new Date();
+        
+        for (const request of allRequests) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const resource = resourceMap[resourceId];
+            const groupInfo = resourceToGroupMap[resourceId];
+            
+            const isInMyGroups = groupInfo && myGroupIds.includes(groupInfo.groupId);
+            
+            if (isInMyGroups) {
+                const eventId = request.relationships?.event?.data?.id;
+                const event = eventMap[eventId];
+                
+                // Fetch event instances to get actual dates
+                let eventStartsAt = null;
+                let eventEndsAt = null;
+                
+                try {
+                    const instancesResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    );
+                    
+                    if (instancesResponse.ok) {
+                        const instancesData = await instancesResponse.json();
+                        if (instancesData.data && instancesData.data.length > 0) {
+                            eventStartsAt = instancesData.data[0].attributes?.starts_at;
+                            eventEndsAt = instancesData.data[0].attributes?.ends_at;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching event instance:', err);
+                }
+                
+                // Filter out events that have already passed
+                if (eventStartsAt) {
+                    const eventDate = new Date(eventStartsAt);
+                    // Skip if event has already started (is in the past)
+                    if (eventDate < now) {
+                        console.log('⏭️ Skipping past event:', event?.attributes?.name, 'on', eventStartsAt);
+                        continue;
+                    }
+                }
+                
+                myApprovals.push({
+                    id: request.id,
+                    event_id: eventId,
+                    event_name: event?.attributes?.name || 'Unknown Event',
+                    event_starts_at: eventStartsAt,
+                    event_ends_at: eventEndsAt,
+                    resource_id: resourceId,
+                    resource_name: resource?.attributes?.name || 'Unknown Resource',
+                    approval_group_name: groupInfo.groupName,
+                    quantity: request.attributes?.quantity,
+                    created_at: request.attributes?.created_at,
+                    approval_status: request.attributes?.approval_status
+                });
+            }
+        }
+
+        // Sort by event start date (soonest first), fallback to created_at if no event date
+        myApprovals.sort((a, b) => {
+            const dateA = new Date(a.event_starts_at || a.created_at);
+            const dateB = new Date(b.event_starts_at || b.created_at);
+            return dateA - dateB;
+        });
+
+        console.log('Found', myApprovals.length, 'future approvals for my groups');
+        
+        return Response.json({ 
+            pending_approvals: myApprovals,
+            count: myApprovals.length,
+            my_groups_count: myGroupIds.length,
+            my_groups: Object.values(myGroupNames),
+            total_fetched: allRequests.length,
+            cache_bust: Date.now()
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        return Response.json({ 
+            error: error.message, 
+            pending_approvals: []
+        }, { status: 500 });
+    }
+});
