@@ -1,4 +1,4 @@
-export default {
+export const pagesConfig = {
   routes: [
     { path: '/Loading', component: 'Loading' },
     { path: '/Dashboard', component: 'Dashboard' },
@@ -23,3 +23,5 @@ export default {
     { path: '/PCODebug', component: 'PCODebug' }
   ]
 };
+
+export default pagesConfig;
