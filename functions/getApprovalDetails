@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
 
         const { request_id, resource_id, event_id } = await req.json();
 
-        console.log('🔍 Getting details for request:', request_id);
+        console.log('🔍 Getting details for:');
+        console.log('   Request ID:', request_id);
+        console.log('   Resource ID:', resource_id);
+        console.log('   Event ID:', event_id);
 
         // Fetch resource questions
         const questionsResponse = await fetch(
@@ -79,14 +82,20 @@ Deno.serve(async (req) => {
                 optional: q.attributes.optional
             }));
             console.log('✅ Found', questions.length, 'questions');
+        } else {
+            console.log('❌ Questions request failed:', questionsResponse.status);
         }
 
-        // Get answers - try resource_bookings approach
+        // Strategy: Try multiple approaches to get answers
         const answers = {};
         
+        console.log('\n📝 Attempting to fetch answers...');
+        
+        // Approach 1: Try getting from the request directly with includes
+        console.log('🔍 Approach 1: Fetch request with includes');
         try {
-            const bookingsResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?include=resource_approval.resource_question_answers&per_page=100`,
+            const requestResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=resource_bookings.resource_approval.resource_question_answers`,
                 {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -95,34 +104,88 @@ Deno.serve(async (req) => {
                 }
             );
             
-            if (bookingsResponse.ok) {
-                const bookingsData = await bookingsResponse.json();
-                console.log('✅ Found', bookingsData.data?.length || 0, 'bookings');
+            if (requestResponse.ok) {
+                const requestData = await requestResponse.json();
+                console.log('✅ Got request data');
                 
-                // Check for included answers in the response
-                if (bookingsData.included) {
-                    console.log('📦 Processing', bookingsData.included.length, 'included items');
+                if (requestData.included && requestData.included.length > 0) {
+                    console.log('📦 Found', requestData.included.length, 'included items');
                     
-                    for (const item of bookingsData.included) {
+                    for (const item of requestData.included) {
+                        console.log('   - Type:', item.type);
+                        
                         if (item.type === 'ResourceQuestionAnswer') {
                             const questionId = item.relationships?.resource_question?.data?.id;
                             const answerValue = item.attributes?.value || item.attributes?.body || '';
                             
                             if (questionId) {
                                 answers[questionId] = answerValue;
-                                console.log(`   ✅ Found answer for question ${questionId}`);
+                                console.log(`   ✅ Answer for Q${questionId}: "${answerValue}"`);
                             }
                         }
                     }
+                } else {
+                    console.log('⚠️ No included items in request');
                 }
-                
-                console.log('✅ Total answers found:', Object.keys(answers).length);
             } else {
-                console.log('⚠️ Bookings request returned:', bookingsResponse.status);
+                console.log('❌ Approach 1 failed:', requestResponse.status);
             }
         } catch (err) {
-            console.error('❌ Error getting answers:', err.message);
+            console.error('❌ Approach 1 error:', err.message);
         }
+        
+        // Approach 2: If no answers yet, try bookings endpoint
+        if (Object.keys(answers).length === 0) {
+            console.log('\n🔍 Approach 2: Fetch resource bookings');
+            try {
+                const bookingsResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?include=resource_approval.resource_question_answers&per_page=100`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (bookingsResponse.ok) {
+                    const bookingsData = await bookingsResponse.json();
+                    console.log('✅ Found', bookingsData.data?.length || 0, 'bookings');
+                    
+                    if (bookingsData.included && bookingsData.included.length > 0) {
+                        console.log('📦 Found', bookingsData.included.length, 'included items');
+                        
+                        for (const item of bookingsData.included) {
+                            console.log('   - Type:', item.type);
+                            
+                            if (item.type === 'ResourceQuestionAnswer') {
+                                const questionId = item.relationships?.resource_question?.data?.id;
+                                const answerValue = item.attributes?.value || item.attributes?.body || '';
+                                
+                                if (questionId) {
+                                    answers[questionId] = answerValue;
+                                    console.log(`   ✅ Answer for Q${questionId}: "${answerValue}"`);
+                                }
+                            }
+                        }
+                    } else {
+                        console.log('⚠️ No included items in bookings');
+                    }
+                } else {
+                    console.log('❌ Approach 2 failed:', bookingsResponse.status);
+                }
+            } catch (err) {
+                console.error('❌ Approach 2 error:', err.message);
+            }
+        }
+        
+        // Approach 3: If still no answers, answers might not be submitted yet
+        if (Object.keys(answers).length === 0) {
+            console.log('\n⚠️ No answers found - they may not have been submitted yet');
+            console.log('💡 This is normal for newly created requests');
+        }
+
+        console.log('\n✅ Total answers found:', Object.keys(answers).length);
 
         // Fetch event details
         const eventResponse = await fetch(
@@ -145,13 +208,13 @@ Deno.serve(async (req) => {
                 summary: eventData.data.attributes.summary,
                 description: eventData.data.attributes.description
             };
+            console.log('✅ Got event details');
         }
 
-        console.log('🎯 Returning:', {
-            questions: questions.length,
-            answers_count: Object.keys(answers).length,
-            event: !!event
-        });
+        console.log('\n🎯 Returning:');
+        console.log('   Questions:', questions.length);
+        console.log('   Answers:', Object.keys(answers).length);
+        console.log('   Event:', !!event);
 
         return Response.json({
             questions,
