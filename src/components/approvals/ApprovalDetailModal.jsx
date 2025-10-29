@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -29,17 +29,29 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
   const loadDetails = async () => {
     setLoading(true);
     try {
+      console.log('🔍 Loading approval details for request:', approval.request_id);
+      console.log('   Resource ID:', approval.resource_id);
+      console.log('   Event ID:', approval.event_id);
+      
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
         resource_id: approval.resource_id,
         event_id: approval.event_id
       });
 
-      console.log('Approval details:', response.data);
+      console.log('📦 Full response:', response);
+      console.log('📦 Response data:', response.data);
+      console.log('❓ Questions received:', response.data.questions);
+      console.log('💬 Answers received:', response.data.answers);
+      
       setQuestions(response.data.questions || []);
       setAnswers(response.data.answers || {});
+      
+      console.log('✅ Set', response.data.questions?.length || 0, 'questions');
+      console.log('✅ Set', Object.keys(response.data.answers || {}).length, 'answers');
     } catch (error) {
-      console.error('Failed to load details:', error);
+      console.error('❌ Failed to load details:', error);
+      console.error('❌ Error details:', error.response?.data);
     } finally {
       setLoading(false);
     }
@@ -74,6 +86,9 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">{approval.event_name}</DialogTitle>
+          <DialogDescription>
+            Review resource request details and answers
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -119,7 +134,9 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-slate-600" />
-                <h3 className="font-semibold text-slate-900">Resource Questions</h3>
+                <h3 className="font-semibold text-slate-900">
+                  Resource Questions ({questions.length})
+                </h3>
               </div>
 
               {questions.map((question) => (
@@ -140,6 +157,10 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
                   </div>
                 </div>
               ))}
+              
+              <div className="text-xs text-slate-500 mt-2">
+                Showing {Object.keys(answers).length} of {questions.length} answers
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-slate-500">
