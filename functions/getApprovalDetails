@@ -85,52 +85,73 @@ Deno.serve(async (req) => {
             console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
-        // Call Vercel function to get answers (it handles resource_bookings logic)
-        console.log('\n🔍 Calling Vercel function for answers...');
-        const answersResponse = await fetch(
-            `https://pco-webhook.vercel.app/api/pco-get-question-answers?request_id=${request_id}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            }
-        );
-
+        // Get answers directly from PCO
         const answers = {};
         
-        if (answersResponse.ok) {
-            const answersData = await answersResponse.json();
-            console.log('✅ Vercel response:', JSON.stringify(answersData, null, 2));
-            console.log('📋 Source:', answersData.source);
-            console.log('📋 Found', answersData.answers?.length || 0, 'answers');
-            
-            // Map Vercel response to our format (question_id -> value)
-            if (answersData.ok && answersData.answers) {
-                answersData.answers.forEach((answer, index) => {
-                    const questionId = answer.question_id;
-                    const answerValue = answer.value_text || answer.choice_id;
-                    
-                    console.log(`\n📌 Answer ${index + 1}:`);
-                    console.log(`   → Question ID: ${questionId}`);
-                    console.log(`   → Answer Value: ${answerValue}`);
-                    
-                    if (questionId && answerValue !== null && answerValue !== undefined) {
-                        answers[questionId] = answerValue;
-                        console.log(`   ✅ Mapped: answers["${questionId}"] = "${answerValue}"`);
+        console.log('\n🔍 Getting answers from PCO API...');
+        
+        // Try to get resource_bookings for this request
+        try {
+            const bookingsResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?per_page=100`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
                     }
-                });
-            }
+                }
+            );
             
-            console.log('\n✅ Final answers object:', JSON.stringify(answers, null, 2));
-            console.log('✅ Total answers mapped:', Object.keys(answers).length);
-            
-            if (answersData.hint) {
-                console.log('💡 Hint:', answersData.hint);
+            if (bookingsResponse.ok) {
+                const bookingsData = await bookingsResponse.json();
+                console.log('✅ Found', bookingsData.data?.length || 0, 'resource bookings');
+                
+                // For each booking, get its resource_approval (which contains the answers)
+                for (const booking of bookingsData.data || []) {
+                    const bookingId = booking.id;
+                    
+                    const approvalResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/resource_bookings/${bookingId}/resource_approval?include=resource_question_answers`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+                    
+                    if (approvalResponse.ok) {
+                        const approvalData = await approvalResponse.json();
+                        console.log('✅ Got resource approval for booking:', bookingId);
+                        
+                        // Check for included answers
+                        if (approvalData.included) {
+                            console.log('📦 Found included data:', approvalData.included.length, 'items');
+                            
+                            for (const item of approvalData.included) {
+                                if (item.type === 'ResourceQuestionAnswer') {
+                                    const questionId = item.relationships?.resource_question?.data?.id;
+                                    const answerValue = item.attributes?.value || '';
+                                    
+                                    if (questionId) {
+                                        answers[questionId] = answerValue;
+                                        console.log(`   ✅ Answer: question ${questionId} = "${answerValue}"`);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        console.log('❌ Failed to get approval:', approvalResponse.status);
+                    }
+                }
+            } else {
+                console.log('❌ Failed to fetch bookings:', bookingsResponse.status);
             }
-        } else {
-            const errorText = await answersResponse.text();
-            console.log('❌ Vercel function failed:', answersResponse.status, errorText);
+        } catch (err) {
+            console.error('❌ Error getting answers:', err.message);
         }
+
+        console.log('\n✅ Total answers found:', Object.keys(answers).length);
 
         // Fetch event details
         const eventResponse = await fetch(
@@ -154,12 +175,6 @@ Deno.serve(async (req) => {
                 description: eventData.data.attributes.description
             };
         }
-
-        console.log('\n🎯 Returning:', {
-            questions: questions.length,
-            answers_count: Object.keys(answers).length,
-            event: !!event
-        });
 
         return Response.json({
             questions,
