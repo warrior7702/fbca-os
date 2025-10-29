@@ -54,8 +54,6 @@ Deno.serve(async (req) => {
         const { request_id, resource_id, event_id } = await req.json();
 
         console.log('🔍 Getting details for request:', request_id);
-        console.log('   Resource ID:', resource_id);
-        console.log('   Event ID:', event_id);
 
         // Fetch resource questions
         const questionsResponse = await fetch(
@@ -80,20 +78,15 @@ Deno.serve(async (req) => {
                 multiple_select: q.attributes.multiple_select,
                 optional: q.attributes.optional
             }));
-            console.log('✅ Found', questions.length, 'questions for resource');
-        } else {
-            console.log('❌ Failed to fetch questions:', await questionsResponse.text());
+            console.log('✅ Found', questions.length, 'questions');
         }
 
-        // Get answers directly from PCO
+        // Get answers - try resource_bookings approach
         const answers = {};
         
-        console.log('\n🔍 Getting answers from PCO API...');
-        
-        // Try to get resource_bookings for this request
         try {
             const bookingsResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?per_page=100`,
+                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?include=resource_approval.resource_question_answers&per_page=100`,
                 {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -104,54 +97,32 @@ Deno.serve(async (req) => {
             
             if (bookingsResponse.ok) {
                 const bookingsData = await bookingsResponse.json();
-                console.log('✅ Found', bookingsData.data?.length || 0, 'resource bookings');
+                console.log('✅ Found', bookingsData.data?.length || 0, 'bookings');
                 
-                // For each booking, get its resource_approval (which contains the answers)
-                for (const booking of bookingsData.data || []) {
-                    const bookingId = booking.id;
+                // Check for included answers in the response
+                if (bookingsData.included) {
+                    console.log('📦 Processing', bookingsData.included.length, 'included items');
                     
-                    const approvalResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/resource_bookings/${bookingId}/resource_approval?include=resource_question_answers`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            }
-                        }
-                    );
-                    
-                    if (approvalResponse.ok) {
-                        const approvalData = await approvalResponse.json();
-                        console.log('✅ Got resource approval for booking:', bookingId);
-                        
-                        // Check for included answers
-                        if (approvalData.included) {
-                            console.log('📦 Found included data:', approvalData.included.length, 'items');
+                    for (const item of bookingsData.included) {
+                        if (item.type === 'ResourceQuestionAnswer') {
+                            const questionId = item.relationships?.resource_question?.data?.id;
+                            const answerValue = item.attributes?.value || item.attributes?.body || '';
                             
-                            for (const item of approvalData.included) {
-                                if (item.type === 'ResourceQuestionAnswer') {
-                                    const questionId = item.relationships?.resource_question?.data?.id;
-                                    const answerValue = item.attributes?.value || '';
-                                    
-                                    if (questionId) {
-                                        answers[questionId] = answerValue;
-                                        console.log(`   ✅ Answer: question ${questionId} = "${answerValue}"`);
-                                    }
-                                }
+                            if (questionId) {
+                                answers[questionId] = answerValue;
+                                console.log(`   ✅ Found answer for question ${questionId}`);
                             }
                         }
-                    } else {
-                        console.log('❌ Failed to get approval:', approvalResponse.status);
                     }
                 }
+                
+                console.log('✅ Total answers found:', Object.keys(answers).length);
             } else {
-                console.log('❌ Failed to fetch bookings:', bookingsResponse.status);
+                console.log('⚠️ Bookings request returned:', bookingsResponse.status);
             }
         } catch (err) {
             console.error('❌ Error getting answers:', err.message);
         }
-
-        console.log('\n✅ Total answers found:', Object.keys(answers).length);
 
         // Fetch event details
         const eventResponse = await fetch(
@@ -175,6 +146,12 @@ Deno.serve(async (req) => {
                 description: eventData.data.attributes.description
             };
         }
+
+        console.log('🎯 Returning:', {
+            questions: questions.length,
+            answers_count: Object.keys(answers).length,
+            event: !!event
+        });
 
         return Response.json({
             questions,
