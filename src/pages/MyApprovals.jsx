@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { getApprovalsLite, approveRequest, denyRequest } from "@/lib/pcoClient";
@@ -65,12 +66,12 @@ export default function MyApprovals() {
     setLoading(true);
     setError(null);
     try {
-      console.log('🔄 Loading approvals from Vercel...');
+      console.log('🔄 Loading approvals directly from PCO...');
       
-      const response = await getApprovalsLite("mygroups");
+      const response = await getApprovalsLite();
       
       console.log('✅ Raw response:', response);
-      console.log('✅ Response data length:', response.data?.length);
+      console.log('✅ Response count:', response.count);
       console.log('✅ First item:', response.data?.[0]);
       
       const transformedApprovals = (response.data || []).map(item => ({
