@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { getApprovalsLite, approveRequest, denyRequest } from "@/utils/pcoClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,6 @@ export default function MyApprovals() {
   const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [processing, setProcessing] = useState(null);
@@ -49,62 +49,52 @@ export default function MyApprovals() {
     setLoading(true);
     setError(null);
     try {
-      // Load from Base44 database
-      const currentUser = await base44.auth.me();
-      const data = await base44.entities.PendingApproval.filter({
-        user_email: currentUser.email,
-        approval_status: 'P'
-      });
+      console.log('Loading approvals from Vercel...');
       
-      setApprovals(data || []);
+      // Call Vercel API via pcoClient
+      const response = await getApprovalsLite("mygroups");
+      
+      console.log('Approvals loaded:', response);
+      
+      // Transform data to match our UI format
+      const transformedApprovals = (response.data || []).map(item => ({
+        id: item.id,
+        request_id: item.id,
+        event_id: item.event?.id,
+        event_name: item.event?.name || 'Unknown Event',
+        event_starts_at: item.event?.starts_at,
+        event_ends_at: item.event?.ends_at,
+        resource_name: item.resource?.name || 'Unknown Resource',
+        approval_group_name: item.approval_group?.name || 'Unknown Group',
+        quantity: item.quantity || 1,
+        approval_status: item.status,
+        pco_created_at: item.created_at,
+        pco_updated_at: item.updated_at
+      }));
+      
+      setApprovals(transformedApprovals);
+      console.log('Transformed approvals:', transformedApprovals.length);
     } catch (error) {
       console.error("Failed to load approvals:", error);
       setError(error.message);
+      toast.error("Failed to load approvals");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const syncFromPCO = async () => {
-    setSyncing(true);
-    try {
-      const response = await base44.functions.invoke('syncMyApprovals');
-      
-      if (response.data.success) {
-        toast.success(`Synced ${response.data.count} pending approvals`);
-        await loadApprovals();
-      } else {
-        throw new Error(response.data.error || 'Sync failed');
-      }
-    } catch (error) {
-      console.error("Sync failed:", error);
-      toast.error(error.message || "Failed to sync approvals");
-    } finally {
-      setSyncing(false);
     }
   };
 
   const handleApprove = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id
-      });
-
-      if (response.data.success) {
-        toast.success('Request approved!');
-        
-        // Remove from local state
-        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
-        
-        // Delete from database
-        await base44.entities.PendingApproval.delete(approval.id);
-      } else {
-        throw new Error('Approval failed');
-      }
+      await approveRequest(approval.request_id, "Approved from FBCA Hub");
+      
+      toast.success('Request approved!');
+      
+      // Remove from local state
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Approval failed:", error);
-      toast.error("Failed to approve request");
+      toast.error(error.message || "Failed to approve request");
     } finally {
       setProcessing(null);
     }
@@ -113,24 +103,15 @@ export default function MyApprovals() {
   const handleDeny = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      const response = await base44.functions.invoke('denyResourceRequest', {
-        request_id: approval.request_id
-      });
-
-      if (response.data.success) {
-        toast.success('Request denied');
-        
-        // Remove from local state
-        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
-        
-        // Delete from database
-        await base44.entities.PendingApproval.delete(approval.id);
-      } else {
-        throw new Error('Denial failed');
-      }
+      await denyRequest(approval.request_id, "Denied from FBCA Hub");
+      
+      toast.success('Request denied');
+      
+      // Remove from local state
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Denial failed:", error);
-      toast.error("Failed to deny request");
+      toast.error(error.message || "Failed to deny request");
     } finally {
       setProcessing(null);
     }
@@ -152,16 +133,13 @@ export default function MyApprovals() {
 
           <div className="flex items-center gap-2">
             <Button
-              onClick={syncFromPCO}
-              disabled={syncing || !user?.pco_access_token}
+              onClick={loadApprovals}
+              disabled={loading || !user?.pco_access_token}
               variant="outline"
               className="gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from PCO'}
-            </Button>
-            <Button onClick={loadApprovals} variant="outline" size="icon">
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Loading...' : 'Refresh'}
             </Button>
           </div>
         </div>
