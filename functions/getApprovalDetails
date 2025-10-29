@@ -85,36 +85,36 @@ Deno.serve(async (req) => {
             console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
-        // Get Base44 access token for Vercel function
-        console.log('\n🔍 Calling Vercel function for answers...');
-        const sid = await base44.auth.getAccessToken();
-        
-        // Call Vercel function with request_id
-        const answersResponse = await fetch(
-            `https://pco-webhook.vercel.app/api/pco-get-question-answers?request_id=${request_id}`,
+        // Fetch answers directly from PCO
+        console.log('\n🔍 Fetching answers from PCO...');
+        const requestResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=resource_answers`,
             {
                 headers: {
-                    'Authorization': `Bearer ${sid}`
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
                 }
             }
         );
 
         const answers = {};
         
-        if (answersResponse.ok) {
-            const answersData = await answersResponse.json();
-            console.log('✅ Vercel response:', JSON.stringify(answersData, null, 2));
-            console.log('📋 Found', answersData.count || 0, 'answers');
+        if (requestResponse.ok) {
+            const requestData = await requestResponse.json();
+            console.log('✅ Request data fetched');
+            console.log('📋 Included items:', requestData.included?.length || 0);
             
-            // Map Vercel response to our format
-            if (answersData.ok && answersData.answers) {
-                answersData.answers.forEach((answer, index) => {
-                    const questionId = answer.question?.id;
-                    const answerValue = answer.value;
+            // Look for resource_answers in the included array
+            if (requestData.included) {
+                const resourceAnswers = requestData.included.filter(item => item.type === 'ResourceAnswer');
+                console.log('📝 Found', resourceAnswers.length, 'resource answers');
+                
+                resourceAnswers.forEach((answer, index) => {
+                    const questionId = answer.relationships?.resource_question?.data?.id;
+                    const answerValue = answer.attributes?.value;
                     
                     console.log(`\n📌 Answer ${index + 1}:`);
                     console.log(`   → Question ID: ${questionId}`);
-                    console.log(`   → Question Text: ${answer.question?.text}`);
                     console.log(`   → Answer Value: ${answerValue}`);
                     
                     if (questionId && answerValue !== null && answerValue !== undefined) {
@@ -127,8 +127,7 @@ Deno.serve(async (req) => {
             console.log('\n✅ Final answers object:', JSON.stringify(answers, null, 2));
             console.log('✅ Total answers mapped:', Object.keys(answers).length);
         } else {
-            const errorText = await answersResponse.text();
-            console.log('❌ Vercel function failed:', answersResponse.status, errorText);
+            console.log('❌ Failed to fetch request:', requestResponse.status, await requestResponse.text());
         }
 
         // Fetch event details
