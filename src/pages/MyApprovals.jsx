@@ -62,18 +62,16 @@ export default function MyApprovals() {
   const loadApprovals = async () => {
     try {
       console.log('🔄 Loading approvals...');
-      const response = await base44.functions.invoke('getMyPendingApprovals');
+      const response = await base44.functions.invoke('listPendingApprovalsV2', {
+        mode: 'mygroups',
+        per_page: 100
+      });
       console.log('✅ Response:', response.data);
-      console.log('📊 Total fetched from PCO:', response.data.total_fetched);
-      console.log('📊 After filtering:', response.data.count, 'approvals');
       
-      const approvalsData = response.data.pending_approvals || [];
+      const approvalsData = response.data.approvals || [];
       console.log('📅 Approvals data:', approvalsData);
       
-      const pendingOnly = approvalsData.filter(a => a.approval_status === 'P');
-      console.log('📋 Pending requests only:', pendingOnly.length);
-      
-      setApprovals(pendingOnly);
+      setApprovals(approvalsData);
     } catch (error) {
       console.error('Error loading approvals:', error);
       toast.error('Failed to load approvals');
@@ -84,12 +82,8 @@ export default function MyApprovals() {
     setSyncing(true);
     try {
       console.log('🔄 Starting sync...');
-      const response = await base44.functions.invoke('syncMyApprovals');
-      console.log('✅ Sync response:', response.data);
-      
-      toast.success(`Synced ${response.data.count} approvals`);
-      
       await loadApprovals();
+      toast.success(`Synced successfully`);
     } catch (error) {
       console.error('Sync error:', error);
       toast.error('Failed to sync approvals');
@@ -199,7 +193,7 @@ export default function MyApprovals() {
             ) : (
               approvals.map((approval, index) => (
                 <motion.div
-                  key={approval.id || index}
+                  key={approval.request_id || index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
