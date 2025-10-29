@@ -170,25 +170,58 @@ Deno.serve(async (req) => {
             const event = eventMap[eventId];
             const resource = resourceMap[resourceId];
             
+            console.log(`\n🔍 Checking request ${request.id} for event: ${event?.attributes?.name} (ID: ${eventId})`);
+            
             // Get event instance for dates
             let eventStartsAt = null;
             let eventEndsAt = null;
             
             try {
-                const instancesResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
+                const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`;
+                console.log(`   → Fetching: ${instancesUrl}`);
+                
+                const instancesResponse = await fetch(instancesUrl, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                console.log(`   → Response status: ${instancesResponse.status}`);
                 
                 if (instancesResponse.ok) {
                     const instancesData = await instancesResponse.json();
+                    console.log(`   → Found ${A(instancesData.data).length} future instances`);
+                    
                     if (A(instancesData.data).length > 0) {
                         eventStartsAt = instancesData.data[0].attributes?.starts_at;
                         eventEndsAt = instancesData.data[0].attributes?.ends_at;
+                        console.log(`   ✅ Event starts: ${eventStartsAt}`);
+                    } else {
+                        console.log(`   ⚠️ No future instances found - checking ALL instances...`);
+                        
+                        // Try without filter
+                        const allInstancesResponse = await fetch(
+                            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?per_page=1&order=-starts_at`,
+                            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                        );
+                        
+                        if (allInstancesResponse.ok) {
+                            const allInstancesData = await allInstancesResponse.json();
+                            if (A(allInstancesData.data).length > 0) {
+                                eventStartsAt = allInstancesData.data[0].attributes?.starts_at;
+                                eventEndsAt = allInstancesData.data[0].attributes?.ends_at;
+                                console.log(`   ⚠️ Using most recent instance: ${eventStartsAt}`);
+                            }
+                        }
                     }
+                } else {
+                    console.log(`   ❌ Failed to fetch instances: ${await instancesResponse.text()}`);
                 }
             } catch (err) {
-                console.error('Error fetching event instance:', err);
+                console.error(`   ❌ Error checking instances:`, err.message);
+            }
+            
+            if (!eventStartsAt) {
+                console.log(`   ⏭️ Skipping - no instance date found`);
+                continue;
             }
             
             myApprovals.push({
@@ -206,6 +239,8 @@ Deno.serve(async (req) => {
                 pco_created_at: request.attributes?.created_at,
                 pco_updated_at: request.attributes?.updated_at
             });
+            
+            console.log(`   ✅ Added to approvals list`);
         }
 
         // Sort by event date
