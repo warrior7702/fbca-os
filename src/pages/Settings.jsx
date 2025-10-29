@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail } from "lucide-react"; // Added Mail import
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug } from "lucide-react"; // Added Bug import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -346,6 +346,31 @@ export default function Settings() {
                 color="orange"
               />
             </div>
+
+            {/* PCO Debug Link */}
+            {user?.pco_access_token && (
+              <Card className="border-purple-200 bg-purple-50 mt-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-900">
+                    <Bug className="w-5 h-5" />
+                    Planning Center Diagnostics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Having issues with approvals not showing? Use the diagnostics tool to see your approval groups, pending requests, and connection status.
+                  </p>
+                  <Button
+                    onClick={() => navigate('/PCODebug')}
+                    variant="outline"
+                    className="border-purple-300 hover:bg-purple-100"
+                  >
+                    <Bug className="w-4 h-4 mr-2" />
+                    Run PCO Diagnostics
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-4">
