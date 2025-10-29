@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { getApprovalsLite, approveRequest, denyRequest } from "@/lib/pcoClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,38 +64,19 @@ export default function MyApprovals() {
     setLoading(true);
     setError(null);
     try {
-      console.log('🔄 Loading approvals directly from PCO...');
+      console.log('🔄 Loading approvals...');
       
-      const response = await getApprovalsLite();
+      const response = await base44.functions.invoke('getMyPendingApprovals', {});
       
-      console.log('✅ Raw response:', response);
-      console.log('✅ Response count:', response.count);
-      console.log('✅ First item:', response.data?.[0]);
+      console.log('✅ Response:', response.data);
       
-      const transformedApprovals = (response.data || []).map(item => ({
-        id: item.id,
-        request_id: item.id,
-        event_id: item.event?.id,
-        event_name: item.event?.name || 'Unknown Event',
-        event_starts_at: item.event?.starts_at,
-        event_ends_at: item.event?.ends_at,
-        resource_name: item.resource?.name || 'Unknown Resource',
-        approval_group_name: item.approval_group?.name || 'Unknown Group',
-        quantity: item.quantity || 1,
-        approval_status: item.status,
-        pco_created_at: item.created_at,
-        pco_updated_at: item.updated_at
-      }));
+      setApprovals(response.data.pending_approvals || []);
       
-      console.log('✅ Transformed approvals:', transformedApprovals);
-      setApprovals(transformedApprovals);
-      
-      if (transformedApprovals.length === 0) {
-        console.log('ℹ️ No approvals found - you may not be in any approval groups or there are no pending requests');
+      if (response.data.pending_approvals?.length === 0) {
+        console.log('ℹ️ No approvals found');
       }
     } catch (error) {
       console.error("❌ Failed to load approvals:", error);
-      console.error("❌ Error details:", error.message);
       setError(error.message);
       toast.error("Failed to load approvals: " + error.message);
     } finally {
@@ -107,14 +87,16 @@ export default function MyApprovals() {
   const handleApprove = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      await approveRequest(approval.request_id);
+      await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id
+      });
       
       toast.success('Request approved!');
       
       setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Approval failed:", error);
-      toast.error(error.message || "Failed to approve request");
+      toast.error(error.response?.data?.error || error.message || "Failed to approve request");
     } finally {
       setProcessing(null);
     }
@@ -123,14 +105,16 @@ export default function MyApprovals() {
   const handleDeny = async (approval) => {
     setProcessing(approval.request_id);
     try {
-      await denyRequest(approval.request_id);
+      await base44.functions.invoke('denyResourceRequest', {
+        request_id: approval.request_id
+      });
       
       toast.success('Request denied');
       
       setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
     } catch (error) {
       console.error("Denial failed:", error);
-      toast.error(error.message || "Failed to deny request");
+      toast.error(error.response?.data?.error || error.message || "Failed to deny request");
     } finally {
       setProcessing(null);
     }
