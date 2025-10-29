@@ -1,22 +1,68 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const user = await base44.auth.me();
+        const currentUser = await base44.auth.me();
 
-        if (!user || !user.pco_access_token) {
+        if (!currentUser) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ error: 'PCO not connected' }, { status: 400 });
+        }
+
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
         const { request_id, resource_id, event_id } = await req.json();
+
+        console.log('🔍 Getting details for request:', request_id);
+        console.log('   Resource ID:', resource_id);
+        console.log('   Event ID:', event_id);
 
         // Fetch resource questions
         const questionsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions`,
+            `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions?per_page=100`,
             {
                 headers: {
-                    'Authorization': `Bearer ${user.pco_access_token}`,
+                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
             }
@@ -34,14 +80,17 @@ Deno.serve(async (req) => {
                 multiple_select: q.attributes.multiple_select,
                 optional: q.attributes.optional
             }));
+            console.log('✅ Found', questions.length, 'questions for resource');
+        } else {
+            console.log('❌ Failed to fetch questions:', await questionsResponse.text());
         }
 
         // Fetch answers for this specific request
         const answersResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers`,
+            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_answers?per_page=100`,
             {
                 headers: {
-                    'Authorization': `Bearer ${user.pco_access_token}`,
+                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
             }
@@ -50,12 +99,17 @@ Deno.serve(async (req) => {
         const answers = {};
         if (answersResponse.ok) {
             const answersData = await answersResponse.json();
+            console.log('📋 Raw answers data:', answersData.data);
             answersData.data.forEach(answer => {
                 const questionId = answer.relationships?.resource_question?.data?.id;
                 if (questionId) {
                     answers[questionId] = answer.attributes.value;
+                    console.log('✅ Answer for question', questionId, ':', answer.attributes.value);
                 }
             });
+            console.log('✅ Processed', Object.keys(answers).length, 'answers');
+        } else {
+            console.log('❌ Failed to fetch answers:', await answersResponse.text());
         }
 
         // Fetch event details
@@ -63,7 +117,7 @@ Deno.serve(async (req) => {
             `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`,
             {
                 headers: {
-                    'Authorization': `Bearer ${user.pco_access_token}`,
+                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
             }
@@ -81,6 +135,12 @@ Deno.serve(async (req) => {
             };
         }
 
+        console.log('✅ Returning:', {
+            questions: questions.length,
+            answers: Object.keys(answers).length,
+            event: !!event
+        });
+
         return Response.json({
             questions,
             answers,
@@ -88,7 +148,12 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('Get approval details error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        console.error('❌ Get approval details error:', error);
+        return Response.json({ 
+            error: error.message,
+            questions: [],
+            answers: {},
+            event: null
+        }, { status: 500 });
     }
 });
