@@ -86,16 +86,15 @@ Deno.serve(async (req) => {
             console.log('❌ Questions request failed:', questionsResponse.status);
         }
 
-        // Strategy: Try multiple approaches to get answers
+        // Get answers by drilling down: request → bookings → approval → answers
         const answers = {};
         
-        console.log('\n📝 Attempting to fetch answers...');
+        console.log('\n📝 Fetching answers...');
         
-        // Approach 1: Try getting from the request directly with includes
-        console.log('🔍 Approach 1: Fetch request with includes');
         try {
-            const requestResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=resource_bookings.resource_approval.resource_question_answers`,
+            // Step 1: Get bookings for this request
+            const bookingsResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?per_page=100`,
                 {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -104,85 +103,72 @@ Deno.serve(async (req) => {
                 }
             );
             
-            if (requestResponse.ok) {
-                const requestData = await requestResponse.json();
-                console.log('✅ Got request data');
+            if (bookingsResponse.ok) {
+                const bookingsData = await bookingsResponse.json();
+                console.log('✅ Found', bookingsData.data?.length || 0, 'bookings');
                 
-                if (requestData.included && requestData.included.length > 0) {
-                    console.log('📦 Found', requestData.included.length, 'included items');
+                // Step 2: For each booking, get its resource_approval
+                for (const booking of bookingsData.data || []) {
+                    const bookingId = booking.id;
+                    console.log('   📦 Processing booking:', bookingId);
                     
-                    for (const item of requestData.included) {
-                        console.log('   - Type:', item.type);
-                        
-                        if (item.type === 'ResourceQuestionAnswer') {
-                            const questionId = item.relationships?.resource_question?.data?.id;
-                            const answerValue = item.attributes?.value || item.attributes?.body || '';
-                            
-                            if (questionId) {
-                                answers[questionId] = answerValue;
-                                console.log(`   ✅ Answer for Q${questionId}: "${answerValue}"`);
+                    const approvalResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/resource_bookings/${bookingId}/resource_approval`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
                             }
                         }
-                    }
-                } else {
-                    console.log('⚠️ No included items in request');
-                }
-            } else {
-                console.log('❌ Approach 1 failed:', requestResponse.status);
-            }
-        } catch (err) {
-            console.error('❌ Approach 1 error:', err.message);
-        }
-        
-        // Approach 2: If no answers yet, try bookings endpoint
-        if (Object.keys(answers).length === 0) {
-            console.log('\n🔍 Approach 2: Fetch resource bookings');
-            try {
-                const bookingsResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/resource_bookings?include=resource_approval.resource_question_answers&per_page=100`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-                
-                if (bookingsResponse.ok) {
-                    const bookingsData = await bookingsResponse.json();
-                    console.log('✅ Found', bookingsData.data?.length || 0, 'bookings');
+                    );
                     
-                    if (bookingsData.included && bookingsData.included.length > 0) {
-                        console.log('📦 Found', bookingsData.included.length, 'included items');
+                    if (approvalResponse.ok) {
+                        const approvalData = await approvalResponse.json();
+                        const approvalId = approvalData.data?.id;
+                        console.log('   ✅ Found approval:', approvalId);
                         
-                        for (const item of bookingsData.included) {
-                            console.log('   - Type:', item.type);
-                            
-                            if (item.type === 'ResourceQuestionAnswer') {
-                                const questionId = item.relationships?.resource_question?.data?.id;
-                                const answerValue = item.attributes?.value || item.attributes?.body || '';
-                                
-                                if (questionId) {
-                                    answers[questionId] = answerValue;
-                                    console.log(`   ✅ Answer for Q${questionId}: "${answerValue}"`);
+                        // Step 3: Get answers for this approval
+                        if (approvalId) {
+                            const answersResponse = await fetch(
+                                `https://api.planningcenteronline.com/calendar/v2/resource_approvals/${approvalId}/resource_question_answers?per_page=100`,
+                                {
+                                    headers: {
+                                        'Authorization': `Bearer ${accessToken}`,
+                                        'Content-Type': 'application/json'
+                                    }
                                 }
+                            );
+                            
+                            if (answersResponse.ok) {
+                                const answersData = await answersResponse.json();
+                                console.log('   ✅ Found', answersData.data?.length || 0, 'answers');
+                                
+                                for (const answer of answersData.data || []) {
+                                    const questionId = answer.relationships?.resource_question?.data?.id;
+                                    const answerValue = answer.attributes?.value || answer.attributes?.body || '';
+                                    
+                                    if (questionId) {
+                                        answers[questionId] = answerValue;
+                                        console.log(`      ✅ Q${questionId}: "${answerValue}"`);
+                                    }
+                                }
+                            } else {
+                                console.log('   ⚠️ Answers request failed:', answersResponse.status);
                             }
                         }
                     } else {
-                        console.log('⚠️ No included items in bookings');
+                        console.log('   ⚠️ Approval request failed:', approvalResponse.status);
                     }
-                } else {
-                    console.log('❌ Approach 2 failed:', bookingsResponse.status);
                 }
-            } catch (err) {
-                console.error('❌ Approach 2 error:', err.message);
+            } else {
+                console.log('❌ Bookings request failed:', bookingsResponse.status);
             }
+        } catch (err) {
+            console.error('❌ Error fetching answers:', err.message);
         }
         
-        // Approach 3: If still no answers, answers might not be submitted yet
         if (Object.keys(answers).length === 0) {
-            console.log('\n⚠️ No answers found - they may not have been submitted yet');
-            console.log('💡 This is normal for newly created requests');
+            console.log('\n⚠️ No answers found - requestor may not have filled out the form yet');
         }
 
         console.log('\n✅ Total answers found:', Object.keys(answers).length);
