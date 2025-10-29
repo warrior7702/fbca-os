@@ -1,58 +1,45 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Calendar,
-  Clock,
-  User,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  AlertCircle,
-  MessageSquare
-} from "lucide-react";
+import { Calendar, MapPin, Clock, AlertCircle, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
-export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({});
+export default function ApprovalDetailModal({ approval, open, onClose, onApprovalAction }) {
+  const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [denying, setDenying] = useState(false);
 
   useEffect(() => {
-    loadDetails();
-  }, [approval.request_id]);
+    if (open && approval) {
+      loadDetails();
+    }
+  }, [open, approval]);
 
   const loadDetails = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Loading approval details for request:', approval.request_id);
-      console.log('   Resource ID:', approval.resource_id);
-      console.log('   Event ID:', approval.event_id);
-      
-      const response = await base44.functions.invoke('getApprovalDetails', {
+      // Use V2 endpoint
+      const response = await base44.functions.invoke('getApprovalDetailsV2', {
         request_id: approval.request_id,
-        resource_id: approval.resource_id,
-        event_id: approval.event_id
+        event_id: approval.event_id,
+        resource_id: approval.resource_id
       });
 
-      console.log('📦 Full response:', response);
-      console.log('📦 Response data:', response.data);
-      console.log('❓ Questions received:', response.data.questions);
-      console.log('💬 Answers received:', response.data.answers);
+      console.log('📦 Approval details response:', response.data);
       
-      setQuestions(response.data.questions || []);
-      setAnswers(response.data.answers || {});
-      
-      console.log('✅ Set', response.data.questions?.length || 0, 'questions');
-      console.log('✅ Set', Object.keys(response.data.answers || {}).length, 'answers');
+      if (response.data.ok) {
+        setDetails(response.data);
+      } else {
+        console.error('Details response not ok:', response.data);
+        toast.error('Failed to load approval details');
+      }
     } catch (error) {
-      console.error('❌ Failed to load details:', error);
-      console.error('❌ Error details:', error.response?.data);
+      console.error('Failed to load approval details:', error);
       toast.error('Failed to load approval details');
     } finally {
       setLoading(false);
@@ -60,169 +47,187 @@ export default function ApprovalDetailModal({ approval, onClose, onComplete }) {
   };
 
   const handleApprove = async () => {
-    setProcessing(true);
+    setApproving(true);
     try {
-      await base44.functions.invoke('approveResourceRequest', {
+      const response = await base44.functions.invoke('approveResourceRequest', {
         request_id: approval.request_id
       });
-      toast.success('Approved successfully!');
-      onComplete();
+
+      if (response.data.success) {
+        toast.success('Request approved!');
+        onApprovalAction?.();
+        onClose();
+      } else {
+        toast.error('Failed to approve request');
+      }
     } catch (error) {
-      console.error('Approval failed:', error);
+      console.error('Approval error:', error);
       toast.error('Failed to approve request');
     } finally {
-      setProcessing(false);
+      setApproving(false);
     }
   };
 
   const handleDeny = async () => {
-    setProcessing(true);
+    setDenying(true);
     try {
-      await base44.functions.invoke('denyResourceRequest', {
+      const response = await base44.functions.invoke('denyResourceRequest', {
         request_id: approval.request_id
       });
-      toast.success('Request denied');
-      onComplete();
+
+      if (response.data.success) {
+        toast.success('Request denied');
+        onApprovalAction?.();
+        onClose();
+      } else {
+        toast.error('Failed to deny request');
+      }
     } catch (error) {
-      console.error('Denial failed:', error);
+      console.error('Deny error:', error);
       toast.error('Failed to deny request');
     } finally {
-      setProcessing(false);
+      setDenying(false);
     }
   };
 
+  if (!approval) return null;
+
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">{approval.event_name}</DialogTitle>
-          <DialogDescription>
-            Review resource request details and answers
-          </DialogDescription>
+          <DialogTitle className="text-2xl">{approval.event_name}</DialogTitle>
+          <p className="text-sm text-slate-500">Review resource request details and answers</p>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Event Details */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-slate-500" />
-              <span className="font-medium">
-                {approval.event_starts_at
-                  ? format(new Date(approval.event_starts_at), 'PPP p')
-                  : 'No date set'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <User className="w-4 h-4 text-slate-500" />
-              <span>{approval.resource_name}</span>
-              {approval.quantity > 1 && (
-                <Badge variant="outline">Qty: {approval.quantity}</Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-slate-500" />
-              <span className="text-slate-600">
-                Requested {format(new Date(approval.pco_created_at), 'PP')}
-              </span>
-            </div>
-
-            <Badge className="bg-orange-100 text-orange-700">
-              {approval.approval_group_name}
-            </Badge>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
-
-          <Separator />
-
-          {/* Resource Questions & Answers */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-            </div>
-          ) : questions.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-slate-600" />
-                <h3 className="font-semibold text-slate-900">
-                  Resource Questions ({questions.length})
-                </h3>
+        ) : (
+          <div className="space-y-6">
+            {/* Event Details */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-700">
+                <Calendar className="w-4 h-4" />
+                <span className="font-medium">
+                  {format(new Date(approval.event_starts_at), 'EEEE, MMMM do, yyyy h:mm a')}
+                </span>
               </div>
+              <div className="flex items-center gap-2 text-slate-700">
+                <MapPin className="w-4 h-4" />
+                <span>{approval.resource_name}</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700">
+                <Clock className="w-4 h-4" />
+                <span>Requested {format(new Date(approval.pco_created_at), 'MMM d, yyyy')}</span>
+              </div>
+            </div>
 
-              {questions.map((question) => (
-                <div key={question.id} className="p-4 bg-slate-50 rounded-lg space-y-2">
-                  <p className="font-medium text-slate-900">{question.question}</p>
-                  {question.description && (
-                    <p className="text-sm text-slate-600">{question.description}</p>
-                  )}
-                  <div className="pt-2">
-                    {answers[question.id] ? (
-                      <div className="flex items-start gap-2">
-                        <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                        <p className="text-slate-700">{answers[question.id]}</p>
+            <Separator />
+
+            {/* Resource Badge */}
+            <div>
+              <Badge className="bg-orange-100 text-orange-700 text-sm px-3 py-1">
+                {approval.approval_group_name}
+              </Badge>
+            </div>
+
+            {/* Questions & Answers */}
+            {details?.questions && details.questions.length > 0 ? (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-slate-900">Resource Request Details</h3>
+                {details.questions.map((q) => {
+                  const answer = details.answers?.[q.id];
+                  return (
+                    <div key={q.id} className="p-4 bg-slate-50 rounded-lg">
+                      <p className="font-medium text-slate-900 mb-2">
+                        {q.question}
+                        {q.required && <span className="text-red-500 ml-1">*</span>}
+                      </p>
+                      {q.description && (
+                        <p className="text-sm text-slate-500 mb-2">{q.description}</p>
+                      )}
+                      <div className="mt-2">
+                        {answer ? (
+                          <p className="text-slate-700 bg-white px-3 py-2 rounded border border-slate-200">
+                            {answer}
+                          </p>
+                        ) : (
+                          <p className="text-slate-400 italic">No answer provided</p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-slate-400 italic">No answer provided</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              <div className="text-xs text-slate-500 mt-2">
-                Showing {Object.keys(answers).length} of {questions.length} answers
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                <AlertCircle className="w-12 h-12 mb-3 text-slate-300" />
+                <p>No resource questions for this request</p>
+              </div>
+            )}
+
+            {!details?.booking_found && details?.questions?.length > 0 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium">No booking found</p>
+                  <p className="mt-1">This request may not have been submitted with answers yet, or the resource booking hasn't been created in Planning Center.</p>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                disabled={approving || denying}
+                className="flex-1"
+              >
+                Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDeny}
+                disabled={approving || denying}
+                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+              >
+                {denying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Denying...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Deny
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleApprove}
+                disabled={approving || denying}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {approving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approve
+                  </>
+                )}
+              </Button>
             </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p>No resource questions for this request</p>
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3">
-            <Button
-              onClick={onClose}
-              variant="outline"
-              disabled={processing}
-            >
-              Close
-            </Button>
-            
-            <Button
-              onClick={handleDeny}
-              disabled={processing}
-              variant="outline"
-              className="text-red-600 hover:bg-red-50"
-            >
-              {processing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Deny
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={handleApprove}
-              disabled={processing}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {processing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Approve
-                </>
-              )}
-            </Button>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
