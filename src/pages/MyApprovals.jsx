@@ -99,6 +99,7 @@ export default function MyApprovals() {
   };
 
   const handleViewDetails = (approval) => {
+    console.log('🔍 Opening details for:', approval);
     setSelectedApproval(approval);
     setShowDetailModal(true);
   };
@@ -268,16 +269,15 @@ export default function MyApprovals() {
           </div>
         )}
 
-        {showDetailModal && selectedApproval && (
-          <ApprovalDetailModal
-            approval={selectedApproval}
-            onClose={() => {
-              setShowDetailModal(false);
-              setSelectedApproval(null);
-            }}
-            onComplete={handleApprovalComplete}
-          />
-        )}
+        <ApprovalDetailModal
+          approval={selectedApproval}
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedApproval(null);
+          }}
+          onApprovalAction={handleApprovalComplete}
+        />
       </div>
     </div>
   );
