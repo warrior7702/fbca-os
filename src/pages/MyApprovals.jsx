@@ -74,10 +74,16 @@ export default function MyApprovals() {
       console.log('📊 After filtering:', response.data.count, 'approvals');
       console.log('📅 Approvals data:', response.data.pending_approvals);
       
-      setApprovals(response.data.pending_approvals || []);
+      // Filter to only show PENDING status ('P')
+      const pendingOnly = (response.data.pending_approvals || []).filter(
+        approval => approval.approval_status === 'P'
+      );
       
-      if (response.data.pending_approvals?.length === 0) {
-        console.log('ℹ️ No approvals found (all past events filtered out)');
+      console.log('📋 Pending requests only:', pendingOnly.length);
+      setApprovals(pendingOnly);
+      
+      if (pendingOnly.length === 0) {
+        console.log('ℹ️ No pending approvals found');
       }
     } catch (error) {
       console.error("❌ Failed to load approvals:", error);
