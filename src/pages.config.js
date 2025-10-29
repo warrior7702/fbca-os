@@ -19,7 +19,6 @@ import MyDepartment from './pages/MyDepartment';
 import InboxHelper from './pages/InboxHelper';
 import MyMeetings from './pages/MyMeetings';
 import PCODebug from './pages/PCODebug';
-import  from './pages/';
 import index from './pages/index';
 import Layout from './Layout.jsx';
 
@@ -46,7 +45,6 @@ export const PAGES = {
     "InboxHelper": InboxHelper,
     "MyMeetings": MyMeetings,
     "PCODebug": PCODebug,
-    "": ,
     "index": index,
 }
 
