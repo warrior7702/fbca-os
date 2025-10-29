@@ -65,9 +65,9 @@ Deno.serve(async (req) => {
         const meData = await meResponse.json();
         const myPcoPersonId = meData.data?.id;
 
-        console.log('My PCO Person ID:', myPcoPersonId);
+        console.log('🔍 My PCO Person ID:', myPcoPersonId);
 
-        // Get all approval groups and find which ones I'm in
+        // Get all approval groups
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -78,8 +78,6 @@ Deno.serve(async (req) => {
         const groupsData = await groupsResponse.json();
         const myGroupIds = [];
         const myGroupNames = {};
-        
-        // Build a map of resources to approval groups
         const resourceToGroupMap = {};
         
         for (const group of groupsData.data || []) {
@@ -117,16 +115,14 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log('I am in', myGroupIds.length, 'groups:', Object.values(myGroupNames));
-        console.log('Mapped', Object.keys(resourceToGroupMap).length, 'resources to groups');
+        console.log('✓ I am in', myGroupIds.length, 'groups');
 
-        // Initialize maps for events and resources
-        const eventMap = {};
-        const resourceMap = {};
-
-        // Get ALL pending requests - fetch multiple pages if needed
+        // Get ALL pending requests
         let allRequests = [];
         let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`;
+        
+        const eventMap = {};
+        const resourceMap = {};
         
         while (nextUrl) {
             const requestsResponse = await fetch(nextUrl, {
@@ -149,102 +145,102 @@ Deno.serve(async (req) => {
                 });
             }
             
-            // Check for next page
             nextUrl = requestsData.links?.next || null;
-            
-            // Safety limit
             if (allRequests.length >= 500) break;
         }
 
-        console.log('Fetched', allRequests.length, 'total pending requests');
+        console.log('✓ Fetched', allRequests.length, 'pending requests from PCO');
 
         const myApprovals = [];
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        console.log('📅 Filtering events - Start of today:', startOfToday.toISOString());
         
         for (const request of allRequests) {
+            const status = request.attributes?.approval_status;
+            console.log('📋 Request', request.id, 'status:', status);
+            
+            // STRICT CHECK: Only include if status is exactly 'P'
+            if (status !== 'P') {
+                console.log('⏭️ Skipping non-pending request:', request.id, 'status:', status);
+                continue;
+            }
+            
             const resourceId = request.relationships?.resource?.data?.id;
             const resource = resourceMap[resourceId];
             const groupInfo = resourceToGroupMap[resourceId];
             
             const isInMyGroups = groupInfo && myGroupIds.includes(groupInfo.groupId);
             
-            if (isInMyGroups) {
-                const eventId = request.relationships?.event?.data?.id;
-                const event = eventMap[eventId];
-                
-                // Fetch event instances - only future ones
-                let eventStartsAt = null;
-                let eventEndsAt = null;
-                let hasFutureInstance = false;
-                
-                try {
-                    const instancesResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
-                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                    );
-                    
-                    if (instancesResponse.ok) {
-                        const instancesData = await instancesResponse.json();
-                        if (instancesData.data && instancesData.data.length > 0) {
-                            hasFutureInstance = true;
-                            eventStartsAt = instancesData.data[0].attributes?.starts_at;
-                            eventEndsAt = instancesData.data[0].attributes?.ends_at;
-                            console.log('✅ Future event found:', event?.attributes?.name, 'on', eventStartsAt);
-                        } else {
-                            console.log('⏭️ No future instances for:', event?.attributes?.name);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error fetching event instance:', err);
-                }
-                
-                // ONLY include if we found a future instance
-                if (!hasFutureInstance) {
-                    console.log('⏭️ Skipping - no future instance');
-                    continue;
-                }
-                
-                myApprovals.push({
-                    id: request.id,
-                    request_id: request.id,
-                    event_id: eventId,
-                    event_name: event?.attributes?.name || 'Unknown Event',
-                    event_starts_at: eventStartsAt,
-                    event_ends_at: eventEndsAt,
-                    resource_id: resourceId,
-                    resource_name: resource?.attributes?.name || 'Unknown Resource',
-                    approval_group_name: groupInfo.groupName,
-                    quantity: request.attributes?.quantity,
-                    pco_created_at: request.attributes?.created_at,
-                    pco_updated_at: request.attributes?.updated_at,
-                    approval_status: request.attributes?.approval_status
-                });
+            if (!isInMyGroups) {
+                console.log('⏭️ Skipping - not in my groups');
+                continue;
             }
+            
+            const eventId = request.relationships?.event?.data?.id;
+            const event = eventMap[eventId];
+            
+            // Check for future instances
+            let eventStartsAt = null;
+            let eventEndsAt = null;
+            let hasFutureInstance = false;
+            
+            try {
+                const instancesResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+                
+                if (instancesResponse.ok) {
+                    const instancesData = await instancesResponse.json();
+                    if (instancesData.data && instancesData.data.length > 0) {
+                        hasFutureInstance = true;
+                        eventStartsAt = instancesData.data[0].attributes?.starts_at;
+                        eventEndsAt = instancesData.data[0].attributes?.ends_at;
+                        console.log('✅ Future event:', event?.attributes?.name, 'on', eventStartsAt);
+                    }
+                }
+            } catch (err) {
+                console.error('Error checking event instance:', err);
+            }
+            
+            if (!hasFutureInstance) {
+                console.log('⏭️ Skipping - no future instance for:', event?.attributes?.name);
+                continue;
+            }
+            
+            myApprovals.push({
+                id: request.id,
+                request_id: request.id,
+                event_id: eventId,
+                event_name: event?.attributes?.name || 'Unknown Event',
+                event_starts_at: eventStartsAt,
+                event_ends_at: eventEndsAt,
+                resource_id: resourceId,
+                resource_name: resource?.attributes?.name || 'Unknown Resource',
+                approval_group_name: groupInfo.groupName,
+                quantity: request.attributes?.quantity,
+                pco_created_at: request.attributes?.created_at,
+                pco_updated_at: request.attributes?.updated_at,
+                approval_status: status
+            });
         }
 
-        // Sort by event start date (soonest first)
         myApprovals.sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.pco_created_at);
             const dateB = new Date(b.event_starts_at || b.pco_created_at);
             return dateA - dateB;
         });
 
-        console.log('✅ Found', myApprovals.length, 'future approvals for my groups');
+        console.log('✅ Final result:', myApprovals.length, 'pending approvals');
         
         return Response.json({ 
             pending_approvals: myApprovals,
             count: myApprovals.length,
             my_groups_count: myGroupIds.length,
             my_groups: Object.values(myGroupNames),
-            total_fetched: allRequests.length,
-            cache_bust: Date.now()
+            total_fetched: allRequests.length
         });
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error:', error);
         return Response.json({ 
             error: error.message, 
             pending_approvals: []
