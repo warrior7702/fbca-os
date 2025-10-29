@@ -162,8 +162,7 @@ Deno.serve(async (req) => {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
-        console.log('📅 Current time:', now.toISOString());
-        console.log('📅 Start of today:', startOfToday.toISOString());
+        console.log('📅 Filtering events - Start of today:', startOfToday.toISOString());
         
         for (const request of allRequests) {
             const resourceId = request.relationships?.resource?.data?.id;
@@ -176,10 +175,10 @@ Deno.serve(async (req) => {
                 const eventId = request.relationships?.event?.data?.id;
                 const event = eventMap[eventId];
                 
-                // Fetch event instances to get actual dates
+                // Fetch event instances - only future ones
                 let eventStartsAt = null;
                 let eventEndsAt = null;
-                let shouldSkip = false;
+                let hasFutureInstance = false;
                 
                 try {
                     const instancesResponse = await fetch(
@@ -190,31 +189,21 @@ Deno.serve(async (req) => {
                     if (instancesResponse.ok) {
                         const instancesData = await instancesResponse.json();
                         if (instancesData.data && instancesData.data.length > 0) {
+                            hasFutureInstance = true;
                             eventStartsAt = instancesData.data[0].attributes?.starts_at;
                             eventEndsAt = instancesData.data[0].attributes?.ends_at;
-                            
-                            // Check if event is in the past
-                            if (eventStartsAt) {
-                                const eventDate = new Date(eventStartsAt);
-                                // Skip if event starts before today (not today or in future)
-                                if (eventDate < startOfToday) {
-                                    console.log('⏭️  Skipping past event:', event?.attributes?.name, 'starts:', eventStartsAt);
-                                    shouldSkip = true;
-                                } else {
-                                    console.log('✅ Including event:', event?.attributes?.name, 'starts:', eventStartsAt);
-                                }
-                            }
+                            console.log('✅ Future event found:', event?.attributes?.name, 'on', eventStartsAt);
                         } else {
-                            // No future instances found - this is likely a past event
-                            console.log('⏭️  Skipping event with no future instances:', event?.attributes?.name);
-                            shouldSkip = true;
+                            console.log('⏭️ No future instances for:', event?.attributes?.name);
                         }
                     }
                 } catch (err) {
                     console.error('Error fetching event instance:', err);
                 }
                 
-                if (shouldSkip) {
+                // ONLY include if we found a future instance
+                if (!hasFutureInstance) {
+                    console.log('⏭️ Skipping - no future instance');
                     continue;
                 }
                 
@@ -236,7 +225,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Sort by event start date (soonest first), fallback to created_at if no event date
+        // Sort by event start date (soonest first)
         myApprovals.sort((a, b) => {
             const dateA = new Date(a.event_starts_at || a.pco_created_at);
             const dateB = new Date(b.event_starts_at || b.pco_created_at);
