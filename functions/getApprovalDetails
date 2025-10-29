@@ -141,15 +141,29 @@ Deno.serve(async (req) => {
                             
                             if (answersResponse.ok) {
                                 const answersData = await answersResponse.json();
-                                console.log('   ✅ Found', answersData.data?.length || 0, 'answers');
+                                console.log('   ✅ Found', answersData.data?.length || 0, 'answer records');
                                 
                                 for (const answer of answersData.data || []) {
                                     const questionId = answer.relationships?.resource_question?.data?.id;
-                                    const answerValue = answer.attributes?.value || answer.attributes?.body || '';
+                                    
+                                    // LOG THE FULL ANSWER OBJECT TO SEE WHAT'S IN IT
+                                    console.log('      📄 Full answer object for Q' + questionId + ':', JSON.stringify(answer.attributes, null, 2));
+                                    
+                                    // Try multiple possible fields where the answer might be
+                                    let answerValue = answer.attributes?.value 
+                                        || answer.attributes?.body 
+                                        || answer.attributes?.text
+                                        || answer.attributes?.answer
+                                        || '';
+                                    
+                                    // Handle array values (for multiple_select questions)
+                                    if (Array.isArray(answerValue)) {
+                                        answerValue = answerValue.join(', ');
+                                    }
                                     
                                     if (questionId) {
                                         answers[questionId] = answerValue;
-                                        console.log(`      ✅ Q${questionId}: "${answerValue}"`);
+                                        console.log(`      ✅ Q${questionId} = "${answerValue}"`);
                                     }
                                 }
                             } else {
