@@ -1,0 +1,203 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+const PCO_BASE = "https://api.planningcenteronline.com";
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+async function pcoJson(url, token) {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const txt = await r.text();
+    let j = {};
+    try { 
+        j = txt ? JSON.parse(txt) : {}; 
+    } catch { 
+        j = { non_json: true, body: txt }; 
+    }
+    if (!r.ok) {
+        throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(j).slice(0, 300)}`);
+    }
+    return j;
+}
+
+function indexIncluded(arr = []) {
+    const m = new Map();
+    for (const x of arr) m.set(`${x.type}:${x.id}`, x);
+    return (t, id) => m.get(`${t}:${id}`) || null;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ error: 'PCO not connected' }, { status: 400 });
+        }
+
+        const token = await refreshTokenIfNeeded(base44, user);
+
+        const { request_id, event_id, resource_id } = await req.json();
+        
+        if (!event_id || !resource_id) {
+            return Response.json({ 
+                error: "event_id and resource_id are required" 
+            }, { status: 400 });
+        }
+
+        console.log('🔍 Getting approval details V2 for:');
+        console.log('   Request ID:', request_id);
+        console.log('   Event ID:', event_id);
+        console.log('   Resource ID:', resource_id);
+
+        // 1) Resource → questions (+choices)
+        const qUrl = `${PCO_BASE}/calendar/v2/resources/${resource_id}/resource_questions?per_page=100&include=choices`;
+        console.log('📋 Fetching questions from:', qUrl);
+        
+        const qJson = await pcoJson(qUrl, token);
+        const qInc = indexIncluded(qJson.included || []);
+        
+        const questions = (qJson.data || []).map(q => {
+            const choicesRel = q?.relationships?.choices?.data || [];
+            const choices = choicesRel.map(rel => {
+                const c = qInc(rel.type, rel.id);
+                return { 
+                    id: c?.id, 
+                    name: c?.attributes?.name 
+                };
+            });
+            return {
+                id: q.id,
+                question: q?.attributes?.name || q?.attributes?.question || "",
+                description: q?.attributes?.description || "",
+                kind: q?.attributes?.question_type || q?.attributes?.kind || "",
+                required: !!q?.attributes?.required,
+                choices
+            };
+        });
+
+        console.log('✅ Found', questions.length, 'questions');
+
+        // 2) Event (bookings+answers) - comprehensive include
+        const include = [
+            "resource_bookings",
+            "resource_bookings.resource",
+            "resource_bookings.resource_question_answers",
+            "resource_bookings.resource_question_answers.resource_question",
+            "resource_bookings.resource_question_answers.choice"
+        ].join(",");
+        
+        const evUrl = `${PCO_BASE}/calendar/v2/events/${event_id}?include=${encodeURIComponent(include)}`;
+        console.log('📦 Fetching event with bookings from:', evUrl);
+        
+        const evJson = await pcoJson(evUrl, token);
+        const inc = indexIncluded(evJson.included || []);
+
+        // Find the booking for this resource
+        const bookings = (evJson.included || []).filter(x => x.type === "ResourceBooking");
+        console.log('📋 Found', bookings.length, 'total bookings for event');
+        
+        const booking = bookings.find(b => {
+            const resRel = b?.relationships?.resource?.data;
+            return resRel?.id === String(resource_id);
+        });
+
+        console.log('🎯 Found matching booking:', !!booking);
+
+        const answersMap = {};
+        if (booking) {
+            const ansRel = booking?.relationships?.resource_question_answers?.data || [];
+            console.log('💬 Processing', ansRel.length, 'answers');
+            
+            for (const rel of ansRel) {
+                const ans = inc(rel.type, rel.id);
+                const qRel = ans?.relationships?.resource_question?.data;
+                const chRel = ans?.relationships?.choice?.data;
+                const q = qRel ? inc(qRel.type, qRel.id) : null;
+                const ch = chRel ? inc(chRel.type, chRel.id) : null;
+
+                const qid = q?.id;
+                if (!qid) continue;
+
+                // Prefer selected choice label when present, else value_text (free text / date / number)
+                const label = ch?.attributes?.name || ans?.attributes?.value_text || ans?.attributes?.value || "";
+                answersMap[qid] = label;
+                
+                console.log(`   ✅ Answer for question ${qid}: "${label}"`);
+            }
+        } else {
+            console.log('⚠️ No booking found for resource', resource_id);
+        }
+
+        // Include event core info
+        const event = {
+            id: evJson?.data?.id,
+            name: evJson?.data?.attributes?.name,
+            approval_status: evJson?.data?.attributes?.approval_status,
+            starts_at: evJson?.data?.attributes?.starts_at,
+            ends_at: evJson?.data?.attributes?.ends_at,
+            summary: evJson?.data?.attributes?.summary,
+            description: evJson?.data?.attributes?.description
+        };
+
+        console.log('🎯 Returning:', {
+            questions: questions.length,
+            answers: Object.keys(answersMap).length,
+            booking_found: !!booking
+        });
+
+        return Response.json({
+            ok: true,
+            event,
+            questions,
+            answers: answersMap,
+            booking_found: !!booking
+        });
+
+    } catch (error) {
+        console.error('❌ Get approval details V2 error:', error);
+        return Response.json({ 
+            error: error.message,
+            questions: [],
+            answers: {},
+            event: null
+        }, { status: 500 });
+    }
+});
