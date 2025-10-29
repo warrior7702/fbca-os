@@ -154,13 +154,14 @@ Deno.serve(async (req) => {
 
         console.log('📥 Fetched', allRequests.length, 'total pending requests');
 
-        // Filter to my groups only
+        // Filter to my groups only AND future events
         const myApprovals = [];
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         
         for (const request of allRequests) {
             // Must be pending
             if (request.attributes?.approval_status !== 'P') {
-                console.log(`⏭️ Request ${request.id}: Not pending (status: ${request.attributes?.approval_status})`);
                 continue;
             }
             
@@ -176,18 +177,14 @@ Deno.serve(async (req) => {
             const event = eventMap[eventId];
             const resource = resourceMap[resourceId];
             
-            console.log(`\n📝 Processing request ${request.id} for event: ${event?.attributes?.name} (ID: ${eventId})`);
-            
-            // Get event instance for dates - try FUTURE first, then ANY
+            // Get event instance for dates - ONLY FUTURE
             let eventStartsAt = null;
             let eventEndsAt = null;
             
             try {
-                // Try future instances first
-                let instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`;
-                console.log(`   🔍 Checking for future instances...`);
+                const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`;
                 
-                let instancesResponse = await fetch(instancesUrl, {
+                const instancesResponse = await fetch(instancesUrl, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 
@@ -197,33 +194,30 @@ Deno.serve(async (req) => {
                     if (A(instancesData.data).length > 0) {
                         eventStartsAt = instancesData.data[0].attributes?.starts_at;
                         eventEndsAt = instancesData.data[0].attributes?.ends_at;
-                        console.log(`   ✅ Found future instance: ${eventStartsAt}`);
-                    } else {
-                        // No future - try ANY instance
-                        console.log(`   ⚠️ No future instances - checking ALL instances...`);
                         
-                        instancesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?per_page=1&order=-starts_at`;
-                        instancesResponse = await fetch(instancesUrl, {
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
-                        });
-                        
-                        if (instancesResponse.ok) {
-                            const allInstancesData = await instancesResponse.json();
-                            if (A(allInstancesData.data).length > 0) {
-                                eventStartsAt = allInstancesData.data[0].attributes?.starts_at;
-                                eventEndsAt = allInstancesData.data[0].attributes?.ends_at;
-                                console.log(`   ⚠️ Using most recent instance: ${eventStartsAt}`);
-                            }
+                        // Verify it's actually in the future (or recent past)
+                        const eventDate = new Date(eventStartsAt);
+                        if (eventDate < sevenDaysAgo) {
+                            console.log(`   ⏭️ Skipping old event: ${event?.attributes?.name} (${eventStartsAt})`);
+                            continue;
                         }
+                        
+                        console.log(`   ✅ Found future event: ${event?.attributes?.name} (${eventStartsAt})`);
+                    } else {
+                        // No future instances - skip this approval
+                        console.log(`   ⏭️ No future instances for: ${event?.attributes?.name}`);
+                        continue;
                     }
                 }
             } catch (err) {
                 console.error(`   ❌ Error checking instances:`, err.message);
+                continue;
             }
             
-            // INCLUDE EVEN WITHOUT DATE - better to show than hide
+            // Only add if we have a future date
             if (!eventStartsAt) {
-                console.log(`   ⚠️ No instance found but INCLUDING anyway`);
+                console.log(`   ⏭️ Skipping - no date: ${event?.attributes?.name}`);
+                continue;
             }
             
             myApprovals.push({
@@ -242,17 +236,17 @@ Deno.serve(async (req) => {
                 pco_updated_at: request.attributes?.updated_at
             });
             
-            console.log(`   ✅ Added to sync list (total: ${myApprovals.length})`);
+            console.log(`   ✅ Added to sync list: ${event?.attributes?.name} (total: ${myApprovals.length})`);
         }
 
-        // Sort by event date (nulls last)
+        // Sort by event date
         myApprovals.sort((a, b) => {
-            const dateA = new Date(a.event_starts_at || a.pco_created_at || 0);
-            const dateB = new Date(b.event_starts_at || b.pco_created_at || 0);
+            const dateA = new Date(a.event_starts_at);
+            const dateB = new Date(b.event_starts_at);
             return dateA - dateB;
         });
 
-        console.log('✅ Found', myApprovals.length, 'pending approvals for my groups');
+        console.log('✅ Found', myApprovals.length, 'future pending approvals for my groups');
 
         // Clear and recreate
         const existingApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
