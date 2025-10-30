@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -122,12 +121,14 @@ export default function MyApprovals() {
           form_data: formData
         });
       } else {
-        // Simple approval using new strict function
+        // Simple approval using NEW strict function
+        console.log('📞 Calling approveResourceRequestUserStrict...');
         response = await base44.functions.invoke('approveResourceRequestUserStrict', {
           request_id: approval.request_id,
           action: 'approve',
           note: `Approved via FBCA OS by ${user?.full_name || user?.email}`
         });
+        console.log('✅ Function response:', response.data);
       }
 
       if (response.data.ok || response.data.success) {
