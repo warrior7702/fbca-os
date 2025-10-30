@@ -1,90 +1,97 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
+
+async function pcoJson(url, token, opts={}) {
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    ...opts
+  });
+  const text = await r.text();
+  let json = {};
+  try { json = text ? JSON.parse(text) : {}; } catch {}
+  if (!r.ok) throw new Error(`HTTP ${r.status} :: ${url} :: ${text.slice(0,800)}`);
+  return json;
+}
 
 Deno.serve(async (req) => {
-    try {
-        console.log('🟢 Function started');
-        
-        const base44 = createClientFromRequest(req);
-        const currentUser = await base44.auth.me();
-
-        console.log('🟢 Current user:', currentUser?.email);
-
-        if (!currentUser) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const body = await req.json();
-        const { request_id } = body;
-
-        console.log('🟢 Request body:', body);
-        console.log('🟢 Request ID:', request_id);
-
-        if (!request_id) {
-            return Response.json({ error: 'Missing request_id' }, { status: 400 });
-        }
-
-        console.log('🔵 Starting approval process for request:', request_id);
-
-        // Use the getPCOToken function to ensure we get the right token
-        const tokenResponse = await base44.functions.invoke('getPCOToken');
-        const accessToken = tokenResponse.data.access_token;
-        const tokenUserId = tokenResponse.data.token_user_id;
-
-        console.log('✅ Got PCO token for user ID:', tokenUserId);
-
-        console.log('🔵 Token ready, making approval request...');
-
-        // Approve the resource request in PCO
-        const response = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    data: {
-                        type: 'EventResourceRequest',
-                        id: request_id,
-                        attributes: {
-                            approval_status: 'A'
-                        }
-                    }
-                })
-            }
-        );
-
-        console.log('🔵 PCO approval response status:', response.status);
-        
-        const responseText = await response.text();
-
-        if (!response.ok) {
-            console.error('❌ PCO approval failed:', responseText);
-            return Response.json({ 
-                error: 'Failed to approve in PCO',
-                details: responseText,
-                status: response.status,
-                token_user_id: tokenUserId
-            }, { status: 500 });
-        }
-
-        const data = JSON.parse(responseText);
-        console.log('✅ PCO approval successful. New status:', data.data?.attributes?.approval_status);
-
-        return Response.json({ 
-            success: true,
-            data: data,
-            new_status: data.data?.attributes?.approval_status,
-            token_user_id: tokenUserId
-        });
-
-    } catch (error) {
-        console.error('❌ Approve request error:', error.message);
-        console.error('❌ Stack:', error.stack);
-        return Response.json({ 
-            error: error.message,
-            stack: error.stack
-        }, { status: 500 });
+  try {
+    const b44 = createClientFromRequest(req);
+    const me = await b44.auth.me();
+    if (!me?.pco_access_token) {
+      return Response.json({ ok:false, error:"Missing PCO token on user" }, { status:401 });
     }
+
+    const { request_id, note } = await req.json();
+    if (!request_id) return Response.json({ ok:false, error:"request_id required" }, { status:400 });
+
+    const token = me.pco_access_token;
+
+    // Who am I? (both IDs)
+    const peopleMe   = await pcoJson("https://api.planningcenteronline.com/people/v2/me", token);
+    const accountsMe = await pcoJson("https://api.planningcenteronline.com/accounts/v2/me", token);
+    const personId   = peopleMe?.data?.id;
+    const userId     = accountsMe?.data?.id; // this is the 3566… style ID in 403s
+    const meName     = peopleMe?.data?.attributes?.name;
+
+    // Request details (who can approve)
+    const reqUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=approval_group,assigned_to_person,event`;
+    const reqData = await pcoJson(reqUrl, token);
+
+    const approvalGroupId = reqData?.data?.relationships?.approval_group?.data?.id || null;
+    const assignedToId    = reqData?.data?.relationships?.assigned_to_person?.data?.id || null;
+    const status          = reqData?.data?.attributes?.approval_status || null;
+    const evName = (reqData?.included || []).find(i => i.type==="Event")?.attributes?.name || null;
+
+    // Your approval-group memberships
+    let myGroupIds = [];
+    try {
+      const gm = await pcoJson(
+        `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${personId}&per_page=200&include=resource_approval_group`,
+        token
+      );
+      myGroupIds = (gm.data || [])
+        .map(d => d?.relationships?.resource_approval_group?.data?.id)
+        .filter(Boolean);
+    } catch { /* orgs not using memberships can 404 here; that's ok */ }
+
+    const inGroup = approvalGroupId ? myGroupIds.includes(approvalGroupId) : false;
+
+    // Helpful early exits
+    if (status && status !== "P") {
+      return Response.json({
+        ok:false,
+        error:`Request is not pending (status=${status})`,
+        diag:{ userId, personId, meName, request_id, approvalGroupId, assignedToId, inGroup, myGroupCount: myGroupIds.length, evName }
+      }, { status:409 });
+    }
+    if (approvalGroupId && !inGroup) {
+      return Response.json({
+        ok:false,
+        error:"You are not a member of this approval group",
+        diag:{ userId, personId, meName, request_id, approvalGroupId, assignedToId, inGroup, myGroupCount: myGroupIds.length, evName }
+      }, { status:403 });
+    }
+
+    // Try approval
+    const approveUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/approve`;
+    const res = await fetch(approveUrl, {
+      method: "POST",
+      headers: { Authorization:`Bearer ${token}`, "Content-Type":"application/json" },
+      body: JSON.stringify(note ? { note } : {})
+    });
+    const body = await res.text();
+
+    if (!res.ok) {
+      return Response.json({
+        ok:false,
+        error:"PCO approval failed",
+        status: res.status,
+        body,
+        diag:{ userId, personId, meName, request_id, approvalGroupId, assignedToId, inGroup, myGroupCount: myGroupIds.length, evName }
+      }, { status: res.status });
+    }
+
+    return Response.json({ ok:true, diag:{ userId, personId, meName, request_id, evName } });
+  } catch (e) {
+    return Response.json({ ok:false, error:String(e) }, { status:500 });
+  }
 });
