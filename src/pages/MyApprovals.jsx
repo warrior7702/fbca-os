@@ -34,16 +34,15 @@ export default function MyApprovals() {
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
   const [expandedPreviews, setExpandedPreviews] = useState({});
-  const [approvalDetails, setApprovalDetails] = useState(null); // New state for detailed approval data
-  const [loadingDetails, setLoadingDetails] = useState(false); // New state for loading details
-  const [showApprovalForm, setShowApprovalForm] = useState(false); // New state for approval form visibility
+  const [approvalDetails, setApprovalDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showApprovalForm, setShowApprovalForm] = useState(false);
 
   useEffect(() => {
     loadUser();
     loadApprovals();
   }, []);
 
-  // Load preview answers for each approval
   useEffect(() => {
     if (approvals.length > 0) {
       loadAllAnswerPreviews();
@@ -72,7 +71,6 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
-    // Only load previews for the first 10 approvals to avoid overwhelming API/UI
     for (const approval of approvals.slice(0, 10)) {
       if (!approvalsWithAnswers[approval.request_id]) {
         loadAnswerPreview(approval);
@@ -135,7 +133,7 @@ export default function MyApprovals() {
       if (response.data.ok || response.data.success) {
         toast.success('Approved successfully!');
         setShowApprovalForm(false);
-        await handleSync(); // Use handleSync instead of syncApprovals
+        await handleSync();
       } else {
         console.error('❌ Approval failed:', response.data);
         toast.error(response.data.error || 'Failed to approve');
@@ -162,7 +160,7 @@ export default function MyApprovals() {
       if (response.data.ok) {
         toast.success('Request denied');
         setSelectedApproval(null);
-        await handleSync(); // Use handleSync instead of syncApprovals
+        await handleSync();
       } else {
         console.error('❌ Denial failed:', response.data);
         toast.error(response.data.error || 'Failed to deny');
@@ -181,7 +179,6 @@ export default function MyApprovals() {
       if (response.data.success) {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
-        // Also clear previous answer previews so they can be reloaded if approvals change
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
       }
@@ -198,8 +195,8 @@ export default function MyApprovals() {
     console.log('🔍 Request ID:', approval.request_id);
     console.log('🔍 Event:', approval.event_name);
     
-    setSelectedApproval(approval); // Keep basic approval info
-    setApprovalDetails(null); // Clear previous details
+    setSelectedApproval(approval);
+    setApprovalDetails(null);
     setLoadingDetails(true);
     setShowDetailModal(true);
 
@@ -231,13 +228,11 @@ export default function MyApprovals() {
   const handleModalClose = () => {
     setShowDetailModal(false);
     setSelectedApproval(null);
-    setApprovalDetails(null); // Clear details on modal close
+    setApprovalDetails(null);
   };
 
   const handleApprovalSuccess = async () => {
-    // Reload approvals after approve/deny
     await loadApprovals();
-    // Clear details and close modal after a successful action
     handleModalClose(); 
   };
 
@@ -255,7 +250,7 @@ export default function MyApprovals() {
   return (
     <div className="h-full bg-gradient-to-br from-orange-50 to-red-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg">
@@ -270,7 +265,6 @@ export default function MyApprovals() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* View Mode Toggle */}
             <div className="flex bg-white rounded-lg shadow-sm border border-slate-200">
               <Button
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
@@ -311,14 +305,12 @@ export default function MyApprovals() {
           </div>
         </div>
 
-        {/* Connection Warning */}
         {!user?.pco_access_token && (
           <div className="mb-6">
             <ConnectionWarning />
           </div>
         )}
 
-        {/* Calendar View */}
         {viewMode === 'calendar' && approvals.length > 0 && (
           <ApprovalCalendar 
             approvals={approvals} 
@@ -326,7 +318,6 @@ export default function MyApprovals() {
           />
         )}
 
-        {/* List View */}
         {viewMode === 'list' && (
           <div className="grid gap-4">
             <AnimatePresence>
@@ -390,7 +381,6 @@ export default function MyApprovals() {
                                 </div>
                               </div>
 
-                              {/* Answer Preview */}
                               {loadingPreview && (
                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
                                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -444,17 +434,16 @@ export default function MyApprovals() {
         )}
       </div>
 
-      {/* Detail Modal */}
       <ApprovalDetailModal
-        approval={selectedApproval} // Basic info
-        approvalDetails={approvalDetails} // Full details loaded via handleViewDetails
-        loadingDetails={loadingDetails} // Loading state for full details
+        approval={selectedApproval}
+        approvalDetails={approvalDetails}
+        loadingDetails={loadingDetails}
         open={showDetailModal}
         onClose={handleModalClose}
         onSuccess={handleApprovalSuccess}
-        onApprove={handleApprove} // Pass the new handleApprove function
-        onDeny={handleDeny}     // Pass the new handleDeny function
-        user={user}              // Pass user for notes
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        user={user}
       />
     </div>
   );
