@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -19,128 +18,44 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-export default function ApprovalDetailModal({ approval, open, onClose, onSuccess }) {
-  const [details, setDetails] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function ApprovalDetailModal({ 
+  approval, 
+  approvalDetails, 
+  loadingDetails,
+  open, 
+  onClose, 
+  onSuccess,
+  onApprove,
+  onDeny,
+  user
+}) {
   const [approving, setApproving] = useState(false);
   const [denying, setDenying] = useState(false);
 
-  useEffect(() => {
-    if (open && approval) {
-      loadDetails();
-    }
-  }, [open, approval]);
-
-  const loadDetails = async () => {
-    setLoading(true);
-    try {
-      const response = await base44.functions.invoke('getApprovalDetails', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        resource_id: approval.resource_id
-      });
-
-      setDetails(response.data);
-    } catch (error) {
-      console.error('❌ Error loading details:', error);
-      toast.error('Failed to load details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleApprove = async () => {
+    if (!approval || !onApprove) return;
+    
     setApproving(true);
     try {
-      console.log('🔍 Attempting to approve:', approval.request_id);
-      
-      const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id
-      });
-      
-      console.log('✅ Approve response:', response.data);
-      
-      toast.success('Request approved!');
-      
-      onClose();
-      
-      if (onSuccess) {
-        setTimeout(() => onSuccess(), 100);
-      }
+      await onApprove(approval);
+      // onApprove handles success and calls onSuccess
     } catch (error) {
-      console.error('❌ Full approval error:', error);
-      console.error('❌ Error response:', error.response?.data);
-      
-      const errorData = error.response?.data;
-      
-      // Check for 403 Forbidden - permission issue
-      if (errorData?.status === 403 || errorData?.details?.includes('403')) {
-        toast.error('Permission denied: You are not authorized to approve this request. Check your Planning Center approval groups.', {
-          duration: 6000
-        });
-      }
-      // Check if token needs reconnection
-      else if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
-        toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
-          duration: 5000,
-          action: {
-            label: 'Go to Settings',
-            onClick: () => window.location.href = '/Settings?tab=integrations'
-          }
-        });
-      } else {
-        const errorMsg = errorData?.error || errorData?.details || error.message;
-        toast.error(`Failed to approve: ${errorMsg}`);
-      }
-      
+      console.error('Modal approve error:', error);
+    } finally {
       setApproving(false);
     }
   };
 
   const handleDeny = async () => {
+    if (!approval || !onDeny) return;
+    
     setDenying(true);
     try {
-      console.log('🔍 Attempting to deny:', approval.request_id);
-      
-      const response = await base44.functions.invoke('denyResourceRequest', {
-        request_id: approval.request_id
-      });
-      
-      console.log('✅ Deny response:', response.data);
-      
-      toast.success('Request denied');
-      
-      onClose();
-      
-      if (onSuccess) {
-        setTimeout(() => onSuccess(), 100);
-      }
+      await onDeny();
+      // onDeny handles success
     } catch (error) {
-      console.error('❌ Full denial error:', error);
-      console.error('❌ Error response:', error.response?.data);
-      
-      const errorData = error.response?.data;
-      
-      // Check for 403 Forbidden - permission issue
-      if (errorData?.status === 403 || errorData?.details?.includes('403')) {
-        toast.error('Permission denied: You are not authorized to deny this request. Check your Planning Center approval groups.', {
-          duration: 6000
-        });
-      }
-      // Check if token needs reconnection
-      else if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
-        toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
-          duration: 5000,
-          action: {
-            label: 'Go to Settings',
-            onClick: () => window.location.href = '/Settings?tab=integrations'
-          }
-        });
-      } else {
-        const errorMsg = errorData?.error || errorData?.details || error.message;
-        toast.error(`Failed to deny: ${errorMsg}`);
-      }
-      
+      console.error('Modal deny error:', error);
+    } finally {
       setDenying(false);
     }
   };
@@ -173,7 +88,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
+        {loadingDetails ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>
@@ -212,14 +127,14 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
             </div>
 
             {/* Questions & Answers */}
-            {details?.questions && details.questions.length > 0 && (
+            {approvalDetails?.questions && approvalDetails.questions.length > 0 && (
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">
                   Request Details
                 </h3>
                 <div className="space-y-4">
-                  {details.questions.map((question) => {
-                    const answer = details.answers?.[question.id];
+                  {approvalDetails.questions.map((question) => {
+                    const answer = approvalDetails.answers?.[question.id];
                     return (
                       <div key={question.id} className="border-l-2 border-slate-200 pl-4">
                         <p className="font-medium text-slate-700 text-sm mb-1">
@@ -243,13 +158,13 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
             )}
 
             {/* Debug Info (collapsible) */}
-            {details?.diag && (
+            {approvalDetails?.diag && (
               <details className="text-xs">
                 <summary className="cursor-pointer text-slate-500 hover:text-slate-700">
                   ▶ Debug Info
                 </summary>
                 <pre className="mt-2 bg-slate-100 p-2 rounded overflow-auto max-h-48">
-                  {JSON.stringify(details.diag, null, 2)}
+                  {JSON.stringify(approvalDetails.diag, null, 2)}
                 </pre>
               </details>
             )}
