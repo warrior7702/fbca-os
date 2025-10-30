@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug } from "lucide-react";
@@ -72,7 +73,16 @@ export default function Settings() {
       } else if (urlParams.get('connected') === 'microsoft') {
         toast.success('Microsoft 365 connected successfully!');
       } else if (urlParams.get('error')) {
-        toast.error('Connection failed. Please try again.');
+        const errorType = urlParams.get('error');
+        if (errorType === 'pco_auth_failed') {
+          toast.error('PCO connection failed. Please try again.');
+        } else if (errorType === 'token_exchange_failed') {
+          toast.error('Failed to exchange PCO tokens. Please try again.');
+        } else if (errorType === 'callback_failed') {
+          toast.error('PCO callback failed. Please try again.');
+        } else {
+          toast.error('Connection failed. Please try again.');
+        }
       }
       
       window.history.replaceState({}, '', window.location.pathname);
@@ -123,12 +133,21 @@ export default function Settings() {
     }
   };
 
-  const handleConnectPCO = () => {
-    const vercelUrl = "https://pco-webhook.vercel.app";
-    const appUrl = window.location.origin;
-    const settingsUrl = `${appUrl}/Settings`;
-    
-    window.location.href = `${vercelUrl}/api/pco-auth?user_id=${user.id}&back=${encodeURIComponent(settingsUrl)}`;
+  const handleConnectPCO = async () => {
+    try {
+      // Use the direct initPCOAuth function
+      const response = await base44.functions.invoke('initPCOAuth', { 
+        state: user.id 
+      });
+      
+      // initPCOAuth will redirect, but if it returns an error:
+      if (response.data?.error) {
+        toast.error('Failed to start PCO connection');
+      }
+    } catch (error) {
+      console.error('PCO connection error:', error);
+      toast.error('Failed to start PCO connection');
+    }
   };
 
   const handleDisconnectPCO = async () => {
@@ -136,7 +155,8 @@ export default function Settings() {
       await base44.auth.updateMe({
         pco_access_token: null,
         pco_refresh_token: null,
-        pco_token_expires_at: null
+        pco_token_expires_at: null,
+        pco_user_id: null
       });
       toast.success("Planning Center disconnected");
       loadUser();
