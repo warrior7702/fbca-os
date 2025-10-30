@@ -108,20 +108,33 @@ Deno.serve(async (req) => {
       isAssignedToMe
     };
 
-    // 5) perform action with user token
-    const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/${action}`;
-    const body = JSON.stringify(note ? { note } : {});
+    // 5) perform action with user token using PATCH (not POST /approve)
+    const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`;
+    const approvalStatus = action === "approve" ? "A" : "R";
+    const body = JSON.stringify({
+      data: {
+        type: "EventResourceRequest",
+        id: request_id,
+        attributes: {
+          approval_status: approvalStatus,
+          notes: note || null
+        }
+      }
+    });
 
     if (inGroup && isAssignedToMe) {
       const r = await fetch(endpoint, { 
-        method:"POST", 
-        headers:{ Authorization:`Bearer ${userToken}`, "Content-Type":"application/json" }, 
+        method: "PATCH",
+        headers: { 
+          Authorization: `Bearer ${userToken}`, 
+          "Content-Type": "application/json" 
+        }, 
         body 
       });
       const txt = await r.text();
       
       if (r.ok) {
-        return Response.json({ ok:true, by:"user", ...diag, action });
+        return Response.json({ ok: true, by: "user", ...diag, action });
       }
       
       // User token failed - add error details to diag
@@ -137,45 +150,60 @@ Deno.serve(async (req) => {
       else errorMsg = "PCO denied the approval (check permissions)";
       
       return Response.json({
-        ok:false,
+        ok: false,
         error: errorMsg,
         diag
-      }, { status:403 });
+      }, { status: 403 });
     }
 
     const svcToken = await useServiceToken();
     if (!svcToken) {
       return Response.json({ 
-        ok:false, 
-        error:"Service token not available",
+        ok: false, 
+        error: "Service token not available",
         diag
-      }, { status:500 });
+      }, { status: 500 });
     }
 
     // Use service token with audit note
     const auditNote = note
       ? `${note} — (via Base44 by ${personName})`
-      : `Approved via Base44 by ${personName}`;
+      : `${action === "approve" ? "Approved" : "Denied"} via Base44 by ${personName}`;
+    
+    const serviceBody = JSON.stringify({
+      data: {
+        type: "EventResourceRequest",
+        id: request_id,
+        attributes: {
+          approval_status: approvalStatus,
+          notes: auditNote
+        }
+      }
+    });
+
     const r2 = await fetch(endpoint, {
-      method:"POST",
-      headers:{ Authorization:`Bearer ${svcToken}`, "Content-Type":"application/json" },
-      body: JSON.stringify({ note: auditNote })
+      method: "PATCH",
+      headers: { 
+        Authorization: `Bearer ${svcToken}`, 
+        "Content-Type": "application/json" 
+      },
+      body: serviceBody
     });
     const txt2 = await r2.text();
     
     if (!r2.ok) {
       return Response.json({ 
-        ok:false, 
-        error:`PCO ${action} failed with service token`, 
-        status:r2.status, 
-        body:txt2.slice(0, 500),
+        ok: false, 
+        error: `PCO ${action} failed with service token`, 
+        status: r2.status, 
+        body: txt2.slice(0, 500),
         diag
-      }, { status:r2.status });
+      }, { status: r2.status });
     }
 
-    return Response.json({ ok:true, by:"service", ...diag, action });
+    return Response.json({ ok: true, by: "service", ...diag, action });
 
   } catch (e) {
-    return Response.json({ ok:false, error:String(e) }, { status:500 });
+    return Response.json({ ok: false, error: String(e) }, { status: 500 });
   }
 });
