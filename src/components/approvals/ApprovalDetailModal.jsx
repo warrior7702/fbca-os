@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -71,10 +72,23 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
     } catch (error) {
       console.error('❌ Full approval error:', error);
       console.error('❌ Error response:', error.response?.data);
-      console.error('❌ Error message:', error.message);
       
-      const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message;
-      toast.error(`Failed to approve: ${errorMsg}`);
+      const errorData = error.response?.data;
+      
+      // Check if token needs reconnection
+      if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
+        toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
+          duration: 5000,
+          action: {
+            label: 'Go to Settings',
+            onClick: () => window.location.href = '/Settings?tab=integrations'
+          }
+        });
+      } else {
+        const errorMsg = errorData?.error || errorData?.details || error.message;
+        toast.error(`Failed to approve: ${errorMsg}`);
+      }
+      
       setApproving(false);
     }
   };
@@ -102,10 +116,23 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
     } catch (error) {
       console.error('❌ Full denial error:', error);
       console.error('❌ Error response:', error.response?.data);
-      console.error('❌ Error message:', error.message);
       
-      const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message;
-      toast.error(`Failed to deny: ${errorMsg}`);
+      const errorData = error.response?.data;
+      
+      // Check if token needs reconnection
+      if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
+        toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
+          duration: 5000,
+          action: {
+            label: 'Go to Settings',
+            onClick: () => window.location.href = '/Settings?tab=integrations'
+          }
+        });
+      } else {
+        const errorMsg = errorData?.error || errorData?.details || error.message;
+        toast.error(`Failed to deny: ${errorMsg}`);
+      }
+      
       setDenying(false);
     }
   };
