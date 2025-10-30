@@ -2,30 +2,41 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 Deno.serve(async (req) => {
     try {
+        console.log('🔵 ========== savePCOTokens START ==========');
+        console.log('📥 Request method:', req.method);
+        console.log('📥 Request headers:', Object.fromEntries(req.headers.entries()));
+        
         const base44 = createClientFromRequest(req);
 
-        const { user_id, access_token, refresh_token, expires_in, expires_at } = await req.json();
+        const body = await req.json();
+        console.log('📦 Received payload:', JSON.stringify(body, null, 2));
 
-        console.log('📥 savePCOTokens called with:', { user_id, has_access_token: !!access_token, has_refresh_token: !!refresh_token, expires_in, expires_at });
+        const { user_id, access_token, refresh_token, expires_in, expires_at } = body;
+
+        console.log('📋 Parsed values:');
+        console.log('  - user_id:', user_id);
+        console.log('  - has_access_token:', !!access_token);
+        console.log('  - has_refresh_token:', !!refresh_token);
+        console.log('  - expires_in:', expires_in);
+        console.log('  - expires_at:', expires_at);
 
         if (!user_id || !access_token || !refresh_token) {
+            console.error('❌ Missing required fields');
             return Response.json({ 
-                error: 'Missing required fields' 
+                error: 'Missing required fields',
+                received: { user_id: !!user_id, access_token: !!access_token, refresh_token: !!refresh_token }
             }, { status: 400 });
         }
 
         // Calculate expiration timestamp - handle both expires_in and expires_at
         let expiresAt;
         if (expires_at) {
-            // If we got expires_at directly from Vercel, use it
             expiresAt = expires_at;
             console.log('✅ Using provided expires_at:', expiresAt);
         } else if (expires_in && !isNaN(Number(expires_in))) {
-            // Calculate from expires_in
             expiresAt = new Date(Date.now() + (Number(expires_in) * 1000)).toISOString();
             console.log('✅ Calculated expires_at from expires_in:', expiresAt);
         } else {
-            // Default to 1 hour
             expiresAt = new Date(Date.now() + (3600 * 1000)).toISOString();
             console.log('⚠️ Using default 1 hour expiration:', expiresAt);
         }
@@ -33,6 +44,7 @@ Deno.serve(async (req) => {
         // Get PCO Person ID
         let pcoUserId = null;
         try {
+            console.log('🔍 Fetching PCO Person ID...');
             const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
                 headers: { 'Authorization': `Bearer ${access_token}` }
             });
@@ -42,10 +54,11 @@ Deno.serve(async (req) => {
                 pcoUserId = meData?.data?.id;
                 console.log('✅ Got PCO Person ID:', pcoUserId);
             } else {
-                console.log('⚠️ Failed to get PCO Person ID (non-fatal)');
+                const errorText = await meResponse.text();
+                console.log('⚠️ Failed to get PCO Person ID:', meResponse.status, errorText);
             }
         } catch (error) {
-            console.error('⚠️ Error getting PCO Person ID (non-fatal):', error);
+            console.error('⚠️ Error getting PCO Person ID (non-fatal):', error.message);
         }
 
         // Update user with tokens and Person ID
@@ -59,14 +72,16 @@ Deno.serve(async (req) => {
             updateData.pco_user_id = pcoUserId;
         }
 
-        console.log('💾 Updating user:', user_id, 'with fields:', Object.keys(updateData));
+        console.log('💾 Updating user:', user_id);
+        console.log('💾 Update fields:', Object.keys(updateData));
 
         await base44.asServiceRole.entities.User.update(user_id, updateData);
 
-        console.log('✅ Saved PCO tokens for user:', user_id);
+        console.log('✅ Successfully saved PCO tokens for user:', user_id);
         if (pcoUserId) {
             console.log('✅ Saved PCO Person ID:', pcoUserId);
         }
+        console.log('🔵 ========== savePCOTokens END (SUCCESS) ==========');
 
         return Response.json({ 
             success: true,
@@ -74,8 +89,11 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('❌ Error saving PCO tokens:', error);
-        console.error('Stack:', error.stack);
+        console.error('❌ ========== savePCOTokens ERROR ==========');
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        console.error('========================================');
+        
         return Response.json({ 
             error: error.message,
             details: error.stack
