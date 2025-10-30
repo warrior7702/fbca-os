@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -115,14 +114,12 @@ export default function MyApprovals() {
       let response;
       
       if (formData) {
-        // Approve with ClickUp task creation
         response = await base44.functions.invoke('approveWithClickUpTask', {
           request_id: approval.request_id,
           approval: approval,
           form_data: formData
         });
       } else {
-        // Simple approval using FIXED approveResourceRequest function
         console.log('📞 Calling approveResourceRequest...');
         response = await base44.functions.invoke('approveResourceRequest', {
           request_id: approval.request_id,
