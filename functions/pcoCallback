@@ -7,10 +7,10 @@ Deno.serve(async (req) => {
         const state = url.searchParams.get('state');
         const error = url.searchParams.get('error');
 
-        console.log('pcoCallback called');
-        console.log('Code:', code ? 'exists' : 'missing');
-        console.log('State:', state);
-        console.log('Error:', error);
+        console.log('🔄 pcoCallback called');
+        console.log('📝 Code:', code ? 'exists' : 'missing');
+        console.log('📝 State (user_id):', state);
+        console.log('❌ Error:', error);
 
         if (error) {
             console.error('PCO OAuth error:', error);
@@ -34,24 +34,12 @@ Deno.serve(async (req) => {
 
         const base44 = createClientFromRequest(req);
         
-        // Determine which redirect_uri to use based on environment
-        const appUrl = Deno.env.get('BASE44_APP_URL');
-        let redirectUri;
+        // Use direct callback (FBCA app registered with this callback URL)
+        const redirectUri = 'https://fbca-unified-hub-37662cca.base44.app/functions/pcoCallback';
         
-        // If this is coming from Vercel proxy, use Vercel callback URL
-        const referer = req.headers.get('referer') || '';
-        if (referer.includes('pco-webhook.vercel.app')) {
-            redirectUri = 'https://pco-webhook.vercel.app/api/pco-callback';
-            console.log('Using Vercel proxy redirect URI');
-        } else {
-            // Direct OAuth flow
-            redirectUri = `${appUrl}/functions/pcoCallback`;
-            console.log('Using direct redirect URI');
-        }
-        
-        console.log('Redirect URI:', redirectUri);
-        console.log('Client ID:', Deno.env.get('PCO_CLIENT_ID') ? 'exists' : 'missing');
-        console.log('Client Secret:', Deno.env.get('PCO_CLIENT_SECRET') ? 'exists' : 'missing');
+        console.log('🔑 Using redirect URI:', redirectUri);
+        console.log('🔑 Client ID exists:', !!Deno.env.get('PCO_CLIENT_ID'));
+        console.log('🔑 Client Secret exists:', !!Deno.env.get('PCO_CLIENT_SECRET'));
         
         // Exchange code for tokens
         const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
@@ -70,17 +58,17 @@ Deno.serve(async (req) => {
 
         if (!tokenResponse.ok) {
             const errorText = await tokenResponse.text();
-            console.error('PCO token exchange failed:', errorText);
+            console.error('❌ PCO token exchange failed:', errorText);
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${appUrl}/Settings?error=token_exchange_failed`
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=token_exchange_failed`
                 }
             });
         }
 
         const tokens = await tokenResponse.json();
-        console.log('Tokens received successfully');
+        console.log('✅ Tokens received successfully');
 
         // Calculate expiration time
         const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
@@ -98,7 +86,7 @@ Deno.serve(async (req) => {
                 console.log('✅ Got PCO Person ID:', pcoUserId);
             }
         } catch (error) {
-            console.error('Failed to get PCO Person ID (non-fatal):', error);
+            console.error('⚠️ Failed to get PCO Person ID (non-fatal):', error);
         }
 
         // Build update object
@@ -112,24 +100,24 @@ Deno.serve(async (req) => {
             updateData.pco_user_id = pcoUserId;
         }
 
-        console.log('Updating user with data:', Object.keys(updateData));
+        console.log('💾 Updating user:', state);
 
         // Update user with tokens using service role
         await base44.asServiceRole.entities.User.update(state, updateData);
 
-        console.log('User updated with tokens');
+        console.log('✅ User updated with tokens');
 
         // Redirect back to Settings page with success message
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${appUrl}/Settings?connected=pco`
+                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?connected=pco`
             }
         });
 
     } catch (error) {
-        console.error('PCO callback error:', error);
-        console.error('Error stack:', error.stack);
+        console.error('❌ PCO callback error:', error);
+        console.error('Stack:', error.stack);
         return new Response(null, {
             status: 302,
             headers: {
