@@ -51,9 +51,13 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   const handleApprove = async () => {
     setApproving(true);
     try {
-      await base44.functions.invoke('approveResourceRequest', {
+      console.log('🔍 Attempting to approve:', approval.request_id);
+      
+      const response = await base44.functions.invoke('approveResourceRequest', {
         request_id: approval.request_id
       });
+      
+      console.log('✅ Approve response:', response.data);
       
       toast.success('Request approved!');
       
@@ -65,8 +69,12 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
         setTimeout(() => onSuccess(), 100);
       }
     } catch (error) {
-      console.error('Approval error:', error);
-      toast.error('Failed to approve request');
+      console.error('❌ Full approval error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error message:', error.message);
+      
+      const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message;
+      toast.error(`Failed to approve: ${errorMsg}`);
       setApproving(false);
     }
   };
@@ -74,9 +82,13 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   const handleDeny = async () => {
     setDenying(true);
     try {
-      await base44.functions.invoke('denyResourceRequest', {
+      console.log('🔍 Attempting to deny:', approval.request_id);
+      
+      const response = await base44.functions.invoke('denyResourceRequest', {
         request_id: approval.request_id
       });
+      
+      console.log('✅ Deny response:', response.data);
       
       toast.success('Request denied');
       
@@ -88,8 +100,12 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
         setTimeout(() => onSuccess(), 100);
       }
     } catch (error) {
-      console.error('Denial error:', error);
-      toast.error('Failed to deny request');
+      console.error('❌ Full denial error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error message:', error.message);
+      
+      const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message;
+      toast.error(`Failed to deny: ${errorMsg}`);
       setDenying(false);
     }
   };
