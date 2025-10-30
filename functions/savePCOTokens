@@ -4,7 +4,9 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        const { user_id, access_token, refresh_token, expires_in } = await req.json();
+        const { user_id, access_token, refresh_token, expires_in, expires_at } = await req.json();
+
+        console.log('📥 savePCOTokens called with:', { user_id, has_access_token: !!access_token, has_refresh_token: !!refresh_token, expires_in, expires_at });
 
         if (!user_id || !access_token || !refresh_token) {
             return Response.json({ 
@@ -12,8 +14,21 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        // Calculate expiration timestamp
-        const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString();
+        // Calculate expiration timestamp - handle both expires_in and expires_at
+        let expiresAt;
+        if (expires_at) {
+            // If we got expires_at directly from Vercel, use it
+            expiresAt = expires_at;
+            console.log('✅ Using provided expires_at:', expiresAt);
+        } else if (expires_in && !isNaN(Number(expires_in))) {
+            // Calculate from expires_in
+            expiresAt = new Date(Date.now() + (Number(expires_in) * 1000)).toISOString();
+            console.log('✅ Calculated expires_at from expires_in:', expiresAt);
+        } else {
+            // Default to 1 hour
+            expiresAt = new Date(Date.now() + (3600 * 1000)).toISOString();
+            console.log('⚠️ Using default 1 hour expiration:', expiresAt);
+        }
 
         // Get PCO Person ID
         let pcoUserId = null;
@@ -26,10 +41,11 @@ Deno.serve(async (req) => {
                 const meData = await meResponse.json();
                 pcoUserId = meData?.data?.id;
                 console.log('✅ Got PCO Person ID:', pcoUserId);
+            } else {
+                console.log('⚠️ Failed to get PCO Person ID (non-fatal)');
             }
         } catch (error) {
-            console.error('Failed to get PCO Person ID:', error);
-            // Continue anyway - not critical
+            console.error('⚠️ Error getting PCO Person ID (non-fatal):', error);
         }
 
         // Update user with tokens and Person ID
@@ -42,6 +58,8 @@ Deno.serve(async (req) => {
         if (pcoUserId) {
             updateData.pco_user_id = pcoUserId;
         }
+
+        console.log('💾 Updating user:', user_id, 'with fields:', Object.keys(updateData));
 
         await base44.asServiceRole.entities.User.update(user_id, updateData);
 
@@ -56,9 +74,11 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('Error saving PCO tokens:', error);
+        console.error('❌ Error saving PCO tokens:', error);
+        console.error('Stack:', error.stack);
         return Response.json({ 
-            error: error.message 
+            error: error.message,
+            details: error.stack
         }, { status: 500 });
     }
 });
