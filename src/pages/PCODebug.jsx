@@ -54,6 +54,7 @@ export default function PCODebug() {
       const data = {
         token_valid: !!token,
         token_expires_at: tokenResponse.data.expires_at,
+        connected_as_user_id: null, // Initialize connected_as_user_id
         my_person: null,
         connected_as_email: null,
         approval_groups: [],
@@ -76,8 +77,10 @@ export default function PCODebug() {
           email: meData.data?.attributes?.email
         };
         data.connected_as_email = meData.data?.attributes?.email;
+        data.connected_as_user_id = meData.data?.id; // Populate connected_as_user_id with the person ID
         console.log('✅ My PCO person:', data.my_person);
         console.log('📧 Connected as:', data.connected_as_email);
+        console.log('👤 Connected as PCO User ID:', data.connected_as_user_id);
       }
 
       // Get all approval groups
@@ -300,7 +303,7 @@ export default function PCODebug() {
 
         {debugData && (
           <div className="space-y-6">
-            {/* User Profile with Email Mismatch Warning */}
+            {/* User Profile with Token User ID */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <Card>
                 <CardHeader>
@@ -324,22 +327,33 @@ export default function PCODebug() {
                       <p className="font-medium">{debugData.my_person?.name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">PCO Person ID</p>
-                      <p className="font-medium text-xs">{debugData.my_person?.id || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">PCO User ID (from OAuth token)</p>
+                      <p className="font-medium text-xs">{debugData.connected_as_user_id || 'N/A'}</p>
                     </div>
                   </div>
 
-                  {/* Email Mismatch Warning */}
-                  {user?.email && debugData.connected_as_email && 
-                   user.email.toLowerCase() !== debugData.connected_as_email.toLowerCase() && (
-                    <Alert className="border-orange-300 bg-orange-50 mt-4">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  {/* Warning if this is NOT Billy Nelms's ID */}
+                  {debugData.connected_as_user_id && debugData.connected_as_user_id !== '149670080' && (
+                    <Alert className="border-red-300 bg-red-50 mt-4">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-slate-700">
-                        <strong>Warning:</strong> Your Base44 email ({user.email}) doesn't match your PCO account ({debugData.connected_as_email}). 
-                        This means you're using a different Planning Center account. Make sure the PCO account <strong>{debugData.connected_as_email}</strong> is in the approval groups, not {user.email}.
+                        <strong>Wrong Account!</strong> Your OAuth token is connected to PCO user <strong>{debugData.connected_as_user_id}</strong> ({debugData.my_person?.name}), 
+                        but you're trying to act as Billy Nelms (149670080). 
+                        <br/><br/>
+                        <strong>To fix:</strong> Go to Settings → Integrations → Disconnect Planning Center → Reconnect and login as Billy Nelms.
                       </AlertDescription>
                     </Alert>
                   )}
+
+                  {debugData.connected_as_user_id === '149670080' && (
+                    <Alert className="border-green-300 bg-green-50 mt-4">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-slate-700">
+                        <strong>Correct Account!</strong> You're connected as Billy Nelms (149670080).
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div>
                     <p className="text-sm text-slate-500">Token Status</p>
                     <Badge className={debugData.token_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
