@@ -4,113 +4,142 @@
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
 
-type PcoJson = {
-  data?: any;
-  included?: any[];
-  meta?: any;
-  errors?: any[];
-};
-
-function asJson(r: Response): Promise<PcoJson> {
-  return r.json().catch(() => ({} as PcoJson));
-}
-
-function err(msg: string, extra: any = {}, status = 400) {
-  return Response.json({ ok: false, error: msg, ...extra }, { status });
-}
-
 Deno.serve(async (req) => {
   try {
     // 0) Auth as the Base44 user and ensure they have a user token for PCO
     const base44 = createClientFromRequest(req);
     const me = await base44.auth.me();
-    if (!me) return err("Not signed in", {}, 401);
-    if (!me.pco_access_token) return err("No PCO token for this user", { who: me?.email }, 401);
+    
+    if (!me) {
+      return Response.json({ ok: false, error: 'Not signed in' }, { status: 401 });
+    }
+    
+    if (!me.pco_access_token) {
+      return Response.json({ 
+        ok: false, 
+        error: 'No PCO token for this user', 
+        who: me?.email 
+      }, { status: 401 });
+    }
 
-    const { request_id, action, note } = await req.json().catch(() => ({}));
-    if (!request_id || !["approve", "deny"].includes(action)) {
-      return err("request_id and action=approve|deny required");
+    const body = await req.json().catch(() => ({}));
+    const request_id = body.request_id;
+    const action = body.action;
+    const note = body.note || '';
+
+    if (!request_id || !['approve', 'deny'].includes(action)) {
+      return Response.json({ 
+        ok: false, 
+        error: 'request_id and action=approve|deny required' 
+      }, { status: 400 });
     }
 
     const userToken = me.pco_access_token;
 
-    // small helper
-    const pcoGet = async (url: string) => {
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${userToken}` } });
-      const j = await asJson(r);
-      if (!r.ok) throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(j).slice(0,400)}`);
-      return j;
+    // Helper to call PCO API
+    const pcoGet = async (url) => {
+      const r = await fetch(url, { 
+        headers: { Authorization: `Bearer ${userToken}` } 
+      });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(json).slice(0, 400)}`);
+      }
+      return json;
     };
 
-    const pcoPost = async (url: string, body: any = {}) => {
+    const pcoPost = async (url, postBody = {}) => {
       const r = await fetch(url, {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${userToken}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body || {}),
+        body: JSON.stringify(postBody),
       });
       const txt = await r.text();
-      if (!r.ok) throw new Error(`POST ${url} :: ${r.status} :: ${txt.slice(0,600)}`);
-      return txt || "{}";
+      if (!r.ok) {
+        throw new Error(`POST ${url} :: ${r.status} :: ${txt.slice(0, 600)}`);
+      }
+      return txt || '{}';
     };
 
     // 1) Who am I in PCO (Person ID)
-    const meRes = await pcoGet("https://api.planningcenteronline.com/people/v2/me");
+    const meRes = await pcoGet('https://api.planningcenteronline.com/people/v2/me');
     const myPersonId = meRes?.data?.id;
     const myName = meRes?.data?.attributes?.name;
 
+    console.log('👤 I am:', myName, 'ID:', myPersonId);
+
     // 2) Load the Event Resource Request (check status + relationships)
-    const reqUrl =
-      `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${encodeURIComponent(request_id)}`
-      + `?include=approval_group,assigned_to_person,event,requested_resources.resource`;
+    const reqUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${encodeURIComponent(request_id)}?include=approval_group,assigned_to_person,event,requested_resources.resource`;
     const reqData = await pcoGet(reqUrl);
 
     const R = reqData?.data;
-    if (!R || R?.type !== "EventResourceRequest") {
-      return err("Request not found", { request_id, raw: reqData }, 404);
+    if (!R || R?.type !== 'EventResourceRequest') {
+      return Response.json({ 
+        ok: false, 
+        error: 'Request not found', 
+        request_id, 
+        raw: reqData 
+      }, { status: 404 });
     }
 
-    const status = R?.attributes?.approval_status; // "P" pending, "A" approved, "D" denied, etc
-    if (status !== "P") {
-      return err("Request is not pending", { request_id, status }, 409);
+    const status = R?.attributes?.approval_status;
+    if (status !== 'P') {
+      return Response.json({ 
+        ok: false, 
+        error: `Request is not pending (status=${status})`, 
+        request_id, 
+        status 
+      }, { status: 409 });
     }
 
     // relationships
     const rel = R?.relationships || {};
-    const assigned = rel?.assigned_to_person?.data || null; // { type:"Person", id:"..." } or null
-    const groupRel = rel?.approval_group?.data || null;     // { type:"ResourceApprovalGroup", id:"..." } or null
+    const assigned = rel?.assigned_to_person?.data || null;
+    const groupRel = rel?.approval_group?.data || null;
+
+    console.log('📋 Request status:', status);
+    console.log('👥 Approval group:', groupRel?.id || 'none');
+    console.log('👤 Assigned to:', assigned?.id || 'none');
 
     // 3) If there is a group => ensure I am a member of that group
     //    If there is NO group => ensure it's assigned to me
     let eligible = false;
-    let reason = "";
-    let groupId: string | null = groupRel?.id || null;
+    let reason = '';
+    const groupId = groupRel?.id || null;
 
     if (groupId) {
       // Check my memberships
       const memUrl = `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${myPersonId}&per_page=200&include=resource_approval_group`;
       const mems = await pcoGet(memUrl);
       const myGroupIds = (mems?.data || [])
-        .map((m: any) => m?.relationships?.resource_approval_group?.data?.id)
+        .map((m) => m?.relationships?.resource_approval_group?.data?.id)
         .filter(Boolean);
 
       eligible = myGroupIds.includes(groupId);
-      if (!eligible) reason = "You are not a member of the approval group for this request.";
+      console.log('✅ My groups:', myGroupIds);
+      console.log('🔍 Am I in group', groupId, '?', eligible);
+      
+      if (!eligible) {
+        reason = 'You are not a member of the approval group for this request.';
+      }
     } else {
       // No approval group; require it be assigned to me
-      if (assigned?.type === "Person" && assigned?.id === myPersonId) {
+      if (assigned?.type === 'Person' && assigned?.id === myPersonId) {
         eligible = true;
       } else {
         reason = assigned?.id
           ? `This request is assigned to another person (Person ${assigned.id}).`
-          : "This request has no approval group and is not assigned to you.";
+          : 'This request has no approval group and is not assigned to you.';
       }
     }
 
     if (!eligible) {
-      return err("Forbidden (user not eligible to approve/deny)", {
+      return Response.json({
+        ok: false,
+        error: 'Forbidden (user not eligible to approve/deny)',
         request_id,
         status,
         groupId: groupId || null,
@@ -118,26 +147,33 @@ Deno.serve(async (req) => {
         personId: myPersonId,
         personName: myName,
         reason
-      }, 403);
+      }, { status: 403 });
     }
 
     // 4) Approve or Deny AS THE USER
     const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/${action}`;
-    // PCO accepts empty body; we optionally send a note for audit
-    const body = note ? { note } : {};
-    const postRes = await pcoPost(endpoint, body);
+    const postBody = note ? { note } : {};
+    
+    console.log('✅ Eligible! Calling:', endpoint);
+    const postRes = await pcoPost(endpoint, postBody);
 
     return Response.json({
       ok: true,
       action,
       request_id,
-      by: "user",
+      by: 'user',
       personId: myPersonId,
       personName: myName,
       groupId: groupId || null,
       raw: postRes,
     });
-  } catch (e: any) {
-    return err(String(e?.message || e), { stack: e?.stack }, 500);
+    
+  } catch (e) {
+    console.error('❌ Error:', e);
+    return Response.json({ 
+      ok: false, 
+      error: String(e?.message || e), 
+      stack: e?.stack 
+    }, { status: 500 });
   }
 });
