@@ -134,10 +134,9 @@ export default function Settings() {
   };
 
   const handleConnectPCO = () => {
-    // Build PCO OAuth URL directly
-    const appUrl = window.location.origin;
-    const clientId = 'f64cb2f00a12f2ebace2f2c30cf17fa65d11affa9e3f3e05eff5961ba4b01cf3';
-    const redirectUri = `${appUrl}/functions/pcoCallback`;
+    // Build PCO OAuth URL with correct client_id from your PCO app
+    const clientId = '224581505990582dc51f90217c69c0b5ee4954b36d302c562';
+    const redirectUri = 'https://fbca-unified-hub-37662cca.base44.app/functions/pcoCallback';
     const scope = 'calendar';
     const state = user.id;
     
