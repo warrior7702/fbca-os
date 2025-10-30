@@ -11,17 +11,18 @@ Deno.serve(async (req) => {
       return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-    const user = users[0];
-
-    if (!user?.pco_access_token) {
-      return Response.json({ ok: false, error: "No PCO token" }, { status: 401 });
-    }
-
     const { request_id, event_id, resource_id } = await req.json();
     
+    diag.push({ step: "input", request_id, event_id, resource_id });
+
+    // Get PCO token (handles refresh automatically)
+    diag.push({ step: "getting-token" });
+    const tokenResponse = await base44.functions.invoke("getPCOToken");
+    const token = tokenResponse.data.access_token;
+    diag.push({ step: "token-obtained", has_token: !!token });
+
     const headers = { 
-      Authorization: `Bearer ${user.pco_access_token}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json" 
     };
 
@@ -42,8 +43,6 @@ Deno.serve(async (req) => {
       if (val === 0) return "0";
       return (val ?? "").toString();
     };
-
-    diag.push({ step: "input", request_id, event_id, resource_id });
 
     // 1) Pull the resource questions (for labels)
     let questions = [];
@@ -74,6 +73,8 @@ Deno.serve(async (req) => {
         );
         const included = new Map((reqJson.included || []).map(x => [`${x.type}:${x.id}`, x]));
         const rqa = (reqJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
+
+        diag.push({ step: "answers-request-raw", answer_count: rqa.length });
 
         for (const a of rqa) {
           const qRel = a.relationships?.resource_question?.data;
@@ -123,6 +124,8 @@ Deno.serve(async (req) => {
         // Pull the bookings data array
         const bookings = Array.isArray(bJson.data) ? bJson.data : [];
 
+        diag.push({ step: "bookings-fetched", count: bookings.length });
+
         // Try to find the booking whose event_resource_request matches our request_id
         const matched = bookings.find(b => {
           const reqRel = b?.relationships?.event_resource_request?.data;
@@ -142,12 +145,20 @@ Deno.serve(async (req) => {
         if (targetBooking) {
           // Extract answers for the target booking from INCLUDED
           const answerItems = (bJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
+          
+          diag.push({ step: "all-answer-objects", count: answerItems.length });
+          
           // We only want answers that belong to the target booking:
           const targetAnswerIds = new Set(
             (targetBooking.relationships?.resource_question_answers?.data || []).map(d => d.id)
           );
 
+          diag.push({ step: "target-booking-answer-ids", count: targetAnswerIds.size });
+
           const mine = answerItems.filter(a => targetAnswerIds.has(a.id));
+          
+          diag.push({ step: "filtered-answers", count: mine.length });
+          
           for (const a of mine) {
             const qRel = a.relationships?.resource_question?.data;
             if (!qRel?.id) continue;
@@ -169,6 +180,7 @@ Deno.serve(async (req) => {
 
             if (raw !== null && raw !== undefined) {
               answers[qRel.id] = normalize(raw);
+              diag.push({ step: "answer-mapped", question_id: qRel.id, value: String(raw).substring(0, 50) });
             }
           }
           diag.push({
