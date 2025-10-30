@@ -1,179 +1,151 @@
-// approveResourceRequestUserStrict (Deno)
-// Action: approve|deny the given Event Resource Request strictly as the LOGGED-IN USER.
-// Body: { request_id: string, action: "approve" | "deny", note?: string }
-
-import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 Deno.serve(async (req) => {
-  try {
-    // 0) Auth as the Base44 user and ensure they have a user token for PCO
-    const base44 = createClientFromRequest(req);
-    const me = await base44.auth.me();
-    
-    if (!me) {
-      return Response.json({ ok: false, error: 'Not signed in' }, { status: 401 });
+    try {
+        const base44 = createClientFromRequest(req);
+        const user = await base44.auth.me();
+
+        if (!user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (!user.pco_access_token) {
+            return Response.json({ 
+                error: 'PCO not connected',
+                who: user.email 
+            }, { status: 400 });
+        }
+
+        const { request_id, action, note } = await req.json();
+
+        if (!request_id || !['approve', 'deny'].includes(action)) {
+            return Response.json({ 
+                error: 'request_id and action=approve|deny required' 
+            }, { status: 400 });
+        }
+
+        const token = user.pco_access_token;
+
+        // Get my Person ID
+        const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!meResponse.ok) {
+            return Response.json({ 
+                error: 'Failed to get PCO user info' 
+            }, { status: 500 });
+        }
+
+        const meData = await meResponse.json();
+        const myPersonId = meData?.data?.id;
+        const myName = meData?.data?.attributes?.name;
+
+        console.log('👤 I am:', myName, 'ID:', myPersonId);
+
+        // Get the request
+        const requestUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=approval_group,assigned_to_person`;
+        const requestResponse = await fetch(requestUrl, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!requestResponse.ok) {
+            return Response.json({ 
+                error: 'Request not found' 
+            }, { status: 404 });
+        }
+
+        const requestData = await requestResponse.json();
+        const request = requestData?.data;
+        const status = request?.attributes?.approval_status;
+
+        if (status !== 'P') {
+            return Response.json({ 
+                error: `Request not pending (status: ${status})` 
+            }, { status: 409 });
+        }
+
+        const groupId = request?.relationships?.approval_group?.data?.id || null;
+        const assignedId = request?.relationships?.assigned_to_person?.data?.id || null;
+
+        console.log('📋 Group ID:', groupId || 'none');
+        console.log('📋 Assigned to:', assignedId || 'none');
+
+        // Check eligibility
+        let eligible = false;
+
+        if (groupId) {
+            // Check group membership
+            const memberUrl = `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${myPersonId}&per_page=200`;
+            const memberResponse = await fetch(memberUrl, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (memberResponse.ok) {
+                const memberData = await memberResponse.json();
+                const myGroups = (memberData?.data || [])
+                    .map(m => m?.relationships?.resource_approval_group?.data?.id)
+                    .filter(Boolean);
+
+                eligible = myGroups.includes(groupId);
+                console.log('✅ My groups:', myGroups);
+                console.log('🔍 Eligible?', eligible);
+            }
+        } else {
+            // No group - check if assigned to me
+            eligible = !assignedId || assignedId === myPersonId;
+            console.log('🔍 No group - assigned to me?', eligible);
+        }
+
+        if (!eligible) {
+            return Response.json({
+                error: 'You are not authorized to approve/deny this request',
+                personId: myPersonId,
+                groupId: groupId || null,
+                assignedId: assignedId || null
+            }, { status: 403 });
+        }
+
+        // Approve or deny
+        const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/${action}`;
+        const body = note ? { note } : {};
+
+        console.log('✅ Calling:', endpoint);
+
+        const actionResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        const responseText = await actionResponse.text();
+
+        if (!actionResponse.ok) {
+            console.error('❌ PCO error:', actionResponse.status, responseText);
+            return Response.json({ 
+                error: `PCO ${action} failed`,
+                status: actionResponse.status,
+                details: responseText.slice(0, 500)
+            }, { status: actionResponse.status });
+        }
+
+        console.log('✅ Success!');
+
+        return Response.json({
+            ok: true,
+            action,
+            request_id,
+            personId: myPersonId,
+            personName: myName
+        });
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        return Response.json({ 
+            error: error.message 
+        }, { status: 500 });
     }
-    
-    if (!me.pco_access_token) {
-      return Response.json({ 
-        ok: false, 
-        error: 'No PCO token for this user', 
-        who: me?.email 
-      }, { status: 401 });
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const request_id = body.request_id;
-    const action = body.action;
-    const note = body.note || '';
-
-    if (!request_id || !['approve', 'deny'].includes(action)) {
-      return Response.json({ 
-        ok: false, 
-        error: 'request_id and action=approve|deny required' 
-      }, { status: 400 });
-    }
-
-    const userToken = me.pco_access_token;
-
-    // Helper to call PCO API
-    const pcoGet = async (url) => {
-      const r = await fetch(url, { 
-        headers: { Authorization: `Bearer ${userToken}` } 
-      });
-      const json = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        throw new Error(`GET ${url} :: ${r.status} :: ${JSON.stringify(json).slice(0, 400)}`);
-      }
-      return json;
-    };
-
-    const pcoPost = async (url, postBody = {}) => {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(postBody),
-      });
-      const txt = await r.text();
-      if (!r.ok) {
-        throw new Error(`POST ${url} :: ${r.status} :: ${txt.slice(0, 600)}`);
-      }
-      return txt || '{}';
-    };
-
-    // 1) Who am I in PCO (Person ID)
-    const meRes = await pcoGet('https://api.planningcenteronline.com/people/v2/me');
-    const myPersonId = meRes?.data?.id;
-    const myName = meRes?.data?.attributes?.name;
-
-    console.log('👤 I am:', myName, 'ID:', myPersonId);
-
-    // 2) Load the Event Resource Request (check status + relationships)
-    const reqUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${encodeURIComponent(request_id)}?include=approval_group,assigned_to_person,event,requested_resources.resource`;
-    const reqData = await pcoGet(reqUrl);
-
-    const R = reqData?.data;
-    if (!R || R?.type !== 'EventResourceRequest') {
-      return Response.json({ 
-        ok: false, 
-        error: 'Request not found', 
-        request_id, 
-        raw: reqData 
-      }, { status: 404 });
-    }
-
-    const status = R?.attributes?.approval_status;
-    if (status !== 'P') {
-      return Response.json({ 
-        ok: false, 
-        error: `Request is not pending (status=${status})`, 
-        request_id, 
-        status 
-      }, { status: 409 });
-    }
-
-    // relationships
-    const rel = R?.relationships || {};
-    const assigned = rel?.assigned_to_person?.data || null;
-    const groupRel = rel?.approval_group?.data || null;
-
-    console.log('📋 Request status:', status);
-    console.log('👥 Approval group:', groupRel?.id || 'none');
-    console.log('👤 Assigned to:', assigned?.id || 'none');
-
-    // 3) If there is a group => ensure I am a member of that group
-    //    If there is NO group => ensure it's assigned to me
-    let eligible = false;
-    let reason = '';
-    const groupId = groupRel?.id || null;
-
-    if (groupId) {
-      // Check my memberships
-      const memUrl = `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${myPersonId}&per_page=200&include=resource_approval_group`;
-      const mems = await pcoGet(memUrl);
-      const myGroupIds = (mems?.data || [])
-        .map((m) => m?.relationships?.resource_approval_group?.data?.id)
-        .filter(Boolean);
-
-      eligible = myGroupIds.includes(groupId);
-      console.log('✅ My groups:', myGroupIds);
-      console.log('🔍 Am I in group', groupId, '?', eligible);
-      
-      if (!eligible) {
-        reason = 'You are not a member of the approval group for this request.';
-      }
-    } else {
-      // No approval group; require it be assigned to me
-      if (assigned?.type === 'Person' && assigned?.id === myPersonId) {
-        eligible = true;
-      } else {
-        reason = assigned?.id
-          ? `This request is assigned to another person (Person ${assigned.id}).`
-          : 'This request has no approval group and is not assigned to you.';
-      }
-    }
-
-    if (!eligible) {
-      return Response.json({
-        ok: false,
-        error: 'Forbidden (user not eligible to approve/deny)',
-        request_id,
-        status,
-        groupId: groupId || null,
-        assigned_to_person_id: assigned?.id || null,
-        personId: myPersonId,
-        personName: myName,
-        reason
-      }, { status: 403 });
-    }
-
-    // 4) Approve or Deny AS THE USER
-    const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/${action}`;
-    const postBody = note ? { note } : {};
-    
-    console.log('✅ Eligible! Calling:', endpoint);
-    const postRes = await pcoPost(endpoint, postBody);
-
-    return Response.json({
-      ok: true,
-      action,
-      request_id,
-      by: 'user',
-      personId: myPersonId,
-      personName: myName,
-      groupId: groupId || null,
-      raw: postRes,
-    });
-    
-  } catch (e) {
-    console.error('❌ Error:', e);
-    return Response.json({ 
-      ok: false, 
-      error: String(e?.message || e), 
-      stack: e?.stack 
-    }, { status: 500 });
-  }
 });
