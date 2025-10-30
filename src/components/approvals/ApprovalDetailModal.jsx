@@ -17,14 +17,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import ApprovalFormModal from "./ApprovalFormModal";
 
 export default function ApprovalDetailModal({ approval, open, onClose, onSuccess }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
   const [denying, setDenying] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     if (open && approval) {
@@ -51,13 +49,6 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   };
 
   const handleApprove = async () => {
-    // Check if Building Access - if so, show form
-    if (approval.resource_name === 'Building Access') {
-      setShowForm(true);
-      return;
-    }
-
-    // Otherwise, standard approval
     setApproving(true);
     try {
       await base44.functions.invoke('approveResourceRequest', {
@@ -66,16 +57,16 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       toast.success('Request approved!');
       
-      // Call onSuccess callback to reload approvals
-      if (onSuccess) {
-        await onSuccess();
-      }
-      
+      // Close immediately
       onClose();
+      
+      // Then reload in background
+      if (onSuccess) {
+        setTimeout(() => onSuccess(), 100);
+      }
     } catch (error) {
       console.error('Approval error:', error);
       toast.error('Failed to approve request');
-    } finally {
       setApproving(false);
     }
   };
@@ -89,39 +80,27 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       toast.success('Request denied');
       
-      // Call onSuccess callback to reload approvals
-      if (onSuccess) {
-        await onSuccess();
-      }
-      
+      // Close immediately
       onClose();
+      
+      // Then reload in background
+      if (onSuccess) {
+        setTimeout(() => onSuccess(), 100);
+      }
     } catch (error) {
       console.error('Denial error:', error);
       toast.error('Failed to deny request');
-    } finally {
       setDenying(false);
     }
   };
 
   const handleClose = () => {
-    setShowForm(false);
-    setDetails(null);
     onClose();
   };
 
-  if (showForm) {
-    return (
-      <ApprovalFormModal
-        approval={approval}
-        details={details}
-        open={showForm}
-        onClose={() => {
-          setShowForm(false);
-          onClose();
-        }}
-        onSuccess={onSuccess}
-      />
-    );
+  // Don't render if no approval
+  if (!approval) {
+    return null;
   }
 
   return (
