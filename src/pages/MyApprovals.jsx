@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -121,9 +122,9 @@ export default function MyApprovals() {
           form_data: formData
         });
       } else {
-        // Simple approval using NEW strict function
-        console.log('📞 Calling approveResourceRequestUserStrict...');
-        response = await base44.functions.invoke('approveResourceRequestUserStrict', {
+        // Simple approval using FIXED approveResourceRequest function
+        console.log('📞 Calling approveResourceRequest...');
+        response = await base44.functions.invoke('approveResourceRequest', {
           request_id: approval.request_id,
           action: 'approve',
           note: `Approved via FBCA OS by ${user?.full_name || user?.email}`
@@ -152,7 +153,7 @@ export default function MyApprovals() {
     try {
       console.log('🔍 Attempting to deny:', selectedApproval.request_id);
       
-      const response = await base44.functions.invoke('approveResourceRequestUserStrict', {
+      const response = await base44.functions.invoke('approveResourceRequest', {
         request_id: selectedApproval.request_id,
         action: 'deny',
         note: `Denied via FBCA OS by ${user?.full_name || user?.email}`
