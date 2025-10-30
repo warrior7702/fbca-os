@@ -12,9 +12,7 @@ import {
   CheckCircle, 
   XCircle, 
   Loader2, 
-  Calendar, 
-  MapPin, 
-  User,
+  Calendar,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,15 +35,12 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
   const loadDetails = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Loading details for approval:', approval);
-      
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
         event_id: approval.event_id,
         resource_id: approval.resource_id
       });
 
-      console.log('📦 Details response:', response.data);
       setDetails(response.data);
     } catch (error) {
       console.error('❌ Error loading details:', error);
@@ -111,9 +106,9 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header with X button */}
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" hideClose>
+        {/* Header with custom X button */}
         <DialogHeader className="relative">
           <Button
             variant="ghost"

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,7 @@ export default function MyApprovals() {
   const [viewMode, setViewMode] = useState('list');
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
+  const [expandedPreviews, setExpandedPreviews] = useState({});
 
   useEffect(() => {
     loadUser();
@@ -67,7 +69,7 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
-    for (const approval of approvals.slice(0, 10)) {
+    for (const approval of approvals.slice(0, 10)) { // Limit to first 10 for initial load performance
       if (!approvalsWithAnswers[approval.request_id]) {
         loadAnswerPreview(approval);
       }
@@ -124,6 +126,13 @@ export default function MyApprovals() {
   const handleViewDetails = (approval) => {
     setSelectedApproval(approval);
     setShowDetailModal(true);
+  };
+
+  const toggleExpandPreview = (requestId) => {
+    setExpandedPreviews(prev => ({
+      ...prev,
+      [requestId]: !prev[requestId]
+    }));
   };
 
   if (loading) {
@@ -231,6 +240,7 @@ export default function MyApprovals() {
                 approvals.map((approval, index) => {
                   const answerPreview = approvalsWithAnswers[approval.request_id];
                   const loadingPreview = loadingAnswers[approval.request_id];
+                  const isExpanded = expandedPreviews[approval.request_id];
                   
                   return (
                     <motion.div
@@ -286,16 +296,22 @@ export default function MyApprovals() {
                                 <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                                   <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
                                   <div className="space-y-1">
-                                    {answerPreview.slice(0, 2).map((qa, idx) => (
+                                    {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
                                       <div key={idx} className="text-xs">
                                         <span className="text-slate-600">{qa.question}:</span>
                                         <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
                                       </div>
                                     ))}
                                     {answerPreview.length > 2 && (
-                                      <p className="text-xs text-slate-500 italic">
-                                        +{answerPreview.length - 2} more detail{answerPreview.length - 2 !== 1 ? 's' : ''}
-                                      </p>
+                                      <button
+                                        onClick={() => toggleExpandPreview(approval.request_id)}
+                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
+                                      >
+                                        {isExpanded 
+                                          ? '- Show less' 
+                                          : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
+                                        }
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -329,7 +345,8 @@ export default function MyApprovals() {
         onClose={() => {
           setShowDetailModal(false);
           setSelectedApproval(null);
-          loadApprovals();
+          // Removed loadApprovals() to avoid unnecessary re-fetching on modal close,
+          // as sync and initial load handle data fetching.
         }}
       />
     </div>
