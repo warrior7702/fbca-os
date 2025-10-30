@@ -57,7 +57,7 @@ export default function PCODebug() {
       const data = {
         token_valid: !!token,
         token_expires_at: tokenResponse.data.expires_at,
-        connected_as_user_id: tokenUserId, // Use the ID from the token check
+        connected_as_user_id: tokenUserId,
         my_person: null,
         connected_as_email: null,
         approval_groups: [],
@@ -213,6 +213,7 @@ export default function PCODebug() {
 
           const requestInfo = {
             id: request.id,
+            event_id: eventId, // Added event_id here
             event_name: event?.attributes?.name || 'Unknown',
             event_starts_at: eventStartsAt,
             resource_id: resourceId,
@@ -424,7 +425,7 @@ export default function PCODebug() {
               </Card>
             </motion.div>
 
-            {/* Pending Requests */}
+            {/* Pending Requests - NOW WITH REQUEST IDs */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <Card>
                 <CardHeader>
@@ -451,10 +452,18 @@ export default function PCODebug() {
                         return (
                           <div key={request.id} className={`p-3 rounded-lg border ${isMyGroup ? 'border-orange-300 bg-orange-50' : 'border-slate-200 bg-white'}`}>
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-medium text-slate-900">{request.event_name}</p>
                                 <p className="text-sm text-slate-600">Resource: {request.resource_name}</p>
-                                <p className="text-xs text-slate-500">Starts: {request.event_starts_at ? new Date(request.event_starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</p>
+                                <p className="text-xs text-slate-500">
+                                  Starts: {request.event_starts_at ? new Date(request.event_starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                                </p>
+                                <p className="text-xs font-mono text-slate-500 mt-1">
+                                  Request ID: {request.id}
+                                </p>
+                                <p className="text-xs font-mono text-slate-500">
+                                  Event ID: {request.event_id}
+                                </p>
                               </div>
                               {isMyGroup && (
                                 <Badge className="bg-orange-600 text-white">
