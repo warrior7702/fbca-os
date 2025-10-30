@@ -133,21 +133,18 @@ export default function Settings() {
     }
   };
 
-  const handleConnectPCO = async () => {
-    try {
-      // Use the direct initPCOAuth function
-      const response = await base44.functions.invoke('initPCOAuth', { 
-        state: user.id 
-      });
-      
-      // initPCOAuth will redirect, but if it returns an error:
-      if (response.data?.error) {
-        toast.error('Failed to start PCO connection');
-      }
-    } catch (error) {
-      console.error('PCO connection error:', error);
-      toast.error('Failed to start PCO connection');
-    }
+  const handleConnectPCO = () => {
+    // Build PCO OAuth URL directly
+    const appUrl = window.location.origin;
+    const clientId = 'f64cb2f00a12f2ebace2f2c30cf17fa65d11affa9e3f3e05eff5961ba4b01cf3';
+    const redirectUri = `${appUrl}/functions/pcoCallback`;
+    const scope = 'calendar';
+    const state = user.id;
+    
+    const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+    
+    console.log('🔗 Redirecting to PCO OAuth:', authUrl);
+    window.location.href = authUrl;
   };
 
   const handleDisconnectPCO = async () => {
