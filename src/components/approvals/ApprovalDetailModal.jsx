@@ -62,10 +62,8 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       toast.success('Request approved!');
       
-      // Close immediately
       onClose();
       
-      // Then reload in background
       if (onSuccess) {
         setTimeout(() => onSuccess(), 100);
       }
@@ -75,8 +73,14 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       const errorData = error.response?.data;
       
+      // Check for 403 Forbidden - permission issue
+      if (errorData?.status === 403 || errorData?.details?.includes('403')) {
+        toast.error('Permission denied: You are not authorized to approve this request. Check your Planning Center approval groups.', {
+          duration: 6000
+        });
+      }
       // Check if token needs reconnection
-      if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
+      else if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
         toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
           duration: 5000,
           action: {
@@ -106,10 +110,8 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       toast.success('Request denied');
       
-      // Close immediately
       onClose();
       
-      // Then reload in background
       if (onSuccess) {
         setTimeout(() => onSuccess(), 100);
       }
@@ -119,8 +121,14 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       
       const errorData = error.response?.data;
       
+      // Check for 403 Forbidden - permission issue
+      if (errorData?.status === 403 || errorData?.details?.includes('403')) {
+        toast.error('Permission denied: You are not authorized to deny this request. Check your Planning Center approval groups.', {
+          duration: 6000
+        });
+      }
       // Check if token needs reconnection
-      if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
+      else if (errorData?.reconnect_needed || errorData?.error === 'PCO_TOKEN_EXPIRED') {
         toast.error(errorData.message || 'Planning Center connection expired. Please reconnect in Settings.', {
           duration: 5000,
           action: {
