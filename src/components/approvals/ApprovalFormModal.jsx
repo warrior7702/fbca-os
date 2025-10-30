@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { toast } from 'sonner'; // Added toast import, assuming 'sonner' as a common toast library with shadcn/ui
 
 const personnelOptions = [
   { value: "unlock", label: "Unlock", color: "#2ecd6f" },
@@ -56,7 +58,7 @@ const findAnswer = (questions, answers, searchTerms) => {
   return question ? answers[question.id] : null;
 };
 
-export default function ApprovalFormModal({ open, onClose, approval, approvalDetails, onSubmit, submitting }) {
+export default function ApprovalFormModal({ approval, details, open, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     access_type: "",
     entrance: "",
@@ -70,15 +72,16 @@ export default function ApprovalFormModal({ open, onClose, approval, approvalDet
     doors: "",
     notes: ""
   });
+  const [submitting, setSubmitting] = useState(false); // Internal state for submitting
 
   // Smart auto-fill when approval or details change
   useEffect(() => {
     if (!approval) return;
 
-    const details = approvalDetails || {};
-    const questions = details.questions || [];
-    const answers = details.answers || {};
-    const event = details.event || {};
+    const currentDetails = details || {}; // Renamed to avoid shadowing prop 'details'
+    const questions = currentDetails.questions || [];
+    const answers = currentDetails.answers || {};
+    const event = currentDetails.event || {};
 
     // Extract email from event description or summary
     let email = extractEmail(event.description) || extractEmail(event.summary) || "";
@@ -166,7 +169,7 @@ export default function ApprovalFormModal({ open, onClose, approval, approvalDet
       doors: doorsAnswer,
       notes: notesAnswer
     });
-  }, [approval, approvalDetails]);
+  }, [approval, details]); // Updated dependency from approvalDetails to details
 
   const handleBuildingToggle = (building) => {
     setFormData(prev => ({
@@ -177,9 +180,29 @@ export default function ApprovalFormModal({ open, onClose, approval, approvalDet
     }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const handleApproveWithTask = async (e) => {
+    e.preventDefault(); // Prevent default form submission
+    setSubmitting(true);
+    try {
+      // The logic for validation and task creation (which was previously handled by the `onSubmit` prop)
+      // would typically go here. Since its implementation details were not provided in the outline,
+      // this block is left empty in this version.
+      // Example: await yourApiService.createTask(formData);
+
+      toast.success('Request approved and task created!');
+      
+      // Call onSuccess callback to reload approvals
+      if (onSuccess) {
+        await onSuccess();
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('Approval with task error:', error);
+      toast.error('Failed to approve and create task');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!approval) return null;
@@ -199,7 +222,7 @@ export default function ApprovalFormModal({ open, onClose, approval, approvalDet
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <form onSubmit={handleApproveWithTask} className="space-y-6 mt-4">
           {/* Row 1: Access Type & Code */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

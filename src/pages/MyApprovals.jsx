@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,7 +68,7 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
-    for (const approval of approvals.slice(0, 10)) { // Limit to first 10 for initial load performance
+    for (const approval of approvals.slice(0, 10)) {
       if (!approvalsWithAnswers[approval.request_id]) {
         loadAnswerPreview(approval);
       }
@@ -133,6 +132,16 @@ export default function MyApprovals() {
       ...prev,
       [requestId]: !prev[requestId]
     }));
+  };
+
+  const handleModalClose = () => {
+    setShowDetailModal(false);
+    setSelectedApproval(null);
+  };
+
+  const handleApprovalSuccess = async () => {
+    // Reload approvals after approve/deny
+    await loadApprovals();
   };
 
   if (loading) {
@@ -342,12 +351,8 @@ export default function MyApprovals() {
       <ApprovalDetailModal
         approval={selectedApproval}
         open={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedApproval(null);
-          // Removed loadApprovals() to avoid unnecessary re-fetching on modal close,
-          // as sync and initial load handle data fetching.
-        }}
+        onClose={handleModalClose}
+        onSuccess={handleApprovalSuccess}
       />
     </div>
   );

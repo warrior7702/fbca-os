@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import ApprovalFormModal from "./ApprovalFormModal";
 
-export default function ApprovalDetailModal({ approval, open, onClose }) {
+export default function ApprovalDetailModal({ approval, open, onClose, onSuccess }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
@@ -65,6 +65,12 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
       });
       
       toast.success('Request approved!');
+      
+      // Call onSuccess callback to reload approvals
+      if (onSuccess) {
+        await onSuccess();
+      }
+      
       onClose();
     } catch (error) {
       console.error('Approval error:', error);
@@ -82,6 +88,12 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
       });
       
       toast.success('Request denied');
+      
+      // Call onSuccess callback to reload approvals
+      if (onSuccess) {
+        await onSuccess();
+      }
+      
       onClose();
     } catch (error) {
       console.error('Denial error:', error);
@@ -89,6 +101,12 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
     } finally {
       setDenying(false);
     }
+  };
+
+  const handleClose = () => {
+    setShowForm(false);
+    setDetails(null);
+    onClose();
   };
 
   if (showForm) {
@@ -101,19 +119,20 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
           setShowForm(false);
           onClose();
         }}
+        onSuccess={onSuccess}
       />
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" hideClose>
         {/* Header with custom X button */}
         <DialogHeader className="relative">
           <Button
             variant="ghost"
             size="icon"
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-600"
           >
             <X className="h-4 w-4" />
@@ -209,7 +228,7 @@ export default function ApprovalDetailModal({ approval, open, onClose }) {
             <div className="flex gap-3 pt-4 border-t">
               <Button
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1"
               >
                 Return to Approvals
