@@ -34,6 +34,25 @@ Deno.serve(async (req) => {
 
         const base44 = createClientFromRequest(req);
         
+        // Determine which redirect_uri to use based on environment
+        const appUrl = Deno.env.get('BASE44_APP_URL');
+        let redirectUri;
+        
+        // If this is coming from Vercel proxy, use Vercel callback URL
+        const referer = req.headers.get('referer') || '';
+        if (referer.includes('pco-webhook.vercel.app')) {
+            redirectUri = 'https://pco-webhook.vercel.app/api/pco-callback';
+            console.log('Using Vercel proxy redirect URI');
+        } else {
+            // Direct OAuth flow
+            redirectUri = `${appUrl}/functions/pcoCallback`;
+            console.log('Using direct redirect URI');
+        }
+        
+        console.log('Redirect URI:', redirectUri);
+        console.log('Client ID:', Deno.env.get('PCO_CLIENT_ID') ? 'exists' : 'missing');
+        console.log('Client Secret:', Deno.env.get('PCO_CLIENT_SECRET') ? 'exists' : 'missing');
+        
         // Exchange code for tokens
         const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
             method: 'POST',
@@ -45,7 +64,7 @@ Deno.serve(async (req) => {
                 code: code,
                 client_id: Deno.env.get('PCO_CLIENT_ID'),
                 client_secret: Deno.env.get('PCO_CLIENT_SECRET'),
-                redirect_uri: `${Deno.env.get('BASE44_APP_URL')}/functions/pcoCallback`
+                redirect_uri: redirectUri
             })
         });
 
@@ -55,7 +74,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=token_exchange_failed`
+                    'Location': `${appUrl}/Settings?error=token_exchange_failed`
                 }
             });
         }
@@ -82,14 +101,13 @@ Deno.serve(async (req) => {
             console.error('Failed to get PCO Person ID (non-fatal):', error);
         }
 
-        // Build update object with only the fields we want to update
+        // Build update object
         const updateData = {
             pco_access_token: tokens.access_token,
             pco_refresh_token: tokens.refresh_token,
             pco_token_expires_at: expiresAt
         };
 
-        // Only add pco_user_id if we got it
         if (pcoUserId) {
             updateData.pco_user_id = pcoUserId;
         }
@@ -105,7 +123,7 @@ Deno.serve(async (req) => {
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?connected=pco`
+                'Location': `${appUrl}/Settings?connected=pco`
             }
         });
 
