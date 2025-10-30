@@ -36,6 +36,7 @@ export default function MyApprovals() {
   const [expandedPreviews, setExpandedPreviews] = useState({});
   const [approvalDetails, setApprovalDetails] = useState(null); // New state for detailed approval data
   const [loadingDetails, setLoadingDetails] = useState(false); // New state for loading details
+  const [showApprovalForm, setShowApprovalForm] = useState(false); // New state for approval form visibility
 
   useEffect(() => {
     loadUser();
@@ -106,6 +107,69 @@ export default function MyApprovals() {
       console.error('Error loading answer preview:', error);
     } finally {
       setLoadingAnswers(prev => ({ ...prev, [approval.request_id]: false }));
+    }
+  };
+
+  const handleApprove = async (approval, formData = null) => {
+    try {
+      console.log('🔍 Attempting to approve:', approval.request_id);
+      
+      let response;
+      
+      if (formData) {
+        // Approve with ClickUp task creation
+        response = await base44.functions.invoke('approveWithClickUpTask', {
+          request_id: approval.request_id,
+          approval: approval,
+          form_data: formData
+        });
+      } else {
+        // Simple approval using new strict function
+        response = await base44.functions.invoke('approveResourceRequestUserStrict', {
+          request_id: approval.request_id,
+          action: 'approve',
+          note: `Approved via FBCA OS by ${user?.full_name || user?.email}`
+        });
+      }
+
+      if (response.data.ok || response.data.success) {
+        toast.success('Approved successfully!');
+        setShowApprovalForm(false);
+        await handleSync(); // Use handleSync instead of syncApprovals
+      } else {
+        console.error('❌ Approval failed:', response.data);
+        toast.error(response.data.error || 'Failed to approve');
+      }
+    } catch (error) {
+      console.error('❌ Full approval error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      toast.error(error.response?.data?.error || 'Failed to approve request');
+    }
+  };
+
+  const handleDeny = async () => {
+    if (!selectedApproval) return;
+    
+    try {
+      console.log('🔍 Attempting to deny:', selectedApproval.request_id);
+      
+      const response = await base44.functions.invoke('approveResourceRequestUserStrict', {
+        request_id: selectedApproval.request_id,
+        action: 'deny',
+        note: `Denied via FBCA OS by ${user?.full_name || user?.email}`
+      });
+
+      if (response.data.ok) {
+        toast.success('Request denied');
+        setSelectedApproval(null);
+        await handleSync(); // Use handleSync instead of syncApprovals
+      } else {
+        console.error('❌ Denial failed:', response.data);
+        toast.error(response.data.error || 'Failed to deny');
+      }
+    } catch (error) {
+      console.error('❌ Denial error:', error);
+      toast.error(error.response?.data?.error || 'Failed to deny request');
     }
   };
 
@@ -388,6 +452,9 @@ export default function MyApprovals() {
         open={showDetailModal}
         onClose={handleModalClose}
         onSuccess={handleApprovalSuccess}
+        onApprove={handleApprove} // Pass the new handleApprove function
+        onDeny={handleDeny}     // Pass the new handleDeny function
+        user={user}              // Pass user for notes
       />
     </div>
   );
