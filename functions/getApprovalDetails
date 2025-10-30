@@ -34,15 +34,6 @@ Deno.serve(async (req) => {
       return json;
     }
 
-    const normalize = (val) => {
-      if (Array.isArray(val)) return val.map(v => (v?.attributes?.name ?? String(v))).join(", ");
-      if (val && typeof val === "object") return val.attributes?.name ?? JSON.stringify(val);
-      if (val === true) return "Yes";
-      if (val === false) return "No";
-      if (val === 0) return "0";
-      return (val ?? "").toString();
-    };
-
     // 1) Pull the resource questions (for labels)
     let questions = [];
     try {
@@ -61,140 +52,63 @@ Deno.serve(async (req) => {
       diag.push({ step: "questions-error", error: String(e) });
     }
 
+    // 2) Get answers from the request's /answers endpoint
     const answers = {};
-
-    // 2) PRIMARY: answers from the specific request include
+    
     if (request_id) {
       try {
-        const reqJson = await pcoGet(
-          `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}` +
-          `?include=resource_question_answers.resource_question,resource_question_answers.choice`
-        );
-        const included = new Map((reqJson.included || []).map(x => [`${x.type}:${x.id}`, x]));
-        const rqa = (reqJson.included || []).filter(x => x.type === "ResourceQuestionAnswer");
-
-        diag.push({ step: "answers-request-raw", answer_count: rqa.length });
-
-        for (const a of rqa) {
-          const qRel = a.relationships?.resource_question?.data;
-          if (!qRel?.id) continue;
-          const raw =
-            a.attributes?.answer_text ??
-            a.attributes?.answer_number ??
-            a.attributes?.answer_boolean ??
-            a.attributes?.answer_choice ??
-            a.attributes?.answer ??
-            a.attributes?.value ?? null;
-          if (raw !== null && raw !== undefined) {
-            answers[qRel.id] = normalize(raw);
-          } else {
-            const cRel = a.relationships?.choice?.data;
-            if (cRel?.id) {
-              const inc = included.get(`${cRel.type}:${cRel.id}`);
-              if (inc?.attributes?.name) answers[qRel.id] = inc.attributes.name;
-            }
-          }
-        }
-        diag.push({ step: "answers-request", found: Object.keys(answers).length });
-      } catch (e) {
-        diag.push({ step: "answers-request-error", error: String(e) });
-      }
-    }
-
-    // 3) Find the booking ID first
-    let bookingId = null;
-    if (!Object.keys(answers).length) {
-      try {
-        const bUrl =
-          `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/resource_bookings` +
-          `?per_page=100` +
-          `&include=resource,event_resource_request`;
-
-        const bJson = await pcoGet(bUrl);
-        const bookings = Array.isArray(bJson.data) ? bJson.data : [];
-
-        diag.push({ step: "bookings-fetched", count: bookings.length });
-
-        // Try to find the booking whose event_resource_request matches our request_id
-        const matched = bookings.find(b => {
-          const reqRel = b?.relationships?.event_resource_request?.data;
-          return reqRel?.id === request_id;
-        });
-
-        // If not found, fall back to same resource_id on this event
-        const fallback = !matched
-          ? bookings.find(b => {
-              const resRel = b?.relationships?.resource?.data;
-              return resRel?.id === resource_id;
-            })
-          : null;
-
-        const targetBooking = matched || fallback;
-        bookingId = targetBooking?.id;
-
-        diag.push({
-          step: "booking-identified",
-          bookingId: bookingId,
-          matchedByRequest: !!matched,
-          matchedByResource: !!fallback && !matched
-        });
-      } catch (e) {
-        diag.push({ step: "booking-identification-error", error: String(e) });
-      }
-    }
-
-    // 4) DIRECT FETCH: Get answers directly from the booking's sub-resource
-    if (!Object.keys(answers).length && bookingId) {
-      try {
-        diag.push({ step: "fetching-answers-direct", bookingId });
+        diag.push({ step: "fetching-answers", url: `/event_resource_requests/${request_id}/answers` });
         
-        const answersUrl = 
-          `https://api.planningcenteronline.com/calendar/v2/resource_bookings/${bookingId}/resource_question_answers` +
-          `?per_page=100&include=resource_question,choice`;
-        
+        const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
         const answersJson = await pcoGet(answersUrl);
-        const answerObjects = Array.isArray(answersJson.data) ? answersJson.data : [];
         
-        diag.push({ step: "direct-answers-fetched", count: answerObjects.length });
-
-        const included = new Map((answersJson.included || []).map(x => [`${x.type}:${x.id}`, x]));
+        const answerObjects = Array.isArray(answersJson.data) ? answersJson.data : [];
+        diag.push({ step: "answers-fetched", count: answerObjects.length });
 
         for (const a of answerObjects) {
-          const qRel = a.relationships?.resource_question?.data;
-          if (!qRel?.id) continue;
-
-          let raw =
-            a.attributes?.answer_text ??
-            a.attributes?.answer_number ??
-            a.attributes?.answer_boolean ??
-            a.attributes?.answer_choice ??
-            a.attributes?.answer ??
-            a.attributes?.value ?? null;
-
-          // Resolve choice name if needed
-          if ((raw === null || typeof raw === "object") && a.relationships?.choice?.data) {
-            const cRel = a.relationships.choice.data;
-            const inc = included.get(`${cRel.type}:${cRel.id}`);
-            if (inc?.attributes?.name) raw = inc.attributes.name;
+          const questionId = a.relationships?.resource_question?.data?.id;
+          
+          if (!questionId) {
+            diag.push({ warning: "Answer has no question relationship", answer_id: a.id });
+            continue;
           }
-
-          if (raw !== null && raw !== undefined) {
-            answers[qRel.id] = normalize(raw);
+          
+          // Extract the answer value
+          let value = 
+            a.attributes?.answer_text ||
+            a.attributes?.answer ||
+            a.attributes?.value ||
+            a.attributes?.answer_number ||
+            a.attributes?.answer_boolean ||
+            a.attributes?.answer_choice;
+          
+          // Handle boolean display
+          if (typeof value === 'boolean') {
+            value = value ? 'Yes' : 'No';
+          }
+          
+          // Handle numbers
+          if (typeof value === 'number') {
+            value = String(value);
+          }
+          
+          if (value !== null && value !== undefined && value !== '') {
+            answers[questionId] = String(value);
             diag.push({ 
               step: "answer-mapped", 
-              question_id: qRel.id, 
-              value: String(raw).substring(0, 100) 
+              question_id: questionId, 
+              value: String(value).substring(0, 100) 
             });
           }
         }
         
-        diag.push({ step: "answers-direct", found: Object.keys(answers).length });
+        diag.push({ step: "answers-final", found: Object.keys(answers).length });
       } catch (e) {
-        diag.push({ step: "answers-direct-error", error: String(e) });
+        diag.push({ step: "answers-error", error: String(e) });
       }
     }
 
-    // 5) Event summary
+    // 3) Event summary
     let event = null;
     try {
       const eJson = await pcoGet(`https://api.planningcenteronline.com/calendar/v2/events/${event_id}`);
