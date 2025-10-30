@@ -66,12 +66,38 @@ Deno.serve(async (req) => {
         // Calculate expiration time
         const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
 
-        // Update user with tokens using service role
-        await base44.asServiceRole.entities.User.update(state, {
+        // Get PCO Person ID
+        let pcoUserId = null;
+        try {
+            const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+                headers: { 'Authorization': `Bearer ${tokens.access_token}` }
+            });
+            
+            if (meResponse.ok) {
+                const meData = await meResponse.json();
+                pcoUserId = meData?.data?.id;
+                console.log('✅ Got PCO Person ID:', pcoUserId);
+            }
+        } catch (error) {
+            console.error('Failed to get PCO Person ID (non-fatal):', error);
+        }
+
+        // Build update object with only the fields we want to update
+        const updateData = {
             pco_access_token: tokens.access_token,
             pco_refresh_token: tokens.refresh_token,
             pco_token_expires_at: expiresAt
-        });
+        };
+
+        // Only add pco_user_id if we got it
+        if (pcoUserId) {
+            updateData.pco_user_id = pcoUserId;
+        }
+
+        console.log('Updating user with data:', Object.keys(updateData));
+
+        // Update user with tokens using service role
+        await base44.asServiceRole.entities.User.update(state, updateData);
 
         console.log('User updated with tokens');
 
@@ -85,6 +111,7 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('PCO callback error:', error);
+        console.error('Error stack:', error.stack);
         return new Response(null, {
             status: 302,
             headers: {
