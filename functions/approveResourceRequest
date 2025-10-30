@@ -55,10 +55,12 @@ Deno.serve(async (req) => {
 
     const userToken = me.pco_access_token;
 
-    // 1) who am I
-    const mePeople = await pcoJson("https://api.planningcenteronline.com/people/v2/me", userToken);
-    const personId = mePeople?.data?.id;
-    const personName = mePeople?.data?.attributes?.name;
+    // 1) who am I - use Calendar API's /me (not People API)
+    const meCalendar = await pcoJson("https://api.planningcenteronline.com/calendar/v2/me", userToken);
+    const personId = meCalendar?.data?.id;
+    const personName = meCalendar?.data?.attributes?.name;
+
+    console.log('🔍 Calendar /me response:', { personId, personName });
 
     // 2) pull the request
     const reqUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}?include=approval_group,event,assigned_to_person`;
@@ -77,19 +79,46 @@ Deno.serve(async (req) => {
       }, { status:409 });
     }
 
-    // 3) check group membership
+    // 3) check group membership - use the same approach as diagnostics
     let inGroup = true;
     let myGroupIds = [];
+    
     try {
-      const mem = await pcoJson(
-        `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships` +
-        `?where[person_id]=${personId}&per_page=200&include=resource_approval_group`,
+      // Get all approval groups
+      const allGroupsResponse = await pcoJson(
+        'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
         userToken
       );
-      myGroupIds = (mem.data || []).map(d => d?.relationships?.resource_approval_group?.data?.id).filter(Boolean);
-      if (groupId) inGroup = myGroupIds.includes(groupId);
-    } catch {
-      inGroup = true;
+      
+      // Check each group for membership
+      for (const group of (allGroupsResponse.data || [])) {
+        const membersResponse = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+          { headers: { 'Authorization': `Bearer ${userToken}` } }
+        );
+        
+        if (membersResponse.ok) {
+          const membersData = await membersResponse.json();
+          const isMember = (membersData.data || []).some(m => m.id === personId);
+          
+          if (isMember) {
+            myGroupIds.push(group.id);
+            console.log('✅ Member of group:', group.attributes?.name, 'ID:', group.id);
+          }
+        }
+      }
+      
+      if (groupId) {
+        inGroup = myGroupIds.includes(groupId);
+        console.log('🔍 Request group:', groupId, '- Am I in it?', inGroup);
+      } else {
+        // No specific group required
+        inGroup = myGroupIds.length > 0;
+        console.log('🔍 No specific group required, but I have', myGroupIds.length, 'groups');
+      }
+    } catch (error) {
+      console.error('❌ Error checking group membership:', error);
+      inGroup = true; // Fail open
     }
 
     // 4) check if assigned to specific person
@@ -103,12 +132,15 @@ Deno.serve(async (req) => {
       groupId,
       inGroup,
       myGroupCount: myGroupIds.length,
+      myGroupIds,
       assignedToId,
       assignedToName: assignedToPerson?.attributes?.name || null,
       isAssignedToMe
     };
 
-    // 5) perform action with user token using PATCH (not POST /approve)
+    console.log('🎯 Final diagnostics:', diag);
+
+    // 5) perform action with user token using PATCH
     const endpoint = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`;
     const approvalStatus = action === "approve" ? "A" : "R";
     const body = JSON.stringify({
@@ -123,6 +155,7 @@ Deno.serve(async (req) => {
     });
 
     if (inGroup && isAssignedToMe) {
+      console.log('✅ Attempting approval with user token...');
       const r = await fetch(endpoint, { 
         method: "PATCH",
         headers: { 
@@ -134,9 +167,11 @@ Deno.serve(async (req) => {
       const txt = await r.text();
       
       if (r.ok) {
+        console.log('✅ Approval successful!');
         return Response.json({ ok: true, by: "user", ...diag, action });
       }
       
+      console.error('❌ User token approval failed:', r.status, txt);
       // User token failed - add error details to diag
       diag.userTokenError = { status: r.status, body: txt.slice(0, 500) };
     }
@@ -145,7 +180,7 @@ Deno.serve(async (req) => {
     const allowService = (Deno.env.get("ALLOW_SERVICE_APPROVALS") || "false").toLowerCase() === "true";
     if (!allowService) {
       let errorMsg = "Forbidden";
-      if (!inGroup) errorMsg = "You are not in the approval group";
+      if (!inGroup) errorMsg = `You are not in the approval group (you're in ${myGroupIds.length} group${myGroupIds.length !== 1 ? 's' : ''}, but not the one for this resource)`;
       else if (!isAssignedToMe) errorMsg = `This request is assigned to ${assignedToPerson?.attributes?.name || 'someone else'}`;
       else errorMsg = "PCO denied the approval (check permissions)";
       
@@ -156,6 +191,7 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
+    console.log('🔄 Attempting service token fallback...');
     const svcToken = await useServiceToken();
     if (!svcToken) {
       return Response.json({ 
@@ -192,6 +228,7 @@ Deno.serve(async (req) => {
     const txt2 = await r2.text();
     
     if (!r2.ok) {
+      console.error('❌ Service token approval failed:', r2.status, txt2);
       return Response.json({ 
         ok: false, 
         error: `PCO ${action} failed with service token`, 
@@ -201,9 +238,11 @@ Deno.serve(async (req) => {
       }, { status: r2.status });
     }
 
+    console.log('✅ Service token approval successful!');
     return Response.json({ ok: true, by: "service", ...diag, action });
 
   } catch (e) {
+    console.error('❌ Function error:', e);
     return Response.json({ ok: false, error: String(e) }, { status: 500 });
   }
 });
