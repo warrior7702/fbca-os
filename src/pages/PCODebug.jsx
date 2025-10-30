@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Calendar,
   Box,
-  DoorOpen
+  DoorOpen,
+  AlertTriangle
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -54,7 +55,7 @@ export default function PCODebug() {
         token_valid: !!token,
         token_expires_at: tokenResponse.data.expires_at,
         my_person: null,
-        connected_as_email: null, // NEW: Show which PCO account is connected
+        connected_as_email: null,
         approval_groups: [],
         my_groups: [],
         resources: [],
@@ -74,9 +75,9 @@ export default function PCODebug() {
           name: meData.data?.attributes?.name,
           email: meData.data?.attributes?.email
         };
-        data.connected_as_email = meData.data?.attributes?.email; // NEW
+        data.connected_as_email = meData.data?.attributes?.email;
         console.log('✅ My PCO person:', data.my_person);
-        console.log('📧 Connected as:', data.connected_as_email); // NEW
+        console.log('📧 Connected as:', data.connected_as_email);
       }
 
       // Get all approval groups
@@ -299,7 +300,7 @@ export default function PCODebug() {
 
         {debugData && (
           <div className="space-y-6">
-            {/* User Profile */}
+            {/* User Profile with Email Mismatch Warning */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <Card>
                 <CardHeader>
@@ -315,23 +316,35 @@ export default function PCODebug() {
                       <p className="font-medium">{user?.email}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">PCO Person ID</p>
-                      <p className="font-medium">{debugData.my_person?.id || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">PCO Account Email</p>
+                      <p className="font-medium">{debugData.connected_as_email || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">PCO Name</p>
                       <p className="font-medium">{debugData.my_person?.name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">PCO Account Email</p>
-                      <p className="font-medium">{debugData.connected_as_email || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">PCO Person ID</p>
+                      <p className="font-medium text-xs">{debugData.my_person?.id || 'N/A'}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-slate-500">Token Status</p>
-                      <Badge className={debugData.token_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                        {debugData.token_valid ? 'Valid' : 'Invalid'}
-                      </Badge>
-                    </div>
+                  </div>
+
+                  {/* Email Mismatch Warning */}
+                  {user?.email && debugData.connected_as_email && 
+                   user.email.toLowerCase() !== debugData.connected_as_email.toLowerCase() && (
+                    <Alert className="border-orange-300 bg-orange-50 mt-4">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <AlertDescription className="text-slate-700">
+                        <strong>Warning:</strong> Your Base44 email ({user.email}) doesn't match your PCO account ({debugData.connected_as_email}). 
+                        This means you're using a different Planning Center account. Make sure the PCO account <strong>{debugData.connected_as_email}</strong> is in the approval groups, not {user.email}.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <div>
+                    <p className="text-sm text-slate-500">Token Status</p>
+                    <Badge className={debugData.token_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                      {debugData.token_valid ? 'Valid' : 'Invalid'}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
