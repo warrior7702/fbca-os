@@ -47,14 +47,17 @@ export default function PCODebug() {
     try {
       console.log('🔍 Starting PCO diagnostics...');
 
-      // Get PCO token
+      // Get PCO token (now includes token_user_id)
       const tokenResponse = await base44.functions.invoke('getPCOToken');
       const token = tokenResponse.data.access_token;
+      const tokenUserId = tokenResponse.data.token_user_id;
+
+      console.log('🆔 Token belongs to PCO user:', tokenUserId);
 
       const data = {
         token_valid: !!token,
         token_expires_at: tokenResponse.data.expires_at,
-        connected_as_user_id: null, // Initialize connected_as_user_id
+        connected_as_user_id: tokenUserId, // Use the ID from the token check
         my_person: null,
         connected_as_email: null,
         approval_groups: [],
@@ -77,7 +80,6 @@ export default function PCODebug() {
           email: meData.data?.attributes?.email
         };
         data.connected_as_email = meData.data?.attributes?.email;
-        data.connected_as_user_id = meData.data?.id; // Populate connected_as_user_id with the person ID
         console.log('✅ My PCO person:', data.my_person);
         console.log('📧 Connected as:', data.connected_as_email);
         console.log('👤 Connected as PCO User ID:', data.connected_as_user_id);
