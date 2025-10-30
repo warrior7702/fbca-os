@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,8 @@ export default function MyApprovals() {
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
   const [expandedPreviews, setExpandedPreviews] = useState({});
+  const [approvalDetails, setApprovalDetails] = useState(null); // New state for detailed approval data
+  const [loadingDetails, setLoadingDetails] = useState(false); // New state for loading details
 
   useEffect(() => {
     loadUser();
@@ -68,6 +71,7 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
+    // Only load previews for the first 10 approvals to avoid overwhelming API/UI
     for (const approval of approvals.slice(0, 10)) {
       if (!approvalsWithAnswers[approval.request_id]) {
         loadAnswerPreview(approval);
@@ -111,8 +115,11 @@ export default function MyApprovals() {
       const response = await base44.functions.invoke('syncMyApprovals');
       
       if (response.data.success) {
-        toast.success(`Synced ${response.data.count} pending approvals`);
+        toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
+        // Also clear previous answer previews so they can be reloaded if approvals change
+        setApprovalsWithAnswers({}); 
+        setExpandedPreviews({});
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -122,9 +129,32 @@ export default function MyApprovals() {
     }
   };
 
-  const handleViewDetails = (approval) => {
-    setSelectedApproval(approval);
+  const handleViewDetails = async (approval) => {
+    console.log('🔍 Opening details for approval:', approval);
+    console.log('🔍 Request ID:', approval.request_id);
+    console.log('🔍 Event:', approval.event_name);
+    
+    setSelectedApproval(approval); // Keep basic approval info
+    setApprovalDetails(null); // Clear previous details
+    setLoadingDetails(true);
     setShowDetailModal(true);
+
+    try {
+      const response = await base44.functions.invoke('getApprovalDetails', {
+        request_id: approval.request_id,
+        event_id: approval.event_id,
+        resource_id: approval.resource_id
+      });
+
+      console.log('✅ Got approval details:', response.data);
+
+      setApprovalDetails(response.data);
+    } catch (error) {
+      console.error('❌ Error loading approval details:', error);
+      toast.error('Failed to load approval details');
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const toggleExpandPreview = (requestId) => {
@@ -137,11 +167,14 @@ export default function MyApprovals() {
   const handleModalClose = () => {
     setShowDetailModal(false);
     setSelectedApproval(null);
+    setApprovalDetails(null); // Clear details on modal close
   };
 
   const handleApprovalSuccess = async () => {
     // Reload approvals after approve/deny
     await loadApprovals();
+    // Clear details and close modal after a successful action
+    handleModalClose(); 
   };
 
   if (loading) {
@@ -349,7 +382,9 @@ export default function MyApprovals() {
 
       {/* Detail Modal */}
       <ApprovalDetailModal
-        approval={selectedApproval}
+        approval={selectedApproval} // Basic info
+        approvalDetails={approvalDetails} // Full details loaded via handleViewDetails
+        loadingDetails={loadingDetails} // Loading state for full details
         open={showDetailModal}
         onClose={handleModalClose}
         onSuccess={handleApprovalSuccess}
