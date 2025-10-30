@@ -73,14 +73,23 @@ Deno.serve(async (req) => {
             }, { status: 409 });
         }
 
-        const groupId = request?.relationships?.approval_group?.data?.id || null;
-        const assignedId = request?.relationships?.assigned_to_person?.data?.id || null;
+        // FIXED ELIGIBILITY LOGIC
+        const rel = request?.relationships || {};
+        const assigned = rel?.assigned_to_person?.data || null;
+        const groupRel = rel?.approval_group?.data || null;
+
+        const assignedToId = assigned?.id || null;
+        const groupId = groupRel?.id || null;
+
+        // Strict check - only true if explicitly assigned to me
+        const isAssignedToMe = (assigned?.type === "Person" && assignedToId === myPersonId);
 
         console.log('📋 Group ID:', groupId || 'none');
-        console.log('📋 Assigned to:', assignedId || 'none');
+        console.log('📋 Assigned to ID:', assignedToId || 'none');
+        console.log('📋 Is assigned to me?:', isAssignedToMe);
 
-        // Check eligibility
         let eligible = false;
+        let reason = "";
 
         if (groupId) {
             // Check group membership
@@ -91,27 +100,44 @@ Deno.serve(async (req) => {
 
             if (memberResponse.ok) {
                 const memberData = await memberResponse.json();
-                const myGroups = (memberData?.data || [])
+                const myGroupIds = (memberData?.data || [])
                     .map(m => m?.relationships?.resource_approval_group?.data?.id)
                     .filter(Boolean);
 
-                eligible = myGroups.includes(groupId);
-                console.log('✅ My groups:', myGroups);
-                console.log('🔍 Am I eligible?', eligible);
+                eligible = myGroupIds.includes(groupId);
+                console.log('✅ My groups:', myGroupIds);
+                console.log('🔍 Am I in the approval group?', eligible);
+
+                if (!eligible) {
+                    reason = "You are not a member of the request's approval group.";
+                }
             }
         } else {
-            // No group - check if assigned to me
-            eligible = !assignedId || assignedId === myPersonId;
-            console.log('🔍 No group - assigned to me?', eligible);
+            // No group → must be explicitly assigned to you
+            eligible = isAssignedToMe;
+            
+            if (!eligible) {
+                reason = assignedToId
+                    ? `This request is assigned to another person (${assignedToId}).`
+                    : "This request has no approval group and is not assigned to anyone, so you can't action it.";
+            }
+            
+            console.log('🔍 No group - eligible?', eligible);
         }
 
         if (!eligible) {
-            console.error('❌ Not authorized');
+            console.error('❌ Not authorized:', reason);
             return Response.json({
-                error: 'You are not authorized to approve/deny this request',
-                personId: myPersonId,
-                groupId: groupId || null,
-                assignedId: assignedId || null
+                ok: false,
+                error: 'PCO denied the approval (check permissions/assignment)',
+                diag: {
+                    personId: myPersonId,
+                    personName: myName,
+                    groupId,
+                    assignedToId,
+                    isAssignedToMe,
+                    reason
+                }
             }, { status: 403 });
         }
 
