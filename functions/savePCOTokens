@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
 
         console.log('📋 Parsed values:');
         console.log('  - user_id:', user_id);
+        console.log('  - user_id type:', typeof user_id);
         console.log('  - has_access_token:', !!access_token);
         console.log('  - has_refresh_token:', !!refresh_token);
         console.log('  - expires_in:', expires_in);
@@ -28,7 +29,31 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        // Calculate expiration timestamp - handle both expires_in and expires_at
+        // Verify user exists first
+        console.log('🔍 Checking if user exists...');
+        let existingUser;
+        try {
+            existingUser = await base44.asServiceRole.entities.User.filter({ id: user_id });
+            console.log('📊 User query result:', existingUser);
+            
+            if (!existingUser || existingUser.length === 0) {
+                console.error('❌ User not found with ID:', user_id);
+                return Response.json({ 
+                    error: 'User not found',
+                    user_id: user_id
+                }, { status: 404 });
+            }
+            
+            console.log('✅ Found user:', existingUser[0]?.email);
+        } catch (error) {
+            console.error('❌ Error finding user:', error.message);
+            return Response.json({ 
+                error: 'Failed to lookup user',
+                details: error.message
+            }, { status: 500 });
+        }
+
+        // Calculate expiration timestamp
         let expiresAt;
         if (expires_at) {
             expiresAt = expires_at;
