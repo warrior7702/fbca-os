@@ -13,16 +13,6 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Get full user data with service role to access tokens
-        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-        const user = users[0];
-
-        console.log('🟢 User loaded, has PCO token:', !!user?.pco_access_token);
-
-        if (!user || !user.pco_access_token) {
-            return Response.json({ error: 'Planning Center not connected' }, { status: 400 });
-        }
-
         const body = await req.json();
         const { request_id } = body;
 
@@ -35,58 +25,12 @@ Deno.serve(async (req) => {
 
         console.log('🔵 Starting approval process for request:', request_id);
 
-        // Check if token needs refresh (within 5 minutes of expiry)
-        const expiresAt = new Date(user.pco_token_expires_at);
-        const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+        // Use the getPCOToken function to ensure we get the right token
+        const tokenResponse = await base44.functions.invoke('getPCOToken');
+        const accessToken = tokenResponse.data.access_token;
+        const tokenUserId = tokenResponse.data.token_user_id;
 
-        let accessToken = user.pco_access_token;
-
-        if (expiresAt <= fiveMinutesFromNow) {
-            console.log('🔵 Token expired, refreshing...');
-            console.log('🔵 Expires at:', expiresAt.toISOString());
-            console.log('🔵 Current time:', new Date().toISOString());
-            
-            const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    grant_type: 'refresh_token',
-                    refresh_token: user.pco_refresh_token,
-                    client_id: Deno.env.get('PCO_CLIENT_ID'),
-                    client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-                })
-            });
-
-            console.log('🔵 Token refresh response status:', tokenResponse.status);
-
-            if (!tokenResponse.ok) {
-                const errorText = await tokenResponse.text();
-                console.error('❌ PCO token refresh failed with status', tokenResponse.status);
-                console.error('❌ Error response:', errorText);
-                
-                return Response.json({ 
-                    error: 'PCO_TOKEN_EXPIRED',
-                    message: 'Your Planning Center connection has expired. Please reconnect in Settings.',
-                    reconnect_needed: true
-                }, { status: 401 });
-            }
-
-            const tokens = await tokenResponse.json();
-            const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-            await base44.asServiceRole.entities.User.update(user.id, {
-                pco_access_token: tokens.access_token,
-                pco_refresh_token: tokens.refresh_token,
-                pco_token_expires_at: newExpiresAt
-            });
-
-            accessToken = tokens.access_token;
-            console.log('✅ Token refreshed successfully');
-        } else {
-            console.log('✅ Token still valid until:', expiresAt.toISOString());
-        }
+        console.log('✅ Got PCO token for user ID:', tokenUserId);
 
         console.log('🔵 Token ready, making approval request...');
 
@@ -120,7 +64,8 @@ Deno.serve(async (req) => {
             return Response.json({ 
                 error: 'Failed to approve in PCO',
                 details: responseText,
-                status: response.status
+                status: response.status,
+                token_user_id: tokenUserId
             }, { status: 500 });
         }
 
@@ -130,7 +75,8 @@ Deno.serve(async (req) => {
         return Response.json({ 
             success: true,
             data: data,
-            new_status: data.data?.attributes?.approval_status
+            new_status: data.data?.attributes?.approval_status,
+            token_user_id: tokenUserId
         });
 
     } catch (error) {
