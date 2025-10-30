@@ -136,13 +136,22 @@ export default function Settings() {
   const handleConnectPCO = () => {
     // Use Vercel proxy (OS2 app)
     const vercelUrl = "https://pco-webhook.vercel.app";
-    const appUrl = window.location.origin; // Use window.location.origin for flexibility
+    const appUrl = window.location.origin;
     const settingsUrl = `${appUrl}/Settings`;
-    const state = user.id;
+    const state = user.id; // Base44 user ID
     
-    const authUrl = `${vercelUrl}/api/pco-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
+    console.log('🔗 Starting PCO connection...');
+    console.log('  - User ID:', state);
+    console.log('  - Redirect back to:', settingsUrl);
     
-    console.log('🔗 Redirecting to Vercel PCO auth:', authUrl);
+    if (!state) {
+      toast.error('User ID not available. Please refresh and try again.');
+      return;
+    }
+    
+    const authUrl = `${vercelUrl}/api/pco-auth?state=${encodeURIComponent(state)}&redirect_url=${encodeURIComponent(settingsUrl)}`;
+    
+    console.log('🔗 Redirecting to:', authUrl);
     window.location.href = authUrl;
   };
 
