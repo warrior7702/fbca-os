@@ -54,6 +54,7 @@ export default function PCODebug() {
         token_valid: !!token,
         token_expires_at: tokenResponse.data.expires_at,
         my_person: null,
+        connected_as_email: null, // NEW: Show which PCO account is connected
         approval_groups: [],
         my_groups: [],
         resources: [],
@@ -73,7 +74,9 @@ export default function PCODebug() {
           name: meData.data?.attributes?.name,
           email: meData.data?.attributes?.email
         };
+        data.connected_as_email = meData.data?.attributes?.email; // NEW
         console.log('✅ My PCO person:', data.my_person);
+        console.log('📧 Connected as:', data.connected_as_email); // NEW
       }
 
       // Get all approval groups
@@ -318,6 +321,10 @@ export default function PCODebug() {
                     <div>
                       <p className="text-sm text-slate-500">PCO Name</p>
                       <p className="font-medium">{debugData.my_person?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">PCO Account Email</p>
+                      <p className="font-medium">{debugData.connected_as_email || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Token Status</p>
