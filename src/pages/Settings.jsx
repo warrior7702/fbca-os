@@ -134,13 +134,16 @@ export default function Settings() {
   };
 
   const handleConnectPCO = () => {
-    // Use Vercel proxy like ClickUp and Microsoft
-    const vercelUrl = "https://pco-webhook.vercel.app";
-    const appUrl = window.location.origin;
-    const settingsUrl = `${appUrl}/Settings`;
+    // Direct OAuth to YOUR FBCA app
+    const clientId = '224581505990582dc51f90217c69c0b5ee4954b36d302c562';
+    const redirectUri = 'https://fbca-unified-hub-37662cca.base44.app/functions/pcoCallback';
+    const scope = 'calendar';
     const state = user.id;
     
-    window.location.href = `${vercelUrl}/api/pco-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
+    const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+    
+    console.log('🔗 PCO OAuth URL:', authUrl);
+    window.location.href = authUrl;
   };
 
   const handleDisconnectPCO = async () => {
