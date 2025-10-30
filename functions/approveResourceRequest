@@ -1,49 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-async function refreshTokenIfNeeded(base44, user) {
-    try {
-        const expiresAt = new Date(user.pco_token_expires_at);
-        const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-
-        if (expiresAt > fiveMinutesFromNow) {
-            return user.pco_access_token;
-        }
-
-        console.log('Refreshing PCO token...');
-
-        const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: user.pco_refresh_token,
-                client_id: Deno.env.get('PCO_CLIENT_ID'),
-                client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-            })
-        });
-
-        if (!tokenResponse.ok) {
-            throw new Error('PCO token refresh failed');
-        }
-
-        const tokens = await tokenResponse.json();
-        const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-        await base44.asServiceRole.entities.User.update(user.id, {
-            pco_access_token: tokens.access_token,
-            pco_refresh_token: tokens.refresh_token,
-            pco_token_expires_at: newExpiresAt
-        });
-
-        return tokens.access_token;
-    } catch (error) {
-        console.error('Token refresh error:', error);
-        throw error;
-    }
-}
-
 Deno.serve(async (req) => {
     try {
         console.log('🟢 Function started');
@@ -79,8 +35,45 @@ Deno.serve(async (req) => {
 
         console.log('🔵 Starting approval process for request:', request_id);
 
-        // Refresh token if needed
-        const accessToken = await refreshTokenIfNeeded(base44, user);
+        // Check if token needs refresh (within 5 minutes of expiry)
+        const expiresAt = new Date(user.pco_token_expires_at);
+        const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+        let accessToken = user.pco_access_token;
+
+        if (expiresAt <= fiveMinutesFromNow) {
+            console.log('🔵 Token expired, refreshing...');
+            
+            const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    refresh_token: user.pco_refresh_token,
+                    client_id: Deno.env.get('PCO_CLIENT_ID'),
+                    client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+                })
+            });
+
+            if (!tokenResponse.ok) {
+                throw new Error('PCO token refresh failed');
+            }
+
+            const tokens = await tokenResponse.json();
+            const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+            await base44.asServiceRole.entities.User.update(user.id, {
+                pco_access_token: tokens.access_token,
+                pco_refresh_token: tokens.refresh_token,
+                pco_token_expires_at: newExpiresAt
+            });
+
+            accessToken = tokens.access_token;
+            console.log('✅ Token refreshed');
+        }
+
         console.log('🔵 Token ready:', !!accessToken);
 
         // First, let's check the current status
