@@ -29,8 +29,26 @@ Deno.serve(async (req) => {
     const q = url.searchParams.get('q') || '';
     const limit = parseInt(url.searchParams.get('limit') || '12', 10);
 
+    console.log(`🔍 Searching for: "${q}"`);
+
     // Get all cardholders
     const cardholders = await base44.asServiceRole.entities.Cardholder.list();
+    console.log(`📊 Total cardholders in database: ${cardholders.length}`);
+
+    if (cardholders.length === 0) {
+      console.log('⚠️ No cardholders found in database!');
+      return Response.json({ 
+        ok: true, 
+        results: [],
+        debug: { total: 0, query: q }
+      });
+    }
+
+    // Log first few records for debugging
+    console.log(`📋 Sample records:`, cardholders.slice(0, 3).map(c => ({ 
+      name: c.name, 
+      pin: c.pin 
+    })));
 
     // Score and filter results
     const results = cardholders
@@ -40,18 +58,26 @@ Deno.serve(async (req) => {
       .slice(0, limit)
       .map(x => x.r);
 
+    console.log(`✅ Found ${results.length} matching results`);
+
     return Response.json({ 
       ok: true, 
-      results 
+      results,
+      debug: { 
+        total: cardholders.length, 
+        query: q, 
+        matched: results.length 
+      }
     }, {
       headers: { 'Cache-Control': 'no-store' }
     });
 
   } catch (error) {
-    console.error('cardholdersSearch error:', error);
+    console.error('❌ cardholdersSearch error:', error);
     return Response.json({ 
       ok: false, 
-      error: error.message 
+      error: error.message,
+      results: []
     }, { status: 500 });
   }
 });
