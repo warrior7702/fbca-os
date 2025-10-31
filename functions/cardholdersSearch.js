@@ -25,9 +25,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const q = url.searchParams.get('q') || '';
-    const limit = parseInt(url.searchParams.get('limit') || '12', 10);
+    // Read from POST body instead of URL params
+    const body = await req.json().catch(() => ({}));
+    const q = body.q || '';
+    const limit = parseInt(body.limit || '12', 10);
 
     console.log(`🔍 Searching for: "${q}"`);
 
