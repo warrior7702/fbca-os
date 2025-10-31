@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -50,10 +49,8 @@ export default function ApprovalDetailModal({
     }
   };
 
-  const openPCOApproval = (eventId, requestId) => {
-    // Open directly to the approvals page filtered to this event
-    // This shows the approve/deny buttons like in your screenshot
-    const url = `https://calendar.planningcenteronline.com/approvals?event_id=${eventId}`;
+  const openPCOApproval = (eventId) => {
+    const url = `https://calendar.planningcenteronline.com/events/${eventId}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -183,7 +180,7 @@ export default function ApprovalDetailModal({
               </Button>
 
               <Button
-                onClick={() => openPCOApproval(approval.event_id, approval.request_id)}
+                onClick={() => openPCOApproval(approval.event_id)}
                 variant="outline"
                 className="border-blue-300 hover:bg-blue-50 gap-2"
               >
@@ -228,8 +225,8 @@ export default function ApprovalDetailModal({
             {/* Helper text */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-slate-700">
-                <strong>How it works:</strong> Click "Open in Planning Center" to see the approval page with Approve/Reject buttons. 
-                After you make your decision in PCO, come back here and click "Check for Decision" to sync the status.
+                <strong>How it works:</strong> Click "Open in Planning Center" to approve/deny this request in PCO. 
+                Then click "Check for Decision" to automatically detect when you've made your choice in PCO.
               </p>
             </div>
           </div>

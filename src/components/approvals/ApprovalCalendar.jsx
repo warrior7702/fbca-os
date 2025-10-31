@@ -1,114 +1,141 @@
 import React, { useState } from "react";
-import { format, addDays, isSameDay } from "date-fns";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon } from "lucide-react";
-import { motion } from "framer-motion";
-import FullApprovalCalendarModal from "./FullApprovalCalendarModal";
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { format, addDays, startOfWeek, isToday, startOfDay, parseISO } from "date-fns";
 
-export default function ApprovalCalendar({ approvals, onApprovalClick }) {
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
-  
-  // Get next 2 weeks from today (static)
-  const today = new Date();
-  const twoWeekDays = Array.from({ length: 14 }, (_, i) => addDays(today, i));
+export default function ApprovalCalendar({ approvals = [], onApprovalClick }) {
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+    startOfWeek(new Date(), { weekStartsOn: 0 })
+  );
 
-  const getApprovalsForDay = (day) => {
-    return approvals.filter(approval => {
-      if (!approval.event_starts_at) return false;
-      const eventDate = new Date(approval.event_starts_at);
-      return isSameDay(eventDate, day);
+  const generateTwoWeeks = () => {
+    const days = [];
+    for (let i = 0; i < 14; i++) {
+      days.push(addDays(currentWeekStart, i));
+    }
+    return days;
+  };
+
+  const twoWeeksDays = generateTwoWeeks();
+
+  // Group approvals by date - with safety checks
+  const approvalsByDate = {};
+  if (Array.isArray(approvals)) {
+    approvals.forEach((approval) => {
+      if (!approval) return;
+      
+      const dateStr = approval.event_starts_at || approval.pco_created_at;
+      if (dateStr) {
+        try {
+          const date = parseISO(dateStr);
+          const dateKey = format(startOfDay(date), 'yyyy-MM-dd');
+          if (!approvalsByDate[dateKey]) {
+            approvalsByDate[dateKey] = [];
+          }
+          approvalsByDate[dateKey].push(approval);
+        } catch (error) {
+          console.error('Error parsing approval date:', error);
+        }
+      }
     });
+  }
+
+  const goToPreviousWeeks = () => {
+    setCurrentWeekStart(prev => addDays(prev, -14));
+  };
+
+  const goToNextWeeks = () => {
+    setCurrentWeekStart(prev => addDays(prev, 14));
+  };
+
+  const goToToday = () => {
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  };
+
+  const week1 = twoWeeksDays.slice(0, 7);
+  const week2 = twoWeeksDays.slice(7, 14);
+
+  const renderDay = (day) => {
+    const dateKey = format(day, 'yyyy-MM-dd');
+    const dayApprovals = approvalsByDate[dateKey] || [];
+    const isTodayDate = isToday(day);
+
+    return (
+      <Card key={dateKey} className={`overflow-hidden transition-all hover:shadow-md ${isTodayDate ? 'ring-2 ring-orange-500 shadow-lg' : ''}`}>
+        <CardContent className="p-0">
+          <div className={`p-3 text-center border-b ${isTodayDate ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{format(day, 'EEE')}</div>
+            <div className={`text-2xl font-bold ${isTodayDate ? 'text-orange-600' : 'text-slate-900'}`}>
+              {format(day, 'd')}
+            </div>
+          </div>
+          
+          <div className="p-2 space-y-1.5 min-h-[120px]">
+            {dayApprovals.slice(0, 3).map((approval, idx) => (
+              <div
+                key={`approval-${approval?.request_id || idx}`}
+                className="text-xs p-2 rounded-md bg-orange-100 border border-orange-300 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => onApprovalClick && onApprovalClick(approval)}
+              >
+                <div className="flex items-start gap-1.5 mb-1">
+                  <AlertCircle className="w-3 h-3 text-orange-600 mt-0.5 flex-shrink-0" />
+                  <span className="flex-1 font-medium leading-tight text-orange-900">
+                    {approval?.event_name || 'Unnamed Event'}
+                  </span>
+                </div>
+                {approval?.resource_name && (
+                  <div className="text-[10px] text-orange-700 truncate ml-4">
+                    {approval.resource_name}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {dayApprovals.length > 3 && (
+              <div className="text-xs text-slate-500 text-center font-medium pt-1">
+                +{dayApprovals.length - 3} more
+              </div>
+            )}
+            
+            {dayApprovals.length === 0 && (
+              <div className="text-xs text-slate-300 text-center py-8">
+                No events
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
-    <>
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-semibold text-slate-900 mb-1">Next 2 Weeks</h3>
-            <p className="text-sm text-slate-600">{approvals.length} approved request{approvals.length !== 1 ? 's' : ''}</p>
-          </div>
-          
-          <Button
-            onClick={() => setShowFullCalendar(true)}
-            variant="outline"
-            className="border-orange-300 hover:bg-orange-50 gap-2"
-          >
-            <CalendarIcon className="w-4 h-4" />
-            View Full Calendar
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={goToPreviousWeeks} className="h-8">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button variant="default" size="sm" onClick={goToToday} className="h-8 bg-blue-600 hover:bg-blue-700">
+            Today
+          </Button>
+          <Button variant="outline" size="sm" onClick={goToNextWeeks} className="h-8">
+            <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
-        
-        <div className="grid grid-cols-7 gap-3">
-          {twoWeekDays.map((day, idx) => {
-            const dayApprovals = getApprovalsForDay(day);
-            const isToday = isSameDay(day, new Date());
-            
-            return (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03 }}
-                className={`p-4 rounded-xl border-2 transition-all ${
-                  isToday 
-                    ? 'border-orange-500 bg-orange-50 shadow-md' 
-                    : dayApprovals.length > 0
-                    ? 'border-green-300 bg-green-50 hover:border-green-500 hover:shadow-md cursor-pointer'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                <div className="text-center mb-2">
-                  <div className="text-xs font-semibold text-slate-500 uppercase">
-                    {format(day, 'EEE')}
-                  </div>
-                  <div className={`text-2xl font-bold ${
-                    isToday ? 'text-orange-600' : 'text-slate-900'
-                  }`}>
-                    {format(day, 'd')}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {format(day, 'MMM')}
-                  </div>
-                </div>
-                
-                {dayApprovals.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Badge className="w-full bg-green-600 text-white text-xs justify-center">
-                      {dayApprovals.length} event{dayApprovals.length !== 1 ? 's' : ''}
-                    </Badge>
-                    {dayApprovals.slice(0, 2).map((approval, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => onApprovalClick(approval)}
-                        className="text-xs p-2 bg-white rounded border border-green-300 hover:bg-green-50 cursor-pointer truncate font-medium text-slate-700"
-                        title={approval.event_name}
-                      >
-                        {approval.event_name}
-                      </div>
-                    ))}
-                    {dayApprovals.length > 2 && (
-                      <div className="text-xs text-slate-500 text-center font-medium">
-                        +{dayApprovals.length - 2} more
-                      </div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-      </Card>
+      </div>
 
-      {/* Full Calendar Modal */}
-      <FullApprovalCalendarModal
-        isOpen={showFullCalendar}
-        onClose={() => setShowFullCalendar(false)}
-        approvals={approvals}
-        onApprovalClick={onApprovalClick}
-      />
-    </>
+      {/* Week 1 */}
+      <div className="grid grid-cols-7 gap-3">
+        {week1.map(renderDay)}
+      </div>
+
+      {/* Week 2 */}
+      <div className="grid grid-cols-7 gap-3">
+        {week2.map(renderDay)}
+      </div>
+    </div>
   );
 }

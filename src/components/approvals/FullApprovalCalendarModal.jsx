@@ -1,148 +1,154 @@
 import React, { useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isToday, startOfDay, parseISO } from "date-fns";
 
-export default function FullApprovalCalendarModal({ isOpen, onClose, approvals, onApprovalClick }) {
+export default function FullApprovalCalendarModal({ open, onClose, approvals = [], onApprovalClick }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = endOfWeek(monthEnd);
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  const generateMonthDays = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
-  const getApprovalsForDay = (day) => {
-    return approvals.filter(approval => {
-      if (!approval.event_starts_at) return false;
-      const eventDate = new Date(approval.event_starts_at);
-      return isSameDay(eventDate, day);
+    const days = [];
+    let day = startDate;
+
+    while (day <= endDate) {
+      days.push(day);
+      day = addDays(day, 1);
+    }
+
+    return days;
+  };
+
+  const monthDays = generateMonthDays();
+
+  // Group approvals by date - with safety checks
+  const approvalsByDate = {};
+  if (Array.isArray(approvals)) {
+    approvals.forEach((approval) => {
+      if (!approval) return;
+      
+      const dateStr = approval.event_starts_at || approval.pco_created_at;
+      if (dateStr) {
+        try {
+          const date = parseISO(dateStr);
+          const dateKey = format(startOfDay(date), 'yyyy-MM-dd');
+          if (!approvalsByDate[dateKey]) {
+            approvalsByDate[dateKey] = [];
+          }
+          approvalsByDate[dateKey].push(approval);
+        } catch (error) {
+          console.error('Error parsing approval date:', error);
+        }
+      }
     });
-  };
+  }
 
-  const previousMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
-  };
-
-  const goToToday = () => {
-    setCurrentMonth(new Date());
-  };
+  const weeks = [];
+  for (let i = 0; i < monthDays.length; i += 7) {
+    weeks.push(monthDays.slice(i, i + 7));
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold">
-              {format(currentMonth, 'MMMM yyyy')}
+            <DialogTitle className="text-3xl font-bold">
+              {format(currentMonth, 'MMMM yyyy')} - Calendar
             </DialogTitle>
-            
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={previousMonth}
+                onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
               >
                 <ChevronLeft className="w-4 h-4" />
-                Previous
               </Button>
-              
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
-                onClick={goToToday}
+                onClick={() => setCurrentMonth(new Date())}
+                className="bg-orange-600 hover:bg-orange-700"
               >
                 Today
               </Button>
-              
               <Button
                 variant="outline"
                 size="sm"
-                onClick={nextMonth}
+                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
               >
-                Next
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="py-4">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-2 mb-2">
-            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-              <div key={day} className="text-center text-sm font-semibold text-slate-600 py-2">
-                {day}
+        <div className="flex-1 overflow-auto mt-4">
+          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 bg-slate-50 border-b">
+              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                <div key={day} className="p-3 text-center font-semibold text-slate-700 border-r last:border-r-0 text-sm">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Weeks */}
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="grid grid-cols-7 border-b last:border-b-0">
+                {week.map((day, dayIdx) => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const dayApprovals = approvalsByDate[dateKey] || [];
+                  const isTodayDate = isToday(day);
+                  const isCurrentMonth = isSameMonth(day, currentMonth);
+
+                  return (
+                    <div
+                      key={dayIdx}
+                      className={`min-h-[140px] p-2 border-r last:border-r-0 ${
+                        isTodayDate ? 'bg-orange-50 ring-2 ring-inset ring-orange-500' : isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                    >
+                      <div className={`text-base font-semibold mb-2 ${
+                        isTodayDate ? 'text-orange-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
+                        {format(day, 'd')}
+                      </div>
+
+                      <div className="space-y-1">
+                        {dayApprovals.map((approval, idx) => (
+                          <div
+                            key={`approval-${approval?.request_id || idx}`}
+                            className="text-xs p-1.5 rounded-md bg-orange-100 border border-orange-300 hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => onApprovalClick && onApprovalClick(approval)}
+                          >
+                            <div className="flex items-start gap-1 mb-0.5">
+                              <AlertCircle className="w-3 h-3 text-orange-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate text-orange-900 leading-tight">
+                                  {approval?.event_name || 'Unnamed Event'}
+                                </div>
+                                {approval?.resource_name && (
+                                  <div className="text-[9px] text-orange-700 truncate mt-0.5">
+                                    {approval.resource_name}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-2">
-            {calendarDays.map((day, idx) => {
-              const dayApprovals = getApprovalsForDay(day);
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isToday = isSameDay(day, new Date());
-              
-              return (
-                <div
-                  key={idx}
-                  className={`min-h-[120px] p-3 rounded-lg border-2 transition-all ${
-                    isToday
-                      ? 'border-orange-500 bg-orange-50 shadow-md'
-                      : dayApprovals.length > 0 && isCurrentMonth
-                      ? 'border-green-300 bg-green-50 hover:border-green-500 hover:shadow-md'
-                      : isCurrentMonth
-                      ? 'border-slate-200 bg-white hover:border-slate-300'
-                      : 'border-slate-100 bg-slate-50'
-                  }`}
-                >
-                  <div className={`text-sm font-bold mb-2 ${
-                    isToday
-                      ? 'text-orange-600'
-                      : isCurrentMonth
-                      ? 'text-slate-900'
-                      : 'text-slate-400'
-                  }`}>
-                    {format(day, 'd')}
-                  </div>
-                  
-                  {dayApprovals.length > 0 && (
-                    <div className="space-y-1">
-                      {dayApprovals.slice(0, 3).map((approval, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => {
-                            onApprovalClick(approval);
-                            onClose();
-                          }}
-                          className="text-xs p-1.5 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer truncate font-medium"
-                          title={`${approval.event_name} - ${approval.resource_name}`}
-                        >
-                          {approval.event_name}
-                        </div>
-                      ))}
-                      {dayApprovals.length > 3 && (
-                        <Badge className="w-full bg-green-700 text-white text-xs justify-center">
-                          +{dayApprovals.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </div>
       </DialogContent>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,8 +12,7 @@ import {
   CheckCircle,
   Clock,
   Box,
-  Eye,
-  ExternalLink // Added ExternalLink import
+  Eye
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,23 +33,14 @@ export default function MyApprovals() {
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
   const [expandedPreviews, setExpandedPreviews] = useState({});
-  // approvalDetails, loadingDetails, and showApprovalForm states are removed as per new modal design
-
-  // NEW: State for approved requests (for calendar)
-  const [approvedRequests, setApprovedRequests] = useState([]);
-  const [loadingApproved, setLoadingApproved] = useState(false);
+  const [approvalDetails, setApprovalDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showApprovalForm, setShowApprovalForm] = useState(false);
 
   useEffect(() => {
     loadUser();
     loadApprovals();
   }, []);
-
-  // NEW: Load approved requests when switching to calendar view
-  useEffect(() => {
-    if (viewMode === 'calendar') {
-      loadApprovedRequests();
-    }
-  }, [viewMode]);
 
   useEffect(() => {
     if (approvals.length > 0) {
@@ -142,7 +131,7 @@ export default function MyApprovals() {
 
       if (response.data.ok || response.data.success) {
         toast.success('Approved successfully!');
-        // setShowApprovalForm(false); // This state has been removed
+        setShowApprovalForm(false);
         await handleSync();
       } else {
         console.error('❌ Approval failed:', response.data);
@@ -184,22 +173,13 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Sync pending approvals
-      const pendingResponse = await base44.functions.invoke('syncMyApprovals');
+      const response = await base44.functions.invoke('syncMyApprovals');
       
-      if (pendingResponse.data.success) {
-        toast.success(`Synced ${pendingResponse.data.count} pending approval${pendingResponse.data.count !== 1 ? 's' : ''}`);
-        setApprovals(pendingResponse.data.pending_approvals || []);
+      if (response.data.success) {
+        toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
+        setApprovals(response.data.pending_approvals || []);
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
-      }
-      
-      // Also sync approved requests
-      const approvedResponse = await base44.functions.invoke('syncMyApprovedRequests');
-      
-      if (approvedResponse.data.success) {
-        toast.success(`Synced ${approvedResponse.data.count} approved request${approvedResponse.data.count !== 1 ? 's' : ''}`);
-        setApprovedRequests(approvedResponse.data.approved_requests || []);
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -209,10 +189,32 @@ export default function MyApprovals() {
     }
   };
 
-  const handleViewDetails = (approval) => {
-    console.log('👁️ Opening details for:', approval);
+  const handleViewDetails = async (approval) => {
+    console.log('🔍 Opening details for approval:', approval);
+    console.log('🔍 Request ID:', approval.request_id);
+    console.log('🔍 Event:', approval.event_name);
+    
     setSelectedApproval(approval);
+    setApprovalDetails(null);
+    setLoadingDetails(true);
     setShowDetailModal(true);
+
+    try {
+      const response = await base44.functions.invoke('getApprovalDetails', {
+        request_id: approval.request_id,
+        event_id: approval.event_id,
+        resource_id: approval.resource_id
+      });
+
+      console.log('✅ Got approval details:', response.data);
+
+      setApprovalDetails(response.data);
+    } catch (error) {
+      console.error('❌ Error loading approval details:', error);
+      toast.error('Failed to load approval details');
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const toggleExpandPreview = (requestId) => {
@@ -222,28 +224,15 @@ export default function MyApprovals() {
     }));
   };
 
-  // handleModalClose and handleApprovalSuccess are removed as their logic is now inline with the modal props.
-
-  // NEW: Load approved requests for calendar
-  const loadApprovedRequests = async () => {
-    setLoadingApproved(true);
-    try {
-      console.log('🔄 Loading approved requests...');
-      const response = await base44.functions.invoke('getMyApprovedRequests');
-      console.log('✅ Approved requests response:', response.data);
-      setApprovedRequests(response.data.approved_requests || []);
-      toast.success(`Loaded ${response.data.count} approved request${response.data.count !== 1 ? 's' : ''}`);
-    } catch (error) {
-      console.error('❌ Error loading approved requests:', error);
-      toast.error('Failed to load approved requests');
-    } finally {
-      setLoadingApproved(false);
-    }
+  const handleModalClose = () => {
+    setShowDetailModal(false);
+    setSelectedApproval(null);
+    setApprovalDetails(null);
   };
 
-  // New function: openPCOApprovalsPage
-  const openPCOApprovalsPage = () => {
-    window.open('https://calendar.planningcenteronline.com/approvals', '_blank', 'noopener,noreferrer');
+  const handleApprovalSuccess = async () => {
+    await loadApprovals();
+    handleModalClose(); 
   };
 
   if (loading) {
@@ -258,7 +247,7 @@ export default function MyApprovals() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-orange-50 to-amber-50 p-6 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-orange-50 to-red-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
         
         <div className="flex items-center justify-between mb-6">
@@ -269,10 +258,7 @@ export default function MyApprovals() {
             <div>
               <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
               <p className="text-slate-600">
-                {viewMode === 'list' 
-                  ? `${approvals.length} pending approval${approvals.length !== 1 ? 's' : ''}`
-                  : `${approvedRequests.length} approved request${approvedRequests.length !== 1 ? 's' : ''}`
-                }
+                {approvals.length} pending approval{approvals.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
@@ -285,7 +271,7 @@ export default function MyApprovals() {
                 onClick={() => setViewMode('list')}
                 className={viewMode === 'list' ? 'bg-orange-500 hover:bg-orange-600' : ''}
               >
-                Pending
+                List
               </Button>
               <Button
                 variant={viewMode === 'calendar' ? 'default' : 'ghost'}
@@ -294,7 +280,7 @@ export default function MyApprovals() {
                 className={viewMode === 'calendar' ? 'bg-orange-500 hover:bg-orange-600' : ''}
               >
                 <Calendar className="w-4 h-4 mr-1" />
-                Approved
+                Calendar
               </Button>
             </div>
 
@@ -324,166 +310,140 @@ export default function MyApprovals() {
           </div>
         )}
 
-        {viewMode === 'calendar' && (
-          loadingApproved ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
-              <p className="text-slate-600 ml-3">Loading approved requests...</p>
-            </div>
-          ) : (
-            <ApprovalCalendar 
-              approvals={approvedRequests} 
-              onApprovalClick={handleViewDetails}
-            />
-          )
+        {viewMode === 'calendar' && approvals.length > 0 && (
+          <ApprovalCalendar 
+            approvals={approvals} 
+            onApprovalClick={handleViewDetails}
+          />
         )}
 
         {viewMode === 'list' && (
-          <>
-            {/* Open Planning Center Button */}
-            <div className="mb-6">
-              <Button
-                onClick={openPCOApprovalsPage}
-                className="bg-blue-600 hover:bg-blue-700 gap-2"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open Planning Center Approvals
-              </Button>
-            </div>
-
-            <div className="grid gap-4">
-              <AnimatePresence>
-                {approvals.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center py-20"
-                  >
-                    <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                      All caught up!
-                    </h3>
-                    <p className="text-slate-600">No pending approvals at this time.</p>
-                  </motion.div>
-                ) : (
-                  approvals.map((approval, index) => {
-                    const answerPreview = approvalsWithAnswers[approval.request_id];
-                    const loadingPreview = loadingAnswers[approval.request_id];
-                    const isExpanded = expandedPreviews[approval.request_id];
-                    
-                    return (
-                      <motion.div
-                        key={approval.request_id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
-                          <CardContent className="p-5">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="font-semibold text-slate-900 text-lg">
-                                    {approval.event_name}
-                                  </h3>
-                                  <Badge variant="outline" className="text-xs">
-                                    {approval.approval_status === 'P' ? 'Pending' : approval.approval_status}
-                                  </Badge>
-                                </div>
-
-                                <div className="space-y-1 text-sm text-slate-600 mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>
-                                      {approval.event_starts_at 
-                                        ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
-                                        : 'Date not set'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Box className="w-4 h-4" />
-                                    <span>{approval.resource_name}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4" />
-                                    <span className="text-xs text-slate-500">
-                                      Group: {approval.approval_group_name}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {loadingPreview && (
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    <span>Loading details...</span>
-                                  </div>
-                                )}
-                                
-                                {answerPreview && answerPreview.length > 0 && (
-                                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                    <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
-                                    <div className="space-y-1">
-                                      {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
-                                        <div key={idx} className="text-xs">
-                                          <span className="text-slate-600">{qa.question}:</span>
-                                          <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
-                                        </div>
-                                      ))}
-                                      {answerPreview.length > 2 && (
-                                        <button
-                                          onClick={() => toggleExpandPreview(approval.request_id)}
-                                          className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
-                                        >
-                                          {isExpanded 
-                                            ? '- Show less' 
-                                            : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
-                                          }
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+          <div className="grid gap-4">
+            <AnimatePresence>
+              {approvals.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-20"
+                >
+                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                    All caught up!
+                  </h3>
+                  <p className="text-slate-600">No pending approvals at this time.</p>
+                </motion.div>
+              ) : (
+                approvals.map((approval, index) => {
+                  const answerPreview = approvalsWithAnswers[approval.request_id];
+                  const loadingPreview = loadingAnswers[approval.request_id];
+                  const isExpanded = expandedPreviews[approval.request_id];
+                  
+                  return (
+                    <motion.div
+                      key={approval.request_id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
+                        <CardContent className="p-5">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-slate-900 text-lg">
+                                  {approval.event_name}
+                                </h3>
+                                <Badge variant="outline" className="text-xs">
+                                  {approval.approval_status === 'P' ? 'Pending' : approval.approval_status}
+                                </Badge>
                               </div>
 
-                              <Button
-                                onClick={() => handleViewDetails(approval)}
-                                size="sm"
-                                className="bg-orange-600 hover:bg-orange-700"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                Details
-                              </Button>
+                              <div className="space-y-1 text-sm text-slate-600 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="w-4 h-4" />
+                                  <span>
+                                    {approval.event_starts_at 
+                                      ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
+                                      : 'Date not set'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Box className="w-4 h-4" />
+                                  <span>{approval.resource_name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4" />
+                                  <span className="text-xs text-slate-500">
+                                    Group: {approval.approval_group_name}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {loadingPreview && (
+                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Loading details...</span>
+                                </div>
+                              )}
+                              
+                              {answerPreview && answerPreview.length > 0 && (
+                                <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                  <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
+                                  <div className="space-y-1">
+                                    {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
+                                      <div key={idx} className="text-xs">
+                                        <span className="text-slate-600">{qa.question}:</span>
+                                        <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
+                                      </div>
+                                    ))}
+                                    {answerPreview.length > 2 && (
+                                      <button
+                                        onClick={() => toggleExpandPreview(approval.request_id)}
+                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
+                                      >
+                                        {isExpanded 
+                                          ? '- Show less' 
+                                          : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
+                                        }
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })
-                )}
-              </AnimatePresence>
-            </div>
-          </>
+
+                            <Button
+                              onClick={() => handleViewDetails(approval)}
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Details
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })
+              )}
+            </AnimatePresence>
+          </div>
         )}
       </div>
 
-      <AnimatePresence>
-        {showDetailModal && selectedApproval && (
-          <ApprovalDetailModal
-            approval={selectedApproval}
-            isOpen={showDetailModal}
-            onClose={() => {
-              setShowDetailModal(false);
-              setSelectedApproval(null);
-            }}
-            onComplete={() => {
-              loadApprovals(); // Reload approvals after completion (approve/deny)
-              setShowDetailModal(false); // Also close the modal
-              setSelectedApproval(null); // Clear selected approval
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <ApprovalDetailModal
+        approval={selectedApproval}
+        approvalDetails={approvalDetails}
+        loadingDetails={loadingDetails}
+        open={showDetailModal}
+        onClose={handleModalClose}
+        onSuccess={handleApprovalSuccess}
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        user={user}
+      />
     </div>
   );
 }
