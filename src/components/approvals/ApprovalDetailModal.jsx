@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -11,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, ExternalLink, Calendar, Package, Users, CheckCircle } from "lucide-react";
+import { Loader2, ExternalLink, Calendar, Package, Users, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -24,6 +23,8 @@ export default function ApprovalDetailModal({
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showIframe, setShowIframe] = useState(false);
+  const [iframeBlocked, setIframeBlocked] = useState(false);
 
   useEffect(() => {
     if (isOpen && approval) {
@@ -51,16 +52,25 @@ export default function ApprovalDetailModal({
   };
 
   const openPCOApproval = (eventId, requestId) => {
-    // Open directly to the approvals page filtered to this event
-    // This shows the approve/deny buttons like in your screenshot
     const url = `https://calendar.planningcenteronline.com/approvals?event_id=${eventId}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    
+    // Try iframe first
+    setShowIframe(true);
+    
+    // Fallback to new tab after 2 seconds if iframe blocked
+    setTimeout(() => {
+      if (showIframe && !iframeBlocked) {
+        setIframeBlocked(true);
+        toast.info("Opening in new tab (PCO blocks embedding)");
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    }, 2000);
   };
 
   const waitForDecision = async (requestId, onUpdate) => {
     const started = Date.now();
-    const timeoutMs = 60_000; // 60 seconds
-    const everyMs = 3_000; // 3 seconds
+    const timeoutMs = 60_000;
+    const everyMs = 3_000;
 
     let last = "P";
     while (Date.now() - started < timeoutMs) {
@@ -85,11 +95,13 @@ export default function ApprovalDetailModal({
 
   if (!approval) return null;
 
+  const pcoUrl = `https://calendar.planningcenteronline.com/approvals?event_id=${approval.event_id}`;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         aria-describedby="approval-desc" 
-        className="max-w-3xl max-h-[85vh] overflow-y-auto"
+        className={showIframe ? "max-w-[95vw] max-h-[95vh] overflow-hidden" : "max-w-3xl max-h-[85vh] overflow-y-auto"}
       >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-3">
@@ -97,11 +109,67 @@ export default function ApprovalDetailModal({
             {approval.event_name}
           </DialogTitle>
           <DialogDescription id="approval-desc" className="text-base">
-            Review resource request details
+            {showIframe ? "Approve/Deny in Planning Center" : "Review resource request details"}
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {showIframe ? (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-amber-900 font-medium">
+                  Opening Planning Center in new tab...
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  PCO blocks embedding for security. After you approve/deny there, click "Check for Decision" below.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setShowIframe(false)} 
+                variant="outline"
+                className="flex-1"
+              >
+                ← Back to Details
+              </Button>
+              <Button
+                onClick={async () => {
+                  setProcessing(true);
+                  toast.message("⏳ Checking Planning Center...");
+                  
+                  const result = await waitForDecision(String(approval.request_id), (status) => {
+                    if (status === "A") {
+                      toast.success("✅ Approved!");
+                    } else if (status === "R") {
+                      toast.error("❌ Rejected");
+                    }
+                  });
+                  
+                  setProcessing(false);
+                  
+                  if (result === "A" || result === "R") {
+                    onComplete?.();
+                    onClose?.();
+                  } else {
+                    toast.info("No decision detected yet.");
+                  }
+                }}
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                disabled={processing}
+              >
+                {processing ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                )}
+                Check for Decision
+              </Button>
+            </div>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
