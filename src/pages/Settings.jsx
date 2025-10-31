@@ -79,7 +79,6 @@ export default function Settings() {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [makingMeAdmin, setMakingMeAdmin] = useState(false);
 
   const navigate = useNavigate();
 
@@ -166,42 +165,32 @@ export default function Settings() {
     }
   };
 
-  const handleMakeMeAdmin = async () => {
-    setMakingMeAdmin(true);
-    try {
-      await base44.functions.invoke('setUserRole', {
-        user_id: user.id,
-        role: 'admin'
-      });
-      toast.success("You are now an admin! Refreshing...");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      console.error("Error making admin:", error);
-      toast.error("Failed to set admin role");
-      setMakingMeAdmin(false);
-    }
-  };
-
   const handleChangeUserRole = async (userId, newRole) => {
     try {
-      await base44.functions.invoke('setUserRole', {
+      console.log('🔄 Changing role for user:', userId, 'to:', newRole);
+      
+      const response = await base44.functions.invoke('setUserRole', {
         user_id: userId,
         role: newRole
       });
-      toast.success(`User role updated to ${newRole}`);
-      loadAllUsers();
       
-      // If we just changed our own role, reload
+      console.log('✅ Role change response:', response.data);
+      
+      toast.success(`User role updated to ${newRole}`);
+      
+      // Reload users list
+      await loadAllUsers();
+      
+      // If we just changed our own role, reload the page
       if (userId === user.id) {
+        toast.success('Your role was updated! Refreshing...');
         setTimeout(() => {
           window.location.reload();
         }, 1000);
       }
     } catch (error) {
-      console.error("Error changing user role:", error);
-      toast.error("Failed to change user role");
+      console.error("❌ Error changing user role:", error);
+      toast.error("Failed to change user role: " + (error.message || 'Unknown error'));
     }
   };
 
@@ -415,30 +404,6 @@ export default function Settings() {
             <p className="text-slate-600">Manage your FBCA OS preferences</p>
           </div>
         </div>
-
-        {/* Make Me Admin Button (only show if not admin) */}
-        {user?.role !== 'admin' && (
-          <Card className="mb-6 border-orange-200 bg-orange-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Crown className="w-8 h-8 text-orange-600" />
-                  <div>
-                    <p className="font-semibold text-slate-900">Need Admin Access?</p>
-                    <p className="text-sm text-slate-600">Click here to grant yourself admin privileges</p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={handleMakeMeAdmin} 
-                  disabled={makingMeAdmin}
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  {makingMeAdmin ? "Granting..." : "Make Me Admin"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6'}`}>
