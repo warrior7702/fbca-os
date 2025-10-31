@@ -15,9 +15,15 @@ Deno.serve(async (req) => {
     
     diag.push({ step: "input", request_id, event_id, resource_id });
 
-    // Get PCO token (handles refresh automatically)
-    const tokenResponse = await base44.functions.invoke("getPCOToken");
-    const token = tokenResponse.data.access_token;
+    // Get PCO token directly from user
+    const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+    const user = users[0];
+    
+    if (!user || !user.pco_access_token) {
+      return Response.json({ ok: false, error: "PCO not connected" }, { status: 400 });
+    }
+
+    const token = user.pco_access_token;
     diag.push({ step: "token-obtained", has_token: !!token });
 
     const headers = { 
@@ -134,6 +140,7 @@ Deno.serve(async (req) => {
       diag
     });
   } catch (err) {
+    console.error('❌ getApprovalDetails error:', err);
     return Response.json({ ok: false, error: String(err), diag }, { status: 500 });
   }
 });
