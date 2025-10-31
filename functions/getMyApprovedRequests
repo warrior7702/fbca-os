@@ -57,14 +57,17 @@ Deno.serve(async (req) => {
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        console.log('🔄 Fetching approved requests for:', currentUser.email);
+        console.log('🔄 Fetching APPROVED requests for:', currentUser.email);
 
         // Get my PCO person ID
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (!meResponse.ok) throw new Error('Failed to get PCO user');
+        if (!meResponse.ok) {
+            console.error('❌ Failed to get PCO user');
+            throw new Error('Failed to get PCO user');
+        }
         
         const meData = await meResponse.json();
         const myPcoPersonId = meData.data?.id;
@@ -77,9 +80,14 @@ Deno.serve(async (req) => {
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
-        if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
+        if (!groupsResponse.ok) {
+            console.error('❌ Failed to fetch approval groups');
+            throw new Error('Failed to fetch approval groups');
+        }
 
         const groupsData = await groupsResponse.json();
+        console.log('📋 Total approval groups in PCO:', A(groupsData.data).length);
+        
         const myGroupIds = new Set();
         const myGroupNames = {};
         const resourceToGroupMap = {};
@@ -98,7 +106,7 @@ Deno.serve(async (req) => {
                 if (isMember) {
                     myGroupIds.add(group.id);
                     myGroupNames[group.id] = group.attributes?.name;
-                    console.log('✅ Member of group:', group.attributes?.name);
+                    console.log('✅ Member of group:', group.attributes?.name, '(ID:', group.id, ')');
                 }
             }
             
@@ -110,6 +118,9 @@ Deno.serve(async (req) => {
 
             if (resourcesResponse.ok) {
                 const resourcesData = await resourcesResponse.json();
+                const resourceCount = A(resourcesData.data).length;
+                console.log(`  📦 Group "${group.attributes?.name}" has ${resourceCount} resources`);
+                
                 for (const resource of A(resourcesData.data)) {
                     resourceToGroupMap[resource.id] = {
                         groupId: group.id,
@@ -119,14 +130,10 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log('📋 I am in', myGroupIds.size, 'approval groups');
+        console.log('📋 I am in', myGroupIds.size, 'approval groups:', Array.from(myGroupIds));
+        console.log('📦 Total resources mapped:', Object.keys(resourceToGroupMap).length);
 
-        // Get APPROVED requests (status=A) from the last 60 days and next 365 days
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 60);
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 365);
-
+        // Get APPROVED requests (status=A)
         let allRequests = [];
         let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=A&per_page=100&include=event,resource`;
         
@@ -134,18 +141,23 @@ Deno.serve(async (req) => {
         const resourceMap = {};
         
         let pageCount = 0;
-        while (nextUrl && pageCount < 10) {
+        console.log('📥 Fetching approved requests...');
+        
+        while (nextUrl && pageCount < 20) {
             const requestsResponse = await fetch(nextUrl, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
 
             if (!requestsResponse.ok) {
-                console.error('Failed to fetch page', pageCount);
+                console.error('❌ Failed to fetch page', pageCount);
                 break;
             }
 
             const requestsData = await requestsResponse.json();
-            allRequests = allRequests.concat(A(requestsData.data));
+            const pageRequests = A(requestsData.data);
+            console.log(`  📄 Page ${pageCount + 1}: ${pageRequests.length} approved requests`);
+            
+            allRequests = allRequests.concat(pageRequests);
             
             // Build maps from included data
             if (requestsData.included) {
@@ -162,24 +174,37 @@ Deno.serve(async (req) => {
             pageCount++;
         }
 
-        console.log('📥 Fetched', allRequests.length, 'approved requests');
+        console.log('📥 Total approved requests fetched:', allRequests.length);
+        console.log('📦 Events in cache:', Object.keys(eventMap).length);
+        console.log('📦 Resources in cache:', Object.keys(resourceMap).length);
 
-        // Filter to my groups and get event instances
-        const myApprovedRequests = [];
-        
-        for (const request of allRequests) {
+        // Filter to my groups
+        const myGroupRequests = allRequests.filter(request => {
             const resourceId = request.relationships?.resource?.data?.id;
             const groupInfo = resourceToGroupMap[resourceId];
-            
-            if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) continue;
-            
+            return groupInfo && myGroupIds.has(groupInfo.groupId);
+        });
+
+        console.log('✅ Approved requests in my groups:', myGroupRequests.length);
+
+        // Build final list with event instances
+        const myApprovedRequests = [];
+        const now = new Date();
+        const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        
+        console.log('🗓️ Looking for events between:', twoWeeksAgo.toISOString(), 'and', oneYearFromNow.toISOString());
+        
+        for (const request of myGroupRequests) {
+            const resourceId = request.relationships?.resource?.data?.id;
             const eventId = request.relationships?.event?.data?.id;
             const event = eventMap[eventId];
             const resource = resourceMap[resourceId];
+            const groupInfo = resourceToGroupMap[resourceId];
             
-            // Get event instances to find the actual date
+            // Get event instances
             const instancesResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=5`,
+                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?per_page=10&order=starts_at`,
                 { headers: { 'Authorization': `Bearer ${accessToken}` } }
             );
             
@@ -187,32 +212,46 @@ Deno.serve(async (req) => {
                 const instancesData = await instancesResponse.json();
                 const instances = A(instancesData.data);
                 
-                if (instances.length > 0) {
-                    const instance = instances[0]; // Get first future instance
+                // Find instances in our date range
+                for (const instance of instances) {
+                    const startDate = new Date(instance.attributes?.starts_at);
                     
-                    myApprovedRequests.push({
-                        request_id: request.id,
-                        event_id: eventId,
-                        event_name: event?.attributes?.name || 'Unknown Event',
-                        event_starts_at: instance.attributes?.starts_at,
-                        event_ends_at: instance.attributes?.ends_at,
-                        resource_id: resourceId,
-                        resource_name: resource?.attributes?.name || 'Unknown Resource',
-                        approval_group_name: groupInfo.groupName,
-                        quantity: request.attributes?.quantity || 1,
-                        approval_status: 'A'
-                    });
+                    if (startDate >= twoWeeksAgo && startDate <= oneYearFromNow) {
+                        myApprovedRequests.push({
+                            request_id: request.id,
+                            event_id: eventId,
+                            event_name: event?.attributes?.name || 'Unknown Event',
+                            event_starts_at: instance.attributes?.starts_at,
+                            event_ends_at: instance.attributes?.ends_at,
+                            resource_id: resourceId,
+                            resource_name: resource?.attributes?.name || 'Unknown Resource',
+                            approval_group_name: groupInfo.groupName,
+                            quantity: request.attributes?.quantity || 1,
+                            approval_status: 'A'
+                        });
+                    }
                 }
+                
+                console.log(`  📅 Event "${event?.attributes?.name}": ${instances.length} total instances, ${instances.filter(i => {
+                    const d = new Date(i.attributes?.starts_at);
+                    return d >= twoWeeksAgo && d <= oneYearFromNow;
+                }).length} in range`);
             }
         }
 
-        console.log('✅ Found', myApprovedRequests.length, 'approved requests in my groups');
+        console.log('✅ Final approved requests with dates:', myApprovedRequests.length);
 
         return Response.json({
             success: true,
             approved_requests: myApprovedRequests,
             count: myApprovedRequests.length,
-            my_groups_count: myGroupIds.size
+            my_groups_count: myGroupIds.size,
+            debug: {
+                my_groups: Array.from(myGroupIds),
+                total_approved_in_pco: allRequests.length,
+                in_my_groups: myGroupRequests.length,
+                with_future_dates: myApprovedRequests.length
+            }
         });
 
     } catch (error) {
