@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -14,26 +13,25 @@ import {
   ListChecks,
   ClipboardCheck,
   Unlock,
-  Mail, // NEW: Import Mail icon for Email app
-  Ticket, // NEW: Import Ticket icon
-  Building2, // NEW: Import Building2 icon
-  Inbox, // NEW: Import Inbox icon
-  Video // NEW: Import Video icon
+  Mail,
+  Ticket,
+  Building2,
+  Inbox,
+  Video
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const defaultApps = [
-  // Renamed categories and added Email app
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
-  { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals" },
+  { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
-  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" }, // New Email app
-  // NEW: Added 4 placeholder apps with updated paths
+  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" },
   { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
   { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
   { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "InboxHelper" },
@@ -48,30 +46,21 @@ const wallpapers = {
   cross_metal_texture: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/dcac8ecf7_ChatGPTImageOct25202502_35_35AM.png"
 };
 
-const COLS = 8; // Increased from 6 to 8
-const ROWS = 6; // Increased from 4 to 6
+const COLS = 8;
+const ROWS = 6;
 
 const getDefaultPositions = () => {
   return {
-    // Row 0 - Core work apps (left side)
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
     email: { row: 0, col: 2 },
-    
-    // Row 1 - Operational apps (left side)
     marketing: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
-    
-    // Row 2 - Utility apps (left side)
     ticketing: { row: 2, col: 0 },
     mydepartment: { row: 2, col: 1 },
     inboxhelper: { row: 2, col: 2 },
-    
-    // Row 3 - Additional apps (left side)
     mymeetings: { row: 3, col: 0 },
-    
-    // Bottom left - Settings (desktop convention)
     settings: { row: 5, col: 0 }
   };
 };
@@ -82,9 +71,11 @@ export default function Dashboard() {
   const [editMode, setEditMode] = useState(false);
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
+  const [approvalsCount, setApprovalsCount] = useState(0);
 
   useEffect(() => {
     loadUser();
+    loadApprovals();
   }, []);
 
   useEffect(() => {
@@ -106,17 +97,13 @@ export default function Dashboard() {
       
       let layout = currentUser.desktop_layout;
       
-      console.log('Raw layout from DB:', layout);
-      
       const defaultPositions = getDefaultPositions();
       
       if (!layout || Array.isArray(layout) || typeof layout !== 'object') {
-        console.log('❌ Invalid layout detected - using defaults');
         setAppPositions(defaultPositions);
         
         try {
           await base44.auth.updateMe({ desktop_layout: defaultPositions });
-          console.log('✅ Layout repaired in database');
         } catch (error) {
           console.error('Failed to repair layout:', error);
         }
@@ -129,13 +116,11 @@ export default function Dashboard() {
           }
         });
         
-        console.log('✅ Merged layout:', mergedPositions);
         setAppPositions(mergedPositions);
         
         if (Object.keys(mergedPositions).length !== Object.keys(layout).length) {
           try {
             await base44.auth.updateMe({ desktop_layout: mergedPositions });
-            console.log('✅ Updated layout with merged positions');
           } catch (error) {
             console.error('Failed to update layout:', error);
           }
@@ -144,6 +129,15 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error loading user:", error);
       setAppPositions(getDefaultPositions());
+    }
+  };
+
+  const loadApprovals = async () => {
+    try {
+      const response = await base44.functions.invoke('getMyPendingApprovals');
+      setApprovalsCount(response.data?.count || 0);
+    } catch (error) {
+      console.error('Failed to load approvals count:', error);
     }
   };
 
@@ -176,17 +170,12 @@ export default function Dashboard() {
       [draggedApp.id]: { row, col }
     };
     
-    console.log('💾 Saving new positions:', newPositions);
-    console.log('Is object?', typeof newPositions === 'object');
-    console.log('Keys:', Object.keys(newPositions));
-    
     setAppPositions(newPositions);
     setDraggedApp(null);
     
     try {
       await base44.auth.updateMe({ desktop_layout: newPositions });
       toast.success('Icon moved!');
-      console.log('✅ Layout saved successfully');
     } catch (error) {
       console.error("Error saving layout:", error);
       toast.error('Failed to save layout');
@@ -214,13 +203,6 @@ export default function Dashboard() {
   };
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
-
-  console.log('📊 Dashboard rendering:');
-  console.log('  Positions:', appPositions);
-  console.log('  Type:', typeof appPositions);
-  console.log('  Is array?', Array.isArray(appPositions));
-  console.log('  Keys:', Object.keys(appPositions));
-  console.log('  Number of apps:', Object.keys(appPositions).length);
 
   return (
     <div 
@@ -282,23 +264,32 @@ export default function Dashboard() {
                           whileHover={{ scale: 1.05 }}
                           className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm"
                         >
-                          <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                          <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                             <app.icon className="w-8 h-8 text-white" />
+                            {app.showBadge && approvalsCount > 0 && (
+                              <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                {approvalsCount}
+                              </Badge>
+                            )}
                           </div>
                           <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
                             {app.name}
                           </span>
                         </motion.div>
                       ) : (
-                        // Conditional rendering for mailto links vs internal links
                         app.path.startsWith("mailto:") ? (
                           <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
                             <motion.div
                               whileHover={{ scale: 1.05 }}
                               className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
                             >
-                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
+                                {app.showBadge && approvalsCount > 0 && (
+                                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                    {approvalsCount}
+                                  </Badge>
+                                )}
                               </div>
                               <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
                                 {app.name}
@@ -311,8 +302,13 @@ export default function Dashboard() {
                               whileHover={{ scale: 1.05 }}
                               className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
                             >
-                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center`}>
+                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
+                                {app.showBadge && approvalsCount > 0 && (
+                                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                    {approvalsCount}
+                                  </Badge>
+                                )}
                               </div>
                               <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
                                 {app.name}
