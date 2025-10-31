@@ -14,7 +14,8 @@ import {
   Box,
   Eye,
   Key,
-  Save
+  Send,
+  CheckCheck
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +39,7 @@ export default function MyApprovals() {
   const [expandedPreviews, setExpandedPreviews] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [savingCodes, setSavingCodes] = useState({});
+  const [sentCodes, setSentCodes] = useState({}); // Track which codes have been sent
 
   useEffect(() => {
     loadUser();
@@ -116,7 +118,7 @@ export default function MyApprovals() {
     }));
   };
 
-  const handleSaveCodeToPCO = async (approval) => {
+  const handleSendCodeToPCO = async (approval) => {
     const cardholder = selectedCardholders[approval.request_id];
     
     if (!cardholder) {
@@ -135,13 +137,17 @@ export default function MyApprovals() {
       });
 
       if (response.data?.ok) {
-        toast.success('Door code saved to PCO notes!');
+        toast.success('Door code sent to Planning Center!');
+        setSentCodes(prev => ({
+          ...prev,
+          [approval.request_id]: true
+        }));
       } else {
-        toast.error(response.data?.error || 'Failed to save code');
+        toast.error(response.data?.error || 'Failed to send code');
       }
     } catch (error) {
-      console.error('Failed to save code:', error);
-      toast.error('Failed to save door code');
+      console.error('Failed to send code:', error);
+      toast.error('Failed to send door code');
     } finally {
       setSavingCodes(prev => ({ ...prev, [approval.request_id]: false }));
     }
@@ -217,6 +223,7 @@ export default function MyApprovals() {
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
         setSelectedCardholders({});
+        setSentCodes({}); // Reset sent codes on sync
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -352,6 +359,7 @@ export default function MyApprovals() {
                   const isExpanded = expandedPreviews[approval.request_id];
                   const selectedCardholder = selectedCardholders[approval.request_id];
                   const savingCode = savingCodes[approval.request_id];
+                  const codeSent = sentCodes[approval.request_id];
                   
                   return (
                     <motion.div
@@ -451,27 +459,51 @@ export default function MyApprovals() {
                               />
                               
                               {selectedCardholder && (
-                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className={`p-3 rounded-lg border-2 ${
+                                    codeSent 
+                                      ? 'bg-green-50 border-green-300' 
+                                      : 'bg-blue-50 border-blue-200'
+                                  }`}
+                                >
                                   <div className="flex items-center justify-between">
                                     <div>
                                       <p className="font-semibold text-slate-900 text-sm">{selectedCardholder.name}</p>
                                       <p className="text-sm text-slate-600">Door Code: {selectedCardholder.pin}#</p>
                                     </div>
-                                    <Button
-                                      onClick={() => handleSaveCodeToPCO(approval)}
-                                      disabled={savingCode}
-                                      size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700"
-                                    >
-                                      {savingCode ? (
-                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                      ) : (
-                                        <Save className="w-3 h-3 mr-1" />
-                                      )}
-                                      Save to Notes
-                                    </Button>
+                                    {codeSent ? (
+                                      <Button
+                                        disabled
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-600 cursor-default"
+                                      >
+                                        <CheckCheck className="w-4 h-4 mr-1" />
+                                        Sent
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        onClick={() => handleSendCodeToPCO(approval)}
+                                        disabled={savingCode}
+                                        size="sm"
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        {savingCode ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                            Sending...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Send className="w-4 h-4 mr-1" />
+                                            Send to Planning Center
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
                                   </div>
-                                </div>
+                                </motion.div>
                               )}
                             </div>
                           </div>
