@@ -21,6 +21,7 @@ import MyMeetings from './pages/MyMeetings';
 import PCODebug from './pages/PCODebug';
 import index from './pages/index';
 import ImportCardholders from './pages/ImportCardholders';
+import TestCardholders from './pages/TestCardholders';
 import Layout from './Layout.jsx';
 
 
@@ -48,6 +49,7 @@ export const PAGES = {
     "PCODebug": PCODebug,
     "index": index,
     "ImportCardholders": ImportCardholders,
+    "TestCardholders": TestCardholders,
 }
 
 export const pagesConfig = {
