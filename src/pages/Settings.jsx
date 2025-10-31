@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const wallpapers = [
   {
@@ -67,6 +75,12 @@ export default function Settings() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newCardholder, setNewCardholder] = useState({ name: "", pin: "", member_id: "", email: "" });
 
+  // User management states
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [makingMeAdmin, setMakingMeAdmin] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,6 +120,7 @@ export default function Settings() {
   useEffect(() => {
     if (activeTab === 'admin' && user?.role === 'admin') {
       loadCardholders();
+      loadAllUsers();
     }
   }, [activeTab, user]);
 
@@ -135,6 +150,58 @@ export default function Settings() {
       toast.error("Failed to load cardholders");
     } finally {
       setLoadingCardholders(false);
+    }
+  };
+
+  const loadAllUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const data = await base44.entities.User.list('full_name');
+      setAllUsers(data);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast.error("Failed to load users");
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleMakeMeAdmin = async () => {
+    setMakingMeAdmin(true);
+    try {
+      await base44.functions.invoke('setUserRole', {
+        user_id: user.id,
+        role: 'admin'
+      });
+      toast.success("You are now an admin! Refreshing...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error("Error making admin:", error);
+      toast.error("Failed to set admin role");
+      setMakingMeAdmin(false);
+    }
+  };
+
+  const handleChangeUserRole = async (userId, newRole) => {
+    try {
+      await base44.functions.invoke('setUserRole', {
+        user_id: userId,
+        role: newRole
+      });
+      toast.success(`User role updated to ${newRole}`);
+      loadAllUsers();
+      
+      // If we just changed our own role, reload
+      if (userId === user.id) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error changing user role:", error);
+      toast.error("Failed to change user role");
     }
   };
 
@@ -320,6 +387,11 @@ export default function Settings() {
     c.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredUsers = allUsers.filter(u =>
+    u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -343,6 +415,30 @@ export default function Settings() {
             <p className="text-slate-600">Manage your FBCA OS preferences</p>
           </div>
         </div>
+
+        {/* Make Me Admin Button (only show if not admin) */}
+        {user?.role !== 'admin' && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Crown className="w-8 h-8 text-orange-600" />
+                  <div>
+                    <p className="font-semibold text-slate-900">Need Admin Access?</p>
+                    <p className="text-sm text-slate-600">Click here to grant yourself admin privileges</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleMakeMeAdmin} 
+                  disabled={makingMeAdmin}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {makingMeAdmin ? "Granting..." : "Make Me Admin"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6'}`}>
@@ -658,6 +754,80 @@ export default function Settings() {
                 </CardHeader>
               </Card>
 
+              {/* User Management Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    User Management
+                  </CardTitle>
+                  <CardDescription>
+                    Manage user roles and permissions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="max-w-md"
+                  />
+
+                  {loadingUsers ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-600 mb-2">
+                        Showing {filteredUsers.length} of {allUsers.length} users
+                      </p>
+                      {filteredUsers.map((u) => (
+                        <Card key={u.id} className="hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white text-sm font-bold">
+                                    {u.full_name?.[0]?.toUpperCase() || 'U'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{u.full_name}</p>
+                                  <p className="text-sm text-slate-600">{u.email}</p>
+                                  {u.department && (
+                                    <p className="text-xs text-slate-500">{u.department}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={u.role || 'user'}
+                                  onValueChange={(value) => handleChangeUserRole(u.id, value)}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="user">User</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {u.role === 'admin' && (
+                                  <Crown className="w-5 h-5 text-orange-500" />
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Door Code Management Section */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
