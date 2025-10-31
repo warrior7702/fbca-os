@@ -5,18 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, Calendar, Clock, User, CheckCircle, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import { AlertCircle, Calendar, Clock, User, CheckCircle, XCircle, Loader2, Key, Save } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import CardholderLookup from "./CardholderLookup";
 
 export default function ApprovalDetailModal({ approval, open, onClose, onApprovalAction }) {
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedCardholder, setSelectedCardholder] = useState(null);
+  const [savingCode, setSavingCode] = useState(false);
 
   useEffect(() => {
     if (open && approval) {
       loadDetails();
+      setSelectedCardholder(null);
     }
   }, [open, approval]);
 
@@ -46,6 +50,34 @@ export default function ApprovalDetailModal({ approval, open, onClose, onApprova
       setError(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveCodeToPCO = async () => {
+    if (!selectedCardholder) {
+      toast.error('Please select a cardholder first');
+      return;
+    }
+
+    setSavingCode(true);
+    try {
+      const note = `Door Code: ${selectedCardholder.pin}# (${selectedCardholder.name})`;
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: approval.request_id,
+        note: note
+      });
+
+      if (response.data?.ok) {
+        toast.success('Door code saved to PCO notes!');
+      } else {
+        toast.error(response.data?.error || 'Failed to save code');
+      }
+    } catch (error) {
+      console.error('Failed to save code:', error);
+      toast.error('Failed to save door code');
+    } finally {
+      setSavingCode(false);
     }
   };
 
@@ -120,6 +152,47 @@ export default function ApprovalDetailModal({ approval, open, onClose, onApprova
           </Card>
         </div>
 
+        <Separator />
+
+        {/* Door Code Assignment */}
+        <div>
+          <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+            <Key className="w-4 h-4" />
+            Assign Door Code
+          </h3>
+          <Card className="border-2 border-blue-200 bg-blue-50">
+            <CardContent className="pt-4 space-y-3">
+              <CardholderLookup onSelect={setSelectedCardholder} />
+              
+              {selectedCardholder && (
+                <div className="p-3 bg-white rounded-lg border border-blue-300">
+                  <p className="text-sm font-medium text-slate-900 mb-1">Selected:</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">{selectedCardholder.name}</p>
+                      <p className="text-sm text-slate-600">Door Code: {selectedCardholder.pin}#</p>
+                    </div>
+                    <Button
+                      onClick={handleSaveCodeToPCO}
+                      disabled={savingCode}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {savingCode ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save to Notes
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-8">
@@ -150,7 +223,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onApprova
                   const answer = details.answers?.[question.id];
                   
                   return (
-                    <Card key={question.id} className="border-l-4 border-l-blue-500">
+                    <Card key={question.id} className="border-l-4 border-l-purple-500">
                       <CardContent className="pt-4">
                         <p className="font-medium text-slate-900 mb-1">
                           {question.question}
@@ -183,16 +256,6 @@ export default function ApprovalDetailModal({ approval, open, onClose, onApprova
                   </p>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Debug Info - temporarily visible */}
-            {details && (
-              <div className="mt-4 p-3 bg-slate-100 rounded text-xs font-mono">
-                <p className="font-bold mb-2">Debug Info:</p>
-                <p>Questions: {details.questions?.length || 0}</p>
-                <p>Answers: {Object.keys(details.answers || {}).length}</p>
-                <p>Total from API: {details.totals?.questions || 0} questions, {details.totals?.answers || 0} answers</p>
-              </div>
             )}
           </div>
         )}
