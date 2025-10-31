@@ -1,155 +1,169 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
-  Calendar,
-  X
-} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, ExternalLink, Calendar, Package, Users, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 export default function ApprovalDetailModal({ 
   approval, 
-  approvalDetails, 
-  loadingDetails,
-  open, 
+  isOpen, 
   onClose, 
-  onSuccess,
-  onApprove,
-  onDeny,
-  user
+  onComplete 
 }) {
-  const [approving, setApproving] = useState(false);
-  const [denying, setDenying] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
-  const handleApprove = async () => {
-    if (!approval || !onApprove) return;
-    
-    setApproving(true);
+  useEffect(() => {
+    if (isOpen && approval) {
+      loadDetails();
+    }
+  }, [isOpen, approval]);
+
+  const loadDetails = async () => {
+    setLoading(true);
     try {
-      await onApprove(approval);
-      // onApprove handles success and calls onSuccess
+      const response = await base44.functions.invoke('getApprovalDetails', {
+        request_id: approval.request_id,
+        event_id: approval.event_id,
+        resource_id: approval.resource_id
+      });
+
+      console.log('✅ Got approval details:', response.data);
+      setDetails(response.data);
     } catch (error) {
-      console.error('Modal approve error:', error);
+      console.error('Error loading details:', error);
+      toast.error('Failed to load approval details');
     } finally {
-      setApproving(false);
+      setLoading(false);
     }
   };
 
-  const handleDeny = async () => {
-    if (!approval || !onDeny) return;
-    
-    setDenying(true);
-    try {
-      await onDeny();
-      // onDeny handles success
-    } catch (error) {
-      console.error('Modal deny error:', error);
-    } finally {
-      setDenying(false);
+  const openPCOApproval = (eventId) => {
+    const url = `https://calendar.planningcenteronline.com/events/${eventId}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const waitForDecision = async (requestId, onUpdate) => {
+    const started = Date.now();
+    const timeoutMs = 60_000; // 60 seconds
+    const everyMs = 3_000; // 3 seconds
+
+    let last = "P";
+    while (Date.now() - started < timeoutMs) {
+      try {
+        const res = await base44.functions.invoke('getPCORequestStatus', {
+          request_id: requestId
+        });
+
+        const status = res.data?.approval?.approval_status || "P";
+        if (status !== last) {
+          last = status;
+          onUpdate(status);
+        }
+        if (status === "A" || status === "R") return status;
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+      await new Promise(r => setTimeout(r, everyMs));
     }
+    return last;
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
-  // Don't render if no approval
-  if (!approval) {
-    return null;
-  }
+  if (!approval) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" hideClose>
-        {/* Header with custom X button */}
-        <DialogHeader className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-600"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          <DialogTitle className="flex items-center gap-2 text-xl pr-8">
-            <Calendar className="w-5 h-5 text-orange-500" />
-            Request Details
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent 
+        aria-describedby="approval-desc" 
+        className="max-w-3xl max-h-[85vh] overflow-y-auto"
+      >
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+            <Calendar className="w-6 h-6 text-blue-600" />
+            {approval.event_name}
           </DialogTitle>
+          <DialogDescription id="approval-desc" className="text-base">
+            Review resource request details
+          </DialogDescription>
         </DialogHeader>
 
-        {loadingDetails ? (
+        {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Event Info */}
-            <div className="bg-slate-50 rounded-lg p-4">
-              <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+          <div className="space-y-6 py-4">
+            {/* Event Info Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
                 Event Information
               </h3>
-              <div className="space-y-2 text-sm">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <span className="text-slate-500">Event:</span>
-                  <span className="ml-2 font-medium">{approval.event_name}</span>
+                  <p className="text-sm text-slate-500">Date & Time</p>
+                  <p className="font-medium">
+                    {approval.event_starts_at ? format(new Date(approval.event_starts_at), 'PPP p') : 'N/A'}
+                  </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Date:</span>
-                  <span className="ml-2 font-medium">
-                    {approval.event_starts_at 
-                      ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Resource:</span>
-                  <span className="ml-2 font-medium">{approval.resource_name}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Approval Group:</span>
-                  <Badge variant="secondary" className="ml-2">
+                  <p className="text-sm text-slate-500">Approval Group</p>
+                  <Badge className="bg-purple-100 text-purple-700 border-purple-300">
                     {approval.approval_group_name}
                   </Badge>
                 </div>
               </div>
             </div>
 
+            {/* Resource Info Card */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                <Package className="w-5 h-5 text-green-600" />
+                Resource Request
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-slate-500">Resource</p>
+                  <p className="font-medium text-lg">{approval.resource_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Quantity</p>
+                  <p className="font-medium">{approval.quantity || 1}</p>
+                </div>
+              </div>
+            </div>
+
             {/* Questions & Answers */}
-            {approvalDetails?.questions && approvalDetails.questions.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-3">
+            {details?.questions?.length > 0 && (
+              <div className="bg-white rounded-xl p-6 border-2 border-slate-200">
+                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-slate-600" />
                   Request Details
                 </h3>
                 <div className="space-y-4">
-                  {approvalDetails.questions.map((question) => {
-                    const answer = approvalDetails.answers?.[question.id];
+                  {details.questions.map((question) => {
+                    const answer = details.answers?.[question.id];
+                    if (!answer) return null;
+
                     return (
-                      <div key={question.id} className="border-l-2 border-slate-200 pl-4">
-                        <p className="font-medium text-slate-700 text-sm mb-1">
+                      <div key={question.id} className="pb-4 border-b border-slate-100 last:border-0">
+                        <p className="text-sm font-semibold text-slate-700 mb-2">
                           {question.question}
                         </p>
-                        {question.description && (
-                          <p className="text-xs text-slate-500 mb-2 italic">
-                            {question.description}
-                          </p>
-                        )}
-                        <div className="bg-slate-50 rounded px-3 py-2">
-                          <p className="text-sm text-slate-700">
-                            {answer || '(Unanswered)'}
-                          </p>
-                        </div>
+                        <p className="text-slate-900 bg-slate-50 p-3 rounded-lg">
+                          {answer}
+                        </p>
                       </div>
                     );
                   })}
@@ -157,62 +171,63 @@ export default function ApprovalDetailModal({
               </div>
             )}
 
-            {/* Debug Info (collapsible) */}
-            {approvalDetails?.diag && (
-              <details className="text-xs">
-                <summary className="cursor-pointer text-slate-500 hover:text-slate-700">
-                  ▶ Debug Info
-                </summary>
-                <pre className="mt-2 bg-slate-100 p-2 rounded overflow-auto max-h-48">
-                  {JSON.stringify(approvalDetails.diag, null, 2)}
-                </pre>
-              </details>
-            )}
+            <Separator />
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t">
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button onClick={onClose} variant="outline" disabled={processing}>
+                Close
+              </Button>
+
               <Button
+                onClick={() => openPCOApproval(approval.event_id)}
                 variant="outline"
-                onClick={handleClose}
-                className="flex-1"
+                className="border-blue-300 hover:bg-blue-50 gap-2"
               >
-                Return to Approvals
+                <ExternalLink className="w-4 h-4" />
+                Open in Planning Center
               </Button>
+
               <Button
-                variant="destructive"
-                onClick={handleDeny}
-                disabled={denying || approving}
-                className="flex-1"
+                onClick={async () => {
+                  setProcessing(true);
+                  toast.message("⏳ Waiting for decision in Planning Center...");
+                  
+                  const result = await waitForDecision(String(approval.request_id), (status) => {
+                    if (status === "A") {
+                      toast.success("✅ Approved in Planning Center!");
+                    } else if (status === "R") {
+                      toast.error("❌ Rejected in Planning Center");
+                    }
+                  });
+                  
+                  setProcessing(false);
+                  
+                  if (result === "A" || result === "R") {
+                    onComplete?.();
+                    onClose?.();
+                  } else {
+                    toast.info("No decision detected yet. You can keep this open or refresh later.");
+                  }
+                }}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white gap-2"
+                disabled={processing}
               >
-                {denying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Denying...
-                  </>
+                {processing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <>
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Deny
-                  </>
+                  <CheckCircle className="w-4 h-4" />
                 )}
+                Check for Decision
               </Button>
-              <Button
-                onClick={handleApprove}
-                disabled={approving || denying}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                {approving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Approving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve
-                  </>
-                )}
-              </Button>
+            </div>
+
+            {/* Helper text */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-slate-700">
+                <strong>How it works:</strong> Click "Open in Planning Center" to approve/deny this request in PCO. 
+                Then click "Check for Decision" to automatically detect when you've made your choice in PCO.
+              </p>
             </div>
           </div>
         )}
