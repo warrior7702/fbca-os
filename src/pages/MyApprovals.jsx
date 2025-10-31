@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +13,8 @@ import {
   RefreshCw,
   Loader2,
   AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp
-} from "lucide-react";
+  CheckCircle2
+}  from "lucide-react"; // ChevronDown, ChevronUp removed as they are no longer used
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -34,7 +33,8 @@ export default function MyApprovals() {
   const [viewMode, setViewMode] = useState('pending');
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [approvedWithAnswers, setApprovedWithAnswers] = useState({});
-  const [expandedPreviews, setExpandedPreviews] = useState({});
+  // `expandedPreviews` state removed as expand/collapse functionality is removed from card previews
+  // const [expandedPreviews, setExpandedPreviews] = useState({});
 
   useEffect(() => {
     loadUser();
@@ -185,7 +185,7 @@ export default function MyApprovals() {
         toast.success(`Synced ${pendingResponse.data.count} pending approval${pendingResponse.data.count !== 1 ? 's' : ''}`);
         setApprovals(pendingResponse.data.pending_approvals || []);
         setApprovalsWithAnswers({}); 
-        setExpandedPreviews({});
+        // `setExpandedPreviews({})` removed as `expandedPreviews` state is removed
       }
       
       console.log('🔄 Syncing approved requests...');
@@ -211,12 +211,13 @@ export default function MyApprovals() {
     setShowDetailModal(true);
   };
 
-  const toggleExpandPreview = (requestId) => {
-    setExpandedPreviews(prev => ({
-      ...prev,
-      [requestId]: !prev[requestId]
-    }));
-  };
+  // `toggleExpandPreview` function removed as expand/collapse functionality is removed from card previews
+  // const toggleExpandPreview = (requestId) => {
+  //   setExpandedPreviews(prev => ({
+  //     ...prev,
+  //     [requestId]: !prev[requestId]
+  //   }));
+  // };
 
   const openPCOApprovalsPage = () => {
     window.open('https://calendar.planningcenteronline.com/approvals', '_blank', 'noopener,noreferrer');
@@ -362,7 +363,7 @@ export default function MyApprovals() {
                 {approvals.map((approval, idx) => {
                   const answerData = approvalsWithAnswers[approval.request_id];
                   const hasAnswers = answerData && Object.keys(answerData.answers).length > 0;
-                  const isExpanded = expandedPreviews[approval.request_id];
+                  // `isExpanded` is removed
                   
                   return (
                     <motion.div
@@ -373,109 +374,73 @@ export default function MyApprovals() {
                     >
                       <Card className="border-2 border-orange-200 hover:border-orange-400 transition-all hover:shadow-lg">
                         <CardContent className="p-6">
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
-                              <div className="flex items-start gap-3 mb-3">
-                                <h3 className="text-xl font-bold text-slate-900 flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-xl font-bold text-slate-900">
                                   {approval.event_name}
                                 </h3>
                                 <Badge className="bg-orange-100 text-orange-700 border border-orange-300">
-                                  {approval.resource_name}
+                                  Pending
                                 </Badge>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                                <div>
-                                  <p className="text-slate-500 mb-1">Event Date:</p>
-                                  <p className="font-medium text-slate-900">
-                                    {approval.event_starts_at
-                                      ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
-                                      : 'N/A'}
-                                  </p>
+                              <div className="flex items-center gap-4 text-sm text-slate-600 mb-4">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  {approval.event_starts_at
+                                    ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
+                                    : 'N/A'}
                                 </div>
+                              </div>
+
+                              <div className="flex items-start gap-2 text-sm mb-3">
+                                <Package className="w-4 h-4 text-orange-600 mt-0.5" />
                                 <div>
-                                  <p className="text-slate-500 mb-1">Requested:</p>
-                                  <p className="font-medium text-slate-900">
-                                    {approval.pco_created_at
-                                      ? format(new Date(approval.pco_created_at), 'MMM d, yyyy')
-                                      : 'N/A'}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500 mb-1">Resource:</p>
-                                  <p className="font-medium text-slate-900">{approval.resource_name}</p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500 mb-1">Quantity:</p>
-                                  <p className="font-medium text-slate-900">{approval.quantity || 1}</p>
+                                  <span className="font-medium text-slate-700">{approval.resource_name}</span>
+                                  {approval.quantity > 1 && (
+                                    <span className="text-slate-500 ml-2">× {approval.quantity}</span>
+                                  )}
                                 </div>
                               </div>
 
                               {hasAnswers && (
-                                <div className="mb-4">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleExpandPreview(approval.request_id)}
-                                    className="text-orange-600 hover:text-orange-700 p-0 h-auto"
-                                  >
-                                    {isExpanded ? (
-                                      <>
-                                        <ChevronUp className="w-4 h-4 mr-1" />
-                                        Hide Additional Info
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ChevronDown className="w-4 h-4 mr-1" />
-                                        Show Additional Info ({Object.keys(answerData.answers).length} field{Object.keys(answerData.answers).length !== 1 ? 's' : ''})
-                                      </>
-                                    )}
-                                  </Button>
-
-                                  {isExpanded && (
-                                    <motion.div
-                                      initial={{ opacity: 0, height: 0 }}
-                                      animate={{ opacity: 1, height: 'auto' }}
-                                      exit={{ opacity: 0, height: 0 }}
-                                      className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200"
-                                    >
-                                      <div className="space-y-3">
-                                        {answerData.questions.map((question) => {
-                                          const answer = answerData.answers[question.id];
-                                          if (!answer) return null;
-                                          
-                                          return (
-                                            <div key={question.id}>
-                                              <p className="text-sm font-medium text-slate-700 mb-1">
-                                                {question.question}
-                                              </p>
-                                              <p className="text-sm text-slate-900">{answer}</p>
-                                            </div>
-                                          );
-                                        })}
+                                <div className="mt-4 space-y-2">
+                                  {answerData.questions.map((question) => {
+                                    const answer = answerData.answers[question.id];
+                                    if (!answer) return null;
+                                    
+                                    return (
+                                      <div key={question.id} className="flex items-start gap-2 text-sm">
+                                        <CheckCircle2 className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                          <span className="text-slate-600">{question.question}: </span>
+                                          <span className="font-medium text-slate-900">{answer}</span>
+                                        </div>
                                       </div>
-                                    </motion.div>
-                                  )}
+                                    );
+                                  })}
                                 </div>
                               )}
+                            </div>
 
-                              <div className="flex items-center gap-3">
-                                <Button
-                                  onClick={() => handleViewDetails(approval)}
-                                  variant="outline"
-                                  className="border-orange-300 hover:bg-orange-50"
-                                >
-                                  View Details
-                                </Button>
-                                
-                                <Button
-                                  onClick={() => handleApprove(approval)}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
-                                >
-                                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                                  Approve
-                                </Button>
-                              </div>
+                            <div className="flex flex-col gap-2 ml-4">
+                              <Button
+                                onClick={() => handleViewDetails(approval)}
+                                variant="outline"
+                                size="sm"
+                                className="border-orange-300 hover:bg-orange-50"
+                              >
+                                Details
+                              </Button>
+                              
+                              <Button
+                                onClick={() => handleApprove(approval)}
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                Approve
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
@@ -535,7 +500,7 @@ export default function MyApprovals() {
                 {approvedRequests.map((approval, idx) => {
                   const answerData = approvedWithAnswers[approval.request_id];
                   const hasAnswers = answerData && Object.keys(answerData.answers).length > 0;
-                  const isExpanded = expandedPreviews[approval.request_id];
+                  // `isExpanded` is removed
                   
                   return (
                     <motion.div
@@ -548,87 +513,50 @@ export default function MyApprovals() {
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <div className="flex items-start gap-3 mb-3">
-                                <h3 className="text-xl font-bold text-slate-900 flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-xl font-bold text-slate-900">
                                   {approval.event_name}
                                 </h3>
                                 <Badge className="bg-green-100 text-green-700 border border-green-300">
-                                  {approval.resource_name}
+                                  Approved
                                 </Badge>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                                <div>
-                                  <p className="text-slate-500 mb-1">Event Date:</p>
-                                  <p className="font-medium text-slate-900">
-                                    {approval.event_starts_at
-                                      ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
-                                      : 'N/A'}
-                                  </p>
+                              <div className="flex items-center gap-4 text-sm text-slate-600 mb-4">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  {approval.event_starts_at
+                                    ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
+                                    : 'N/A'}
                                 </div>
+                              </div>
+
+                              <div className="flex items-start gap-2 text-sm mb-3">
+                                <Package className="w-4 h-4 text-green-600 mt-0.5" />
                                 <div>
-                                  <p className="text-slate-500 mb-1">Approved:</p>
-                                  <p className="font-medium text-slate-900">
-                                    {approval.pco_updated_at
-                                      ? format(new Date(approval.pco_updated_at), 'MMM d, yyyy')
-                                      : 'N/A'}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500 mb-1">Resource:</p>
-                                  <p className="font-medium text-slate-900">{approval.resource_name}</p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500 mb-1">Quantity:</p>
-                                  <p className="font-medium text-slate-900">{approval.quantity || 1}</p>
+                                  <span className="font-medium text-slate-700">{approval.resource_name}</span>
+                                  {approval.quantity > 1 && (
+                                    <span className="text-slate-500 ml-2">× {approval.quantity}</span>
+                                  )}
                                 </div>
                               </div>
 
                               {hasAnswers && (
-                                <div className="mb-4">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleExpandPreview(approval.request_id)}
-                                    className="text-green-600 hover:text-green-700 p-0 h-auto"
-                                  >
-                                    {isExpanded ? (
-                                      <>
-                                        <ChevronUp className="w-4 h-4 mr-1" />
-                                        Hide Additional Info
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ChevronDown className="w-4 h-4 mr-1" />
-                                        Show Additional Info ({Object.keys(answerData.answers).length} field{Object.keys(answerData.answers).length !== 1 ? 's' : ''})
-                                      </>
-                                    )}
-                                  </Button>
-
-                                  {isExpanded && (
-                                    <motion.div
-                                      initial={{ opacity: 0, height: 0 }}
-                                      animate={{ opacity: 1, height: 'auto' }}
-                                      exit={{ opacity: 0, height: 0 }}
-                                      className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200"
-                                    >
-                                      <div className="space-y-3">
-                                        {answerData.questions.map((question) => {
-                                          const answer = answerData.answers[question.id];
-                                          if (!answer) return null;
-                                          
-                                          return (
-                                            <div key={question.id}>
-                                              <p className="text-sm font-medium text-slate-700 mb-1">
-                                                {question.question}
-                                              </p>
-                                              <p className="text-sm text-slate-900">{answer}</p>
-                                            </div>
-                                          );
-                                        })}
+                                <div className="mt-4 space-y-2">
+                                  {answerData.questions.map((question) => {
+                                    const answer = answerData.answers[question.id];
+                                    if (!answer) return null;
+                                    
+                                    return (
+                                      <div key={question.id} className="flex items-start gap-2 text-sm">
+                                        <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                          <span className="text-slate-600">{question.question}: </span>
+                                          <span className="font-medium text-slate-900">{answer}</span>
+                                        </div>
                                       </div>
-                                    </motion.div>
-                                  )}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
