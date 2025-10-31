@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X } from "lucide-react";
@@ -230,11 +229,10 @@ export default function Settings() {
   };
 
   const handleConnectPCO = () => {
-    // Use Vercel proxy (OS2 app)
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
     const settingsUrl = `${appUrl}/Settings`;
-    const state = user.id; // Base44 user ID
+    const state = user.id;
     
     console.log('🔗 Starting PCO connection...');
     console.log('  - User ID:', state);
@@ -640,7 +638,6 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* NEW: Admin Tab */}
           {user?.role === 'admin' && (
             <TabsContent value="admin" className="space-y-4">
               <Card>
