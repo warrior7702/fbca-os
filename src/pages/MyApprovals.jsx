@@ -13,7 +13,8 @@ import {
   CheckCircle,
   Clock,
   Box,
-  Eye
+  Eye,
+  ExternalLink // Added ExternalLink import
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
@@ -228,6 +229,11 @@ export default function MyApprovals() {
     }
   };
 
+  // New function: openPCOApprovalsPage
+  const openPCOApprovalsPage = () => {
+    window.open('https://calendar.planningcenteronline.com/approvals', '_blank', 'noopener,noreferrer');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -320,118 +326,131 @@ export default function MyApprovals() {
         )}
 
         {viewMode === 'list' && (
-          <div className="grid gap-4">
-            <AnimatePresence>
-              {approvals.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-20"
-                >
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                    All caught up!
-                  </h3>
-                  <p className="text-slate-600">No pending approvals at this time.</p>
-                </motion.div>
-              ) : (
-                approvals.map((approval, index) => {
-                  const answerPreview = approvalsWithAnswers[approval.request_id];
-                  const loadingPreview = loadingAnswers[approval.request_id];
-                  const isExpanded = expandedPreviews[approval.request_id];
-                  
-                  return (
-                    <motion.div
-                      key={approval.request_id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
-                        <CardContent className="p-5">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-slate-900 text-lg">
-                                  {approval.event_name}
-                                </h3>
-                                <Badge variant="outline" className="text-xs">
-                                  {approval.approval_status === 'P' ? 'Pending' : approval.approval_status}
-                                </Badge>
-                              </div>
+          <>
+            {/* Open Planning Center Button */}
+            <div className="mb-6">
+              <Button
+                onClick={openPCOApprovalsPage}
+                className="bg-blue-600 hover:bg-blue-700 gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open Planning Center Approvals
+              </Button>
+            </div>
 
-                              <div className="space-y-1 text-sm text-slate-600 mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>
-                                    {approval.event_starts_at 
-                                      ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
-                                      : 'Date not set'}
-                                  </span>
+            <div className="grid gap-4">
+              <AnimatePresence>
+                {approvals.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-20"
+                  >
+                    <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                      All caught up!
+                    </h3>
+                    <p className="text-slate-600">No pending approvals at this time.</p>
+                  </motion.div>
+                ) : (
+                  approvals.map((approval, index) => {
+                    const answerPreview = approvalsWithAnswers[approval.request_id];
+                    const loadingPreview = loadingAnswers[approval.request_id];
+                    const isExpanded = expandedPreviews[approval.request_id];
+                    
+                    return (
+                      <motion.div
+                        key={approval.request_id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="font-semibold text-slate-900 text-lg">
+                                    {approval.event_name}
+                                  </h3>
+                                  <Badge variant="outline" className="text-xs">
+                                    {approval.approval_status === 'P' ? 'Pending' : approval.approval_status}
+                                  </Badge>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Box className="w-4 h-4" />
-                                  <span>{approval.resource_name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-4 h-4" />
-                                  <span className="text-xs text-slate-500">
-                                    Group: {approval.approval_group_name}
-                                  </span>
-                                </div>
-                              </div>
 
-                              {loadingPreview && (
-                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  <span>Loading details...</span>
-                                </div>
-                              )}
-                              
-                              {answerPreview && answerPreview.length > 0 && (
-                                <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                  <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
-                                  <div className="space-y-1">
-                                    {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
-                                      <div key={idx} className="text-xs">
-                                        <span className="text-slate-600">{qa.question}:</span>
-                                        <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
-                                      </div>
-                                    ))}
-                                    {answerPreview.length > 2 && (
-                                      <button
-                                        onClick={() => toggleExpandPreview(approval.request_id)}
-                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
-                                      >
-                                        {isExpanded 
-                                          ? '- Show less' 
-                                          : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
-                                        }
-                                      </button>
-                                    )}
+                                <div className="space-y-1 text-sm text-slate-600 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4" />
+                                    <span>
+                                      {approval.event_starts_at 
+                                        ? format(new Date(approval.event_starts_at), 'MMM d, yyyy h:mm a')
+                                        : 'Date not set'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Box className="w-4 h-4" />
+                                    <span>{approval.resource_name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    <span className="text-xs text-slate-500">
+                                      Group: {approval.approval_group_name}
+                                    </span>
                                   </div>
                                 </div>
-                              )}
-                            </div>
 
-                            <Button
-                              onClick={() => handleViewDetails(approval)}
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700"
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              Details
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })
-              )}
-            </AnimatePresence>
-          </div>
+                                {loadingPreview && (
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    <span>Loading details...</span>
+                                  </div>
+                                )}
+                                
+                                {answerPreview && answerPreview.length > 0 && (
+                                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                    <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
+                                    <div className="space-y-1">
+                                      {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
+                                        <div key={idx} className="text-xs">
+                                          <span className="text-slate-600">{qa.question}:</span>
+                                          <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
+                                        </div>
+                                      ))}
+                                      {answerPreview.length > 2 && (
+                                        <button
+                                          onClick={() => toggleExpandPreview(approval.request_id)}
+                                          className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
+                                        >
+                                          {isExpanded 
+                                            ? '- Show less' 
+                                            : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
+                                          }
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <Button
+                                onClick={() => handleViewDetails(approval)}
+                                size="sm"
+                                className="bg-orange-600 hover:bg-orange-700"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Details
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </AnimatePresence>
+            </div>
+          </>
         )}
       </div>
 
