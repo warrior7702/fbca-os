@@ -184,18 +184,22 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await base44.functions.invoke('syncMyApprovals');
+      // Sync pending approvals
+      const pendingResponse = await base44.functions.invoke('syncMyApprovals');
       
-      if (response.data.success) {
-        toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
-        setApprovals(response.data.pending_approvals || []);
+      if (pendingResponse.data.success) {
+        toast.success(`Synced ${pendingResponse.data.count} pending approval${pendingResponse.data.count !== 1 ? 's' : ''}`);
+        setApprovals(pendingResponse.data.pending_approvals || []);
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
       }
       
-      // If in calendar view, also refresh approved requests
-      if (viewMode === 'calendar') {
-        await loadApprovedRequests();
+      // Also sync approved requests
+      const approvedResponse = await base44.functions.invoke('syncMyApprovedRequests');
+      
+      if (approvedResponse.data.success) {
+        toast.success(`Synced ${approvedResponse.data.count} approved request${approvedResponse.data.count !== 1 ? 's' : ''}`);
+        setApprovedRequests(approvedResponse.data.approved_requests || []);
       }
     } catch (error) {
       console.error('Sync error:', error);
