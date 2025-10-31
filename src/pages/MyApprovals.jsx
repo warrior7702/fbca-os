@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,6 +122,10 @@ export default function MyApprovals() {
       if (response.data.success) {
         toast.success('Request approved!');
         loadApprovals();
+        // Also refresh approved requests if on calendar view
+        if (viewMode === 'calendar') {
+          loadApprovedRequests();
+        }
       } else {
         toast.error(response.data.error || 'Failed to approve request');
       }
