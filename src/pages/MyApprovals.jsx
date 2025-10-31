@@ -12,7 +12,9 @@ import {
   CheckCircle,
   Clock,
   Box,
-  Eye
+  Eye,
+  Key,
+  Save
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +23,7 @@ import { format } from "date-fns";
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 export default function MyApprovals() {
   const [user, setUser] = useState(null);
@@ -33,9 +36,8 @@ export default function MyApprovals() {
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
   const [expandedPreviews, setExpandedPreviews] = useState({});
-  const [approvalDetails, setApprovalDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [showApprovalForm, setShowApprovalForm] = useState(false);
+  const [selectedCardholders, setSelectedCardholders] = useState({});
+  const [savingCodes, setSavingCodes] = useState({});
 
   useEffect(() => {
     loadUser();
@@ -107,6 +109,44 @@ export default function MyApprovals() {
     }
   };
 
+  const handleCardholderSelect = (requestId, cardholder) => {
+    setSelectedCardholders(prev => ({
+      ...prev,
+      [requestId]: cardholder
+    }));
+  };
+
+  const handleSaveCodeToPCO = async (approval) => {
+    const cardholder = selectedCardholders[approval.request_id];
+    
+    if (!cardholder) {
+      toast.error('Please select a cardholder first');
+      return;
+    }
+
+    setSavingCodes(prev => ({ ...prev, [approval.request_id]: true }));
+    
+    try {
+      const note = `Door Code: ${cardholder.pin}# (${cardholder.name})`;
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: approval.request_id,
+        note: note
+      });
+
+      if (response.data?.ok) {
+        toast.success('Door code saved to PCO notes!');
+      } else {
+        toast.error(response.data?.error || 'Failed to save code');
+      }
+    } catch (error) {
+      console.error('Failed to save code:', error);
+      toast.error('Failed to save door code');
+    } finally {
+      setSavingCodes(prev => ({ ...prev, [approval.request_id]: false }));
+    }
+  };
+
   const handleApprove = async (approval, formData = null) => {
     try {
       console.log('🔍 Attempting to approve:', approval.request_id);
@@ -131,7 +171,6 @@ export default function MyApprovals() {
 
       if (response.data.ok || response.data.success) {
         toast.success('Approved successfully!');
-        setShowApprovalForm(false);
         await handleSync();
       } else {
         console.error('❌ Approval failed:', response.data);
@@ -144,21 +183,18 @@ export default function MyApprovals() {
     }
   };
 
-  const handleDeny = async () => {
-    if (!selectedApproval) return;
-    
+  const handleDeny = async (approval) => {
     try {
-      console.log('🔍 Attempting to deny:', selectedApproval.request_id);
+      console.log('🔍 Attempting to deny:', approval.request_id);
       
       const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: selectedApproval.request_id,
+        request_id: approval.request_id,
         action: 'deny',
         note: `Denied via FBCA OS by ${user?.full_name || user?.email}`
       });
 
       if (response.data.ok) {
         toast.success('Request denied');
-        setSelectedApproval(null);
         await handleSync();
       } else {
         console.error('❌ Denial failed:', response.data);
@@ -180,6 +216,7 @@ export default function MyApprovals() {
         setApprovals(response.data.pending_approvals || []);
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
+        setSelectedCardholders({});
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -190,31 +227,8 @@ export default function MyApprovals() {
   };
 
   const handleViewDetails = async (approval) => {
-    console.log('🔍 Opening details for approval:', approval);
-    console.log('🔍 Request ID:', approval.request_id);
-    console.log('🔍 Event:', approval.event_name);
-    
     setSelectedApproval(approval);
-    setApprovalDetails(null);
-    setLoadingDetails(true);
     setShowDetailModal(true);
-
-    try {
-      const response = await base44.functions.invoke('getApprovalDetails', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        resource_id: approval.resource_id
-      });
-
-      console.log('✅ Got approval details:', response.data);
-
-      setApprovalDetails(response.data);
-    } catch (error) {
-      console.error('❌ Error loading approval details:', error);
-      toast.error('Failed to load approval details');
-    } finally {
-      setLoadingDetails(false);
-    }
   };
 
   const toggleExpandPreview = (requestId) => {
@@ -227,7 +241,6 @@ export default function MyApprovals() {
   const handleModalClose = () => {
     setShowDetailModal(false);
     setSelectedApproval(null);
-    setApprovalDetails(null);
   };
 
   const handleApprovalSuccess = async () => {
@@ -337,6 +350,8 @@ export default function MyApprovals() {
                   const answerPreview = approvalsWithAnswers[approval.request_id];
                   const loadingPreview = loadingAnswers[approval.request_id];
                   const isExpanded = expandedPreviews[approval.request_id];
+                  const selectedCardholder = selectedCardholders[approval.request_id];
+                  const savingCode = savingCodes[approval.request_id];
                   
                   return (
                     <motion.div
@@ -348,7 +363,7 @@ export default function MyApprovals() {
                     >
                       <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
                         <CardContent className="p-5">
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <h3 className="font-semibold text-slate-900 text-lg">
@@ -422,6 +437,44 @@ export default function MyApprovals() {
                               Details
                             </Button>
                           </div>
+
+                          {/* Door Code Assignment - Under Details Button */}
+                          <div className="mt-4 pt-4 border-t border-slate-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Key className="w-4 h-4 text-blue-600" />
+                              <h4 className="font-semibold text-slate-900 text-sm">Assign Door Code</h4>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <CardholderLookup 
+                                onSelect={(cardholder) => handleCardholderSelect(approval.request_id, cardholder)} 
+                              />
+                              
+                              {selectedCardholder && (
+                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="font-semibold text-slate-900 text-sm">{selectedCardholder.name}</p>
+                                      <p className="text-sm text-slate-600">Door Code: {selectedCardholder.pin}#</p>
+                                    </div>
+                                    <Button
+                                      onClick={() => handleSaveCodeToPCO(approval)}
+                                      disabled={savingCode}
+                                      size="sm"
+                                      className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                      {savingCode ? (
+                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <Save className="w-3 h-3 mr-1" />
+                                      )}
+                                      Save to Notes
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </motion.div>
@@ -435,14 +488,9 @@ export default function MyApprovals() {
 
       <ApprovalDetailModal
         approval={selectedApproval}
-        approvalDetails={approvalDetails}
-        loadingDetails={loadingDetails}
         open={showDetailModal}
         onClose={handleModalClose}
-        onSuccess={handleApprovalSuccess}
-        onApprove={handleApprove}
-        onDeny={handleDeny}
-        user={user}
+        onApprovalAction={handleApprove}
       />
     </div>
   );
