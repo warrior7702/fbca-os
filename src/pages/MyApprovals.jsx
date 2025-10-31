@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,9 +34,7 @@ export default function MyApprovals() {
   const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
   const [loadingAnswers, setLoadingAnswers] = useState({});
   const [expandedPreviews, setExpandedPreviews] = useState({});
-  const [approvalDetails, setApprovalDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [showApprovalForm, setShowApprovalForm] = useState(false);
+  // approvalDetails, loadingDetails, and showApprovalForm states are removed as per new modal design
 
   useEffect(() => {
     loadUser();
@@ -131,7 +130,7 @@ export default function MyApprovals() {
 
       if (response.data.ok || response.data.success) {
         toast.success('Approved successfully!');
-        setShowApprovalForm(false);
+        // setShowApprovalForm(false); // This state has been removed
         await handleSync();
       } else {
         console.error('❌ Approval failed:', response.data);
@@ -189,32 +188,10 @@ export default function MyApprovals() {
     }
   };
 
-  const handleViewDetails = async (approval) => {
-    console.log('🔍 Opening details for approval:', approval);
-    console.log('🔍 Request ID:', approval.request_id);
-    console.log('🔍 Event:', approval.event_name);
-    
+  const handleViewDetails = (approval) => {
+    console.log('👁️ Opening details for:', approval);
     setSelectedApproval(approval);
-    setApprovalDetails(null);
-    setLoadingDetails(true);
     setShowDetailModal(true);
-
-    try {
-      const response = await base44.functions.invoke('getApprovalDetails', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        resource_id: approval.resource_id
-      });
-
-      console.log('✅ Got approval details:', response.data);
-
-      setApprovalDetails(response.data);
-    } catch (error) {
-      console.error('❌ Error loading approval details:', error);
-      toast.error('Failed to load approval details');
-    } finally {
-      setLoadingDetails(false);
-    }
   };
 
   const toggleExpandPreview = (requestId) => {
@@ -224,16 +201,7 @@ export default function MyApprovals() {
     }));
   };
 
-  const handleModalClose = () => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-    setApprovalDetails(null);
-  };
-
-  const handleApprovalSuccess = async () => {
-    await loadApprovals();
-    handleModalClose(); 
-  };
+  // handleModalClose and handleApprovalSuccess are removed as their logic is now inline with the modal props.
 
   if (loading) {
     return (
@@ -247,7 +215,7 @@ export default function MyApprovals() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-orange-50 to-red-50 p-6 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-orange-50 to-amber-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
         
         <div className="flex items-center justify-between mb-6">
@@ -433,17 +401,23 @@ export default function MyApprovals() {
         )}
       </div>
 
-      <ApprovalDetailModal
-        approval={selectedApproval}
-        approvalDetails={approvalDetails}
-        loadingDetails={loadingDetails}
-        open={showDetailModal}
-        onClose={handleModalClose}
-        onSuccess={handleApprovalSuccess}
-        onApprove={handleApprove}
-        onDeny={handleDeny}
-        user={user}
-      />
+      <AnimatePresence>
+        {showDetailModal && selectedApproval && (
+          <ApprovalDetailModal
+            approval={selectedApproval}
+            isOpen={showDetailModal}
+            onClose={() => {
+              setShowDetailModal(false);
+              setSelectedApproval(null);
+            }}
+            onComplete={() => {
+              loadApprovals(); // Reload approvals after completion (approve/deny)
+              setShowDetailModal(false); // Also close the modal
+              setSelectedApproval(null); // Clear selected approval
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
