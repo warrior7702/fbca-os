@@ -192,6 +192,11 @@ export default function MyApprovals() {
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
       }
+      
+      // If in calendar view, also refresh approved requests
+      if (viewMode === 'calendar') {
+        await loadApprovedRequests();
+      }
     } catch (error) {
       console.error('Sync error:', error);
       toast.error('Failed to sync approvals');
@@ -219,10 +224,13 @@ export default function MyApprovals() {
   const loadApprovedRequests = async () => {
     setLoadingApproved(true);
     try {
+      console.log('🔄 Loading approved requests...');
       const response = await base44.functions.invoke('getMyApprovedRequests');
+      console.log('✅ Approved requests response:', response.data);
       setApprovedRequests(response.data.approved_requests || []);
+      toast.success(`Loaded ${response.data.count} approved request${response.data.count !== 1 ? 's' : ''}`);
     } catch (error) {
-      console.error('Error loading approved requests:', error);
+      console.error('❌ Error loading approved requests:', error);
       toast.error('Failed to load approved requests');
     } finally {
       setLoadingApproved(false);
@@ -316,6 +324,7 @@ export default function MyApprovals() {
           loadingApproved ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+              <p className="text-slate-600 ml-3">Loading approved requests...</p>
             </div>
           ) : (
             <ApprovalCalendar 
