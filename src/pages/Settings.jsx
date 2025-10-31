@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,13 @@ import { Calendar, CheckSquare, Briefcase } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const wallpapers = [
   {
@@ -53,6 +60,14 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
+  // Admin section states
+  const [cardholders, setCardholders] = useState([]);
+  const [loadingCardholders, setLoadingCardholders] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingCardholder, setEditingCardholder] = useState(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newCardholder, setNewCardholder] = useState({ name: "", pin: "", member_id: "", email: "" });
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,6 +104,12 @@ export default function Settings() {
     }
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'admin' && user?.role === 'admin') {
+      loadCardholders();
+    }
+  }, [activeTab, user]);
+
   const loadUser = async () => {
     try {
       const currentUser = await base44.auth.me();
@@ -102,6 +123,19 @@ export default function Settings() {
       toast.error("Failed to load settings");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCardholders = async () => {
+    setLoadingCardholders(true);
+    try {
+      const data = await base44.entities.Cardholder.list('name');
+      setCardholders(data);
+    } catch (error) {
+      console.error("Error loading cardholders:", error);
+      toast.error("Failed to load cardholders");
+    } finally {
+      setLoadingCardholders(false);
     }
   };
 
@@ -130,6 +164,68 @@ export default function Settings() {
     } catch (error) {
       console.error("Error updating wallpaper:", error);
       toast.error("Failed to update wallpaper");
+    }
+  };
+
+  const handleEditCardholder = async (cardholder) => {
+    if (cardholder.pin.length !== 6 || !/^\d{6}$/.test(cardholder.pin)) {
+      toast.error("PIN must be 6 digits");
+      return;
+    }
+    try {
+      await base44.entities.Cardholder.update(cardholder.id, {
+        name: cardholder.name,
+        pin: cardholder.pin,
+        member_id: cardholder.member_id || null,
+        email: cardholder.email || null
+      });
+      toast.success("Cardholder updated!");
+      setEditingCardholder(null);
+      loadCardholders();
+    } catch (error) {
+      console.error("Error updating cardholder:", error);
+      toast.error("Failed to update cardholder");
+    }
+  };
+
+  const handleAddCardholder = async () => {
+    if (!newCardholder.name || !newCardholder.pin) {
+      toast.error("Name and PIN are required");
+      return;
+    }
+
+    if (newCardholder.pin.length !== 6 || !/^\d{6}$/.test(newCardholder.pin)) {
+      toast.error("PIN must be 6 digits");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...newCardholder,
+        member_id: newCardholder.member_id || null,
+        email: newCardholder.email || null,
+      };
+      await base44.entities.Cardholder.create(payload);
+      toast.success("Cardholder added!");
+      setShowAddDialog(false);
+      setNewCardholder({ name: "", pin: "", member_id: "", email: "" });
+      loadCardholders();
+    } catch (error) {
+      console.error("Error adding cardholder:", error);
+      toast.error("Failed to add cardholder");
+    }
+  };
+
+  const handleDeleteCardholder = async (id) => {
+    if (!confirm("Are you sure you want to delete this cardholder?")) return;
+    
+    try {
+      await base44.entities.Cardholder.delete(id);
+      toast.success("Cardholder deleted");
+      loadCardholders();
+    } catch (error) {
+      console.error("Error deleting cardholder:", error);
+      toast.error("Failed to delete cardholder");
     }
   };
 
@@ -220,6 +316,12 @@ export default function Settings() {
     navigate(createPageUrl('Dashboard') + '?edit=true'); 
   };
 
+  const filteredCardholders = cardholders.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.pin.includes(searchQuery) ||
+    c.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -245,13 +347,19 @@ export default function Settings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6'}`}>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="brand">Brand</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
+            {user?.role === 'admin' && (
+              <TabsTrigger value="admin">
+                <Shield className="w-4 h-4 mr-1" />
+                Admin
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="profile" className="space-y-4">
@@ -531,8 +639,227 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* NEW: Admin Tab */}
+          {user?.role === 'admin' && (
+            <TabsContent value="admin" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-orange-600" />
+                        Admin Tools
+                      </CardTitle>
+                      <CardDescription>Manage system data and configurations</CardDescription>
+                    </div>
+                    <Button onClick={() => navigate(createPageUrl('TestCardholders'))} variant="outline">
+                      <Database className="w-4 h-4 mr-2" />
+                      Database Test Page
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Door Code Management</CardTitle>
+                      <CardDescription>
+                        Manage cardholders and door codes for building access approvals
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={() => navigate(createPageUrl('ImportCardholders'))} variant="outline">
+                        <Database className="w-4 h-4 mr-2" />
+                        Import Data
+                      </Button>
+                      <Button onClick={() => setShowAddDialog(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Cardholder
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Search by name, PIN, or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="max-w-md"
+                  />
+
+                  {loadingCardholders ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-600 mb-2">
+                        Showing {filteredCardholders.length} of {cardholders.length} cardholders
+                      </p>
+                      {filteredCardholders.slice(0, 50).map((cardholder) => (
+                        <Card key={cardholder.id} className="hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            {editingCardholder?.id === cardholder.id ? (
+                              <div className="space-y-3">
+                                <div className="grid md:grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs">Name</Label>
+                                    <Input
+                                      value={editingCardholder.name}
+                                      onChange={(e) => setEditingCardholder({...editingCardholder, name: e.target.value})}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">PIN (6 digits)</Label>
+                                    <Input
+                                      value={editingCardholder.pin}
+                                      onChange={(e) => setEditingCardholder({...editingCardholder, pin: e.target.value})}
+                                      maxLength={6}
+                                      onKeyPress={(event) => {
+                                        if (!/[0-9]/.test(event.key)) {
+                                          event.preventDefault();
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Member ID</Label>
+                                    <Input
+                                      value={editingCardholder.member_id || ''}
+                                      onChange={(e) => setEditingCardholder({...editingCardholder, member_id: e.target.value})}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Email</Label>
+                                    <Input
+                                      value={editingCardholder.email || ''}
+                                      onChange={(e) => setEditingCardholder({...editingCardholder, email: e.target.value})}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                  <Button size="sm" onClick={() => handleEditCardholder(editingCardholder)}>
+                                    <Save className="w-4 h-4 mr-1" />
+                                    Save
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => setEditingCardholder(null)}>
+                                    <X className="w-4 h-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 grid md:grid-cols-4 gap-4">
+                                  <div>
+                                    <p className="text-xs text-slate-500">Name</p>
+                                    <p className="font-semibold">{cardholder.name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-slate-500">PIN</p>
+                                    <p className="font-mono font-semibold text-blue-600">{cardholder.pin}#</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-slate-500">Member ID</p>
+                                    <p className="text-sm">{cardholder.member_id || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-slate-500">Email</p>
+                                    <p className="text-sm truncate">{cardholder.email || '—'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => setEditingCardholder(cardholder)}>
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleDeleteCardholder(cardholder.id)}>
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {filteredCardholders.length > 50 && (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Showing first 50 results. Use search to narrow down.
+                        </p>
+                      )}
+                      {filteredCardholders.length === 0 && !loadingCardholders && (
+                        <p className="text-sm text-slate-500 text-center py-4">No cardholders found.</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
+
+      {/* Add Cardholder Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Cardholder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Name *</Label>
+              <Input
+                value={newCardholder.name}
+                onChange={(e) => setNewCardholder({...newCardholder, name: e.target.value})}
+                placeholder="Full name"
+              />
+            </div>
+            <div>
+              <Label>PIN Code * (6 digits)</Label>
+              <Input
+                value={newCardholder.pin}
+                onChange={(e) => setNewCardholder({...newCardholder, pin: e.target.value})}
+                placeholder="123456"
+                maxLength={6}
+                onKeyPress={(event) => {
+                  if (!/[0-9]/.test(event.key)) {
+                    event.preventDefault();
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Label>Member ID</Label>
+              <Input
+                value={newCardholder.member_id}
+                onChange={(e) => setNewCardholder({...newCardholder, member_id: e.target.value})}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input
+                value={newCardholder.email}
+                onChange={(e) => setNewCardholder({...newCardholder, email: e.target.value})}
+                placeholder="Optional"
+                type="email"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddCardholder}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Cardholder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
