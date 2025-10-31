@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, CheckCircle, AlertCircle, Loader2, Download, FileText } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Loader2, Download, FileText, Database } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ImportCardholders() {
@@ -11,6 +11,21 @@ export default function ImportCardholders() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [currentCount, setCurrentCount] = useState(null);
+
+  // Load current count on mount
+  React.useEffect(() => {
+    loadCurrentCount();
+  }, []);
+
+  const loadCurrentCount = async () => {
+    try {
+      const cardholders = await base44.entities.Cardholder.list();
+      setCurrentCount(cardholders.length);
+    } catch (error) {
+      console.error('Failed to load count:', error);
+    }
+  };
 
   const parseCSV = (text) => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -109,24 +124,32 @@ export default function ImportCardholders() {
 
       // Show preview
       setPreview(cardholders.slice(0, 3));
+      toast.info(`Found ${cardholders.length} cardholders. Importing...`);
 
       // Call the import function
+      console.log('🔄 Calling importCardholders function...');
       const response = await base44.functions.invoke('importCardholders', { 
         cardholders 
       });
 
-      console.log('🔄 Import response:', response.data);
+      console.log('✅ Import response:', response.data);
 
       if (response.data.ok) {
         setResult(response.data);
-        toast.success(`Successfully imported ${response.data.imported} cardholders!`);
+        await loadCurrentCount(); // Refresh count
+        toast.success(`Successfully imported ${response.data.imported} cardholders!`, {
+          duration: 5000
+        });
       } else {
         throw new Error(response.data.error || 'Import failed');
       }
     } catch (err) {
       console.error('❌ Import error:', err);
+      console.error('❌ Error details:', err.response?.data);
       setError(err.message);
-      toast.error('Import failed: ' + err.message);
+      toast.error('Import failed: ' + err.message, {
+        duration: 8000
+      });
     } finally {
       setImporting(false);
     }
@@ -153,14 +176,27 @@ Bob Wilson,111222,M003,bob@example.com`;
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6 overflow-auto">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
-            <Upload className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
+              <Upload className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Import Cardholders</h1>
+              <p className="text-slate-600">Upload your cardholders database for door code lookup</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Import Cardholders</h1>
-            <p className="text-slate-600">Upload your cardholders database for door code lookup</p>
-          </div>
+          
+          {/* Current Count Badge */}
+          {currentCount !== null && (
+            <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border border-slate-200 px-4 py-2">
+              <Database className="w-4 h-4 text-blue-600" />
+              <div className="text-sm">
+                <span className="text-slate-600">In Database:</span>
+                <span className="ml-1 font-semibold text-slate-900">{currentCount}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Instructions */}
