@@ -20,6 +20,7 @@ import InboxHelper from './pages/InboxHelper';
 import MyMeetings from './pages/MyMeetings';
 import PCODebug from './pages/PCODebug';
 import index from './pages/index';
+import ImportCardholders from './pages/ImportCardholders';
 import Layout from './Layout.jsx';
 
 
@@ -46,6 +47,7 @@ export const PAGES = {
     "MyMeetings": MyMeetings,
     "PCODebug": PCODebug,
     "index": index,
+    "ImportCardholders": ImportCardholders,
 }
 
 export const pagesConfig = {
