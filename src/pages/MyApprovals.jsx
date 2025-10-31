@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,7 +121,6 @@ export default function MyApprovals() {
       if (response.data.success) {
         toast.success('Request approved!');
         loadApprovals();
-        // Also refresh approved requests if on calendar view
         if (viewMode === 'calendar') {
           loadApprovedRequests();
         }
@@ -159,7 +157,10 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
+      console.log('🔄 Starting sync...');
+      
       const pendingResponse = await base44.functions.invoke('syncMyApprovals');
+      console.log('📥 Pending response:', pendingResponse.data);
       
       if (pendingResponse.data.success) {
         toast.success(`Synced ${pendingResponse.data.count} pending approval${pendingResponse.data.count !== 1 ? 's' : ''}`);
@@ -168,11 +169,14 @@ export default function MyApprovals() {
         setExpandedPreviews({});
       }
       
+      console.log('🔄 Syncing approved requests...');
       const approvedResponse = await base44.functions.invoke('syncMyApprovedRequests');
+      console.log('📥 Approved response:', approvedResponse.data);
       
       if (approvedResponse.data.success) {
         toast.success(`Synced ${approvedResponse.data.count} approved request${approvedResponse.data.count !== 1 ? 's' : ''}`);
         setApprovedRequests(approvedResponse.data.approved_requests || []);
+        console.log('✅ Approved requests loaded:', approvedResponse.data.approved_requests?.length);
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -202,11 +206,17 @@ export default function MyApprovals() {
   const loadApprovedRequests = async () => {
     setLoadingApproved(true);
     try {
-      console.log('🔄 Loading approved requests...');
+      console.log('🔄 Loading approved requests from database...');
       const response = await base44.functions.invoke('getMyApprovedRequests');
       console.log('✅ Approved requests response:', response.data);
+      console.log('📊 Count:', response.data.count);
+      console.log('📊 Requests:', response.data.approved_requests);
       setApprovedRequests(response.data.approved_requests || []);
-      toast.success(`Loaded ${response.data.count} approved request${response.data.count !== 1 ? 's' : ''}`);
+      if (response.data.count > 0) {
+        toast.success(`Loaded ${response.data.count} approved request${response.data.count !== 1 ? 's' : ''}`);
+      } else {
+        toast.info('No approved requests found. Try syncing first!');
+      }
     } catch (error) {
       console.error('❌ Error loading approved requests:', error);
       toast.error('Failed to load approved requests');
@@ -289,6 +299,11 @@ export default function MyApprovals() {
           >
             <Calendar className="w-4 h-4 mr-2" />
             Approved
+            {approvedRequests.length > 0 && (
+              <Badge className="ml-2 bg-white text-orange-600">
+                {approvedRequests.length}
+              </Badge>
+            )}
           </Button>
         </div>
 
@@ -304,6 +319,28 @@ export default function MyApprovals() {
               <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
               <p className="text-slate-600 ml-3">Loading approved requests...</p>
             </div>
+          ) : approvedRequests.length === 0 ? (
+            <Card className="border-2 border-dashed border-slate-300">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Calendar className="w-16 h-16 text-slate-400 mb-4" />
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">No approved requests yet</h3>
+                <p className="text-slate-600 text-center mb-4">
+                  Click "Sync from PCO" to load your approved requests
+                </p>
+                <Button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {syncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Sync Now
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
             <ApprovalCalendar 
               approvals={approvedRequests} 
