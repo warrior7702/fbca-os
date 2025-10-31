@@ -6,78 +6,51 @@ const A = (x) => Array.isArray(x) ? x : [];
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function refreshTokenIfNeeded(base44, user) {
-    try {
-        const expiresAt = new Date(user.pco_token_expires_at);
-        const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
 
-        if (expiresAt > fiveMinutesFromNow) {
-            console.log('✅ PCO token still valid');
-            return user.pco_access_token;
-        }
-
-        console.log('🔄 Refreshing PCO token...');
-        const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: user.pco_refresh_token,
-                client_id: Deno.env.get('PCO_CLIENT_ID'),
-                client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-            })
-        });
-
-        if (!tokenResponse.ok) {
-            const errorText = await tokenResponse.text();
-            console.error('❌ Token refresh failed:', errorText);
-            throw new Error(`Token refresh failed: ${tokenResponse.status}`);
-        }
-
-        const tokens = await tokenResponse.json();
-        const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-        await base44.asServiceRole.entities.User.update(user.id, {
-            pco_access_token: tokens.access_token,
-            pco_refresh_token: tokens.refresh_token,
-            pco_token_expires_at: newExpiresAt
-        });
-
-        console.log('✅ PCO token refreshed');
-        return tokens.access_token;
-    } catch (error) {
-        console.error('❌ Error in refreshTokenIfNeeded:', error);
-        throw error;
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
     }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
 }
 
 Deno.serve(async (req) => {
     try {
-        console.log('🔄 Starting syncMyApprovals...');
-        
         const base44 = createClientFromRequest(req);
         const currentUser = await base44.auth.me();
 
         if (!currentUser) {
-            console.error('❌ No authenticated user');
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
-        console.log('👤 User:', currentUser.email);
 
         const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
         const user = A(users)[0];
 
-        if (!user) {
-            console.error('❌ User not found in database');
-            return Response.json({ 
-                error: 'User not found',
-                pending_approvals: [],
-                count: 0
-            }, { status: 400 });
-        }
-
-        if (!user.pco_access_token) {
-            console.error('❌ PCO not connected');
+        if (!user || !user.pco_access_token) {
             return Response.json({ 
                 error: 'PCO not connected',
                 pending_approvals: [],
@@ -85,19 +58,16 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        console.log('🔑 Getting PCO token...');
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        console.log('👤 Getting PCO person ID...');
+        console.log('🔄 Starting sync for:', currentUser.email);
+
+        // Get my PCO person ID
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (!meResponse.ok) {
-            const errorText = await meResponse.text();
-            console.error('❌ Failed to get PCO user:', errorText);
-            throw new Error(`Failed to get PCO user: ${meResponse.status}`);
-        }
+        if (!meResponse.ok) throw new Error('Failed to get PCO user');
         
         const meData = await meResponse.json();
         const myPcoPersonId = meData.data?.id;
@@ -105,27 +75,20 @@ Deno.serve(async (req) => {
         console.log('👤 My PCO Person ID:', myPcoPersonId);
 
         // Get approval groups I'm in
-        console.log('📋 Fetching approval groups...');
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
-        if (!groupsResponse.ok) {
-            const errorText = await groupsResponse.text();
-            console.error('❌ Failed to fetch approval groups:', errorText);
-            throw new Error(`Failed to fetch approval groups: ${groupsResponse.status}`);
-        }
+        if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
 
         const groupsData = await groupsResponse.json();
         const myGroupIds = new Set();
         const myGroupNames = {};
         const resourceToGroupMap = {};
         
-        console.log('📋 Total approval groups:', A(groupsData.data).length);
-        
         for (const group of A(groupsData.data)) {
-            await delay(100);
+            await delay(100); // Small delay between calls
             
             // Check if I'm in this group
             const membersResponse = await fetch(
@@ -144,7 +107,7 @@ Deno.serve(async (req) => {
                 }
             }
 
-            await delay(100);
+            await delay(100); // Small delay
             
             // Map resources to groups
             const resourcesResponse = await fetch(
@@ -173,17 +136,15 @@ Deno.serve(async (req) => {
         const resourceMap = {};
         
         let pageCount = 0;
-        console.log('📥 Fetching pending requests...');
-        
-        while (nextUrl && pageCount < 10) {
-            await delay(200);
+        while (nextUrl && pageCount < 10) { // Limit to 10 pages = 1000 requests
+            await delay(200); // Delay between pagination calls
             
             const requestsResponse = await fetch(nextUrl, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
 
             if (!requestsResponse.ok) {
-                console.error('❌ Failed to fetch page', pageCount);
+                console.error('Failed to fetch page', pageCount, '- stopping pagination');
                 break;
             }
 
@@ -214,16 +175,20 @@ Deno.serve(async (req) => {
             return groupInfo && myGroupIds.has(groupInfo.groupId) && request.attributes?.approval_status === 'P';
         });
 
-        console.log('📋 Found', myGroupRequests.length, 'pending requests in my groups');
+        console.log('📋 Found', myGroupRequests.length, 'pending requests in my groups (before date filtering)');
 
-        // Get all future event instances
-        console.log('🗓️ Fetching future event instances...');
+        // Get all future event instances in ONE call
+        const now = new Date();
+        const startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+        const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+        
+        console.log('🗓️ Fetching future event instances from', startDate.toISOString(), 'to', endDate.toISOString());
         
         const eventInstanceMap = {};
         let instanceNextUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         let instancePageCount = 0;
         
-        while (instanceNextUrl && instancePageCount < 20) {
+        while (instanceNextUrl && instancePageCount < 20) { // Limit to 20 pages = 2000 instances
             await delay(200);
             
             const instancesResponse = await fetch(instanceNextUrl, {
@@ -231,7 +196,7 @@ Deno.serve(async (req) => {
             });
             
             if (!instancesResponse.ok) {
-                console.error('❌ Failed to fetch instance page', instancePageCount);
+                console.error('Failed to fetch instance page', instancePageCount);
                 break;
             }
             
@@ -240,6 +205,7 @@ Deno.serve(async (req) => {
             for (const instance of A(instancesData.data)) {
                 const eventId = instance.relationships?.event?.data?.id;
                 if (eventId && !eventInstanceMap[eventId]) {
+                    // Store the first (earliest) future instance for each event
                     eventInstanceMap[eventId] = {
                         starts_at: instance.attributes?.starts_at,
                         ends_at: instance.attributes?.ends_at
@@ -253,7 +219,7 @@ Deno.serve(async (req) => {
         
         console.log('✅ Cached', Object.keys(eventInstanceMap).length, 'future event instances');
 
-        // Now build final approvals list
+        // Now build final approvals list using cached data
         const myApprovals = [];
         
         for (const request of myGroupRequests) {
@@ -263,6 +229,7 @@ Deno.serve(async (req) => {
             const resource = resourceMap[resourceId];
             const groupInfo = resourceToGroupMap[resourceId];
             
+            // Check if this event has a future instance (using cached data)
             const eventInstance = eventInstanceMap[eventId];
             
             if (!eventInstance) {
@@ -294,10 +261,9 @@ Deno.serve(async (req) => {
             return dateA - dateB;
         });
 
-        console.log('✅ Found', myApprovals.length, 'future pending approvals');
+        console.log('✅ Found', myApprovals.length, 'future pending approvals for my groups');
 
         // Clear and recreate
-        console.log('🗑️ Clearing existing approvals...');
         const existingApprovals = await base44.asServiceRole.entities.PendingApproval.filter({
             user_email: currentUser.email
         }).catch(() => []);
@@ -308,7 +274,7 @@ Deno.serve(async (req) => {
             try {
                 await base44.asServiceRole.entities.PendingApproval.delete(existing.id);
             } catch (error) {
-                console.error('❌ Error deleting approval:', error);
+                console.error('Error deleting approval:', error);
             }
         }
 
@@ -318,7 +284,7 @@ Deno.serve(async (req) => {
             try {
                 await base44.asServiceRole.entities.PendingApproval.create(approval);
             } catch (error) {
-                console.error('❌ Error creating approval:', error);
+                console.error('Error creating approval:', error);
             }
         }
 
@@ -333,7 +299,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('❌ Sync error:', error);
-        console.error('❌ Error stack:', error.stack);
         return Response.json({ 
             error: error.message,
             pending_approvals: [],
