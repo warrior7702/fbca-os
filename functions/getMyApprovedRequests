@@ -1,0 +1,226 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+const A = (x) => Array.isArray(x) ? x : [];
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = A(users)[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ 
+                error: 'PCO not connected',
+                approved_requests: [],
+                count: 0
+            }, { status: 400 });
+        }
+
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
+        console.log('🔄 Fetching approved requests for:', currentUser.email);
+
+        // Get my PCO person ID
+        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!meResponse.ok) throw new Error('Failed to get PCO user');
+        
+        const meData = await meResponse.json();
+        const myPcoPersonId = meData.data?.id;
+
+        console.log('👤 My PCO Person ID:', myPcoPersonId);
+
+        // Get approval groups I'm in
+        const groupsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
+
+        const groupsData = await groupsResponse.json();
+        const myGroupIds = new Set();
+        const myGroupNames = {};
+        const resourceToGroupMap = {};
+        
+        for (const group of A(groupsData.data)) {
+            // Check if I'm in this group
+            const membersResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (membersResponse.ok) {
+                const membersData = await membersResponse.json();
+                const isMember = A(membersData.data).some(person => person.id === myPcoPersonId);
+                
+                if (isMember) {
+                    myGroupIds.add(group.id);
+                    myGroupNames[group.id] = group.attributes?.name;
+                    console.log('✅ Member of group:', group.attributes?.name);
+                }
+            }
+            
+            // Map resources to groups
+            const resourcesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                for (const resource of A(resourcesData.data)) {
+                    resourceToGroupMap[resource.id] = {
+                        groupId: group.id,
+                        groupName: group.attributes?.name
+                    };
+                }
+            }
+        }
+
+        console.log('📋 I am in', myGroupIds.size, 'approval groups');
+
+        // Get APPROVED requests (status=A) from the last 60 days and next 365 days
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 60);
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 365);
+
+        let allRequests = [];
+        let nextUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=A&per_page=100&include=event,resource`;
+        
+        const eventMap = {};
+        const resourceMap = {};
+        
+        let pageCount = 0;
+        while (nextUrl && pageCount < 10) {
+            const requestsResponse = await fetch(nextUrl, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!requestsResponse.ok) {
+                console.error('Failed to fetch page', pageCount);
+                break;
+            }
+
+            const requestsData = await requestsResponse.json();
+            allRequests = allRequests.concat(A(requestsData.data));
+            
+            // Build maps from included data
+            if (requestsData.included) {
+                A(requestsData.included).forEach(item => {
+                    if (item.type === 'Event') {
+                        if (!eventMap[item.id]) eventMap[item.id] = item;
+                    } else if (item.type === 'Resource') {
+                        if (!resourceMap[item.id]) resourceMap[item.id] = item;
+                    }
+                });
+            }
+            
+            nextUrl = requestsData.links?.next || null;
+            pageCount++;
+        }
+
+        console.log('📥 Fetched', allRequests.length, 'approved requests');
+
+        // Filter to my groups and get event instances
+        const myApprovedRequests = [];
+        
+        for (const request of allRequests) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const groupInfo = resourceToGroupMap[resourceId];
+            
+            if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) continue;
+            
+            const eventId = request.relationships?.event?.data?.id;
+            const event = eventMap[eventId];
+            const resource = resourceMap[resourceId];
+            
+            // Get event instances to find the actual date
+            const instancesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=5`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (instancesResponse.ok) {
+                const instancesData = await instancesResponse.json();
+                const instances = A(instancesData.data);
+                
+                if (instances.length > 0) {
+                    const instance = instances[0]; // Get first future instance
+                    
+                    myApprovedRequests.push({
+                        request_id: request.id,
+                        event_id: eventId,
+                        event_name: event?.attributes?.name || 'Unknown Event',
+                        event_starts_at: instance.attributes?.starts_at,
+                        event_ends_at: instance.attributes?.ends_at,
+                        resource_id: resourceId,
+                        resource_name: resource?.attributes?.name || 'Unknown Resource',
+                        approval_group_name: groupInfo.groupName,
+                        quantity: request.attributes?.quantity || 1,
+                        approval_status: 'A'
+                    });
+                }
+            }
+        }
+
+        console.log('✅ Found', myApprovedRequests.length, 'approved requests in my groups');
+
+        return Response.json({
+            success: true,
+            approved_requests: myApprovedRequests,
+            count: myApprovedRequests.length,
+            my_groups_count: myGroupIds.size
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching approved requests:', error);
+        return Response.json({ 
+            error: error.message,
+            approved_requests: [],
+            count: 0
+        }, { status: 500 });
+    }
+});

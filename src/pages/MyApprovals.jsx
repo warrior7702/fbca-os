@@ -36,10 +36,21 @@ export default function MyApprovals() {
   const [expandedPreviews, setExpandedPreviews] = useState({});
   // approvalDetails, loadingDetails, and showApprovalForm states are removed as per new modal design
 
+  // NEW: State for approved requests (for calendar)
+  const [approvedRequests, setApprovedRequests] = useState([]);
+  const [loadingApproved, setLoadingApproved] = useState(false);
+
   useEffect(() => {
     loadUser();
     loadApprovals();
   }, []);
+
+  // NEW: Load approved requests when switching to calendar view
+  useEffect(() => {
+    if (viewMode === 'calendar') {
+      loadApprovedRequests();
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     if (approvals.length > 0) {
@@ -203,6 +214,20 @@ export default function MyApprovals() {
 
   // handleModalClose and handleApprovalSuccess are removed as their logic is now inline with the modal props.
 
+  // NEW: Load approved requests for calendar
+  const loadApprovedRequests = async () => {
+    setLoadingApproved(true);
+    try {
+      const response = await base44.functions.invoke('getMyApprovedRequests');
+      setApprovedRequests(response.data.approved_requests || []);
+    } catch (error) {
+      console.error('Error loading approved requests:', error);
+      toast.error('Failed to load approved requests');
+    } finally {
+      setLoadingApproved(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -226,7 +251,10 @@ export default function MyApprovals() {
             <div>
               <h1 className="text-3xl font-bold text-slate-900">My Approvals</h1>
               <p className="text-slate-600">
-                {approvals.length} pending approval{approvals.length !== 1 ? 's' : ''}
+                {viewMode === 'list' 
+                  ? `${approvals.length} pending approval${approvals.length !== 1 ? 's' : ''}`
+                  : `${approvedRequests.length} approved request${approvedRequests.length !== 1 ? 's' : ''}`
+                }
               </p>
             </div>
           </div>
@@ -239,7 +267,7 @@ export default function MyApprovals() {
                 onClick={() => setViewMode('list')}
                 className={viewMode === 'list' ? 'bg-orange-500 hover:bg-orange-600' : ''}
               >
-                List
+                Pending
               </Button>
               <Button
                 variant={viewMode === 'calendar' ? 'default' : 'ghost'}
@@ -248,7 +276,7 @@ export default function MyApprovals() {
                 className={viewMode === 'calendar' ? 'bg-orange-500 hover:bg-orange-600' : ''}
               >
                 <Calendar className="w-4 h-4 mr-1" />
-                Calendar
+                Approved
               </Button>
             </div>
 
@@ -278,11 +306,17 @@ export default function MyApprovals() {
           </div>
         )}
 
-        {viewMode === 'calendar' && approvals.length > 0 && (
-          <ApprovalCalendar 
-            approvals={approvals} 
-            onApprovalClick={handleViewDetails}
-          />
+        {viewMode === 'calendar' && (
+          loadingApproved ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+            </div>
+          ) : (
+            <ApprovalCalendar 
+              approvals={approvedRequests} 
+              onApprovalClick={handleViewDetails}
+            />
+          )
         )}
 
         {viewMode === 'list' && (
