@@ -11,15 +11,13 @@ Deno.serve(async (req) => {
         console.log('📋 Current user:', me.email, 'ID:', me.id);
         console.log('📋 Current role:', me.role);
         
-        // Force update to admin using service role
+        // Update role using auth.updateMe (for built-in User entity)
         console.log('💾 Updating role to admin...');
-        await base44.asServiceRole.entities.User.update(me.id, { 
-            role: 'admin' 
-        });
+        await base44.auth.updateMe({ role: 'admin' });
         
-        // Verify the update
-        const updated = await base44.asServiceRole.entities.User.filter({ id: me.id });
-        console.log('✅ Updated user:', updated[0]?.role);
+        // Verify the update by fetching user again
+        const updated = await base44.auth.me();
+        console.log('✅ Updated user role:', updated.role);
         
         return Response.json({ 
             success: true,
@@ -27,7 +25,7 @@ Deno.serve(async (req) => {
             user_id: me.id,
             email: me.email,
             old_role: me.role,
-            new_role: updated[0]?.role
+            new_role: updated.role
         });
 
     } catch (error) {
@@ -35,7 +33,8 @@ Deno.serve(async (req) => {
         console.error('❌ Stack:', error.stack);
         return Response.json({ 
             error: error.message,
-            stack: error.stack
+            stack: error.stack,
+            details: 'Failed to update role. Make sure role field exists in User entity.'
         }, { status: 500 });
     }
 });
