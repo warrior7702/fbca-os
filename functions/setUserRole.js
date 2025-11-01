@@ -17,18 +17,25 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'user_id and role required' }, { status: 400 });
         }
 
-        if (!['admin', 'user'].includes(role)) {
-            return Response.json({ error: 'role must be "admin" or "user"' }, { status: 400 });
+        if (!['admin', 'user', 'super_user'].includes(role)) {
+            return Response.json({ error: 'role must be "admin", "user", or "super_user"' }, { status: 400 });
         }
 
         // Allow users to make themselves admin (for initial setup)
-        // OR require caller to be admin to change others
+        // OR require caller to be admin/super_user to change others
         const isSelf = caller.id === user_id;
-        const isAdmin = caller.role === 'admin';
+        const isAdminOrSuper = caller.role === 'admin' || caller.role === 'super_user';
 
-        if (!isSelf && !isAdmin) {
+        if (!isSelf && !isAdminOrSuper) {
             return Response.json({ 
-                error: 'Only admins can change other users roles' 
+                error: 'Only admins and super users can change other users roles' 
+            }, { status: 403 });
+        }
+
+        // Only super users can create other super users
+        if (role === 'super_user' && caller.role !== 'super_user' && !isSelf) {
+            return Response.json({ 
+                error: 'Only super users can grant super user access' 
             }, { status: 403 });
         }
 

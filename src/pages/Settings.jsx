@@ -117,7 +117,7 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'admin' && user?.role === 'admin') {
+    if (activeTab === 'admin' && (user?.role === 'admin' || user?.role === 'super_user')) {
       loadCardholders();
       loadAllUsers();
     }
@@ -406,17 +406,17 @@ export default function Settings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6'}`}>
+          <TabsList className={`grid w-full ${user?.role === 'admin' || user?.role === 'super_user' ? 'grid-cols-7' : 'grid-cols-6'}`}>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="brand">Brand</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'super_user') && (
               <TabsTrigger value="admin">
                 <Shield className="w-4 h-4 mr-1" />
-                Admin
+                {user?.role === 'super_user' ? 'Super Admin' : 'Admin'}
               </TabsTrigger>
             )}
           </TabsList>
@@ -699,17 +699,22 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'super_user') && (
             <TabsContent value="admin" className="space-y-4">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-orange-600" />
-                        Admin Tools
+                        <Shield className={`w-5 h-5 ${user?.role === 'super_user' ? 'text-purple-600' : 'text-orange-600'}`} />
+                        {user?.role === 'super_user' ? 'Super User Tools' : 'Admin Tools'}
                       </CardTitle>
-                      <CardDescription>Manage system data and configurations</CardDescription>
+                      <CardDescription>
+                        {user?.role === 'super_user' 
+                          ? 'Full system access - manage everything'
+                          : 'Manage system data and configurations'
+                        }
+                      </CardDescription>
                     </div>
                     <Button onClick={() => navigate(createPageUrl('TestCardholders'))} variant="outline">
                       <Database className="w-4 h-4 mr-2" />
@@ -771,14 +776,18 @@ export default function Settings() {
                                   value={u.role || 'user'}
                                   onValueChange={(value) => handleChangeUserRole(u.id, value)}
                                 >
-                                  <SelectTrigger className="w-32">
+                                  <SelectTrigger className="w-40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="user">User</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="super_user">Super User</SelectItem>
                                   </SelectContent>
                                 </Select>
+                                {u.role === 'super_user' && (
+                                  <Crown className="w-5 h-5 text-purple-500" />
+                                )}
                                 {u.role === 'admin' && (
                                   <Crown className="w-5 h-5 text-orange-500" />
                                 )}
