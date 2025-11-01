@@ -22,6 +22,7 @@ import PCODebug from './pages/PCODebug';
 import index from './pages/index';
 import ImportCardholders from './pages/ImportCardholders';
 import TestCardholders from './pages/TestCardholders';
+import AdminSetup from './pages/AdminSetup';
 import Layout from './Layout.jsx';
 
 
@@ -50,6 +51,7 @@ export const PAGES = {
     "index": index,
     "ImportCardholders": ImportCardholders,
     "TestCardholders": TestCardholders,
+    "AdminSetup": AdminSetup,
 }
 
 export const pagesConfig = {
