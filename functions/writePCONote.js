@@ -30,43 +30,20 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    console.log('📝 Writing badge code to EVENT description (not details)');
+    console.log('📝 Creating Event Note with badge code');
     console.log('Event ID:', event_id);
     console.log('Badge Code:', badge_code);
-    console.log('Append mode:', append);
 
     // Create note text
-    const noteText = `Door Code: ${badge_code} — Approved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
+    const noteText = `🚪 Door Code: ${badge_code}\n\nApproved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
 
-    // Optional: append mode (pull existing notes first)
-    let finalNote = noteText;
-    if (append) {
-      const auth = btoa(`${appId}:${secret}`);
-      const getResp = await fetch(
-        `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`,
-        {
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      if (getResp.ok) {
-        const current = await getResp.json();
-        const existing = current?.data?.attributes?.description || '';
-        finalNote = existing ? `${existing}\n\n${noteText}` : noteText;
-        console.log('📝 Appending to existing event description');
-      }
-    }
-
-    // Use Basic Auth with admin credentials - write to EVENT description
+    // Use Basic Auth with admin credentials - CREATE an Event Note
     const auth = btoa(`${appId}:${secret}`);
 
     const response = await fetch(
-      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`,
+      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_notes`,
       {
-        method: 'PATCH',
+        method: 'POST',
         headers: {
           'Authorization': `Basic ${auth}`,
           'Content-Type': 'application/json',
@@ -74,10 +51,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           data: {
-            type: 'Event',
-            id: event_id,
+            type: 'EventNote',
             attributes: {
-              description: finalNote
+              body: noteText
             }
           }
         })
@@ -98,7 +74,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to write event description',
+        error: 'Failed to create event note',
         status: response.status,
         details: errorData
       }, { status: response.status });
@@ -109,7 +85,8 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       event_id,
-      note: finalNote,
+      note: noteText,
+      note_id: result?.data?.id,
       result
     });
 
