@@ -10,12 +10,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!user.pco_access_token) {
-      return Response.json({ 
-        error: 'PCO not connected. Please connect in Settings.' 
-      }, { status: 401 });
-    }
-
     const { request_id, badge_code, append } = await req.json();
 
     if (!request_id) {
@@ -25,7 +19,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
-    console.log('📝 Writing badge code to request notes using user token');
+    // Get PCO Admin credentials (Personal Access Token)
+    const appId = Deno.env.get('PCO_APP_ID2');
+    const secret = Deno.env.get('PCO_SECRET2');
+
+    if (!appId || !secret) {
+      return Response.json({
+        ok: false,
+        error: 'PCO admin credentials not configured. Please set PCO_APP_ID2 and PCO_SECRET2 in environment variables.'
+      }, { status: 500 });
+    }
+
+    console.log('📝 Writing badge code using Calendar Admin credentials');
     console.log('Request ID:', request_id);
     console.log('Badge Code:', badge_code);
     console.log('Append mode:', append);
@@ -36,11 +41,12 @@ Deno.serve(async (req) => {
     // Optional: append mode (pull existing notes first)
     let finalNote = noteText;
     if (append) {
+      const auth = btoa(`${appId}:${secret}`);
       const getResp = await fetch(
         `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
         {
           headers: {
-            'Authorization': `Bearer ${user.pco_access_token}`,
+            'Authorization': `Basic ${auth}`,
             'Accept': 'application/json'
           }
         }
@@ -54,13 +60,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Use Bearer token (user's access token)
+    // Use Basic Auth with admin credentials
+    const auth = btoa(`${appId}:${secret}`);
+
     const response = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
       {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${user.pco_access_token}`,
+          'Authorization': `Basic ${auth}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
