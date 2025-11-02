@@ -27,6 +27,8 @@ export default function PCODebug() {
   const [error, setError] = useState(null);
   const [testingNote, setTestingNote] = useState(false);
   const [noteTestResult, setNoteTestResult] = useState(null);
+  const [testingApproval, setTestingApproval] = useState(false);
+  const [approvalTestResult, setApprovalTestResult] = useState(null);
 
   useEffect(() => {
     loadUser();
@@ -46,6 +48,7 @@ export default function PCODebug() {
     setError(null);
     setDebugData(null);
     setNoteTestResult(null);
+    setApprovalTestResult(null); // Clear approval test result when running diagnostics
 
     try {
       console.log('🔍 Starting PCO diagnostics...');
@@ -234,6 +237,58 @@ export default function PCODebug() {
     }
   };
 
+  const testApproveRequest = async () => {
+    if (!debugData?.my_pending_requests?.length) {
+      toast.error('No pending requests to test with');
+      return;
+    }
+
+    setTestingApproval(true);
+    setApprovalTestResult(null);
+
+    try {
+      const firstRequest = debugData.my_pending_requests[0];
+      
+      console.log('🧪 Testing approval on request:', firstRequest.request_id);
+      
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: firstRequest.request_id,
+        action: 'approve'
+      });
+
+      console.log('✅ Approval response:', response.data);
+      
+      if (response.data.ok) {
+        setApprovalTestResult({
+          success: true,
+          message: 'Successfully approved request!',
+          request_id: firstRequest.request_id,
+          event_name: firstRequest.event_name,
+          action: 'approve'
+        });
+        toast.success('Test approval succeeded!');
+      } else {
+        setApprovalTestResult({
+          success: false,
+          message: response.data.error || 'Failed to approve',
+          details: response.data
+        });
+        toast.error('Test approval failed');
+      }
+
+    } catch (error) {
+      console.error('❌ Approval test failed:', error);
+      setApprovalTestResult({
+        success: false,
+        message: error.message,
+        details: error.response?.data
+      });
+      toast.error('Test failed: ' + error.message);
+    } finally {
+      setTestingApproval(false);
+    }
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-indigo-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
@@ -250,19 +305,34 @@ export default function PCODebug() {
 
           <div className="flex gap-2">
             {debugData?.my_pending_requests?.length > 0 && (
-              <Button
-                onClick={testWriteNote}
-                disabled={testingNote}
-                variant="outline"
-                className="border-green-300 hover:bg-green-50"
-              >
-                {testingNote ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                )}
-                Test Write Badge Code
-              </Button>
+              <>
+                <Button
+                  onClick={testApproveRequest}
+                  disabled={testingApproval}
+                  variant="outline"
+                  className="border-purple-300 hover:bg-purple-50"
+                >
+                  {testingApproval ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Test Approve Request
+                </Button>
+                <Button
+                  onClick={testWriteNote}
+                  disabled={testingNote}
+                  variant="outline"
+                  className="border-green-300 hover:bg-green-50"
+                >
+                  {testingNote ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Test Write Badge Code
+                </Button>
+              </>
             )}
             <Button
               onClick={runDiagnostics}
@@ -291,6 +361,48 @@ export default function PCODebug() {
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Approval Test Result */}
+        {approvalTestResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className={approvalTestResult.success ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {approvalTestResult.success ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  Approval Test Result
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`font-medium mb-2 ${approvalTestResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                  {approvalTestResult.message}
+                </p>
+                {approvalTestResult.request_id && (
+                  <p className="text-sm text-slate-700">
+                    Request ID: <code className="bg-white px-2 py-1 rounded">{approvalTestResult.request_id}</code>
+                  </p>
+                )}
+                {approvalTestResult.event_name && (
+                  <p className="text-sm text-slate-700">
+                    Event: {approvalTestResult.event_name}
+                  </p>
+                )}
+                {approvalTestResult.details && (
+                  <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-32">
+                    {JSON.stringify(approvalTestResult.details, null, 2)}
+                  </pre>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {/* Note Test Result */}

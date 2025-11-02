@@ -40,7 +40,11 @@ export default function MyApprovals() {
   const [expandedPreviews, setExpandedPreviews] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [savingCodes, setSavingCodes] = useState({});
-  const [sentCodes, setSentCodes] = useState({}); // Track which codes have been sent
+  const [sentCodes, setSentCodes] = useState(() => {
+    // Load sent codes from localStorage on mount
+    const saved = localStorage.getItem('sentDoorCodes');
+    return saved ? JSON.parse(saved) : {};
+  });
 
   useEffect(() => {
     loadUser();
@@ -52,6 +56,11 @@ export default function MyApprovals() {
       loadAllAnswerPreviews();
     }
   }, [approvals]);
+
+  // Persist sentCodes to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sentDoorCodes', JSON.stringify(sentCodes));
+  }, [sentCodes]);
 
   const loadUser = async () => {
     try {
@@ -225,7 +234,7 @@ export default function MyApprovals() {
         setApprovalsWithAnswers({}); 
         setExpandedPreviews({});
         setSelectedCardholders({});
-        setSentCodes({}); // Reset sent codes on sync
+        // DON'T clear sentCodes - keep the green checks even after sync
       }
     } catch (error) {
       console.error('Sync error:', error);
