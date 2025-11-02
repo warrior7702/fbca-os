@@ -191,10 +191,13 @@ export default function PCODebug() {
       const firstRequest = debugData.my_pending_requests[0];
       
       console.log('🧪 Testing badge code write on request:', firstRequest.request_id);
+      console.log('🧪 Event ID:', firstRequest.event_id);
       
       const response = await base44.functions.invoke('writePCONote', {
         request_id: firstRequest.request_id,
-        badge_code: `123456# (TEST from FBCA OS at ${new Date().toLocaleTimeString()})`
+        event_id: firstRequest.event_id, // Now passing event_id
+        badge_code: `123456# (TEST from FBCA OS at ${new Date().toLocaleTimeString()})`,
+        append: true
       });
 
       console.log('✅ Badge code write response:', response.data);
@@ -202,12 +205,13 @@ export default function PCODebug() {
       if (response.data.ok) {
         setNoteTestResult({
           success: true,
-          message: 'Successfully wrote badge code to Notes tab!',
+          message: 'Successfully wrote badge code to Event notes!',
           request_id: firstRequest.request_id,
+          event_id: firstRequest.event_id,
           event_name: firstRequest.event_name,
           note: response.data.note
         });
-        toast.success('Badge code written successfully!');
+        toast.success('Badge code written to Event notes successfully!');
       } else {
         setNoteTestResult({
           success: false,
@@ -314,6 +318,11 @@ export default function PCODebug() {
                 {noteTestResult.request_id && (
                   <p className="text-sm text-slate-700">
                     Request ID: <code className="bg-white px-2 py-1 rounded">{noteTestResult.request_id}</code>
+                  </p>
+                )}
+                {noteTestResult.event_id && (
+                  <p className="text-sm text-slate-700">
+                    Event ID: <code className="bg-white px-2 py-1 rounded">{noteTestResult.event_id}</code>
                   </p>
                 )}
                 {noteTestResult.event_name && (
@@ -491,6 +500,9 @@ export default function PCODebug() {
                               </p>
                               <p className="text-xs font-mono text-slate-500 mt-1">
                                 Request ID: {request.request_id}
+                              </p>
+                              <p className="text-xs font-mono text-slate-500">
+                                Event ID: {request.event_id}
                               </p>
                             </div>
                             <Badge className="bg-orange-600 text-white">
