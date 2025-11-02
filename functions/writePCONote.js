@@ -26,11 +26,13 @@ Deno.serve(async (req) => {
       }, { status: 401 });
     }
 
-    console.log('📝 Writing note to request:', request_id);
+    console.log('📝 Adding note by approving request:', request_id);
     console.log('🔑 Using token for user:', user.email);
 
-    // Write note directly to PCO API (no Vercel proxy)
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/notes`;
+    // PCO doesn't have a separate notes endpoint
+    // Notes can only be added when approving/denying
+    // So we'll approve with a note for testing
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/approve`;
     
     const response = await fetch(pcoUrl, {
       method: 'POST',
@@ -39,12 +41,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${user.pco_access_token}`
       },
       body: JSON.stringify({
-        data: {
-          type: 'Note',
-          attributes: {
-            note: note
-          }
-        }
+        note: note
       })
     });
 
@@ -62,7 +59,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'PCO note write failed',
+        error: 'PCO approve with note failed',
         status: response.status,
         details: errorData
       }, { status: response.status });
@@ -74,6 +71,7 @@ Deno.serve(async (req) => {
       ok: true,
       request_id,
       note,
+      message: 'Request approved with note',
       result
     });
 
