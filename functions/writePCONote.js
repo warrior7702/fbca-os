@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
     console.log('Event ID:', event_id);
     console.log('Badge Code:', badge_code);
 
-    // Create comment text for activity thread
-    const commentText = `🚪 Building Access Approved\n\nDoor Code: ${badge_code}\n\nApproved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
+    // Create comment text for activity thread - PCO shows who posted it
+    const commentText = `🚪 Building Access Approved\n\nDoor Code: ${badge_code}`;
 
     // Use Basic Auth with admin credentials - POST a comment to event activity
     const auth = btoa(`${appId}:${secret}`);
