@@ -732,7 +732,7 @@ export default function Settings() {
                     User Management
                   </CardTitle>
                   <CardDescription>
-                    Manage user roles and permissions
+                    Manage user roles and permissions. Changes save automatically.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -780,9 +780,21 @@ export default function Settings() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="user">User</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="super_user">Super User</SelectItem>
+                                    <SelectItem value="user">
+                                      <span className="flex items-center gap-2">
+                                        User
+                                      </span>
+                                    </SelectItem>
+                                    <SelectItem value="admin">
+                                      <span className="flex items-center gap-2">
+                                        Admin
+                                      </span>
+                                    </SelectItem>
+                                    <SelectItem value="super_user">
+                                      <span className="flex items-center gap-2">
+                                        Super User
+                                      </span>
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {u.role === 'super_user' && (

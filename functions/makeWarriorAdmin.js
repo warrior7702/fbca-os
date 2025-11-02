@@ -22,19 +22,19 @@ Deno.serve(async (req) => {
         console.log('Current user:', user);
         console.log('Current role:', user.role);
         
-        // Update to super_user
+        // Keep as regular user
         await base44.asServiceRole.entities.User.update(user.id, {
-            role: 'super_user'
+            role: 'user'
         });
         
-        console.log('✅ Updated to super_user');
+        console.log('✅ Updated to user');
         
         return Response.json({ 
             success: true,
-            message: 'warrior7702@gmail.com is now a Super User',
+            message: 'warrior7702@gmail.com is now a regular user',
             user_id: user.id,
             old_role: user.role,
-            new_role: 'super_user'
+            new_role: 'user'
         });
 
     } catch (error) {
