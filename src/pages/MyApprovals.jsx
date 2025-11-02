@@ -524,7 +524,7 @@ export default function MyApprovals() {
         approval={selectedApproval}
         open={showDetailModal}
         onClose={handleModalClose}
-        onApprovalAction={handleApprove}
+        onSuccess={handleApprovalSuccess}
       />
     </div>
   );

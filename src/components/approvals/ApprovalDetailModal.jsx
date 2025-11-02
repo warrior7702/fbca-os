@@ -1,14 +1,10 @@
-
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Loader2, Calendar, CheckCircle, XCircle, Clock, Key, MapPin, Users, FileText, CheckSquare } from "lucide-react";
+import { Loader2, Calendar, CheckCircle, XCircle, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import CardholderLookup from "./CardholderLookup";
@@ -26,7 +22,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
     if (open && approval) {
       loadDetails();
       setSelectedCardholder(null);
-      setSentToPCO(false); // Reset PCO sent status when modal opens
+      setSentToPCO(false);
     }
   }, [open, approval]);
 
@@ -91,10 +87,22 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   const handleApprove = async () => {
     setApproving(true);
     try {
-      await onSuccess(approval, 'approve');
-      toast.success('Request approved successfully!');
-      onClose();
+      console.log('🔍 Approving from modal:', approval.request_id);
+      
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id,
+        action: 'approve'
+      });
+
+      if (response.data?.ok) {
+        toast.success('Request approved successfully!');
+        onClose();
+        if (onSuccess) await onSuccess(); // Trigger refresh in parent
+      } else {
+        toast.error(response.data?.error || 'Failed to approve');
+      }
     } catch (error) {
+      console.error('❌ Approve error:', error);
       toast.error('Failed to approve request');
     } finally {
       setApproving(false);
@@ -104,10 +112,22 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   const handleDeny = async () => {
     setDenying(true);
     try {
-      await onSuccess(approval, 'deny');
-      toast.success('Request denied successfully!');
-      onClose();
+      console.log('🔍 Denying from modal:', approval.request_id);
+      
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id,
+        action: 'deny'
+      });
+
+      if (response.data?.ok) {
+        toast.success('Request denied successfully!');
+        onClose();
+        if (onSuccess) await onSuccess(); // Trigger refresh in parent
+      } else {
+        toast.error(response.data?.error || 'Failed to deny');
+      }
     } catch (error) {
+      console.error('❌ Deny error:', error);
       toast.error('Failed to deny request');
     } finally {
       setDenying(false);
@@ -166,7 +186,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Request Details</Label>
                 {details.questions.map((question) => {
-                  const answer = details.answers?.[question.id]; // Use optional chaining for answers
+                  const answer = details.answers?.[question.id];
                   if (!answer) return null;
                   
                   return (
