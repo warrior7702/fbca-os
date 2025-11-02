@@ -26,26 +26,49 @@ Deno.serve(async (req) => {
       }, { status: 401 });
     }
 
-    // Call Vercel endpoint to write note
-    const vercelUrl = 'https://pco-webhook.vercel.app';
-    const response = await fetch(`${vercelUrl}/api/pco-write-note`, {
+    console.log('📝 Writing note to request:', request_id);
+    console.log('🔑 Using token for user:', user.email);
+
+    // Write note directly to PCO API (no Vercel proxy)
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/notes`;
+    
+    const response = await fetch(pcoUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${user.pco_access_token}`
       },
-      body: JSON.stringify({ request_id, note })
+      body: JSON.stringify({
+        data: {
+          type: 'Note',
+          attributes: {
+            note: note
+          }
+        }
+      })
     });
 
-    const result = await response.json();
+    const responseText = await response.text();
+    console.log('📥 PCO Response Status:', response.status);
+    console.log('📥 PCO Response:', responseText);
 
     if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { raw: responseText };
+      }
+
       return Response.json({
         ok: false,
-        error: result.error || 'Failed to write note',
-        details: result
+        error: 'PCO note write failed',
+        status: response.status,
+        details: errorData
       }, { status: response.status });
     }
+
+    const result = responseText ? JSON.parse(responseText) : { success: true };
 
     return Response.json({
       ok: true,
