@@ -194,8 +194,7 @@ export default function PCODebug() {
       
       const response = await base44.functions.invoke('writePCONote', {
         request_id: firstRequest.request_id,
-        resource_id: firstRequest.resource_id,
-        badge_code: `TEST-123456# (from FBCA OS at ${new Date().toLocaleTimeString()})`
+        badge_code: `123456# (TEST from FBCA OS at ${new Date().toLocaleTimeString()})`
       });
 
       console.log('✅ Badge code write response:', response.data);
@@ -203,11 +202,10 @@ export default function PCODebug() {
       if (response.data.ok) {
         setNoteTestResult({
           success: true,
-          message: 'Successfully wrote badge code to resource question!',
+          message: 'Successfully wrote badge code to Notes tab!',
           request_id: firstRequest.request_id,
           event_name: firstRequest.event_name,
-          question: response.data.question,
-          answer: response.data.answer
+          note: response.data.note
         });
         toast.success('Badge code written successfully!');
       } else {
@@ -323,14 +321,9 @@ export default function PCODebug() {
                     Event: {noteTestResult.event_name}
                   </p>
                 )}
-                {noteTestResult.question && (
+                {noteTestResult.note && (
                   <p className="text-sm text-slate-700">
-                    Question: {noteTestResult.question}
-                  </p>
-                )}
-                {noteTestResult.answer && (
-                  <p className="text-sm text-slate-700">
-                    Answer Written: <code className="bg-white px-2 py-1 rounded">{noteTestResult.answer}</code>
+                    Note Written: <code className="bg-white px-2 py-1 rounded">{noteTestResult.note}</code>
                   </p>
                 )}
                 {noteTestResult.details && (
