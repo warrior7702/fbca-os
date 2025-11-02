@@ -10,10 +10,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { request_id, badge_code, append } = await req.json();
+    const { request_id, event_id, badge_code, append } = await req.json();
 
-    if (!request_id) {
-      return Response.json({ error: 'request_id required' }, { status: 400 });
+    if (!event_id) {
+      return Response.json({ error: 'event_id required' }, { status: 400 });
     }
     if (!badge_code) {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
@@ -30,20 +30,20 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    console.log('📝 Writing badge code using Calendar Admin credentials');
-    console.log('Request ID:', request_id);
+    console.log('📝 Writing badge code to EVENT notes (not request notes)');
+    console.log('Event ID:', event_id);
     console.log('Badge Code:', badge_code);
     console.log('Append mode:', append);
 
     // Create note text
-    const noteText = `Door Code: ${badge_code} — Approved by ${user.full_name || user.email}`;
+    const noteText = `Door Code: ${badge_code} — Approved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
 
     // Optional: append mode (pull existing notes first)
     let finalNote = noteText;
     if (append) {
       const auth = btoa(`${appId}:${secret}`);
       const getResp = await fetch(
-        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
+        `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`,
         {
           headers: {
             'Authorization': `Basic ${auth}`,
@@ -54,17 +54,17 @@ Deno.serve(async (req) => {
       
       if (getResp.ok) {
         const current = await getResp.json();
-        const existing = current?.data?.attributes?.notes || '';
-        finalNote = existing ? `${existing}\n${noteText}` : noteText;
-        console.log('📝 Appending to existing notes');
+        const existing = current?.data?.attributes?.details || '';
+        finalNote = existing ? `${existing}\n\n${noteText}` : noteText;
+        console.log('📝 Appending to existing event notes');
       }
     }
 
-    // Use Basic Auth with admin credentials
+    // Use Basic Auth with admin credentials - write to EVENT details
     const auth = btoa(`${appId}:${secret}`);
 
     const response = await fetch(
-      `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
+      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}`,
       {
         method: 'PATCH',
         headers: {
@@ -74,10 +74,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           data: {
-            type: 'EventResourceRequest',
-            id: request_id,
+            type: 'Event',
+            id: event_id,
             attributes: {
-              notes: finalNote
+              details: finalNote
             }
           }
         })
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to write note',
+        error: 'Failed to write event note',
         status: response.status,
         details: errorData
       }, { status: response.status });
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       ok: true,
-      request_id,
+      event_id,
       note: finalNote,
       result
     });
