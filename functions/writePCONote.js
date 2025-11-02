@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    console.log('📝 Writing badge code to EVENT notes (not request notes)');
+    console.log('📝 Writing badge code to EVENT description (not details)');
     console.log('Event ID:', event_id);
     console.log('Badge Code:', badge_code);
     console.log('Append mode:', append);
@@ -54,13 +54,13 @@ Deno.serve(async (req) => {
       
       if (getResp.ok) {
         const current = await getResp.json();
-        const existing = current?.data?.attributes?.details || '';
+        const existing = current?.data?.attributes?.description || '';
         finalNote = existing ? `${existing}\n\n${noteText}` : noteText;
-        console.log('📝 Appending to existing event notes');
+        console.log('📝 Appending to existing event description');
       }
     }
 
-    // Use Basic Auth with admin credentials - write to EVENT details
+    // Use Basic Auth with admin credentials - write to EVENT description
     const auth = btoa(`${appId}:${secret}`);
 
     const response = await fetch(
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
             type: 'Event',
             id: event_id,
             attributes: {
-              details: finalNote
+              description: finalNote
             }
           }
         })
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to write event note',
+        error: 'Failed to write event description',
         status: response.status,
         details: errorData
       }, { status: response.status });
