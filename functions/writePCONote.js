@@ -62,36 +62,87 @@ Deno.serve(async (req) => {
 
     console.log('✅ Found badge question:', badgeQuestion.id, '-', badgeQuestion.attributes?.question);
 
-    // Step 2: Submit the answer to this question
-    const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
-    
-    const answerPayload = {
-      data: {
-        type: 'Answer',
-        attributes: {
-          answer: badge_code
+    // Step 2: Check if an answer already exists for this question
+    const existingAnswersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
+    const existingAnswersResponse = await fetch(existingAnswersUrl, {
+      headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
+    });
+
+    let existingAnswer = null;
+    if (existingAnswersResponse.ok) {
+      const existingAnswersData = await existingAnswersResponse.json();
+      existingAnswer = existingAnswersData.data?.find(a => 
+        a.relationships?.resource_question?.data?.id === badgeQuestion.id
+      );
+      
+      if (existingAnswer) {
+        console.log('✅ Found existing answer:', existingAnswer.id);
+      }
+    }
+
+    // Step 3: Update existing answer or create new one
+    let answerResponse;
+    let method;
+    let url;
+
+    if (existingAnswer) {
+      // PATCH existing answer
+      method = 'PATCH';
+      url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers/${existingAnswer.id}`;
+      
+      const updatePayload = {
+        data: {
+          type: 'Answer',
+          id: existingAnswer.id,
+          attributes: {
+            answer: badge_code
+          }
+        }
+      };
+
+      console.log('📤 Updating existing answer:', JSON.stringify(updatePayload, null, 2));
+
+      answerResponse = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.pco_access_token}`
         },
-        relationships: {
-          resource_question: {
-            data: {
-              type: 'ResourceQuestion',
-              id: badgeQuestion.id
+        body: JSON.stringify(updatePayload)
+      });
+    } else {
+      // POST new answer
+      method = 'POST';
+      url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
+      
+      const createPayload = {
+        data: {
+          type: 'Answer',
+          attributes: {
+            answer: badge_code
+          },
+          relationships: {
+            resource_question: {
+              data: {
+                type: 'ResourceQuestion',
+                id: badgeQuestion.id
+              }
             }
           }
         }
-      }
-    };
+      };
 
-    console.log('📤 Submitting answer:', JSON.stringify(answerPayload, null, 2));
+      console.log('📤 Creating new answer:', JSON.stringify(createPayload, null, 2));
 
-    const answerResponse = await fetch(answersUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.pco_access_token}`
-      },
-      body: JSON.stringify(answerPayload)
-    });
+      answerResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.pco_access_token}`
+        },
+        body: JSON.stringify(createPayload)
+      });
+    }
 
     const responseText = await answerResponse.text();
     console.log('📥 PCO Response Status:', answerResponse.status);
@@ -107,7 +158,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to submit answer',
+        error: `Failed to ${method === 'PATCH' ? 'update' : 'create'} answer`,
         status: answerResponse.status,
         details: errorData
       }, { status: answerResponse.status });
@@ -121,6 +172,7 @@ Deno.serve(async (req) => {
       question_id: badgeQuestion.id,
       question: badgeQuestion.attributes?.question,
       answer: badge_code,
+      method: method,
       result
     });
 
