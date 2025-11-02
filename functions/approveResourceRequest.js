@@ -12,9 +12,9 @@ async function pcoGet(url, token) {
   return j;
 }
 
-async function pcoPost(url, token, body = {}) {
+async function pcoPatch(url, token, body = {}) {
   const r = await fetch(url, {
-    method: 'POST',
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -22,8 +22,8 @@ async function pcoPost(url, token, body = {}) {
     body: JSON.stringify(body)
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`POST ${url} :: ${r.status} :: ${text}`);
-  return text ? JSON.parse(text).catch(() => ({})) : { ok: true };
+  if (!r.ok) throw new Error(`PATCH ${url} :: ${r.status} :: ${text}`);
+  return text ? JSON.parse(text) : { ok: true };
 }
 
 Deno.serve(async (req) => {
@@ -135,13 +135,31 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    // ---- 5) call PCO approve/deny as the user ----
-    const url = `${PCO.base}/event_resource_requests/${request_id}/${action}`;
-    console.log('🚀 Calling PCO:', url);
+    // ---- 5) PATCH the request to approve/deny ----
+    const statusCode = action === 'approve' ? 'A' : 'R'; // A=Approved, R=Rejected
+    const url = `${PCO.base}/event_resource_requests/${request_id}`;
     
-    const result = await pcoPost(url, userToken, note ? { note } : {});
+    console.log('🚀 Patching PCO request:', url);
+    console.log('  Status:', statusCode);
+    
+    const patchBody = {
+      data: {
+        type: 'EventResourceRequest',
+        id: request_id,
+        attributes: {
+          approval_status: statusCode
+        }
+      }
+    };
 
-    console.log('✅ PCO approved/denied successfully');
+    // Add note if provided
+    if (note) {
+      patchBody.data.attributes.notes = note;
+    }
+
+    const result = await pcoPatch(url, userToken, patchBody);
+
+    console.log('✅ PCO request', action === 'approve' ? 'approved' : 'denied', 'successfully');
 
     return Response.json({ ok: true, action, request_id, result });
   } catch (e) {
