@@ -1,46 +1,42 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ClipboardCheck, 
-  Calendar, 
-  RefreshCw, 
+import {
+  ClipboardCheck,
+  Calendar,
+  RefreshCw,
   AlertCircle,
   Loader2,
   CheckCircle,
   Clock,
-  Box,
-  Eye,
-  Key,
-  Send,
-  CheckCheck,
-  ExternalLink // Added ExternalLink import
+  ExternalLink,
+  MapPin, // Added
+  User, // Added
+  XCircle, // Added
+  Building2, // Added
+  Users, // Added
+  FileText // Added
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format } = "date-fns";
+import { format } from "date-fns"; // Fixed syntax
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
-import ConnectionWarning from "../components/shared/ConnectionWarning";
-import CardholderLookup from "../components/approvals/CardholderLookup";
+import ConnectionWarning from "../components/shared/ConnectionWarning"; // Retained
 
 export default function MyApprovals() {
-  const [user, setUser] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [user, setUser] = useState(null); // Reordered
   const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false); // Retained
   const [viewMode, setViewMode] = useState('list');
-  const [approvalsWithAnswers, setApprovalsWithAnswers] = useState({});
-  const [loadingAnswers, setLoadingAnswers] = useState({});
-  const [expandedPreviews, setExpandedPreviews] = useState({});
-  const [selectedCardholders, setSelectedCardholders] = useState({});
-  const [savingCodes, setSavingCodes] = useState({});
+  const [answerPreviews, setAnswerPreviews] = useState({}); // Renamed from approvalsWithAnswers
   const [sentCodes, setSentCodes] = useState(() => {
     // Load sent codes from localStorage on mount
     const saved = localStorage.getItem('sentDoorCodes');
@@ -101,16 +97,16 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
-    for (const approval of approvals.slice(0, 10)) {
-      if (!approvalsWithAnswers[approval.request_id]) {
+    // Only load previews for the first few approvals to avoid rate limits
+    for (const approval of approvals.slice(0, 10)) { 
+      if (!answerPreviews[approval.request_id]) { // Changed from approvalsWithAnswers
         loadAnswerPreview(approval);
       }
     }
   };
 
   const loadAnswerPreview = async (approval) => {
-    setLoadingAnswers(prev => ({ ...prev, [approval.request_id]: true }));
-    
+    // loadingAnswers state and its usage are removed as per new outline
     try {
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
@@ -126,60 +122,18 @@ export default function MyApprovals() {
             answer: response.data.answers[q.id]
           }));
 
-        setApprovalsWithAnswers(prev => ({
+        setAnswerPreviews(prev => ({ // Changed from setApprovalsWithAnswers
           ...prev,
           [approval.request_id]: answeredQuestions
         }));
       }
     } catch (error) {
       console.error('Error loading answer preview:', error);
-    } finally {
-      setLoadingAnswers(prev => ({ ...prev, [approval.request_id]: false }));
     }
+    // setLoadingAnswers and its usage are removed as per new outline
   };
 
-  const handleCardholderSelect = (requestId, cardholder) => {
-    setSelectedCardholders(prev => ({
-      ...prev,
-      [requestId]: cardholder
-    }));
-  };
-
-  const handleSendCodeToPCO = async (approval) => {
-    const cardholder = selectedCardholders[approval.request_id];
-    
-    if (!cardholder) {
-      toast.error('Please select a cardholder first');
-      return;
-    }
-
-    setSavingCodes(prev => ({ ...prev, [approval.request_id]: true }));
-    
-    try {
-      const badgeCode = `${cardholder.pin}#`;
-      
-      const response = await base44.functions.invoke('writePCONote', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        badge_code: badgeCode
-      });
-
-      if (response.data?.ok) {
-        toast.success('Door code sent to Planning Center event activity!');
-        setSentCodes(prev => ({
-          ...prev,
-          [approval.request_id]: true
-        }));
-      } else {
-        toast.error(response.data?.error || 'Failed to send code');
-      }
-    } catch (error) {
-      console.error('Failed to send code:', error);
-      toast.error('Failed to send door code');
-    } finally {
-      setSavingCodes(prev => ({ ...prev, [approval.request_id]: false }));
-    }
-  };
+  // handleCardholderSelect and handleSendCodeToPCO functions removed as per new outline (related states removed)
 
   const handleApprove = async (approval, formData = null) => {
     try {
@@ -248,10 +202,8 @@ export default function MyApprovals() {
       if (response.data.success) {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
-        setApprovalsWithAnswers({}); 
-        setExpandedPreviews({});
-        setSelectedCardholders({});
-        // DON'T clear sentCodes - keep the green checks even after sync
+        setAnswerPreviews({}); // Changed from setApprovalsWithAnswers
+        // expandedPreviews and selectedCardholders states were removed, so their set functions are removed here
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -266,12 +218,7 @@ export default function MyApprovals() {
     setShowDetailModal(true);
   };
 
-  const toggleExpandPreview = (requestId) => {
-    setExpandedPreviews(prev => ({
-      ...prev,
-      [requestId]: !prev[requestId]
-    }));
-  };
+  // toggleExpandPreview function removed as expandedPreviews state was removed
 
   const handleModalClose = () => {
     setShowDetailModal(false);
@@ -358,7 +305,7 @@ export default function MyApprovals() {
           </div>
         )}
 
-        {/* Open in Planning Center - List View */}
+        {/* Open in Planning Center - List View (Retained) */}
         {viewMode === 'list' && (
           <div className="mb-6">
             <a 
@@ -405,12 +352,9 @@ export default function MyApprovals() {
                 </motion.div>
               ) : (
                 approvals.map((approval, index) => {
-                  const answerPreview = approvalsWithAnswers[approval.request_id];
-                  const loadingPreview = loadingAnswers[approval.request_id];
-                  const isExpanded = expandedPreviews[approval.request_id];
-                  const selectedCardholder = selectedCardholders[approval.request_id];
-                  const savingCode = savingCodes[approval.request_id];
-                  const codeSent = sentCodes[approval.request_id];
+                  const answerPreview = answerPreviews[approval.request_id]; // Changed from approvalsWithAnswers
+                  // loadingPreview and isExpanded states were removed
+                  // selectedCardholder, savingCode, codeSent states were removed
                   
                   return (
                     <motion.div
@@ -443,45 +387,31 @@ export default function MyApprovals() {
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Box className="w-4 h-4" />
+                                  <Building2 className="w-4 h-4" /> {/* Changed from Box */}
                                   <span>{approval.resource_name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Clock className="w-4 h-4" />
+                                  <Users className="w-4 h-4" /> {/* Changed from Clock */}
                                   <span className="text-xs text-slate-500">
                                     Group: {approval.approval_group_name}
                                   </span>
                                 </div>
                               </div>
 
-                              {loadingPreview && (
-                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  <span>Loading details...</span>
-                                </div>
-                              )}
+                              {/* loadingPreview was removed */}
                               
                               {answerPreview && answerPreview.length > 0 && (
                                 <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                                   <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
                                   <div className="space-y-1">
-                                    {(isExpanded ? answerPreview : answerPreview.slice(0, 2)).map((qa, idx) => (
+                                    {/* isExpanded logic removed, now shows all answers */}
+                                    {answerPreview.map((qa, idx) => (
                                       <div key={idx} className="text-xs">
                                         <span className="text-slate-600">{qa.question}:</span>
                                         <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
                                       </div>
                                     ))}
-                                    {answerPreview.length > 2 && (
-                                      <button
-                                        onClick={() => toggleExpandPreview(approval.request_id)}
-                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline cursor-pointer"
-                                      >
-                                        {isExpanded 
-                                          ? '- Show less' 
-                                          : `+${answerPreview.length - 2} more detail${answerPreview.length - 2 !== 1 ? 's' : ''}`
-                                        }
-                                      </button>
-                                    )}
+                                    {/* Toggle button removed */}
                                   </div>
                                 </div>
                               )}
@@ -492,72 +422,13 @@ export default function MyApprovals() {
                               size="sm"
                               className="bg-orange-600 hover:bg-orange-700"
                             >
-                              <Eye className="w-4 h-4 mr-1" />
+                              <FileText className="w-4 h-4 mr-1" /> {/* Changed from Eye */}
                               Details
                             </Button>
                           </div>
 
-                          {/* Door Code Assignment - Under Details Button */}
-                          <div className="mt-4 pt-4 border-t border-slate-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Key className="w-4 h-4 text-blue-600" />
-                              <h4 className="font-semibold text-slate-900 text-sm">Assign Door Code</h4>
-                            </div>
-                            
-                            <div className="space-y-3">
-                              <CardholderLookup 
-                                onSelect={(cardholder) => handleCardholderSelect(approval.request_id, cardholder)} 
-                              />
-                              
-                              {selectedCardholder && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: -10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className={`p-3 rounded-lg border-2 ${
-                                    codeSent 
-                                      ? 'bg-green-50 border-green-300' 
-                                      : 'bg-blue-50 border-blue-200'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="font-semibold text-slate-900 text-sm">{selectedCardholder.name}</p>
-                                      <p className="text-sm text-slate-600">Door Code: {selectedCardholder.pin}#</p>
-                                    </div>
-                                    {codeSent ? (
-                                      <Button
-                                        disabled
-                                        size="sm"
-                                        className="bg-green-600 hover:bg-green-600 cursor-default"
-                                      >
-                                        <CheckCheck className="w-4 h-4 mr-1" />
-                                        Sent
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        onClick={() => handleSendCodeToPCO(approval)}
-                                        disabled={savingCode}
-                                        size="sm"
-                                        className="bg-blue-600 hover:bg-blue-700"
-                                      >
-                                        {savingCode ? (
-                                          <>
-                                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                            Sending...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Send className="w-4 h-4 mr-1" />
-                                            Send to Planning Center
-                                          </>
-                                        )}
-                                      </Button>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </div>
-                          </div>
+                          {/* Door Code Assignment section removed as per new outline */}
+                          {/* CardholderLookup component and related state/logic removed */}
                         </CardContent>
                       </Card>
                     </motion.div>
