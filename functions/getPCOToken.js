@@ -75,11 +75,39 @@ Deno.serve(async (req) => {
         // Refresh token if needed
         const { access_token, expires_at } = await refreshTokenIfNeeded(base44, user);
 
+        // Get PCO user ID - use people/v2/me endpoint (not calendar)
+        let token_user_id = user.pco_user_id || null;
+        
+        if (!token_user_id) {
+            try {
+                const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+                    headers: { 'Authorization': `Bearer ${access_token}` }
+                });
+                
+                if (meResponse.ok) {
+                    const meData = await meResponse.json();
+                    token_user_id = meData.data?.id;
+                    console.log('🔍 Token belongs to PCO user ID:', token_user_id);
+                    
+                    // Save it to user record for next time
+                    if (token_user_id) {
+                        await base44.asServiceRole.entities.User.update(user.id, {
+                            pco_user_id: token_user_id
+                        });
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not fetch PCO user ID:', error);
+                // Non-fatal - continue without it
+            }
+        }
+
         return Response.json({
             ok: true,
             access_token: access_token,
             provider: 'calendar',
-            expires_at: expires_at
+            expires_at: expires_at,
+            token_user_id: token_user_id
         });
 
     } catch (error) {
