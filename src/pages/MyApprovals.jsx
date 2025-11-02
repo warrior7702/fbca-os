@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -129,15 +130,16 @@ export default function MyApprovals() {
     setSavingCodes(prev => ({ ...prev, [approval.request_id]: true }));
     
     try {
-      const note = `Door Code: ${cardholder.pin}# (${cardholder.name})`;
+      const badgeCode = `${cardholder.pin}#`;
       
       const response = await base44.functions.invoke('writePCONote', {
         request_id: approval.request_id,
-        note: note
+        event_id: approval.event_id,
+        badge_code: badgeCode
       });
 
       if (response.data?.ok) {
-        toast.success('Door code sent to Planning Center!');
+        toast.success('Door code sent to Planning Center event activity!');
         setSentCodes(prev => ({
           ...prev,
           [approval.request_id]: true
