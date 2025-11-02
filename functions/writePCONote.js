@@ -10,7 +10,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { request_id, badge_code } = await req.json();
+    if (!user.pco_access_token) {
+      return Response.json({ 
+        error: 'PCO not connected. Please connect in Settings.' 
+      }, { status: 401 });
+    }
+
+    const { request_id, badge_code, append } = await req.json();
 
     if (!request_id) {
       return Response.json({ error: 'request_id required' }, { status: 400 });
@@ -19,33 +25,42 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
-    // Get PCO Admin credentials
-    const appId = Deno.env.get('PCO_APP_ID2');
-    const secret = Deno.env.get('PCO_SECRET2');
-
-    if (!appId || !secret) {
-      return Response.json({
-        ok: false,
-        error: 'PCO admin credentials not configured'
-      }, { status: 500 });
-    }
-
-    console.log('📝 Writing badge code to request notes using Basic Auth');
+    console.log('📝 Writing badge code to request notes using user token');
     console.log('Request ID:', request_id);
     console.log('Badge Code:', badge_code);
+    console.log('Append mode:', append);
 
     // Create note text
     const noteText = `Door Code: ${badge_code} — Approved by ${user.full_name || user.email}`;
 
-    // Use Basic Auth with admin token
-    const auth = btoa(`${appId}:${secret}`);
+    // Optional: append mode (pull existing notes first)
+    let finalNote = noteText;
+    if (append) {
+      const getResp = await fetch(
+        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${user.pco_access_token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      if (getResp.ok) {
+        const current = await getResp.json();
+        const existing = current?.data?.attributes?.notes || '';
+        finalNote = existing ? `${existing}\n${noteText}` : noteText;
+        console.log('📝 Appending to existing notes');
+      }
+    }
 
+    // Use Bearer token (user's access token)
     const response = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
       {
         method: 'PATCH',
         headers: {
-          'Authorization': `Basic ${auth}`,
+          'Authorization': `Bearer ${user.pco_access_token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -54,7 +69,7 @@ Deno.serve(async (req) => {
             type: 'EventResourceRequest',
             id: request_id,
             attributes: {
-              notes: noteText
+              notes: finalNote
             }
           }
         })
@@ -86,7 +101,7 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       request_id,
-      note: noteText,
+      note: finalNote,
       result
     });
 
