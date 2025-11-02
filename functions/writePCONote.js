@@ -10,13 +10,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { request_id, note } = await req.json();
+    const { request_id, resource_id, badge_code } = await req.json();
 
-    if (!request_id) {
-      return Response.json({ error: 'request_id required' }, { status: 400 });
+    if (!request_id || !resource_id) {
+      return Response.json({ error: 'request_id and resource_id required' }, { status: 400 });
     }
-    if (!note) {
-      return Response.json({ error: 'note required' }, { status: 400 });
+    if (!badge_code) {
+      return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
     // Get user's PCO token
@@ -26,30 +26,78 @@ Deno.serve(async (req) => {
       }, { status: 401 });
     }
 
-    console.log('📝 Adding note by approving request:', request_id);
-    console.log('🔑 Using token for user:', user.email);
+    console.log('📝 Writing badge code to resource question');
+    console.log('Request ID:', request_id);
+    console.log('Resource ID:', resource_id);
+    console.log('Badge Code:', badge_code);
 
-    // PCO doesn't have a separate notes endpoint
-    // Notes can only be added when approving/denying
-    // So we'll approve with a note for testing
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/approve`;
+    // Step 1: Get the resource questions for this resource
+    const questionsUrl = `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions`;
+    const questionsResponse = await fetch(questionsUrl, {
+      headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
+    });
+
+    if (!questionsResponse.ok) {
+      return Response.json({
+        ok: false,
+        error: 'Failed to fetch resource questions',
+        status: questionsResponse.status
+      }, { status: questionsResponse.status });
+    }
+
+    const questionsData = await questionsResponse.json();
     
-    const response = await fetch(pcoUrl, {
+    // Find the "badge or code" question
+    const badgeQuestion = questionsData.data?.find(q => 
+      q.attributes?.question?.toLowerCase().includes('badge') ||
+      q.attributes?.question?.toLowerCase().includes('code')
+    );
+
+    if (!badgeQuestion) {
+      return Response.json({
+        ok: false,
+        error: 'Could not find badge/code question for this resource'
+      }, { status: 404 });
+    }
+
+    console.log('✅ Found badge question:', badgeQuestion.id, '-', badgeQuestion.attributes?.question);
+
+    // Step 2: Submit the answer to this question
+    const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
+    
+    const answerPayload = {
+      data: {
+        type: 'Answer',
+        attributes: {
+          answer: badge_code
+        },
+        relationships: {
+          resource_question: {
+            data: {
+              type: 'ResourceQuestion',
+              id: badgeQuestion.id
+            }
+          }
+        }
+      }
+    };
+
+    console.log('📤 Submitting answer:', JSON.stringify(answerPayload, null, 2));
+
+    const answerResponse = await fetch(answersUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${user.pco_access_token}`
       },
-      body: JSON.stringify({
-        note: note
-      })
+      body: JSON.stringify(answerPayload)
     });
 
-    const responseText = await response.text();
-    console.log('📥 PCO Response Status:', response.status);
+    const responseText = await answerResponse.text();
+    console.log('📥 PCO Response Status:', answerResponse.status);
     console.log('📥 PCO Response:', responseText);
 
-    if (!response.ok) {
+    if (!answerResponse.ok) {
       let errorData;
       try {
         errorData = JSON.parse(responseText);
@@ -59,10 +107,10 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'PCO approve with note failed',
-        status: response.status,
+        error: 'Failed to submit answer',
+        status: answerResponse.status,
         details: errorData
-      }, { status: response.status });
+      }, { status: answerResponse.status });
     }
 
     const result = responseText ? JSON.parse(responseText) : { success: true };
@@ -70,8 +118,9 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       request_id,
-      note,
-      message: 'Request approved with note',
+      question_id: badgeQuestion.id,
+      question: badgeQuestion.attributes?.question,
+      answer: badge_code,
       result
     });
 
