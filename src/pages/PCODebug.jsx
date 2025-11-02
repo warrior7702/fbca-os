@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from 'sonner'; // Assuming sonner is the toast library used with shadcn/ui
+import { toast } from 'sonner';
 import {
   Bug,
   User,
@@ -16,7 +15,6 @@ import {
   RefreshCw,
   Calendar,
   Box,
-  DoorOpen,
   AlertTriangle
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -46,7 +44,7 @@ export default function PCODebug() {
     setLoading(true);
     setError(null);
     setDebugData(null);
-    setNoteTestResult(null); // Clear note test result on new diagnostics run
+    setNoteTestResult(null);
 
     try {
       console.log('🔍 Starting PCO diagnostics...');
@@ -67,8 +65,7 @@ export default function PCODebug() {
         approval_groups: [],
         my_groups: [],
         resources: [],
-        pending_requests: [],
-        my_pending_requests: []
+        my_pending_requests: [] // Will come from database
       };
 
       // Get my PCO person ID
@@ -85,8 +82,6 @@ export default function PCODebug() {
         };
         data.connected_as_email = meData.data?.attributes?.email;
         console.log('✅ My PCO person:', data.my_person);
-        console.log('📧 Connected as:', data.connected_as_email);
-        console.log('👤 Connected as PCO User ID:', data.connected_as_user_id);
       }
 
       // Get all approval groups
@@ -99,7 +94,6 @@ export default function PCODebug() {
         const groupsData = await groupsResponse.json();
         console.log('✅ Found', groupsData.data?.length, 'approval groups');
 
-        // Check each group for membership and resources
         for (const group of groupsData.data || []) {
           const groupInfo = {
             id: group.id,
@@ -149,94 +143,11 @@ export default function PCODebug() {
         console.log('✅ I am in', data.my_groups.length, 'groups');
       }
 
-      // Build resource to group map
-      const resourceToGroupMap = {};
-      for (const group of data.my_groups) {
-        for (const resource of group.resources) {
-          resourceToGroupMap[resource.id] = group.name;
-        }
-      }
-
-      // Get all pending requests
-      const requestsResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource',
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-
-      if (requestsResponse.ok) {
-        const requestsData = await requestsResponse.json();
-        console.log('✅ Found', requestsData.data?.length, 'pending requests');
-
-        // Build maps
-        const eventMap = {};
-        const resourceMap = {};
-
-        if (requestsData.included) {
-          requestsData.included.forEach(item => {
-            if (item.type === 'Event') {
-              eventMap[item.id] = item;
-            } else if (item.type === 'Resource') {
-              resourceMap[item.id] = item;
-            }
-          });
-        }
-
-        // Process all requests with future filtering
-        for (const request of requestsData.data || []) {
-          const resourceId = request.relationships?.resource?.data?.id;
-          const eventId = request.relationships?.event?.data?.id;
-          const event = eventMap[eventId];
-          const resource = resourceMap[resourceId];
-
-          // Check if event has future instances
-          let hasFutureInstance = false;
-          let eventStartsAt = null;
-          
-          try {
-            const instancesResponse = await fetch(
-              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
-              { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            
-            if (instancesResponse.ok) {
-              const instancesData = await instancesResponse.json();
-              if (instancesData.data && instancesData.data.length > 0) {
-                hasFutureInstance = true;
-                eventStartsAt = instancesData.data[0].attributes?.starts_at;
-              }
-            }
-          } catch (err) {
-            console.error('Error checking event instance:', err);
-          }
-
-          // Skip if no future instance
-          if (!hasFutureInstance) {
-            console.log('⏭️ Skipping past event:', event?.attributes?.name);
-            continue;
-          }
-
-          const requestInfo = {
-            id: request.id,
-            event_id: eventId, // Added event_id here
-            event_name: event?.attributes?.name || 'Unknown',
-            event_starts_at: eventStartsAt,
-            resource_id: resourceId,
-            resource_name: resource?.attributes?.name || 'Unknown',
-            status: request.attributes?.approval_status,
-            created_at: request.attributes?.created_at
-          };
-
-          data.pending_requests.push(requestInfo);
-
-          // Check if this is in my groups
-          const isMyGroup = resourceToGroupMap[resourceId];
-          if (isMyGroup) {
-            data.my_pending_requests.push(requestInfo);
-          }
-        }
-
-        console.log('✅ Found', data.my_pending_requests.length, 'future requests in my groups');
-      }
+      // Get pending requests from DATABASE (same source as My Approvals page)
+      console.log('📥 Fetching pending approvals from database...');
+      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
+      data.my_pending_requests = approvalsResponse.data.pending_approvals || [];
+      console.log('✅ Found', data.my_pending_requests.length, 'pending approvals in database');
 
       // Get all resources
       const allResourcesResponse = await fetch(
@@ -278,10 +189,10 @@ export default function PCODebug() {
     try {
       const firstRequest = debugData.my_pending_requests[0];
       
-      console.log('🧪 Testing note write on request:', firstRequest.id);
+      console.log('🧪 Testing note write on request:', firstRequest.request_id);
       
       const response = await base44.functions.invoke('writePCONote', {
-        request_id: firstRequest.id,
+        request_id: firstRequest.request_id,
         note: `🧪 Test note from FBCA OS - ${new Date().toLocaleString()}`
       });
 
@@ -291,7 +202,7 @@ export default function PCODebug() {
         setNoteTestResult({
           success: true,
           message: 'Successfully wrote test note!',
-          request_id: firstRequest.id,
+          request_id: firstRequest.request_id,
           event_name: firstRequest.event_name
         });
         toast.success('Note written successfully!');
@@ -539,55 +450,48 @@ export default function PCODebug() {
               </Card>
             </motion.div>
 
-            {/* Pending Requests - NOW WITH REQUEST IDs */}
+            {/* Pending Requests from Database */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <Calendar className="w-5 h-5" />
-                      Pending Requests
+                      My Pending Approvals (from Database)
                     </span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Total: {debugData.pending_requests.length}</Badge>
-                      <Badge className="bg-orange-100 text-orange-700">
-                        Your Groups: {debugData.my_pending_requests.length}
-                      </Badge>
-                    </div>
+                    <Badge className="bg-orange-100 text-orange-700">
+                      {debugData.my_pending_requests.length} approval{debugData.my_pending_requests.length !== 1 ? 's' : ''}
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <p className="text-sm text-slate-600 mb-4">
+                    This shows the same data as your "My Approvals" page (from PendingApproval entity)
+                  </p>
                   <div className="space-y-3">
-                    {debugData.pending_requests.length === 0 ? (
-                      <p className="text-center text-slate-500 py-8">No pending requests found</p>
+                    {debugData.my_pending_requests.length === 0 ? (
+                      <p className="text-center text-slate-500 py-8">No pending approvals found</p>
                     ) : (
-                      debugData.pending_requests.map((request) => {
-                        const isMyGroup = debugData.my_pending_requests.some(r => r.id === request.id);
-                        return (
-                          <div key={request.id} className={`p-3 rounded-lg border ${isMyGroup ? 'border-orange-300 bg-orange-50' : 'border-slate-200 bg-white'}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <p className="font-medium text-slate-900">{request.event_name}</p>
-                                <p className="text-sm text-slate-600">Resource: {request.resource_name}</p>
-                                <p className="text-xs text-slate-500">
-                                  Starts: {request.event_starts_at ? new Date(request.event_starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                                </p>
-                                <p className="text-xs font-mono text-slate-500 mt-1">
-                                  Request ID: {request.id}
-                                </p>
-                                <p className="text-xs font-mono text-slate-500">
-                                  Event ID: {request.event_id}
-                                </p>
-                              </div>
-                              {isMyGroup && (
-                                <Badge className="bg-orange-600 text-white">
-                                  Your Group
-                                </Badge>
-                              )}
+                      debugData.my_pending_requests.map((request) => (
+                        <div key={request.id} className="p-3 rounded-lg border border-orange-300 bg-orange-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-900">{request.event_name}</p>
+                              <p className="text-sm text-slate-600">Resource: {request.resource_name}</p>
+                              <p className="text-sm text-slate-600">Group: {request.approval_group_name}</p>
+                              <p className="text-xs text-slate-500">
+                                Starts: {request.event_starts_at ? new Date(request.event_starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                              </p>
+                              <p className="text-xs font-mono text-slate-500 mt-1">
+                                Request ID: {request.request_id}
+                              </p>
                             </div>
+                            <Badge className="bg-orange-600 text-white">
+                              Your Group
+                            </Badge>
                           </div>
-                        );
-                      })
+                        </div>
+                      ))
                     )}
                   </div>
                 </CardContent>
@@ -642,11 +546,7 @@ export default function PCODebug() {
                     ) : (
                       <XCircle className="w-4 h-4 text-orange-500" />
                     )}
-                    <span><strong>{debugData.my_pending_requests.length}</strong> pending request{debugData.my_pending_requests.length !== 1 ? 's' : ''} need your approval</span>
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600" />
-                    <span><strong>{debugData.pending_requests.length}</strong> total pending requests in the system (future events only)</span>
+                    <span><strong>{debugData.my_pending_requests.length}</strong> pending approval{debugData.my_pending_requests.length !== 1 ? 's' : ''} need your action</span>
                   </p>
                   
                   {debugData.my_groups.length === 0 && (
