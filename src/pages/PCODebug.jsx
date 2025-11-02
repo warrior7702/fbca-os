@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from 'sonner'; // Assuming sonner is the toast library used with shadcn/ui
 import {
   Bug,
   User,
@@ -25,6 +26,8 @@ export default function PCODebug() {
   const [loading, setLoading] = useState(false);
   const [debugData, setDebugData] = useState(null);
   const [error, setError] = useState(null);
+  const [testingNote, setTestingNote] = useState(false);
+  const [noteTestResult, setNoteTestResult] = useState(null);
 
   useEffect(() => {
     loadUser();
@@ -43,6 +46,7 @@ export default function PCODebug() {
     setLoading(true);
     setError(null);
     setDebugData(null);
+    setNoteTestResult(null); // Clear note test result on new diagnostics run
 
     try {
       console.log('🔍 Starting PCO diagnostics...');
@@ -262,6 +266,57 @@ export default function PCODebug() {
     }
   };
 
+  const testWriteNote = async () => {
+    if (!debugData?.my_pending_requests?.length) {
+      toast.error('No pending requests to test with');
+      return;
+    }
+
+    setTestingNote(true);
+    setNoteTestResult(null);
+
+    try {
+      const firstRequest = debugData.my_pending_requests[0];
+      
+      console.log('🧪 Testing note write on request:', firstRequest.id);
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: firstRequest.id,
+        note: `🧪 Test note from FBCA OS - ${new Date().toLocaleString()}`
+      });
+
+      console.log('✅ Note write response:', response.data);
+      
+      if (response.data.ok) {
+        setNoteTestResult({
+          success: true,
+          message: 'Successfully wrote test note!',
+          request_id: firstRequest.id,
+          event_name: firstRequest.event_name
+        });
+        toast.success('Note written successfully!');
+      } else {
+        setNoteTestResult({
+          success: false,
+          message: response.data.error || 'Failed to write note',
+          details: response.data
+        });
+        toast.error('Failed to write note');
+      }
+
+    } catch (error) {
+      console.error('❌ Note test failed:', error);
+      setNoteTestResult({
+        success: false,
+        message: error.message,
+        details: error.response?.data
+      });
+      toast.error('Note test failed: ' + error.message);
+    } finally {
+      setTestingNote(false);
+    }
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-indigo-50 p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
@@ -276,18 +331,35 @@ export default function PCODebug() {
             </div>
           </div>
 
-          <Button
-            onClick={runDiagnostics}
-            disabled={loading || !user?.pco_access_token}
-            className="bg-purple-600 hover:bg-purple-700 gap-2"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4" />
+          <div className="flex gap-2">
+            {debugData?.my_pending_requests?.length > 0 && (
+              <Button
+                onClick={testWriteNote}
+                disabled={testingNote}
+                variant="outline"
+                className="border-green-300 hover:bg-green-50"
+              >
+                {testingNote ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                )}
+                Test Write Note
+              </Button>
             )}
-            {loading ? 'Running...' : 'Run Diagnostics'}
-          </Button>
+            <Button
+              onClick={runDiagnostics}
+              disabled={loading || !user?.pco_access_token}
+              className="bg-purple-600 hover:bg-purple-700 gap-2"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {loading ? 'Running...' : 'Run Diagnostics'}
+            </Button>
+          </div>
         </div>
 
         {!user?.pco_access_token && (
@@ -302,6 +374,48 @@ export default function PCODebug() {
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Note Test Result */}
+        {noteTestResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className={noteTestResult.success ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {noteTestResult.success ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  Note Write Test Result
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`font-medium mb-2 ${noteTestResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                  {noteTestResult.message}
+                </p>
+                {noteTestResult.request_id && (
+                  <p className="text-sm text-slate-700">
+                    Request ID: <code className="bg-white px-2 py-1 rounded">{noteTestResult.request_id}</code>
+                  </p>
+                )}
+                {noteTestResult.event_name && (
+                  <p className="text-sm text-slate-700">
+                    Event: {noteTestResult.event_name}
+                  </p>
+                )}
+                {noteTestResult.details && (
+                  <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-32">
+                    {JSON.stringify(noteTestResult.details, null, 2)}
+                  </pre>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {debugData && (
