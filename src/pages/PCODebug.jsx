@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -189,40 +190,43 @@ export default function PCODebug() {
     try {
       const firstRequest = debugData.my_pending_requests[0];
       
-      console.log('🧪 Testing note write on request:', firstRequest.request_id);
+      console.log('🧪 Testing badge code write on request:', firstRequest.request_id);
       
       const response = await base44.functions.invoke('writePCONote', {
         request_id: firstRequest.request_id,
-        note: `🧪 Test note from FBCA OS - ${new Date().toLocaleString()}`
+        resource_id: firstRequest.resource_id,
+        badge_code: `TEST-123456# (from FBCA OS at ${new Date().toLocaleTimeString()})`
       });
 
-      console.log('✅ Note write response:', response.data);
+      console.log('✅ Badge code write response:', response.data);
       
       if (response.data.ok) {
         setNoteTestResult({
           success: true,
-          message: 'Successfully wrote test note!',
+          message: 'Successfully wrote badge code to resource question!',
           request_id: firstRequest.request_id,
-          event_name: firstRequest.event_name
+          event_name: firstRequest.event_name,
+          question: response.data.question,
+          answer: response.data.answer
         });
-        toast.success('Note written successfully!');
+        toast.success('Badge code written successfully!');
       } else {
         setNoteTestResult({
           success: false,
-          message: response.data.error || 'Failed to write note',
+          message: response.data.error || 'Failed to write badge code',
           details: response.data
         });
-        toast.error('Failed to write note');
+        toast.error('Failed to write badge code');
       }
 
     } catch (error) {
-      console.error('❌ Note test failed:', error);
+      console.error('❌ Badge code test failed:', error);
       setNoteTestResult({
         success: false,
         message: error.message,
         details: error.response?.data
       });
-      toast.error('Note test failed: ' + error.message);
+      toast.error('Test failed: ' + error.message);
     } finally {
       setTestingNote(false);
     }
@@ -255,7 +259,7 @@ export default function PCODebug() {
                 ) : (
                   <CheckCircle className="w-4 h-4 mr-2" />
                 )}
-                Test Write Note
+                Test Write Badge Code
               </Button>
             )}
             <Button
@@ -302,7 +306,7 @@ export default function PCODebug() {
                   ) : (
                     <XCircle className="w-5 h-5 text-red-600" />
                   )}
-                  Note Write Test Result
+                  Badge Code Write Test Result
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -317,6 +321,16 @@ export default function PCODebug() {
                 {noteTestResult.event_name && (
                   <p className="text-sm text-slate-700">
                     Event: {noteTestResult.event_name}
+                  </p>
+                )}
+                {noteTestResult.question && (
+                  <p className="text-sm text-slate-700">
+                    Question: {noteTestResult.question}
+                  </p>
+                )}
+                {noteTestResult.answer && (
+                  <p className="text-sm text-slate-700">
+                    Answer Written: <code className="bg-white px-2 py-1 rounded">{noteTestResult.answer}</code>
                   </p>
                 )}
                 {noteTestResult.details && (
