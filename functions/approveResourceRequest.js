@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
     );
 
     const myGroupIds = [];
+    const groupResourceMap = {}; // Map group ID to list of resource IDs
+    
     for (const group of groupsResponse.data || []) {
       // Get members of this group
       const membersResponse = await pcoGet(
@@ -82,43 +84,53 @@ Deno.serve(async (req) => {
       if (isMember) {
         myGroupIds.push(group.id);
         console.log('✅ Member of group:', group.attributes?.name, '(', group.id, ')');
+        
+        // Get resources for this group
+        const resourcesResponse = await pcoGet(
+          `${PCO.base}/resource_approval_groups/${group.id}/resources?per_page=100`,
+          userToken
+        );
+        
+        groupResourceMap[group.id] = (resourcesResponse.data || []).map(r => r.id);
+        console.log('  ↳ Manages', groupResourceMap[group.id].length, 'resources');
       }
     }
 
     console.log('📋 My group IDs:', myGroupIds);
 
-    // ---- 3) pull bookings for this request; approval group lives here ----
-    const bookings = await pcoGet(
-      `${PCO.base}/event_resource_requests/${request_id}/resource_bookings?per_page=100&include=approval_group,resource`,
+    // ---- 3) Get the request details to find the resource ----
+    const requestResponse = await pcoGet(
+      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
       userToken
     );
 
-    const bookingGroupIds = new Set();
-    for (const b of (bookings.data || [])) {
-      const rel = b?.relationships?.approval_group?.data;
-      if (rel?.id) {
-        bookingGroupIds.add(rel.id);
-        console.log('📦 Booking requires group:', rel.id);
+    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
+    console.log('📦 Request is for resource:', resourceId);
+
+    // ---- 4) Check if I have permission to approve this resource ----
+    let hasPermission = false;
+    
+    // Check if any of my groups manage this resource
+    for (const groupId of myGroupIds) {
+      const groupResources = groupResourceMap[groupId] || [];
+      if (groupResources.includes(resourceId)) {
+        hasPermission = true;
+        console.log('✅ Group', groupId, 'manages this resource');
+        break;
       }
     }
 
-    // ---- 4) check eligibility (overlap between my groups and bookings' groups) ----
-    let eligible = false;
-    let overlap = [];
-    if (bookingGroupIds.size) {
-      overlap = [...bookingGroupIds].filter(id => myGroupIds.includes(id));
-      eligible = overlap.length > 0;
-    }
+    console.log('✅ Has permission:', hasPermission);
 
-    console.log('🔍 Overlap groups:', overlap);
-    console.log('✅ Eligible:', eligible);
-
-    if (!eligible) {
+    if (!hasPermission) {
       return Response.json({
         ok: false,
-        error: 'Forbidden (not in booking approval group)',
+        error: 'You are not authorized to approve this resource',
         diag: {
-          personId, myGroupIds, bookingGroupIds: [...bookingGroupIds], overlap
+          personId,
+          myGroupIds,
+          resourceId,
+          message: 'None of your approval groups manage this resource'
         }
       }, { status: 403 });
     }
