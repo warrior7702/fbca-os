@@ -55,6 +55,15 @@ export default function PCODebug() {
 
       // Get PCO token (now includes token_user_id)
       const tokenResponse = await base44.functions.invoke('getPCOToken');
+      
+      console.log('📦 Token response:', tokenResponse);
+      
+      if (!tokenResponse.data?.ok) {
+        const errorMsg = tokenResponse.data?.error || 'Failed to get PCO token';
+        console.error('❌ Token error:', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       const token = tokenResponse.data.access_token;
       const tokenUserId = tokenResponse.data.token_user_id;
 
