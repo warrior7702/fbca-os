@@ -10,123 +10,62 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { request_id, resource_id, badge_code } = await req.json();
+    const { request_id, badge_code } = await req.json();
 
-    if (!request_id || !resource_id) {
-      return Response.json({ error: 'request_id and resource_id required' }, { status: 400 });
+    if (!request_id) {
+      return Response.json({ error: 'request_id required' }, { status: 400 });
     }
     if (!badge_code) {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
-    // Get user's PCO token
-    if (!user.pco_access_token) {
-      return Response.json({ 
-        error: 'PCO not connected' 
-      }, { status: 401 });
+    // Get PCO Admin credentials
+    const appId = Deno.env.get('PCO_APP_ID2');
+    const secret = Deno.env.get('PCO_SECRET2');
+
+    if (!appId || !secret) {
+      return Response.json({
+        ok: false,
+        error: 'PCO admin credentials not configured'
+      }, { status: 500 });
     }
 
-    console.log('📝 Attempting to write badge code via delete + recreate');
+    console.log('📝 Writing badge code to request notes using Basic Auth');
     console.log('Request ID:', request_id);
-    console.log('Resource ID:', resource_id);
     console.log('Badge Code:', badge_code);
 
-    // Step 1: Get the resource questions for this resource
-    const questionsUrl = `https://api.planningcenteronline.com/calendar/v2/resources/${resource_id}/resource_questions`;
-    const questionsResponse = await fetch(questionsUrl, {
-      headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
-    });
+    // Create note text
+    const noteText = `Door Code: ${badge_code} — Approved by ${user.full_name || user.email}`;
 
-    if (!questionsResponse.ok) {
-      return Response.json({
-        ok: false,
-        error: 'Failed to fetch resource questions',
-        status: questionsResponse.status
-      }, { status: questionsResponse.status });
-    }
+    // Use Basic Auth with admin token
+    const auth = btoa(`${appId}:${secret}`);
 
-    const questionsData = await questionsResponse.json();
-    
-    // Find the "badge or code" question
-    const badgeQuestion = questionsData.data?.find(q => 
-      q.attributes?.question?.toLowerCase().includes('badge') ||
-      q.attributes?.question?.toLowerCase().includes('code')
-    );
-
-    if (!badgeQuestion) {
-      return Response.json({
-        ok: false,
-        error: 'Could not find badge/code question for this resource'
-      }, { status: 404 });
-    }
-
-    console.log('✅ Found badge question:', badgeQuestion.id, '-', badgeQuestion.attributes?.question);
-
-    // Step 2: Check if an answer already exists for this question and DELETE it
-    const existingAnswersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
-    const existingAnswersResponse = await fetch(existingAnswersUrl, {
-      headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
-    });
-
-    if (existingAnswersResponse.ok) {
-      const existingAnswersData = await existingAnswersResponse.json();
-      const existingAnswer = existingAnswersData.data?.find(a => 
-        a.relationships?.resource_question?.data?.id === badgeQuestion.id
-      );
-      
-      if (existingAnswer) {
-        console.log('🗑️ Deleting existing answer:', existingAnswer.id);
-        
-        const deleteUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers/${existingAnswer.id}`;
-        const deleteResponse = await fetch(deleteUrl, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
-        });
-        
-        if (deleteResponse.ok) {
-          console.log('✅ Deleted existing answer');
-        } else {
-          console.log('⚠️ Could not delete existing answer, will try to create anyway');
-        }
-      }
-    }
-
-    // Step 3: Create new answer
-    const createUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
-    
-    const createPayload = {
-      data: {
-        type: 'Answer',
-        attributes: {
-          answer_text: badge_code
+    const response = await fetch(
+      `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        relationships: {
-          resource_question: {
-            data: {
-              type: 'ResourceQuestion',
-              id: badgeQuestion.id
+        body: JSON.stringify({
+          data: {
+            type: 'EventResourceRequest',
+            id: request_id,
+            attributes: {
+              notes: noteText
             }
           }
-        }
+        })
       }
-    };
+    );
 
-    console.log('📤 Creating new answer:', JSON.stringify(createPayload, null, 2));
-
-    const answerResponse = await fetch(createUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.pco_access_token}`
-      },
-      body: JSON.stringify(createPayload)
-    });
-
-    const responseText = await answerResponse.text();
-    console.log('📥 PCO Response Status:', answerResponse.status);
+    const responseText = await response.text();
+    console.log('📥 PCO Response Status:', response.status);
     console.log('📥 PCO Response:', responseText);
 
-    if (!answerResponse.ok) {
+    if (!response.ok) {
       let errorData;
       try {
         errorData = JSON.parse(responseText);
@@ -136,10 +75,10 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to create answer',
-        status: answerResponse.status,
+        error: 'Failed to write note',
+        status: response.status,
         details: errorData
-      }, { status: answerResponse.status });
+      }, { status: response.status });
     }
 
     const result = responseText ? JSON.parse(responseText) : { success: true };
@@ -147,9 +86,7 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       request_id,
-      question_id: badgeQuestion.id,
-      question: badgeQuestion.attributes?.question,
-      answer: badge_code,
+      note: noteText,
       result
     });
 
