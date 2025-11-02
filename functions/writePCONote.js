@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       }, { status: 401 });
     }
 
-    console.log('📝 Writing badge code to resource question');
+    console.log('📝 Attempting to write badge code via delete + recreate');
     console.log('Request ID:', request_id);
     console.log('Resource ID:', resource_id);
     console.log('Badge Code:', badge_code);
@@ -61,91 +61,66 @@ Deno.serve(async (req) => {
     }
 
     console.log('✅ Found badge question:', badgeQuestion.id, '-', badgeQuestion.attributes?.question);
-    console.log('Question kind:', badgeQuestion.attributes?.kind);
 
-    // Step 2: Check if an answer already exists for this question
+    // Step 2: Check if an answer already exists for this question and DELETE it
     const existingAnswersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
     const existingAnswersResponse = await fetch(existingAnswersUrl, {
       headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
     });
 
-    let existingAnswer = null;
     if (existingAnswersResponse.ok) {
       const existingAnswersData = await existingAnswersResponse.json();
-      existingAnswer = existingAnswersData.data?.find(a => 
+      const existingAnswer = existingAnswersData.data?.find(a => 
         a.relationships?.resource_question?.data?.id === badgeQuestion.id
       );
       
       if (existingAnswer) {
-        console.log('✅ Found existing answer:', existingAnswer.id);
-        console.log('Existing answer data:', JSON.stringify(existingAnswer, null, 2));
+        console.log('🗑️ Deleting existing answer:', existingAnswer.id);
+        
+        const deleteUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers/${existingAnswer.id}`;
+        const deleteResponse = await fetch(deleteUrl, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
+        });
+        
+        if (deleteResponse.ok) {
+          console.log('✅ Deleted existing answer');
+        } else {
+          console.log('⚠️ Could not delete existing answer, will try to create anyway');
+        }
       }
     }
 
-    // Step 3: Update existing answer or create new one
-    let answerResponse;
-    let method;
-    let url;
-
-    if (existingAnswer) {
-      // PATCH existing answer - use the correct attribute based on question kind
-      method = 'PATCH';
-      url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers/${existingAnswer.id}`;
-      
-      // Use answer_text for string questions
-      const updatePayload = {
-        data: {
-          type: 'Answer',
-          id: existingAnswer.id,
-          attributes: {
-            answer_text: badge_code
-          }
-        }
-      };
-
-      console.log('📤 Updating existing answer:', JSON.stringify(updatePayload, null, 2));
-
-      answerResponse = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.pco_access_token}`
+    // Step 3: Create new answer
+    const createUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
+    
+    const createPayload = {
+      data: {
+        type: 'Answer',
+        attributes: {
+          answer_text: badge_code
         },
-        body: JSON.stringify(updatePayload)
-      });
-    } else {
-      // POST new answer - use answer_text for string questions
-      method = 'POST';
-      url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
-      
-      const createPayload = {
-        data: {
-          type: 'Answer',
-          attributes: {
-            answer_text: badge_code
-          },
-          relationships: {
-            resource_question: {
-              data: {
-                type: 'ResourceQuestion',
-                id: badgeQuestion.id
-              }
+        relationships: {
+          resource_question: {
+            data: {
+              type: 'ResourceQuestion',
+              id: badgeQuestion.id
             }
           }
         }
-      };
+      }
+    };
 
-      console.log('📤 Creating new answer:', JSON.stringify(createPayload, null, 2));
+    console.log('📤 Creating new answer:', JSON.stringify(createPayload, null, 2));
 
-      answerResponse = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.pco_access_token}`
-        },
-        body: JSON.stringify(createPayload)
-      });
-    }
+    const answerResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${user.pco_access_token}`
+      },
+      body: JSON.stringify(createPayload)
+    });
 
     const responseText = await answerResponse.text();
     console.log('📥 PCO Response Status:', answerResponse.status);
@@ -161,7 +136,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: `Failed to ${method === 'PATCH' ? 'update' : 'create'} answer`,
+        error: 'Failed to create answer',
         status: answerResponse.status,
         details: errorData
       }, { status: answerResponse.status });
@@ -175,7 +150,6 @@ Deno.serve(async (req) => {
       question_id: badgeQuestion.id,
       question: badgeQuestion.attributes?.question,
       answer: badge_code,
-      method: method,
       result
     });
 
