@@ -22,7 +22,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format } = "date-fns";
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
@@ -62,6 +62,22 @@ export default function MyApprovals() {
   useEffect(() => {
     localStorage.setItem('sentDoorCodes', JSON.stringify(sentCodes));
   }, [sentCodes]);
+
+  // Auto-sync when page becomes visible again (e.g., returning from PCO tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !syncing) {
+        console.log('👁️ Page became visible - auto-syncing...');
+        handleSync();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncing]);
 
   const loadUser = async () => {
     try {
