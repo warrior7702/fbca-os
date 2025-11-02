@@ -16,7 +16,8 @@ import {
   Eye,
   Key,
   Send,
-  CheckCheck
+  CheckCheck,
+  ExternalLink // Added ExternalLink import
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
@@ -338,6 +339,29 @@ export default function MyApprovals() {
         {!user?.pco_access_token && (
           <div className="mb-6">
             <ConnectionWarning />
+          </div>
+        )}
+
+        {/* Open in Planning Center - List View */}
+        {viewMode === 'list' && (
+          <div className="mb-6">
+            <a 
+              href="https://calendar.planningcenteronline.com/approvals"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <Button 
+                variant="outline" 
+                className="w-full border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open in Planning Center (Approve There)
+              </Button>
+            </a>
+            <p className="text-xs text-slate-500 mt-2 text-center">
+              If you have trouble approving here, use this link to approve directly in PCO
+            </p>
           </div>
         )}
 
