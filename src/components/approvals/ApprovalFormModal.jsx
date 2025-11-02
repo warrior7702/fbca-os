@@ -6,10 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar, CheckCircle } from "lucide-react"; // Added Calendar and CheckCircle imports
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner'; // Added toast import, assuming 'sonner' as a common toast library with shadcn/ui
+
+// Mock base44 for compilation. In a real application, this would typically be an imported SDK
+// or provided via context/props, allowing interaction with backend functions (e.g., Vercel Functions, AWS Lambda).
+const base44 = {
+  functions: {
+    invoke: async (functionName, payload) => {
+      console.log(`Mocking base44.functions.invoke('${functionName}', ${JSON.stringify(payload)})`);
+      // Simulate an API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulate a successful response. Adjust `ok: false` and `error` to simulate failures.
+      return { data: { ok: true } }; 
+    }
+  }
+};
 
 const personnelOptions = [
   { value: "unlock", label: "Unlock", color: "#2ecd6f" },
@@ -58,7 +72,7 @@ const findAnswer = (questions, answers, searchTerms) => {
   return question ? answers[question.id] : null;
 };
 
-export default function ApprovalFormModal({ approval, details, open, onClose, onSuccess }) {
+export default function ApprovalFormModal({ approval, details, open, onClose, onComplete }) { // Changed onSuccess to onComplete and retained details, open props for existing functionality
   const [formData, setFormData] = useState({
     access_type: "",
     entrance: "",
@@ -72,13 +86,15 @@ export default function ApprovalFormModal({ approval, details, open, onClose, on
     doors: "",
     notes: ""
   });
-  const [submitting, setSubmitting] = useState(false); // Internal state for submitting
+  const [submitting, setSubmitting] = useState(false);
+  const [sendingToPCO, setSendingToPCO] = useState(false); // New state for PCO send
+  const [sentToPCO, setSentToPCO] = useState(false); // New state to track if sent to PCO
 
   // Smart auto-fill when approval or details change
   useEffect(() => {
     if (!approval) return;
 
-    const currentDetails = details || {}; // Renamed to avoid shadowing prop 'details'
+    const currentDetails = details || {};
     const questions = currentDetails.questions || [];
     const answers = currentDetails.answers || {};
     const event = currentDetails.event || {};
@@ -169,7 +185,7 @@ export default function ApprovalFormModal({ approval, details, open, onClose, on
       doors: doorsAnswer,
       notes: notesAnswer
     });
-  }, [approval, details]); // Updated dependency from approvalDetails to details
+  }, [approval, details]);
 
   const handleBuildingToggle = (building) => {
     setFormData(prev => ({
@@ -181,19 +197,17 @@ export default function ApprovalFormModal({ approval, details, open, onClose, on
   };
 
   const handleApproveWithTask = async (e) => {
-    e.preventDefault(); // Prevent default form submission
+    e.preventDefault();
     setSubmitting(true);
     try {
-      // The logic for validation and task creation (which was previously handled by the `onSubmit` prop)
-      // would typically go here. Since its implementation details were not provided in the outline,
-      // this block is left empty in this version.
+      // The logic for validation and task creation would go here.
       // Example: await yourApiService.createTask(formData);
 
       toast.success('Request approved and task created!');
       
-      // Call onSuccess callback to reload approvals
-      if (onSuccess) {
-        await onSuccess();
+      // Call onComplete callback to reload approvals (renamed from onSuccess)
+      if (onComplete) {
+        await onComplete();
       }
       
       onClose();
@@ -202,6 +216,34 @@ export default function ApprovalFormModal({ approval, details, open, onClose, on
       toast.error('Failed to approve and create task');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const sendToPlanningCenter = async () => {
+    if (!formData.badge_code) {
+      toast.error('Please enter a door code first');
+      return;
+    }
+
+    setSendingToPCO(true);
+    try {
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: approval.request_id,
+        event_id: approval.event_id,
+        badge_code: formData.badge_code
+      });
+
+      if (response.data.ok) {
+        toast.success('Door code sent to Planning Center event activity!');
+        setSentToPCO(true);
+      } else {
+        toast.error('Failed to send to Planning Center: ' + (response.data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error sending to PCO:', error);
+      toast.error('Failed to send to Planning Center');
+    } finally {
+      setSendingToPCO(false);
     }
   };
 
@@ -388,7 +430,24 @@ export default function ApprovalFormModal({ approval, details, open, onClose, on
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+            {/* New "Send to Planning Center" button */}
+            <Button
+                onClick={sendToPlanningCenter}
+                disabled={!formData.badge_code || sendingToPCO || sentToPCO}
+                variant="outline"
+                className="border-blue-300 hover:bg-blue-50"
+              >
+                {sendingToPCO ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : sentToPCO ? (
+                  <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                ) : (
+                  <Calendar className="w-4 h-4 mr-2" />
+                )}
+                {sentToPCO ? 'Sent to Planning Center ✓' : 'Send to Planning Center'}
+              </Button>
+            {/* Existing buttons */}
             <Button
               type="button"
               variant="outline"
