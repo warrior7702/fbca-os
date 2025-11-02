@@ -60,9 +60,18 @@ Deno.serve(async (req) => {
         }
 
         // Get full user data with service role to access tokens
-        const users = await base44.asServiceRole.entities.User.filter({ 
-            email: currentUser.email 
-        });
+        let users;
+        try {
+            users = await base44.asServiceRole.entities.User.filter({ 
+                email: currentUser.email 
+            });
+        } catch (filterError) {
+            console.error('Error filtering users:', filterError);
+            return Response.json({ 
+                ok: false,
+                error: 'Database error: ' + filterError.message
+            }, { status: 500 });
+        }
         
         if (!users || users.length === 0) {
             return Response.json({ 
@@ -83,44 +92,14 @@ Deno.serve(async (req) => {
         // Refresh token if needed
         const { access_token, expires_at } = await refreshTokenIfNeeded(base44, user);
 
-        // Get PCO user ID - use people/v2/me endpoint (not calendar)
-        let token_user_id = user.pco_user_id || null;
-        
-        if (!token_user_id) {
-            try {
-                const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
-                    headers: { 'Authorization': `Bearer ${access_token}` }
-                });
-                
-                if (meResponse.ok) {
-                    const meData = await meResponse.json();
-                    token_user_id = meData.data?.id;
-                    
-                    if (token_user_id) {
-                        console.log('🔍 Token belongs to PCO user ID:', token_user_id);
-                        
-                        // Save it to user record for next time
-                        try {
-                            await base44.asServiceRole.entities.User.update(user.id, {
-                                pco_user_id: token_user_id
-                            });
-                        } catch (updateError) {
-                            console.warn('Could not save PCO user ID:', updateError);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.warn('Could not fetch PCO user ID:', error);
-                // Non-fatal - continue without it
-            }
-        }
-
+        // Return token without trying to fetch user ID for now
+        // (We can add that back later if needed, but it's causing issues)
         return Response.json({
             ok: true,
             access_token: access_token,
             provider: 'calendar',
             expires_at: expires_at,
-            token_user_id: token_user_id
+            token_user_id: user.pco_user_id || null // Return it if we have it saved
         });
 
     } catch (error) {
