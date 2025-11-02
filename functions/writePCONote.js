@@ -30,18 +30,18 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    console.log('📝 Creating Event Note with badge code');
+    console.log('💬 Posting door code to event activity thread');
     console.log('Event ID:', event_id);
     console.log('Badge Code:', badge_code);
 
-    // Create note text
-    const noteText = `🚪 Door Code: ${badge_code}\n\nApproved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
+    // Create comment text for activity thread
+    const commentText = `🚪 Building Access Approved\n\nDoor Code: ${badge_code}\n\nApproved by ${user.full_name || user.email} on ${new Date().toLocaleString()}`;
 
-    // Use Basic Auth with admin credentials - CREATE an Event Note
+    // Use Basic Auth with admin credentials - POST a comment to event activity
     const auth = btoa(`${appId}:${secret}`);
 
     const response = await fetch(
-      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_notes`,
+      `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_comments`,
       {
         method: 'POST',
         headers: {
@@ -51,9 +51,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           data: {
-            type: 'EventNote',
+            type: 'EventComment',
             attributes: {
-              body: noteText
+              body: commentText
             }
           }
         })
@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ok: false,
-        error: 'Failed to create event note',
+        error: 'Failed to post comment to event activity',
         status: response.status,
         details: errorData
       }, { status: response.status });
@@ -85,8 +85,8 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       event_id,
-      note: noteText,
-      note_id: result?.data?.id,
+      comment: commentText,
+      comment_id: result?.data?.id,
       result
     });
 
