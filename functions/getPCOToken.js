@@ -63,6 +63,14 @@ Deno.serve(async (req) => {
         const users = await base44.asServiceRole.entities.User.filter({ 
             email: currentUser.email 
         });
+        
+        if (!users || users.length === 0) {
+            return Response.json({ 
+                ok: false,
+                error: 'User not found' 
+            }, { status: 404 });
+        }
+        
         const user = users[0];
 
         if (!user || !user.pco_access_token) {
@@ -87,13 +95,18 @@ Deno.serve(async (req) => {
                 if (meResponse.ok) {
                     const meData = await meResponse.json();
                     token_user_id = meData.data?.id;
-                    console.log('🔍 Token belongs to PCO user ID:', token_user_id);
                     
-                    // Save it to user record for next time
                     if (token_user_id) {
-                        await base44.asServiceRole.entities.User.update(user.id, {
-                            pco_user_id: token_user_id
-                        });
+                        console.log('🔍 Token belongs to PCO user ID:', token_user_id);
+                        
+                        // Save it to user record for next time
+                        try {
+                            await base44.asServiceRole.entities.User.update(user.id, {
+                                pco_user_id: token_user_id
+                            });
+                        } catch (updateError) {
+                            console.warn('Could not save PCO user ID:', updateError);
+                        }
                     }
                 }
             } catch (error) {
@@ -112,9 +125,10 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('Get PCO token error:', error);
+        console.error('Error stack:', error.stack);
         return Response.json({ 
             ok: false,
-            error: error.message 
+            error: error.message || String(error)
         }, { status: 500 });
     }
 });
