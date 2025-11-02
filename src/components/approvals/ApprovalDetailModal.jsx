@@ -1,15 +1,17 @@
+
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Calendar, CheckCircle, XCircle, CheckSquare } from "lucide-react";
+import { Loader2, Calendar, CheckCircle, XCircle, CheckSquare, ExternalLink, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import CardholderLookup from "./CardholderLookup";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function ApprovalDetailModal({ approval, open, onClose, onSuccess }) {
+export default function ApprovalDetailModal({ approval, onClose, onApprove, onDeny }) {
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState(null);
   const [approving, setApproving] = useState(false);
@@ -17,17 +19,20 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
   const [selectedCardholder, setSelectedCardholder] = useState(null);
   const [sendingToPCO, setSendingToPCO] = useState(false);
   const [sentToPCO, setSentToPCO] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (open && approval) {
+    if (approval) {
       loadDetails();
+      // Reset cardholder selection and PCO sent status when a new approval is opened
       setSelectedCardholder(null);
-      setSentToPCO(false);
+      setSentToPCO(false); 
     }
-  }, [open, approval]);
+  }, [approval]);
 
   const loadDetails = async () => {
     setLoading(true);
+    setError(null); // Reset error state on new load
     console.log('🔍 Loading approval details for:', approval.request_id);
     
     try {
@@ -44,11 +49,15 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
         console.log('✅ Questions:', response.data.questions?.length || 0);
         console.log('✅ Answers:', Object.keys(response.data.answers || {}).length);
       } else {
-        toast.error(response.data?.error || 'Failed to load details');
+        const errorMessage = response.data?.error || 'Failed to load details';
+        toast.error(errorMessage);
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('❌ Failed to load details:', error);
-      toast.error('Failed to load details: ' + error.message);
+      const errorMessage = 'Failed to load details: ' + error.message;
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -97,7 +106,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       if (response.data?.ok) {
         toast.success('Request approved successfully!');
         onClose();
-        if (onSuccess) await onSuccess(); // Trigger refresh in parent
+        if (onApprove) await onApprove(); // Trigger refresh in parent
       } else {
         toast.error(response.data?.error || 'Failed to approve');
       }
@@ -122,7 +131,7 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
       if (response.data?.ok) {
         toast.success('Request denied successfully!');
         onClose();
-        if (onSuccess) await onSuccess(); // Trigger refresh in parent
+        if (onDeny) await onDeny(); // Trigger refresh in parent
       } else {
         toast.error(response.data?.error || 'Failed to deny');
       }
@@ -136,22 +145,50 @@ export default function ApprovalDetailModal({ approval, open, onClose, onSuccess
 
   if (!approval) return null;
 
+  const pcoUrl = `https://calendar.planningcenteronline.com/requests/${approval.request_id}`;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={!!approval} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            {approval.event_name}
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Calendar className="w-5 h-5 text-orange-600" />
+            Approval Request Details
           </DialogTitle>
         </DialogHeader>
 
+        {/* NEW: Open in Planning Center button at top */}
+        <div className="mb-4">
+          <a 
+            href={pcoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+          >
+            <Button 
+              variant="outline" 
+              className="w-full border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open in Planning Center (Approve There)
+            </Button>
+          </a>
+          <p className="text-xs text-slate-500 mt-2 text-center">
+            If approval fails below, use this link to approve directly in PCO
+          </p>
+        </div>
+
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
+        ) : error ? (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         ) : (
-          <div className="space-y-6 mt-4">
+          <div className="space-y-6">
             {/* Event Details */}
             <div className="grid grid-cols-2 gap-4">
               <div>
