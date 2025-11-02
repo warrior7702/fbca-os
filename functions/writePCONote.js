@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
     }
 
     console.log('✅ Found badge question:', badgeQuestion.id, '-', badgeQuestion.attributes?.question);
+    console.log('Question kind:', badgeQuestion.attributes?.kind);
 
     // Step 2: Check if an answer already exists for this question
     const existingAnswersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
@@ -77,6 +78,7 @@ Deno.serve(async (req) => {
       
       if (existingAnswer) {
         console.log('✅ Found existing answer:', existingAnswer.id);
+        console.log('Existing answer data:', JSON.stringify(existingAnswer, null, 2));
       }
     }
 
@@ -86,16 +88,17 @@ Deno.serve(async (req) => {
     let url;
 
     if (existingAnswer) {
-      // PATCH existing answer
+      // PATCH existing answer - use the correct attribute based on question kind
       method = 'PATCH';
       url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers/${existingAnswer.id}`;
       
+      // Use answer_text for string questions
       const updatePayload = {
         data: {
           type: 'Answer',
           id: existingAnswer.id,
           attributes: {
-            answer: badge_code
+            answer_text: badge_code
           }
         }
       };
@@ -111,7 +114,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify(updatePayload)
       });
     } else {
-      // POST new answer
+      // POST new answer - use answer_text for string questions
       method = 'POST';
       url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request_id}/answers`;
       
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
         data: {
           type: 'Answer',
           attributes: {
-            answer: badge_code
+            answer_text: badge_code
           },
           relationships: {
             resource_question: {
