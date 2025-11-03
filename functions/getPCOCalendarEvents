@@ -62,9 +62,13 @@ Deno.serve(async (req) => {
         // Refresh token if needed
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // Set date range to October 2025
-        const startDate = '2025-10-01';
-        const endDate = '2025-10-31';
+        // Set date range from today to 60 days from now
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + 60);
+
+        const startDate = today.toISOString().split('T')[0];
+        const endDate = futureDate.toISOString().split('T')[0];
 
         console.log('Fetching events from', startDate, 'to', endDate);
 
