@@ -17,14 +17,16 @@ import {
   MapPin,
   Users,
   Key,
-  User // Added User icon for cardholder search results
+  User, // Added User icon for cardholder search results
+  ListChecks // Added ListChecks icon for Task Calendar section
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-// Removed CardholderLookup import as it's no longer used
+import MyScheduleCalendar from "../components/approvals/MyScheduleCalendar"; // New import
+import TaskCalendar from "../components/tasks/TaskCalendar"; // New import
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -78,8 +80,6 @@ export default function MyApprovals() {
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
   const [cardholderSearchResults, setCardholderSearchResults] = useState({});
   const [searchingCardholder, setSearchingCardholder] = useState({});
-
-  // Removed: showCardholderLookup and currentApprovalForLookup states as they are replaced by inline search
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -336,7 +336,7 @@ export default function MyApprovals() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-orange-50 to-red-50 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-green-50 to-emerald-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {!user?.pco_access_token && <ConnectionWarning />}
 
@@ -353,18 +353,17 @@ export default function MyApprovals() {
               )}
             </div>
           }
-          iconColor="from-orange-500 to-red-500"
+          iconColor="from-green-500 to-emerald-500"
           action={
             <div className="flex gap-2">
-              <Button onClick={() => setShowCalendar(true)} variant="outline" size="sm">
+              <Button onClick={() => setShowCalendar(true)} variant="outline">
                 <Calendar className="w-4 h-4 mr-2" />
-                Calendar
+                View Calendar
               </Button>
               <Button
                 onClick={handleSync}
                 disabled={syncing}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-                size="sm"
+                className="bg-green-600 hover:bg-green-700"
               >
                 {syncing ? (
                   <>
@@ -374,7 +373,7 @@ export default function MyApprovals() {
                 ) : (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync from PCO
+                    Sync Now
                   </>
                 )}
               </Button>
@@ -382,6 +381,39 @@ export default function MyApprovals() {
           }
         />
 
+        {/* My Schedule Calendar Section - NEW */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+              <Calendar className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">My Schedule</h2>
+              <p className="text-slate-600">Events requiring your approval</p>
+            </div>
+          </div>
+          <MyScheduleCalendar approvals={approvals} />
+        </div>
+
+        {/* Task Calendar Section */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
+              <ListChecks className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Task Calendar</h2>
+              <p className="text-slate-600">Your upcoming tasks</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <TaskCalendar userId={user?.id} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pending Approvals List */}
         <div className="space-y-4">
           <AnimatePresence>
             {approvals.length === 0 ? (
@@ -555,7 +587,6 @@ export default function MyApprovals() {
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
-      {/* Removed CardholderLookup modal entirely as its functionality is now inline */}
     </div>
   );
 }
