@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter } from "lucide-react";
@@ -44,34 +45,48 @@ export default function Calendar() {
 
       console.log('🔍 Fetching calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-      console.log('📅 Full calendar events response:', eventsResponse);
-      console.log('📅 Events data:', eventsResponse.data);
+      console.log('📅 Full response:', eventsResponse);
+      console.log('📅 Response data:', eventsResponse.data);
+      console.log('📅 Events array:', eventsResponse.data?.events);
       
       if (!eventsResponse.data) {
         console.error('❌ No data in response');
-        toast.error('Failed to load calendar data - no response data');
+        toast.error('Failed to load calendar - no response data');
         setEvents([]);
         setLoading(false);
         return;
       }
 
       const eventsData = eventsResponse.data?.events || [];
-      console.log('📅 Events array length:', eventsData.length);
+      console.log('📅 Events data length:', eventsData.length);
       
-      if (eventsData.length > 0) {
-        console.log('📅 First few events:', eventsData.slice(0, 3));
-      } else {
+      if (eventsData.length === 0) {
         console.warn('⚠️ No events returned from API');
+        console.log('📝 Response message:', eventsResponse.data.message);
+        console.log('📝 Debug info:', eventsResponse.data.debug);
       }
       
-      // Don't filter - just set all events
-      console.log('✅ Setting events in state:', eventsData.length);
-      setEvents(eventsData);
+      if (eventsData.length > 0) {
+        console.log('📅 First event:', eventsData[0]);
+        console.log('📅 Sample events:', eventsData.slice(0, 3));
+      }
+      
+      // Filter to only events with valid dates for display
+      const validEvents = eventsData.filter(event => event.has_valid_dates);
+      console.log('✅ Valid events for display:', validEvents.length);
+      
+      if (validEvents.length < eventsData.length) {
+        console.warn(`⚠️ Filtered out ${eventsData.length - validEvents.length} events without valid dates`);
+        const invalidEvents = eventsData.filter(event => !event.has_valid_dates);
+        console.log('📋 Events without dates:', invalidEvents.map(e => e.name));
+      }
+      
+      setEvents(validEvents);
       setLastSync(new Date());
 
       // Extract unique rooms from events
       const roomsSet = new Set();
-      eventsData.forEach(event => {
+      validEvents.forEach(event => {
         if (event.rooms && Array.isArray(event.rooms)) {
           event.rooms.forEach(room => {
             roomsSet.add(JSON.stringify({ id: room.id, name: room.name }));
@@ -83,15 +98,16 @@ export default function Calendar() {
       console.log('🏠 Unique rooms:', uniqueRooms.length);
       setResources(uniqueRooms);
 
-      if (eventsData.length === 0) {
-        toast.info('No upcoming events found in PCO Calendar');
+      if (validEvents.length === 0) {
+        toast.info('No upcoming events with valid dates found in PCO Calendar');
       } else {
-        toast.success(`Loaded ${eventsData.length} events`);
+        toast.success(`Loaded ${validEvents.length} events`);
       }
     } catch (error) {
       console.error('❌ Error loading calendar data:', error);
+      console.error('❌ Error message:', error.message);
       console.error('❌ Error details:', error.response?.data);
-      toast.error('Failed to load calendar data: ' + (error.message || 'Unknown error'));
+      toast.error('Failed to load calendar: ' + (error.message || 'Unknown error'));
       setEvents([]);
     } finally {
       setLoading(false);
