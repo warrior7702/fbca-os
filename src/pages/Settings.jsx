@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import EmailPollingService from "../components/settings/EmailPollingService";
 
 const wallpapers = [
   {
@@ -494,6 +495,11 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Email Polling Service - NEW */}
+            {(user?.role === 'admin' || user?.role === 'super_user') && (
+              <EmailPollingService user={user} />
             )}
 
             <div className="grid gap-4 md:grid-cols-1">
