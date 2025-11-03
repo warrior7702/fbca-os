@@ -214,32 +214,56 @@ export default function MyTasks() {
   const loadMySchedule = async () => {
     setLoadingSchedule(true);
     try {
+      console.log('🗓️ Loading My Schedule...');
+
       // First get my approval groups from pending approvals
       const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
       const approvals = approvalsResponse.data.pending_approvals || [];
 
-      // Extract unique approval group names
-      const groups = [...new Set(approvals.map(a => a.approval_group_name))];
-      setMyApprovalGroups(groups);
+      console.log('✅ My pending approvals:', approvals.length);
+
+      if (approvals.length === 0) {
+        console.log('⚠️ No pending approvals found - schedule will be empty');
+        setMyScheduleEvents([]);
+        setLoadingSchedule(false);
+        return;
+      }
+
+      // Extract unique resource names from my approvals
+      const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
+      console.log('📋 My approval resources:', myResourceNames);
 
       // Fetch calendar events
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       const allEvents = eventsResponse.data.events || [];
 
-      // Filter events that have resources matching my approval groups
+      console.log('📅 Total calendar events fetched:', allEvents.length);
+
+      // Filter events that have resources matching my approval resources
       const myEvents = allEvents.filter(event => {
-        return event.resources && event.resources.some(resource => {
-          // Match resource names with approval group resources
-          return approvals.some(approval =>
-            approval.resource_name === resource.name
-          );
-        });
+        if (!event.resources || event.resources.length === 0) {
+          return false;
+        }
+
+        // Check if any of the event's resources match my approval resources
+        const hasMyResource = event.resources.some(resource =>
+          myResourceNames.includes(resource.name)
+        );
+
+        if (hasMyResource) {
+          console.log('✅ Found matching event:', event.name, 'with resources:', event.resources.map(r => r.name));
+        }
+
+        return hasMyResource;
       });
+
+      console.log('🎯 Filtered events for my schedule:', myEvents.length);
 
       // Sort by date
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
       // Fetch door codes for each event
+      console.log('🚪 Fetching door codes for events...');
       for (const event of myEvents) {
         try {
           const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
@@ -258,18 +282,21 @@ export default function MyTasks() {
               if (match) {
                 event.posted_door_code = match[1];
                 event.posted_by = doorCodeComment.created_by;
+                console.log('  ✅ Found door code for', event.name, ':', event.posted_door_code);
               }
             }
           }
         } catch (error) {
-          console.error('Error fetching comments for event:', event.event_id, error);
+          console.error('  ❌ Error fetching comments for event:', event.event_id, error);
         }
       }
 
+      console.log('✅ My Schedule loaded successfully:', myEvents.length, 'events');
       setMyScheduleEvents(myEvents);
     } catch (error) {
-      console.error('Error loading schedule:', error);
-      toast.error('Failed to load schedule');
+      console.error('❌ Error loading schedule:', error);
+      console.error('Error details:', error.message);
+      toast.error('Failed to load schedule: ' + error.message);
     } finally {
       setLoadingSchedule(false);
     }
