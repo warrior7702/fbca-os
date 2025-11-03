@@ -1,0 +1,183 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    console.log('Refreshing PCO token...');
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) {
+        throw new Error('PCO token refresh failed');
+    }
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ 
+                events: [], 
+                message: 'PCO not connected. Please connect in Settings > Integrations' 
+            });
+        }
+
+        // Refresh token if needed
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
+        // Get date range - 2 weeks from today
+        const today = new Date();
+        const twoWeeksFromNow = new Date();
+        twoWeeksFromNow.setDate(today.getDate() + 14);
+
+        const startDate = today.toISOString().split('T')[0];
+        const endDate = twoWeeksFromNow.toISOString().split('T')[0];
+
+        console.log('Fetching events from', startDate, 'to', endDate);
+
+        // Fetch events from PCO Calendar using date range filter
+        const eventsResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/events?where[starts_at][gte]=${startDate}&where[starts_at][lte]=${endDate}&per_page=100&include=event_resource_requests`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (!eventsResponse.ok) {
+            const errorText = await eventsResponse.text();
+            console.error('PCO events fetch failed:', errorText);
+            throw new Error('Failed to fetch calendar events');
+        }
+
+        const eventsData = await eventsResponse.json();
+        console.log('Found', eventsData.data?.length, 'events');
+
+        // Build resource requests map from included data
+        const resourceRequestsMap = {};
+        if (eventsData.included) {
+            for (const item of eventsData.included) {
+                if (item.type === 'EventResourceRequest') {
+                    const eventId = item.relationships?.event?.data?.id;
+                    if (eventId) {
+                        if (!resourceRequestsMap[eventId]) {
+                            resourceRequestsMap[eventId] = [];
+                        }
+                        resourceRequestsMap[eventId].push({
+                            id: item.id,
+                            resource_id: item.relationships?.resource?.data?.id,
+                            approval_status: item.attributes?.approval_status,
+                            quantity: item.attributes?.quantity
+                        });
+                    }
+                }
+            }
+        }
+
+        // Format events and fetch resource details for each
+        const eventsWithResources = [];
+        
+        for (const event of (eventsData.data || [])) {
+            const eventId = event.id;
+            const resourceRequests = resourceRequestsMap[eventId] || [];
+            
+            // Fetch resource details for this event
+            const rooms = [];
+            for (const request of resourceRequests) {
+                try {
+                    const resourceResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/resources/${request.resource_id}`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+                    
+                    if (resourceResponse.ok) {
+                        const resourceData = await resourceResponse.json();
+                        const resource = resourceData.data;
+                        
+                        if (resource.attributes?.kind === 'Room') {
+                            rooms.push({
+                                id: resource.id,
+                                name: resource.attributes?.name,
+                                kind: resource.attributes?.kind,
+                                approval_status: request.approval_status
+                            });
+                        }
+                    }
+                } catch (resourceError) {
+                    console.error('Error fetching resource:', resourceError);
+                }
+            }
+            
+            eventsWithResources.push({
+                id: eventId,
+                name: event.attributes.name,
+                starts_at: event.attributes.starts_at,
+                ends_at: event.attributes.ends_at,
+                summary: event.attributes.summary,
+                description: event.attributes.description,
+                visible_in_church_center: event.attributes.visible_in_church_center,
+                approval_status: event.attributes.approval_status,
+                rooms: rooms,
+                resource_count: resourceRequests.length
+            });
+        }
+
+        console.log('Processed', eventsWithResources.length, 'events with resource details');
+
+        return Response.json({ 
+            events: eventsWithResources,
+            count: eventsWithResources.length
+        });
+
+    } catch (error) {
+        console.error('Get PCO calendar events error:', error);
+        return Response.json({ 
+            error: error.message, 
+            events: [],
+            details: 'Check function logs for more information'
+        }, { status: 500 });
+    }
+});
