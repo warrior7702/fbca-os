@@ -66,12 +66,7 @@ export default function Calendar() {
 
       const eventsData = eventsResponse.data.events;
       console.log('✅ Loaded', eventsData.length, 'events');
-      
-      // Log first few events to check dates
-      if (eventsData.length > 0) {
-        console.log('📅 First event:', eventsData[0].name, 'on', eventsData[0].starts_at);
-        console.log('📅 Last event:', eventsData[eventsData.length - 1].name, 'on', eventsData[eventsData.length - 1].starts_at);
-      }
+      console.log('📊 Sample event:', eventsData[0]);
       
       setEvents(eventsData);
       setLastSync(new Date());
@@ -89,6 +84,7 @@ export default function Calendar() {
       });
       
       const uniqueKinds = Array.from(kindsSet).sort();
+      console.log('🔧 Extracted resource kinds:', uniqueKinds);
       setResourceKinds(uniqueKinds);
 
       // Extract unique tags
@@ -102,6 +98,7 @@ export default function Calendar() {
       });
       
       const uniqueTags = Array.from(tagsSet).sort();
+      console.log('🏷️ Extracted tags:', uniqueTags);
       setEventTags(uniqueTags);
 
       toast.success(`Loaded ${eventsData.length} events`);
