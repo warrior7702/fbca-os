@@ -24,6 +24,7 @@ import ImportCardholders from './pages/ImportCardholders';
 import TestCardholders from './pages/TestCardholders';
 import AdminSetup from './pages/AdminSetup';
 import Calendar from './pages/Calendar';
+import SupportTickets from './pages/SupportTickets';
 import Layout from './Layout.jsx';
 
 
@@ -54,6 +55,7 @@ export const PAGES = {
     "TestCardholders": TestCardholders,
     "AdminSetup": AdminSetup,
     "Calendar": Calendar,
+    "SupportTickets": SupportTickets,
 }
 
 export const pagesConfig = {
