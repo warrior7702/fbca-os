@@ -149,34 +149,55 @@ export default function MyApprovals() {
     try {
       console.log('📤 Sending badge code to PCO:', cardholder.pin);
       
-      const response = await base44.functions.invoke('writePCONote', {
+      // 1. Write the badge code to PCO notes
+      const noteResponse = await base44.functions.invoke('writePCONote', {
         request_id: approval.request_id,
         event_id: approval.event_id,
         badge_code: `${cardholder.pin}#`,
         append: true
       });
 
-      if (response.data.ok) {
-        toast.success(`Badge code ${cardholder.pin}# sent to ${approval.event_name}!`);
+      if (!noteResponse.data.ok) {
+        toast.error('Failed to send badge code: ' + (noteResponse.data.error || 'Unknown error'));
+        return;
+      }
+
+      // 2. Automatically approve the request since we assigned the code
+      console.log('✅ Badge code sent, now approving request...');
+      const approveResponse = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id,
+        action: 'approve',
+        note: `Badge code ${cardholder.pin}# assigned to ${cardholder.name} via FBCA OS by ${user?.full_name || user?.email}`
+      });
+
+      if (approveResponse.data.ok) {
+        toast.success(`Badge code ${cardholder.pin}# sent and request approved!`);
         
-        // Mark as sent in local storage
+        // Clear the sent code from localStorage since it's now approved
         setSentCodes(prev => {
-          const updated = {
-            ...prev,
-            [approval.request_id]: {
-              code: cardholder.pin,
-              cardholder: cardholder.name,
-              sentAt: new Date().toISOString()
-            }
-          };
+          const updated = { ...prev };
+          delete updated[approval.request_id];
           return updated;
         });
+        
+        // Refresh the approvals list
+        await handleSync();
       } else {
-        toast.error('Failed to send badge code: ' + (response.data.error || 'Unknown error'));
+        // Code was sent but approval failed - still mark as sent
+        toast.warning(`Badge code sent, but auto-approval failed: ${approveResponse.data.error || 'Unknown error'}`);
+        
+        setSentCodes(prev => ({
+          ...prev,
+          [approval.request_id]: {
+            code: cardholder.pin,
+            cardholder: cardholder.name,
+            sentAt: new Date().toISOString()
+          }
+        }));
       }
     } catch (error) {
-      console.error('Error sending badge code:', error);
-      toast.error('Failed to send badge code');
+      console.error('Error in handleSendCodeToPCO:', error);
+      toast.error('Failed to complete operation');
     } finally {
       setSavingCode(prev => ({ ...prev, [approval.request_id]: false }));
     }
