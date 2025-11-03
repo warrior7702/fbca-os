@@ -158,7 +158,8 @@ export default function Layout({ children, currentPageName }) {
 
   const performLiveSearch = async (query) => {
     setSearching(true);
-    setShowResults(true);
+    // Don't set showResults here, let the onFocus handle it based on totalResults
+    // setShowResults(true); 
 
     console.log('🔍 Starting live search for:', query);
 
@@ -214,10 +215,18 @@ export default function Layout({ children, currentPageName }) {
       });
 
       setSearchResults(newResults);
+      // After updating search results, if there are any, and search query is long enough, show results
+      if ((newResults.staff.length + newResults.files.length + newResults.modules.length) > 0) {
+        setShowResults(true);
+      } else {
+        setShowResults(false);
+      }
+      
     } catch (error) {
       console.error('❌ Live search error:', error);
       // Still set whatever results we have, or clear if a critical error
       setSearchResults({ staff: [], files: [], modules: [] });
+      setShowResults(false);
     } finally {
       setSearching(false);
     }
@@ -379,8 +388,7 @@ export default function Layout({ children, currentPageName }) {
                     setSearchQuery(e.target.value);
                   }}
                   onFocus={() => {
-                    console.log('🔍 Search focused, query:', searchQuery);
-                    if (searchQuery.length >= 2) {
+                    if (searchQuery.length >= 2 && totalResults > 0) {
                       setShowResults(true);
                     }
                   }}
@@ -393,18 +401,12 @@ export default function Layout({ children, currentPageName }) {
             </form>
 
             {/* Live Search Results Dropdown */}
-            {showResults && (
+            {showResults && totalResults > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute bottom-12 left-0 right-0 bg-white rounded-lg shadow-2xl border border-slate-200 max-h-96 overflow-y-auto z-50"
               >
-                {totalResults === 0 && !searching && (
-                  <div className="p-4 text-center text-slate-500 text-sm">
-                    No results found for "{searchQuery}"
-                  </div>
-                )}
-
                 {/* Staff Results */}
                 {searchResults.staff.length > 0 && (
                   <div className="p-2">
@@ -481,20 +483,18 @@ export default function Layout({ children, currentPageName }) {
                 )}
 
                 {/* View All Results */}
-                {totalResults > 0 && (
-                  <div className="p-2 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
-                        setShowResults(false);
-                        setSearchQuery("");
-                      }}
-                      className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium py-2"
-                    >
-                      View all results for "{searchQuery}"
-                    </button>
-                  </div>
-                )}
+                <div className="p-2 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
+                      setShowResults(false);
+                      setSearchQuery("");
+                    }}
+                    className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium py-2"
+                  >
+                    View all results for "{searchQuery}"
+                  </button>
+                </div>
               </motion.div>
             )}
           </div>
