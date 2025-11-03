@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   CheckSquare,
-  Calendar,
+  Calendar as CalendarIcon, // Aliased to CalendarIcon as per instruction and new usage
   Mail,
   ExternalLink,
   Loader2,
@@ -22,11 +22,14 @@ import {
   Tag,
   Maximize2,
   ListChecks,
-  Info, // Added Info icon
-  RefreshCw, // Added RefreshCw icon
-  Ticket as TicketIcon, // Added TicketIcon
-  AlertCircle, // Added AlertCircle
-  Sparkles // Added Sparkles icon for suggested solution
+  Info,
+  RefreshCw,
+  Ticket as TicketIcon,
+  AlertCircle,
+  Sparkles,
+  User, // Added User icon
+  Key,  // Added Key icon
+  Clock, // Added Clock icon for schedule
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -37,7 +40,7 @@ import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import EmailDetailModal from "../components/emails/EmailDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-import { useNavigate } from "react-router-dom"; // Assuming react-router-dom for navigation
+import { useNavigate } from "react-router-dom";
 
 const CATEGORY_COLORS = {
   'Action Needed': '#c43e00',
@@ -59,34 +62,35 @@ export default function MyTasks() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState(null);
-  const [showEmailDetail, setShowEmailDetail] = useState(false); // Re-used for new modal trigger
-  const [supportTickets, setSupportTickets] = useState([]); // New state for support tickets
-  const [loadingTickets, setLoadingTickets] = useState(false); // New loading state
+  const [showEmailDetail, setShowEmailDetail] = useState(false);
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
 
-  const navigate = useNavigate(); // Initialize useNavigate
+  // NEW: My Schedule state
+  const [myScheduleEvents, setMyScheduleEvents] = useState([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [myApprovalGroups, setMyApprovalGroups] = useState([]);
 
-  // Helper to create page URLs based on name, assuming a simple convention
+
+  const navigate = useNavigate();
+
   const createPageUrl = (pageName) => {
     switch (pageName) {
-      case 'SupportTickets': return '/support-tickets'; // Example route
-      // Add other page mappings as needed
+      case 'SupportTickets': return '/support-tickets';
       default: return `/${pageName.toLowerCase()}`;
     }
   };
 
   useEffect(() => {
     loadData();
+    loadMySchedule(); // Load schedule on initial mount
   }, []);
 
-  // New useEffect hook to load support tickets when user data is available
   useEffect(() => {
     if (user) {
-      // The outline suggests separate load functions for tasks, emails, etc.
-      // but the original file has a single `loadData`.
-      // `loadSupportTickets` will be called here as it depends on `user` being available.
       loadSupportTickets();
     }
-  }, [user]); // Re-run when user object changes
+  }, [user]);
 
   const loadData = async () => {
     setLoading(true);
@@ -103,7 +107,6 @@ export default function MyTasks() {
         toast.error('Please connect ClickUp or Microsoft 365 in Settings');
       }
 
-      // Load tasks in parallel for faster loading
       const taskPromises = [];
 
       if (currentUser.clickup_access_token) {
@@ -128,7 +131,6 @@ export default function MyTasks() {
         taskPromises.push(
           base44.functions.invoke('getMicrosoftToDo')
             .then(res => {
-              // Fix To Do API error: Check for 'tasks' property or if 'res.data' itself is the array
               const tasks = res.data.tasks || res.data || [];
               console.log('✅ Microsoft To Do tasks loaded:', tasks.length || 0);
               if (tasks.length > 0) {
@@ -141,7 +143,6 @@ export default function MyTasks() {
             })
             .catch(error => {
               console.error('❌ Error fetching Microsoft To Do:', error);
-              // Check if it's a 403 permission error
               if (error.response?.status === 403) {
                 toast.error('Microsoft To Do access denied. Please reconnect Microsoft 365 in Settings to grant Tasks permission.');
               } else {
@@ -165,7 +166,6 @@ export default function MyTasks() {
         );
       }
 
-      // Wait for all to complete in parallel
       const results = await Promise.all(taskPromises);
 
       results.forEach(result => {
@@ -191,7 +191,7 @@ export default function MyTasks() {
   const loadSupportTickets = async () => {
     setLoadingTickets(true);
     try {
-      if (user?.email) { // Ensure user and email are available
+      if (user?.email) {
         const allTickets = await base44.entities.Ticket.filter({
           assigned_to: user.email,
           status: { $in: ['open', 'in_progress', 'pending'] }
@@ -200,7 +200,7 @@ export default function MyTasks() {
         console.log('✅ Support Tickets loaded:', allTickets.length);
       } else {
         console.warn('⚠️ User email not available for support ticket load.');
-        setSupportTickets([]); // Clear tickets if user email is not present
+        setSupportTickets([]);
       }
     } catch (error) {
       console.error('Error loading support tickets:', error);
@@ -210,8 +210,72 @@ export default function MyTasks() {
     }
   };
 
+  // NEW: Load calendar events with my approval groups
+  const loadMySchedule = async () => {
+    setLoadingSchedule(true);
+    try {
+      // First get my approval groups from pending approvals
+      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
+      const approvals = approvalsResponse.data.pending_approvals || [];
+
+      // Extract unique approval group names
+      const groups = [...new Set(approvals.map(a => a.approval_group_name))];
+      setMyApprovalGroups(groups);
+
+      // Fetch calendar events
+      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      const allEvents = eventsResponse.data.events || [];
+
+      // Filter events that have resources matching my approval groups
+      const myEvents = allEvents.filter(event => {
+        return event.resources && event.resources.some(resource => {
+          // Match resource names with approval group resources
+          return approvals.some(approval =>
+            approval.resource_name === resource.name
+          );
+        });
+      });
+
+      // Sort by date
+      myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+      // Fetch door codes for each event
+      for (const event of myEvents) {
+        try {
+          const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
+            event_id: event.event_id
+          });
+
+          if (commentsResponse.data.comments) {
+            // Find door code comments
+            const doorCodeComment = commentsResponse.data.comments.find(c =>
+              c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+            );
+
+            if (doorCodeComment) {
+              // Extract door code from comment
+              const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+              if (match) {
+                event.posted_door_code = match[1];
+                event.posted_by = doorCodeComment.created_by;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching comments for event:', event.event_id, error);
+        }
+      }
+
+      setMyScheduleEvents(myEvents);
+    } catch (error) {
+      console.error('Error loading schedule:', error);
+      toast.error('Failed to load schedule');
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
   const handleTaskClick = (task) => {
-    // Microsoft To Do tasks open in browser
     if (task.source === 'microsoft_todo') {
       if (task.url) {
         window.open(task.url, '_blank', 'noopener,noreferrer');
@@ -219,24 +283,21 @@ export default function MyTasks() {
       return;
     }
 
-    // ClickUp tasks open modal
     setSelectedTask(task);
     setShowTaskDetail(true);
   };
 
   const handleCompleteTask = async (task, e) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
 
     try {
       if (task.source === 'microsoft_todo') {
-        // Complete Microsoft To Do task
         await base44.functions.invoke('completeMicrosoftToDoTask', {
           list_id: task.list_id,
           task_id: task.id
         });
         toast.success('Task completed!');
       } else {
-        // Complete ClickUp task
         await base44.functions.invoke('updateClickUpTask', {
           task_id: task.id,
           closed: true
@@ -244,7 +305,6 @@ export default function MyTasks() {
         toast.success('Task closed!');
       }
 
-      // Reload data
       await loadData();
     } catch (error) {
       console.error('Error completing task:', error);
@@ -253,30 +313,25 @@ export default function MyTasks() {
   };
 
   const handleTaskUpdate = async () => {
-    // Reload tasks after update
     await loadData();
   };
 
-  // handleEmailClick function removed as per new logic
-
-  // Combine all tasks
   const allTasks = [...clickupTasks, ...todoTasks];
 
   console.log('📊 Total tasks:', allTasks.length, '(ClickUp:', clickupTasks.length, ', To Do:', todoTasks.length, ')');
 
-  // My Day: Tasks due today from both ClickUp AND Microsoft To Do
   const myDayTasks = allTasks.filter(task =>
     task.due_date && isToday(new Date(task.due_date))
   );
 
   const LIST_COLORS = {
-    'Special Event Master': '#22c55e', // green-500
-    'Facilities Work Orders': '#0ea5e9', // sky-500
-    'Marketing': '#f59e0b', // amber-500
-    'IT & Technology': '#8b5cf6', // violet-500
-    'Worship & Production': '#ec4899', // pink-500
-    'Admin & Operations': '#6366f1', // indigo-500
-    'default': '#94a3b8' // slate-400
+    'Special Event Master': '#22c55e',
+    'Facilities Work Orders': '#0ea5e9',
+    'Marketing': '#f59e0b',
+    'IT & Technology': '#8b5cf6',
+    'Worship & Production': '#ec4899',
+    'Admin & Operations': '#6366f1',
+    'default': '#94a3b8'
   };
 
   const getStatusColor = (status) => {
@@ -295,7 +350,6 @@ export default function MyTasks() {
   const formatStatus = (status) => {
     if (!status) return 'No Status';
 
-    // Split by spaces, hyphens, or underscores
     return status
       .split(/[\s_-]+/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -338,20 +392,34 @@ export default function MyTasks() {
           description={`Welcome back, ${displayName}`}
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <Button onClick={loadData} variant="outline" size="sm">
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm">
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                Calendar
+              </Button>
+              <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sync
+                  </>
+                )}
+              </Button>
+            </div>
           }
         />
 
-        {/* Stats Cards (Placeholder, actual stats are not in original code for this section) */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {/* Example existing stat card (assuming there were others) */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <Calendar className="w-5 h-5 text-indigo-600" />
+                <CalendarIcon className="w-5 h-5 text-indigo-600" />
                 <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300">
                   Today
                 </Badge>
@@ -375,6 +443,111 @@ export default function MyTasks() {
             </CardContent>
           </Card>
         </div>
+
+        {/* NEW: My Schedule Section */}
+        <Card className="border-2 border-green-200 bg-green-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  <CalendarIcon className="w-6 h-6 text-green-600" />
+                  My Schedule
+                </CardTitle>
+                <p className="text-slate-600 text-sm mt-1">
+                  Upcoming events requiring your approval group • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <Button onClick={loadMySchedule} disabled={loadingSchedule} variant="outline" size="sm">
+                {loadingSchedule ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingSchedule ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <p className="text-slate-600">Loading your schedule...</p>
+              </div>
+            ) : myScheduleEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-600">No upcoming events with your approval groups</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {myScheduleEvents.slice(0, 10).map((event) => (
+                  <Card key={event.id} className="border border-green-200 hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-slate-900 mb-2">{event.name}</h3>
+
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mb-3">
+                            <div className="flex items-center gap-1">
+                              <CalendarIcon className="w-4 h-4 text-green-600" />
+                              {format(parseISO(event.starts_at), 'EEE, MMM d')}
+                            </div>
+                            <span>•</span>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4 text-green-600" />
+                              {format(parseISO(event.starts_at), 'h:mm a')}
+                            </div>
+                          </div>
+
+                          {event.resources && event.resources.length > 0 && (
+                            <div className="space-y-1 mb-3">
+                              <p className="text-xs font-semibold text-slate-700">Resources:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {event.resources.map((resource, idx) => (
+                                  <Badge key={idx} variant="outline" className="bg-white text-xs">
+                                    {resource.name} ({resource.kind})
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {event.posted_door_code && (
+                            <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Key className="w-4 h-4 text-green-700" />
+                                <span className="text-sm font-semibold text-green-900">Door Code Posted:</span>
+                                <span className="text-sm font-mono font-bold text-green-700">{event.posted_door_code}#</span>
+                              </div>
+                              {event.posted_by && (
+                                <p className="text-xs text-green-700 mt-1 ml-6">
+                                  Posted by: {event.posted_by}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${event.event_id}`, '_blank')}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {myScheduleEvents.length > 10 && (
+                  <p className="text-sm text-slate-500 text-center pt-2">
+                    Showing first 10 events • {myScheduleEvents.length - 10} more
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
 
         {/* My Day */}
@@ -447,7 +620,7 @@ export default function MyTasks() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
+                <CalendarIcon className="w-5 h-5" />
                 Task Calendar
               </CardTitle>
               <CardDescription>Your upcoming tasks</CardDescription>
@@ -543,7 +716,7 @@ export default function MyTasks() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4" // Added space-y-4 for separation between the main title and category cards
+            className="space-y-4"
           >
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Mail className="w-5 h-5 text-blue-600" />
@@ -556,33 +729,31 @@ export default function MyTasks() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
-                  const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default; // Still useful for the color dot
-                  
+                  const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
+
                   return (
                     <Card key={category} className="bg-slate-50">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-sm flex items-center justify-between">
                           <span className="flex items-center gap-2">
-                            {/* Re-added color dot for category as per original styling, alongside Tag icon */}
-                            <span 
-                              className="h-3 w-3 rounded-full flex-shrink-0" 
+                            <span
+                              className="h-3 w-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: categoryColor }}
                             />
                             {category}
                           </span>
                           <Badge variant="secondary">{categoryEmails.length}</Badge>
                         </CardTitle>
-                        {/* Removed CardDescription here as it's now part of CardTitle */}
                       </CardHeader>
                       <CardContent className="pt-0">
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2"> {/* Added pr-2 to prevent scrollbar overlap */}
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
                           {categoryEmails.slice(0, 5).map((email, idx) => (
                             <motion.div
-                              key={email.messageId || email.id} // Use messageId or id as fallback
+                              key={email.messageId || email.id}
                               whileHover={{ scale: 1.01 }}
                               onClick={() => {
                                 setSelectedEmail(email);
-                                setShowEmailDetail(true); // Open the detail modal
+                                setShowEmailDetail(true);
                               }}
                               className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                             >
@@ -625,7 +796,7 @@ export default function MyTasks() {
           </motion.div>
         )}
 
-        {/* Support Tickets Section - NEW */}
+        {/* Support Tickets Section */}
         {supportTickets.length > 0 && (
           <Card>
             <CardHeader>
@@ -634,8 +805,8 @@ export default function MyTasks() {
                   <TicketIcon className="w-5 h-5 text-purple-600" />
                   My Support Tickets ({supportTickets.length})
                 </CardTitle>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => navigate(createPageUrl('SupportTickets'))}
                 >
