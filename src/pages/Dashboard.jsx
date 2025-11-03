@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -17,7 +18,8 @@ import {
   Ticket,
   Building2,
   Inbox,
-  Video
+  Video,
+  CalendarIcon // Added CalendarIcon import
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -27,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
+  { id: "calendar", name: "Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" }, // Added Calendar app
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
@@ -53,7 +56,8 @@ const getDefaultPositions = () => {
   return {
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
-    email: { row: 0, col: 2 },
+    calendar: { row: 0, col: 2 }, // Position for the new Calendar app
+    email: { row: 0, col: 3 }, // Adjusted email position
     marketing: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
