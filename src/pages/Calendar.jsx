@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Select,
@@ -16,6 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Calendar() {
   const [user, setUser] = useState(null);
@@ -25,7 +30,8 @@ export default function Calendar() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [selectedResource, setSelectedResource] = useState("all");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -46,8 +52,6 @@ export default function Calendar() {
       console.log('🔍 Fetching calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       console.log('📅 Full response:', eventsResponse);
-      console.log('📅 Response data:', eventsResponse.data);
-      console.log('📅 Events array:', eventsResponse.data?.events);
       
       if (!eventsResponse.data) {
         console.error('❌ No data in response');
@@ -60,31 +64,13 @@ export default function Calendar() {
       const eventsData = eventsResponse.data?.events || [];
       console.log('📅 Events data length:', eventsData.length);
       
-      if (eventsData.length === 0) {
-        console.warn('⚠️ No events returned from API');
-        console.log('📝 Response message:', eventsResponse.data.message);
-        console.log('📝 Debug info:', eventsResponse.data.debug);
-      }
-      
-      if (eventsData.length > 0) {
-        console.log('📅 First event:', eventsData[0]);
-        console.log('📅 Sample events:', eventsData.slice(0, 3));
-      }
-      
-      // Filter to only events with valid dates for display
       const validEvents = eventsData.filter(event => event.has_valid_dates);
       console.log('✅ Valid events for display:', validEvents.length);
-      
-      if (validEvents.length < eventsData.length) {
-        console.warn(`⚠️ Filtered out ${eventsData.length - validEvents.length} events without valid dates`);
-        const invalidEvents = eventsData.filter(event => !event.has_valid_dates);
-        console.log('📋 Events without dates:', invalidEvents.map(e => e.name));
-      }
       
       setEvents(validEvents);
       setLastSync(new Date());
 
-      // Extract unique rooms from events
+      // Extract unique rooms
       const roomsSet = new Set();
       validEvents.forEach(event => {
         if (event.rooms && Array.isArray(event.rooms)) {
@@ -105,8 +91,6 @@ export default function Calendar() {
       }
     } catch (error) {
       console.error('❌ Error loading calendar data:', error);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error details:', error.response?.data);
       toast.error('Failed to load calendar: ' + (error.message || 'Unknown error'));
       setEvents([]);
     } finally {
@@ -120,30 +104,38 @@ export default function Calendar() {
     setSyncing(false);
   };
 
-  // Filter events by selected resource
   const filteredEvents = selectedResource === "all" 
     ? events 
     : events.filter(event => 
         event.rooms?.some(room => room.id === selectedResource)
       );
 
-  console.log('📊 Rendering with:', {
-    totalEvents: events.length,
-    filteredEvents: filteredEvents.length,
-    selectedResource
-  });
+  // Calendar grid generation
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(monthStart);
+  const startDate = startOfWeek(monthStart);
+  const endDate = endOfWeek(monthEnd);
 
-  // Group events by date
-  const eventsByDate = {};
-  filteredEvents.forEach(event => {
-    const dateKey = format(new Date(event.starts_at), 'yyyy-MM-dd');
-    if (!eventsByDate[dateKey]) {
-      eventsByDate[dateKey] = [];
+  const generateCalendarDays = () => {
+    const days = [];
+    let day = startDate;
+
+    while (day <= endDate) {
+      days.push(day);
+      day = addDays(day, 1);
     }
-    eventsByDate[dateKey].push(event);
-  });
 
-  const sortedDates = Object.keys(eventsByDate).sort();
+    return days;
+  };
+
+  const getEventsForDay = (day) => {
+    return filteredEvents.filter(event => {
+      const eventDate = parseISO(event.starts_at);
+      return isSameDay(eventDate, day);
+    });
+  };
+
+  const calendarDays = generateCalendarDays();
 
   if (loading) {
     return (
@@ -166,7 +158,7 @@ export default function Calendar() {
           title="Church Calendar"
           description={
             <div className="flex items-center gap-2">
-              <span>{filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} in the next 60 days</span>
+              <span>{filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}</span>
               {lastSync && (
                 <span className="text-xs text-slate-500">
                   • Last synced: {format(lastSync, 'h:mm a')}
@@ -221,66 +213,144 @@ export default function Calendar() {
               No upcoming events in Planning Center Calendar
             </p>
           </div>
-        ) : filteredEvents.length === 0 ? (
-          <div className="text-center py-20">
-            <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Events for Selected Room</h3>
-            <p className="text-slate-600">
-              Try selecting a different room or "All Rooms"
-            </p>
-          </div>
         ) : (
-          <div className="space-y-8">
-            {sortedDates.map(dateKey => (
-              <div key={dateKey}>
-                <h2 className="text-xl font-bold text-slate-900 mb-4">
-                  {format(new Date(dateKey), 'EEEE, MMMM d, yyyy')}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            {/* Calendar Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {format(currentMonth, 'MMMM yyyy')}
                 </h2>
-                <div className="space-y-3">
-                  <AnimatePresence>
-                    {eventsByDate[dateKey].map(event => (
-                      <motion.div
-                        key={event.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="bg-white rounded-lg border-2 border-blue-200 p-4 hover:shadow-lg transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                              {event.name}
-                            </h3>
-                            <div className="flex items-center gap-3 text-sm text-slate-600 mb-2">
-                              <span>
-                                {format(new Date(event.starts_at), 'h:mm a')} - {format(new Date(event.ends_at), 'h:mm a')}
-                              </span>
-                            </div>
-                            {event.rooms && event.rooms.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {event.rooms.map(room => (
-                                  <Badge key={room.id} variant="secondary">
-                                    {room.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                            {event.description && (
-                              <p className="text-sm text-slate-600 mt-2">
-                                {event.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
-            ))}
+              <Button
+                variant="outline"
+                onClick={() => setCurrentMonth(new Date())}
+              >
+                Today
+              </Button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {/* Day headers */}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
+                  {day}
+                </div>
+              ))}
+
+              {/* Calendar days */}
+              {calendarDays.map((day, index) => {
+                const dayEvents = getEventsForDay(day);
+                const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isToday = isSameDay(day, new Date());
+
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.01 }}
+                    className={`min-h-32 border border-slate-200 p-2 ${
+                      !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
+                    } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
+                  >
+                    <div className={`text-sm font-semibold mb-1 ${
+                      isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
+                    }`}>
+                      {format(day, 'd')}
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 3).map((event, idx) => (
+                        <motion.div
+                          key={event.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          onClick={() => setSelectedEvent(event)}
+                          className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
+                        >
+                          {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
+                        </motion.div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="text-xs text-slate-500 font-medium pl-1">
+                          +{dayEvents.length - 3} more
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Event Detail Dialog */}
+      <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{selectedEvent?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 text-slate-600">
+                <CalendarIcon className="w-5 h-5" />
+                <div>
+                  <p className="font-semibold">
+                    {format(parseISO(selectedEvent.starts_at), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  <p className="text-sm">
+                    {format(parseISO(selectedEvent.starts_at), 'h:mm a')} - {format(parseISO(selectedEvent.ends_at), 'h:mm a')}
+                  </p>
+                </div>
+              </div>
+
+              {selectedEvent.rooms && selectedEvent.rooms.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Rooms:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEvent.rooms.map(room => (
+                      <Badge key={room.id} variant="secondary">
+                        {room.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedEvent.description && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Description:</p>
+                  <p className="text-slate-600">{selectedEvent.description}</p>
+                </div>
+              )}
+
+              <Button
+                onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${selectedEvent.event_id}`, '_blank')}
+                className="w-full"
+              >
+                View in Planning Center
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
