@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,23 +13,15 @@ import {
   Clock,
   ExternalLink,
   MapPin,
-  User,
-  XCircle,
-  Building2,
   Users,
-  FileText
+  Key
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns"; // Added parseISO
-// Removed: import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal"; -> Will re-add placeholder
+import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-// Removed: import CardholderLookup from "../components/approvals/CardholderLookup"; // Added back -> Removed again
-
-// Placeholder components - these would typically be imported from other files
-// But for a self-contained, working example based on the outline, they are defined here.
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -47,42 +38,6 @@ const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   </div>
 );
 
-// Placeholder for ApprovalDetailModal - Re-introduced based on outline usage
-const ApprovalDetailModal = ({ approval, isOpen, onClose, onApprove, onDeny }) => {
-  if (!isOpen || !approval) return null;
-
-  const eventDate = approval.event_starts_at ? format(parseISO(approval.event_starts_at), 'MMM d, yyyy h:mm a') : 'Date not set';
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-lg">
-        <h2 className="text-2xl font-bold mb-4">{approval.event_name}</h2>
-        <p className="text-slate-700 mb-2"><strong>Resource:</strong> {approval.resource_name}</p>
-        <p className="text-slate-700 mb-2"><strong>Group:</strong> {approval.approval_group_name}</p>
-        <p className="text-slate-700 mb-4"><strong>Date/Time:</strong> {eventDate}</p>
-
-        {/* You might display more details here, possibly from `answerPreviews` if available */}
-        {/* For now, just a placeholder message for additional details */}
-        <p className="text-sm text-slate-600 mb-6">Additional request details would appear here.</p>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button className="bg-red-500 hover:bg-red-600 text-white" onClick={() => onDeny(approval)}>
-            <XCircle className="w-4 h-4 mr-2" /> Deny
-          </Button>
-          <Button className="bg-green-500 hover:bg-green-600 text-white" onClick={() => onApprove(approval)}>
-            <CheckCircle className="w-4 h-4 mr-2" /> Approve
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Placeholder for ApprovalFormModal
-const ApprovalFormModal = () => null;
-
-// Placeholder for FullApprovalCalendarModal
 const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
   if (!isOpen) return null;
   return (
@@ -93,7 +48,6 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
           <ApprovalCalendar
             approvals={approvals}
             onApprovalClick={(approval) => {
-              // Open in PCO instead of modal
               window.open(`https://calendar.planningcenteronline.com/events/${approval.event_id}`, '_blank');
             }}
           />
@@ -106,28 +60,17 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
   );
 };
 
-
 export default function MyApprovals() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [user, setUser] = useState(null);
   const [answerPreviews, setAnswerPreviews] = useState({});
-  const [sentCodes, setSentCodes] = useState(() => {
-    // Load sent codes from localStorage on mount
-    const saved = localStorage.getItem('sentDoorCodes');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  // New states from outline
   const [lastSync, setLastSync] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
-  // Re-introduced states for ApprovalDetailModal
+  const [showCardholderLookup, setShowCardholderLookup] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
 
-
-  // Group color mapping - returns Tailwind classes
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
 
@@ -176,7 +119,6 @@ export default function MyApprovals() {
       };
     }
 
-    // Default color
     return {
       border: 'border-slate-300',
       bg: 'bg-slate-50',
@@ -196,12 +138,6 @@ export default function MyApprovals() {
     }
   }, [approvals]);
 
-  // Persist sentCodes to localStorage whenever it changes - keeping this even if feature removed for future proofing
-  useEffect(() => {
-    localStorage.setItem('sentDoorCodes', JSON.stringify(sentCodes));
-  }, [sentCodes]);
-
-  // Auto-sync when page becomes visible again (e.g., returning from PCO tab)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !syncing) {
@@ -211,7 +147,6 @@ export default function MyApprovals() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -230,7 +165,7 @@ export default function MyApprovals() {
     try {
       const response = await base44.functions.invoke('getMyPendingApprovals');
       setApprovals(response.data.pending_approvals || []);
-      setLastSync(new Date()); // Update last sync time
+      setLastSync(new Date());
     } catch (error) {
       console.error('Error loading approvals:', error);
       toast.error('Failed to load approvals');
@@ -240,8 +175,6 @@ export default function MyApprovals() {
   };
 
   const loadAllAnswerPreviews = async () => {
-    // Only load previews for the first few approvals to avoid rate limits
-    // Changed to load all for displayed approvals if not already loaded
     for (const approval of approvals) {
       if (!answerPreviews[approval.request_id]) {
         loadAnswerPreview(approval);
@@ -251,15 +184,11 @@ export default function MyApprovals() {
 
   const loadAnswerPreview = async (approval) => {
     try {
-      // console.log('📋 Loading answers for:', approval.event_name);
-
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
         event_id: approval.event_id,
         resource_id: approval.resource_id
       });
-
-      // console.log('📥 Response from getApprovalDetails:', response.data);
 
       if (response.data?.answers && Object.keys(response.data.answers).length > 0) {
         const answeredQuestions = response.data.questions
@@ -269,85 +198,13 @@ export default function MyApprovals() {
             answer: response.data.answers[q.id]
           }));
 
-        // console.log('✅ Found answers:', answeredQuestions);
-
         setAnswerPreviews(prev => ({
           ...prev,
           [approval.request_id]: answeredQuestions
         }));
-      } else {
-        // console.log('⚠️ No answers found in response');
       }
     } catch (error) {
       console.error('❌ Error loading answer preview:', error);
-      console.error('Error details:', error.response?.data);
-    }
-  };
-
-  // Removed handleSendCodeToPCO as per outline changes
-
-  const handleApprovalSuccess = async () => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-    await handleSync();
-  };
-
-  const handleApprove = async (approval, formData = null) => {
-    try {
-      console.log('🔍 Attempting to approve:', approval.request_id);
-
-      let response;
-
-      if (formData) {
-        response = await base44.functions.invoke('approveWithClickUpTask', {
-          request_id: approval.request_id,
-          approval: approval,
-          form_data: formData
-        });
-      } else {
-        console.log('📞 Calling approveResourceRequest...');
-        response = await base44.functions.invoke('approveResourceRequest', {
-          request_id: approval.request_id,
-          action: 'approve',
-          note: `Approved via FBCA OS by ${user?.full_name || user?.email}`
-        });
-        console.log('✅ Function response:', response.data);
-      }
-
-      if (response.data.ok || response.data.success) {
-        toast.success('Approved successfully!');
-        await handleApprovalSuccess(); // Use shared success handler
-      } else {
-        console.error('❌ Approval failed:', response.data);
-        toast.error(response.data.error || 'Failed to approve');
-      }
-    } catch (error) {
-      console.error('❌ Full approval error:', error);
-      console.error('❌ Error response:', error.response?.data);
-      toast.error(error.response?.data?.error || 'Failed to approve request');
-    }
-  };
-
-  const handleDeny = async (approval) => {
-    try {
-      console.log('🔍 Attempting to deny:', approval.request_id);
-
-      const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id,
-        action: 'deny',
-        note: `Denied via FBCA OS by ${user?.full_name || user?.email}`
-      });
-
-      if (response.data.ok) {
-        toast.success('Request denied');
-        await handleApprovalSuccess(); // Use shared success handler
-      } else {
-        console.error('❌ Denial failed:', response.data);
-        toast.error(response.data.error || 'Failed to deny');
-      }
-    } catch (error) {
-      console.error('❌ Denial error:', error);
-      toast.error(error.response?.data?.error || 'Failed to deny request');
     }
   };
 
@@ -360,7 +217,7 @@ export default function MyApprovals() {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
-        setLastSync(new Date()); // Update last sync time
+        setLastSync(new Date());
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -370,17 +227,32 @@ export default function MyApprovals() {
     }
   };
 
-  // Re-introduced handleViewDetails for the "View Details" button
-  const handleViewDetails = (approval) => {
+  const handleSendCodeToPCO = (approval) => {
     setSelectedApproval(approval);
-    setShowDetailModal(true);
+    setShowCardholderLookup(true);
   };
 
-  const handleModalClose = () => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-  };
+  const handleCardholderSelected = async (cardholder) => {
+    try {
+      console.log('🚪 Posting door code to PCO event...');
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        event_id: selectedApproval.event_id,
+        badge_code: cardholder.pin
+      });
 
+      if (response.data.ok) {
+        toast.success('Door code posted to event activity in PCO!');
+        setShowCardholderLookup(false);
+        setSelectedApproval(null);
+      } else {
+        toast.error(response.data.error || 'Failed to post door code');
+      }
+    } catch (error) {
+      console.error('Error posting door code:', error);
+      toast.error('Failed to post door code to PCO');
+    }
+  };
 
   if (loading) {
     return (
@@ -526,27 +398,18 @@ export default function MyApprovals() {
 
                         <div className="flex gap-2 pt-4">
                           <Button
-                            onClick={() => handleViewDetails(approval)}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View Details
-                          </Button>
-                          <Button
-                            onClick={() => handleApprove(approval)}
+                            onClick={() => handleSendCodeToPCO(approval)}
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                           >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Approve
+                            <Key className="w-4 h-4 mr-2" />
+                            Write Code to PCO
                           </Button>
                           <Button
-                            onClick={() => handleDeny(approval)}
+                            onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${approval.event_id}`, '_blank')}
                             variant="outline"
-                            className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
                           >
-                            <XCircle className="w-4 h-4 mr-2" />
-                            Deny
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            View in PCO
                           </Button>
                         </div>
                       </CardContent>
@@ -559,19 +422,22 @@ export default function MyApprovals() {
         </div>
       </div>
 
-      <ApprovalDetailModal
-        approval={selectedApproval}
-        isOpen={showDetailModal}
-        onClose={handleModalClose}
-        onApprove={handleApprove}
-        onDeny={handleDeny}
-      />
-      <ApprovalFormModal />
       <FullApprovalCalendarModal
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
+
+      {showCardholderLookup && (
+        <CardholderLookup
+          isOpen={showCardholderLookup}
+          onClose={() => {
+            setShowCardholderLookup(false);
+            setSelectedApproval(null);
+          }}
+          onSelect={handleCardholderSelected}
+        />
+      )}
     </div>
   );
 }
