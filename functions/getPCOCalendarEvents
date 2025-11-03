@@ -39,6 +39,54 @@ async function refreshTokenIfNeeded(base44, user) {
     return tokens.access_token;
 }
 
+async function fetchAllInstances(accessToken, baseUrl) {
+    let allInstances = [];
+    let nextUrl = baseUrl;
+    let pageCount = 0;
+    const maxPages = 10; // Safety limit to prevent infinite loops
+    
+    while (nextUrl && pageCount < maxPages) {
+        pageCount++;
+        console.log(`📄 Fetching page ${pageCount}...`);
+        
+        const response = await fetch(nextUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ PCO instances fetch failed:', response.status, errorText);
+            throw new Error(`Failed to fetch calendar events: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+            allInstances = allInstances.concat(data.data);
+            console.log(`  ✅ Got ${data.data.length} instances (total: ${allInstances.length})`);
+        }
+        
+        // Check for next page
+        nextUrl = data.links?.next;
+        
+        // Also merge included data from all pages
+        if (data.included) {
+            if (!allInstances.allIncluded) {
+                allInstances.allIncluded = [];
+            }
+            allInstances.allIncluded = allInstances.allIncluded.concat(data.included);
+        }
+    }
+    
+    console.log(`📊 Total pages fetched: ${pageCount}`);
+    console.log(`📊 Total instances: ${allInstances.length}`);
+    
+    return allInstances;
+}
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -65,34 +113,22 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        console.log('📅 Fetching EVENT INSTANCES from PCO...');
+        console.log('📅 Fetching EVENT INSTANCES from PCO (with pagination)...');
 
-        // Get event instances with tags included
-        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100&include=event,event_resource_requests,tags`;
+        // Fetch from today forward, with pagination
+        const today = new Date().toISOString().split('T')[0];
+        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=after,${today}&order=starts_at&per_page=100&include=event,event_resource_requests,tags`;
         
-        console.log('🔗 Request URL:', instancesUrl);
+        console.log('🔗 Base URL:', baseUrl);
         
-        const instancesResponse = await fetch(instancesUrl, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        console.log('📡 Response status:', instancesResponse.status);
-
-        if (!instancesResponse.ok) {
-            const errorText = await instancesResponse.text();
-            console.error('❌ PCO instances fetch failed:', instancesResponse.status, errorText);
-            return Response.json({ 
-                error: 'Failed to fetch calendar events',
-                details: errorText,
-                events: []
-            }, { status: 500 });
-        }
-
-        const instancesData = await instancesResponse.json();
-        console.log('📦 Event instances array length:', instancesData.data?.length || 0);
+        // Fetch all pages
+        const allInstancesData = await fetchAllInstances(accessToken, baseUrl);
+        const instancesData = {
+            data: allInstancesData,
+            included: allInstancesData.allIncluded || []
+        };
+        
+        console.log('📦 Total event instances fetched:', instancesData.data?.length || 0);
         
         if (!instancesData.data || instancesData.data.length === 0) {
             console.warn('⚠️ No event instances in response from PCO');
@@ -181,7 +217,7 @@ Deno.serve(async (req) => {
                         resources.push({
                             id: resource.id,
                             name: resource.attributes?.name,
-                            kind: resource.attributes?.kind, // AV, Room, Equipment, etc.
+                            kind: resource.attributes?.kind,
                             approval_status: request.approval_status
                         });
                     }
@@ -200,7 +236,7 @@ Deno.serve(async (req) => {
                 description: event?.attributes?.description,
                 visible_in_church_center: event?.attributes?.visible_in_church_center,
                 approval_status: event?.attributes?.approval_status,
-                resources: resources, // Now includes all resource kinds with their kind attribute
+                resources: resources,
                 tags: eventTags,
                 resource_count: resourceRequests.length,
                 has_valid_dates: true
@@ -210,11 +246,17 @@ Deno.serve(async (req) => {
         console.log('🎯 Processed', eventsWithResources.length, 'event instances with valid dates');
         
         if (eventsWithResources.length > 0) {
+            console.log('📊 Date range:');
+            const dates = eventsWithResources.map(e => new Date(e.starts_at)).sort((a, b) => a - b);
+            console.log(`  First: ${dates[0].toISOString().split('T')[0]}`);
+            console.log(`  Last: ${dates[dates.length - 1].toISOString().split('T')[0]}`);
+            
             console.log('📊 First event sample:');
             const sample = eventsWithResources[0];
             console.log(`  - Name: ${sample.name}`);
-            console.log(`  - Tags: ${sample.tags.join(', ')}`);
-            console.log(`  - Resources: ${sample.resources.map(r => `${r.name} (${r.kind})`).join(', ')}`);
+            console.log(`  - Date: ${sample.starts_at}`);
+            console.log(`  - Tags: ${sample.tags.join(', ') || 'none'}`);
+            console.log(`  - Resources: ${sample.resources.map(r => `${r.name} (${r.kind})`).join(', ') || 'none'}`);
         }
 
         return Response.json({ 
