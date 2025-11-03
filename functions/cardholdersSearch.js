@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Read from POST body instead of URL params
+    // Read from POST body
     const body = await req.json().catch(() => ({}));
     const q = body.q || '';
     const limit = parseInt(body.limit || '12', 10);
@@ -45,11 +45,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Log first few records for debugging
-    console.log(`📋 Sample records:`, cardholders.slice(0, 3).map(c => ({ 
-      name: c.name, 
-      pin: c.pin 
-    })));
+    // Log first record structure
+    console.log(`📋 First record structure:`, cardholders[0]);
 
     // Score and filter results
     const results = cardholders
@@ -60,6 +57,9 @@ Deno.serve(async (req) => {
       .map(x => x.r);
 
     console.log(`✅ Found ${results.length} matching results`);
+    if (results.length > 0) {
+      console.log(`📋 First result:`, results[0]);
+    }
 
     return Response.json({ 
       ok: true, 
