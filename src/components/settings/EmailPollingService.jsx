@@ -1,34 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Mail, Zap, AlertCircle, Loader2, CheckCircle } from "lucide-react";
+import { Mail, AlertCircle, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EmailPollingService({ user }) {
-  const [webhookStatus, setWebhookStatus] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-
-  const setupWebhooks = async () => {
-    setLoading(true);
-    try {
-      const response = await base44.functions.invoke('setupEmailWebhooks');
-      
-      if (response.data.success) {
-        setWebhookStatus(response.data);
-        toast.success('Email webhooks configured!');
-      } else {
-        toast.error('Failed to setup webhooks: ' + (response.data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('❌ Webhook setup error:', error);
-      toast.error('Failed to setup webhooks: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const processEmailsNow = async () => {
     setProcessing(true);
@@ -63,7 +41,7 @@ export default function EmailPollingService({ user }) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-yellow-800">
-            Connect Microsoft 365 to enable automatic email processing.
+            Connect Microsoft 365 to enable email processing.
           </p>
         </CardContent>
       </Card>
@@ -73,23 +51,13 @@ export default function EmailPollingService({ user }) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
-              Instant Email Processing
-            </CardTitle>
-            <CardDescription className="mt-2">
-              Tickets are created automatically when emails arrive
-            </CardDescription>
-          </div>
-          {webhookStatus?.success && (
-            <Badge variant="default" className="bg-green-500">
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Active
-            </Badge>
-          )}
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Mail className="w-5 h-5 text-blue-600" />
+          Manual Email Processing
+        </CardTitle>
+        <CardDescription className="mt-2">
+          Check service inboxes and create tickets from emails
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Status */}
@@ -99,90 +67,33 @@ export default function EmailPollingService({ user }) {
               <Zap className="w-5 h-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-slate-900 mb-1">How It Works</h3>
+              <h3 className="font-semibold text-slate-900 mb-1">Email Processing</h3>
               <p className="text-sm text-slate-600 mb-2">
-                When an email arrives in any monitored inbox, Microsoft 365 immediately 
-                notifies our system and a ticket is created within seconds.
-              </p>
-              <p className="text-xs text-slate-500">
-                No browser tab needed - this runs 24/7 on the server.
+                Manually check the service inboxes and create tickets from unread emails.
+                Automatic processing is configured externally via Zapier.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Webhook Status */}
-        {webhookStatus && (
-          <div className="space-y-2">
-            <h4 className="font-semibold text-sm text-slate-700">Active Webhooks</h4>
-            <div className="space-y-2">
-              {webhookStatus.results?.map((result, idx) => (
-                <div 
-                  key={idx}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {result.success ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-600" />
-                    )}
-                    <span className="text-sm font-medium text-slate-700">
-                      {result.mailbox}
-                    </span>
-                  </div>
-                  {result.success && result.expiresAt && (
-                    <span className="text-xs text-slate-500">
-                      Expires {new Date(result.expiresAt).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="space-y-2">
-          <Button
-            onClick={setupWebhooks}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Setting Up...
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4 mr-2" />
-                {webhookStatus ? 'Renew Webhooks' : 'Enable Instant Processing'}
-              </>
-            )}
-          </Button>
-
-          <Button
-            onClick={processEmailsNow}
-            disabled={processing}
-            className="w-full"
-            variant="outline"
-          >
-            {processing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Mail className="w-4 h-4 mr-2" />
-                Check Emails Now (Manual)
-              </>
-            )}
-          </Button>
-        </div>
+        {/* Manual Check Button */}
+        <Button
+          onClick={processEmailsNow}
+          disabled={processing}
+          className="w-full"
+        >
+          {processing ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing Emails...
+            </>
+          ) : (
+            <>
+              <Mail className="w-4 h-4 mr-2" />
+              Check Emails Now
+            </>
+          )}
+        </Button>
 
         {/* Monitored Inboxes */}
         <div className="pt-4 border-t">
@@ -201,14 +112,6 @@ export default function EmailPollingService({ user }) {
               <span className="text-slate-600">cleaning@fbca.org</span>
             </div>
           </div>
-        </div>
-
-        {/* Important Note */}
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-xs text-yellow-800">
-            <strong>Note:</strong> Microsoft webhooks expire after 3 days. 
-            Click "Renew Webhooks" to extend for another 3 days.
-          </p>
         </div>
       </CardContent>
     </Card>
