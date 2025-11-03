@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -61,13 +62,9 @@ Deno.serve(async (req) => {
         // Refresh token if needed
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // Get date range - 2 weeks from today
-        const today = new Date();
-        const twoWeeksFromNow = new Date();
-        twoWeeksFromNow.setDate(today.getDate() + 14);
-
-        const startDate = today.toISOString().split('T')[0];
-        const endDate = twoWeeksFromNow.toISOString().split('T')[0];
+        // Set date range to October 2025
+        const startDate = '2025-10-01';
+        const endDate = '2025-10-31';
 
         console.log('Fetching events from', startDate, 'to', endDate);
 
@@ -118,6 +115,12 @@ Deno.serve(async (req) => {
         for (const event of (eventsData.data || [])) {
             const eventId = event.id;
             const resourceRequests = resourceRequestsMap[eventId] || [];
+            
+            // Skip events without valid dates
+            if (!event.attributes?.starts_at || !event.attributes?.ends_at) {
+                console.log('⏭️ Skipping event without dates:', event.attributes?.name);
+                continue;
+            }
             
             // Fetch resource details for this event
             const rooms = [];
