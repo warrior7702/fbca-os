@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -25,13 +24,11 @@ import {
   Loader2,
   RefreshCw,
   Filter,
-  Grid3x3,
-  List,
   Key,
   FileText,
   ExternalLink
 } from "lucide-react";
-import { format, parseISO, startOfDay, addDays } from "date-fns";
+import { format, parseISO, startOfDay, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
@@ -44,7 +41,6 @@ export default function Calendar() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [selectedResource, setSelectedResource] = useState("all");
-  const [viewMode, setViewMode] = useState("list");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [eventComments, setEventComments] = useState({});
@@ -186,7 +182,7 @@ export default function Calendar() {
   const groupEventsByDate = () => {
     const grouped = {};
     filteredEvents.forEach(event => {
-      if (!event.starts_at) return; // Skip events without start date
+      if (!event.starts_at) return;
       
       try {
         const dateKey = format(parseISO(event.starts_at), 'yyyy-MM-dd');
@@ -202,145 +198,76 @@ export default function Calendar() {
   };
 
   const renderCalendarView = () => {
+    const today = new Date();
+    const weekStart = startOfWeek(today);
+    const weekEnd = endOfWeek(today);
     const grouped = groupEventsByDate();
 
-    return (
-      <div className="grid grid-cols-7 gap-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center font-semibold text-slate-700 py-2">
-            {day}
-          </div>
-        ))}
-        
-        {Array.from({ length: 35 }).map((_, idx) => {
-          const date = addDays(startOfDay(new Date()), idx - 7);
-          const dateKey = format(date, 'yyyy-MM-dd');
-          const dayEvents = grouped[dateKey] || [];
+    // Generate 6 weeks (42 days) starting from beginning of current week
+    const totalDays = 42;
+    const startDate = weekStart;
 
-          return (
-            <div
-              key={idx}
-              className="min-h-[100px] bg-white border border-slate-200 rounded-lg p-2"
-            >
-              <div className="text-xs text-slate-500 mb-1">
-                {format(date, 'd')}
-              </div>
-              <div className="space-y-1">
-                {dayEvents.slice(0, 2).map(event => (
-                  <div
-                    key={event.id}
-                    onClick={() => handleEventClick(event)}
-                    className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded px-1 py-0.5 cursor-pointer truncate"
-                  >
-                    {event.name}
-                  </div>
-                ))}
-                {dayEvents.length > 2 && (
-                  <div className="text-xs text-slate-400">
-                    +{dayEvents.length - 2} more
-                  </div>
-                )}
-              </div>
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+        {/* Calendar Header - Days of Week */}
+        <div className="grid grid-cols-7 border-b border-slate-200">
+          {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+            <div key={day} className="text-center font-semibold text-slate-700 py-3 text-sm border-r border-slate-200 last:border-r-0">
+              {day}
             </div>
-          );
-        })}
-      </div>
-    );
-  };
+          ))}
+        </div>
 
-  const renderListView = () => {
-    const grouped = groupEventsByDate();
-    const sortedDates = Object.keys(grouped).sort();
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7">
+          {Array.from({ length: totalDays }).map((_, idx) => {
+            const date = addDays(startDate, idx);
+            const dateKey = format(date, 'yyyy-MM-dd');
+            const dayEvents = grouped[dateKey] || [];
+            const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+            const isCurrentMonth = date.getMonth() === today.getMonth();
 
-    return (
-      <div className="space-y-6">
-        {sortedDates.map(dateKey => {
-          let date;
-          try {
-            date = parseISO(dateKey);
-          } catch (e) {
-            console.error(`Error parsing dateKey "${dateKey}":`, e);
-            return null; // Skip invalid dates
-          }
-          
-          const dayEvents = grouped[dateKey];
-
-          return (
-            <div key={dateKey}>
-              <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-600" />
-                {format(date, 'EEEE, MMMM d, yyyy')}
-              </h3>
-              <div className="space-y-3">
-                {dayEvents.map(event => {
-                  const rooms = event.rooms || [];
-                  
-                  // Safety check for dates
-                  if (!event.starts_at || !event.ends_at) {
-                    return null;
-                  }
-                  
-                  let startsAt, endsAt;
-                  try {
-                    startsAt = parseISO(event.starts_at);
-                    endsAt = parseISO(event.ends_at);
-                  } catch (error) {
-                    console.error('Error parsing event dates:', event.name, error);
-                    return null;
-                  }
-                  
-                  return (
-                    <motion.div
-                      key={event.id}
-                      whileHover={{ scale: 1.01 }}
-                      onClick={() => handleEventClick(event)}
-                      className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-all cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900 mb-2">
-                            {event.name}
-                          </h4>
-                          <div className="flex flex-col gap-1 text-sm text-slate-600">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {format(startsAt, 'h:mm a')} - {format(endsAt, 'h:mm a')}
-                            </div>
-                            {rooms.length > 0 && (
-                              <div className="flex items-center gap-1 text-blue-600">
-                                <MapPin className="w-4 h-4 text-blue-600" />
-                                <span className="font-medium">
-                                  {rooms.map(r => r.name).join(', ')}
-                                </span>
-                              </div>
-                            )}
+            return (
+              <div
+                key={idx}
+                className={`min-h-[120px] p-2 border-r border-b border-slate-200 ${
+                  !isCurrentMonth ? 'bg-slate-50' : ''
+                } ${isToday ? 'bg-blue-50' : ''}`}
+              >
+                <div className={`text-sm font-medium mb-2 ${
+                  isToday ? 'text-blue-600' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
+                }`}>
+                  {format(date, 'd')}
+                </div>
+                <div className="space-y-1">
+                  {dayEvents.slice(0, 3).map(event => {
+                    const rooms = event.rooms || [];
+                    return (
+                      <div
+                        key={event.id}
+                        onClick={() => handleEventClick(event)}
+                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-900 rounded px-2 py-1 cursor-pointer truncate transition-colors"
+                        title={event.name}
+                      >
+                        <div className="font-medium truncate">{event.name}</div>
+                        {rooms.length > 0 && (
+                          <div className="text-blue-700 text-[10px] truncate mt-0.5">
+                            {rooms.map(r => r.name).join(', ')}
                           </div>
-                          {event.summary && (
-                            <p className="text-sm text-slate-500 mt-2 line-clamp-2">
-                              {event.summary}
-                            </p>
-                          )}
-                        </div>
-                        <ExternalLink className="w-5 h-5 text-slate-400" />
+                        )}
                       </div>
-                    </motion.div>
-                  );
-                })}
+                    );
+                  })}
+                  {dayEvents.length > 3 && (
+                    <div className="text-xs text-slate-500 px-2">
+                      +{dayEvents.length - 3} more
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-        {sortedDates.length === 0 && (
-          <div className="text-center py-12">
-            <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500">No events found</p>
-            {selectedResource !== "all" && (
-              <p className="text-xs text-slate-400 mt-2">
-                Try selecting "All Resources" to see all events
-              </p>
-            )}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -360,7 +287,7 @@ export default function Calendar() {
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-[1600px] mx-auto p-6 space-y-6">
         {!user?.pco_access_token && <ConnectionWarning />}
 
         <AppHeader
@@ -378,41 +305,19 @@ export default function Calendar() {
           }
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <div className="flex items-center gap-2">
-              <div className="flex bg-white rounded-lg shadow-sm border border-slate-200">
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-blue-500 hover:bg-blue-600' : ''}
-                >
-                  <List className="w-4 h-4 mr-1" />
-                  List
-                </Button>
-                <Button
-                  variant={viewMode === 'calendar' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('calendar')}
-                  className={viewMode === 'calendar' ? 'bg-blue-500 hover:bg-blue-600' : ''}
-                >
-                  <Grid3x3 className="w-4 h-4 mr-1" />
-                  Calendar
-                </Button>
-              </div>
-              <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                {syncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync from PCO
-                  </>
-                )}
-              </Button>
-            </div>
+            <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+              {syncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Sync from PCO
+                </>
+              )}
+            </Button>
           }
         />
 
@@ -437,7 +342,7 @@ export default function Calendar() {
           </CardContent>
         </Card>
 
-        {viewMode === 'calendar' ? renderCalendarView() : renderListView()}
+        {renderCalendarView()}
       </div>
 
       <Dialog open={showEventDetail} onOpenChange={setShowEventDetail}>
