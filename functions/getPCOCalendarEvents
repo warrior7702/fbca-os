@@ -42,6 +42,7 @@ async function refreshTokenIfNeeded(base44, user) {
 
 async function fetchAllInstances(accessToken, baseUrl) {
     let allInstances = [];
+    let allIncluded = []; // Initialize allIncluded array
     let nextUrl = baseUrl;
     let pageCount = 0;
     const maxPages = 10; // Safety limit to prevent infinite loops
@@ -70,22 +71,20 @@ async function fetchAllInstances(accessToken, baseUrl) {
             console.log(`  ✅ Got ${data.data.length} instances (total: ${allInstances.length})`);
         }
         
-        // Check for next page
-        nextUrl = data.links?.next;
-        
-        // Also merge included data from all pages
-        if (data.included) {
-            if (!allInstances.allIncluded) {
-                allInstances.allIncluded = [];
-            }
-            allInstances.allIncluded = allInstances.allIncluded.concat(data.included);
+        // Collect included data from all pages
+        if (data.included && data.included.length > 0) {
+            allIncluded = allIncluded.concat(data.included);
+            console.log(`  📦 Got ${data.included.length} included items (total: ${allIncluded.length})`);
         }
+        
+        nextUrl = data.links?.next;
     }
     
     console.log(`📊 Total pages fetched: ${pageCount}`);
     console.log(`📊 Total instances: ${allInstances.length}`);
+    console.log(`📊 Total included items: ${allIncluded.length}`); // New log
     
-    return allInstances;
+    return { data: allInstances, included: allIncluded }; // Return object with data and included
 }
 
 Deno.serve(async (req) => {
@@ -121,12 +120,8 @@ Deno.serve(async (req) => {
         
         console.log('🔗 Base URL:', baseUrl);
         
-        // Fetch all pages
-        const allInstancesData = await fetchAllInstances(accessToken, baseUrl);
-        const instancesData = {
-            data: allInstancesData,
-            included: allInstancesData.allIncluded || []
-        };
+        // Fetch all pages with included data
+        const instancesData = await fetchAllInstances(accessToken, baseUrl); // instancesData is now { data, included }
         
         console.log('📦 Total event instances fetched:', instancesData.data?.length || 0);
         
@@ -138,10 +133,12 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Build maps from included data
+        // Build maps from ALL included data
         const eventMap = {};
         const resourceRequestsMap = {};
         const tagsMap = {};
+        
+        console.log('🔨 Building maps from', instancesData.included?.length || 0, 'included items...'); // New log
         
         if (instancesData.included) {
             for (const item of instancesData.included) {
@@ -172,6 +169,7 @@ Deno.serve(async (req) => {
 
         // Process event instances
         const eventsWithResources = [];
+        let missingEventCount = 0; // New variable
         
         for (const instance of instancesData.data) {
             const eventId = instance.relationships?.event?.data?.id;
@@ -184,6 +182,11 @@ Deno.serve(async (req) => {
             if (!starts_at || !ends_at) {
                 console.warn('⚠️ Skipping instance without dates:', instance.id);
                 continue;
+            }
+            
+            // Check if event name is missing
+            if (!event || !event.attributes?.name) {
+                missingEventCount++;
             }
             
             // Get tags for this event
@@ -243,20 +246,18 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log('🎯 Processed', eventsWithResources.length, 'event instances with valid dates');
+        console.log('🎯 Processed', eventsWithResources.length, 'event instances'); // Modified log
+        console.log('⚠️ Events with missing names:', missingEventCount); // New log
         
         if (eventsWithResources.length > 0) {
-            console.log('📊 Date range:');
             const dates = eventsWithResources.map(e => new Date(e.starts_at)).sort((a, b) => a - b);
-            console.log(`  First: ${dates[0].toISOString().split('T')[0]}`);
-            console.log(`  Last: ${dates[dates.length - 1].toISOString().split('T')[0]}`);
+            console.log(`📅 Date range: ${dates[0].toISOString().split('T')[0]} to ${dates[dates.length - 1].toISOString().split('T')[0]}`); // Modified log
             
-            console.log('📊 First event sample:');
-            const sample = eventsWithResources[0];
-            console.log(`  - Name: ${sample.name}`);
-            console.log(`  - Date: ${sample.starts_at}`);
-            console.log(`  - Tags: ${sample.tags.join(', ') || 'none'}`);
-            console.log(`  - Resources: ${sample.resources.map(r => `${r.name} (${r.kind})`).join(', ') || 'none'}`);
+            // Count events with resources and tags
+            const withResources = eventsWithResources.filter(e => e.resources.length > 0).length;
+            const withTags = eventsWithResources.filter(e => e.tags.length > 0).length;
+            console.log(`📊 Events with resources: ${withResources}`);
+            console.log(`📊 Events with tags: ${withTags}`);
         }
 
         return Response.json({ 
