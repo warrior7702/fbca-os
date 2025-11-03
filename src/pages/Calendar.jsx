@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -68,10 +69,20 @@ export default function Calendar() {
       console.log('📅 Calendar events response:', eventsResponse.data);
       
       const eventsData = eventsResponse.data?.events || [];
-      setEvents(eventsData);
+      
+      // Filter out events with invalid dates
+      const validEvents = eventsData.filter(event => {
+        const hasValidDates = event.starts_at && event.ends_at;
+        if (!hasValidDates) {
+          console.warn('⚠️ Skipping event with invalid dates:', event.name);
+        }
+        return hasValidDates;
+      });
+      
+      setEvents(validEvents);
 
       const roomsSet = new Set();
-      eventsData.forEach(event => {
+      validEvents.forEach(event => {
         if (event.rooms && Array.isArray(event.rooms)) {
           event.rooms.forEach(room => {
             roomsSet.add(JSON.stringify({ id: room.id, name: room.name }));
@@ -82,7 +93,7 @@ export default function Calendar() {
       const uniqueRooms = Array.from(roomsSet).map(r => JSON.parse(r));
       setResources(uniqueRooms);
 
-      toast.success(`Loaded ${eventsData.length} events`);
+      toast.success(`Loaded ${validEvents.length} events`);
     } catch (error) {
       console.error('Error loading calendar data:', error);
       toast.error('Failed to load calendar data');
@@ -120,11 +131,17 @@ export default function Calendar() {
   const groupEventsByDate = () => {
     const grouped = {};
     filteredEvents.forEach(event => {
-      const dateKey = format(parseISO(event.starts_at), 'yyyy-MM-dd');
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
+      if (!event.starts_at) return; // Skip events without start date
+      
+      try {
+        const dateKey = format(parseISO(event.starts_at), 'yyyy-MM-dd');
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(event);
+      } catch (error) {
+        console.error('Error parsing date for event:', event.name, error);
       }
-      grouped[dateKey].push(event);
     });
     return grouped;
   };
@@ -183,7 +200,14 @@ export default function Calendar() {
     return (
       <div className="space-y-6">
         {sortedDates.map(dateKey => {
-          const date = parseISO(dateKey);
+          let date;
+          try {
+            date = parseISO(dateKey);
+          } catch (e) {
+            console.error(`Error parsing dateKey "${dateKey}":`, e);
+            return null; // Skip invalid dates
+          }
+          
           const dayEvents = grouped[dateKey];
 
           return (
@@ -195,6 +219,20 @@ export default function Calendar() {
               <div className="space-y-3">
                 {dayEvents.map(event => {
                   const rooms = event.rooms || [];
+                  
+                  // Safety check for dates
+                  if (!event.starts_at || !event.ends_at) {
+                    return null;
+                  }
+                  
+                  let startsAt, endsAt;
+                  try {
+                    startsAt = parseISO(event.starts_at);
+                    endsAt = parseISO(event.ends_at);
+                  } catch (error) {
+                    console.error('Error parsing event dates:', event.name, error);
+                    return null;
+                  }
                   
                   return (
                     <motion.div
@@ -211,8 +249,7 @@ export default function Calendar() {
                           <div className="flex flex-col gap-1 text-sm text-slate-600">
                             <div className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
-                              {format(parseISO(event.starts_at), 'h:mm a')} - 
-                              {format(parseISO(event.ends_at), 'h:mm a')}
+                              {format(startsAt, 'h:mm a')} - {format(endsAt, 'h:mm a')}
                             </div>
                             {rooms.length > 0 && (
                               <div className="flex items-center gap-1 text-blue-600">
