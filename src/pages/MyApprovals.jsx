@@ -110,11 +110,15 @@ export default function MyApprovals() {
 
   const loadAnswerPreview = async (approval) => {
     try {
+      console.log('📋 Loading answers for:', approval.event_name);
+      
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
         event_id: approval.event_id,
         resource_id: approval.resource_id
       });
+
+      console.log('📥 Response from getApprovalDetails:', response.data);
 
       if (response.data?.answers && Object.keys(response.data.answers).length > 0) {
         const answeredQuestions = response.data.questions
@@ -124,13 +128,18 @@ export default function MyApprovals() {
             answer: response.data.answers[q.id]
           }));
 
+        console.log('✅ Found answers:', answeredQuestions);
+
         setAnswerPreviews(prev => ({ 
           ...prev,
           [approval.request_id]: answeredQuestions
         }));
+      } else {
+        console.log('⚠️ No answers found in response');
       }
     } catch (error) {
-      console.error('Error loading answer preview:', error);
+      console.error('❌ Error loading answer preview:', error);
+      console.error('Error details:', error.response?.data);
     }
   };
 
