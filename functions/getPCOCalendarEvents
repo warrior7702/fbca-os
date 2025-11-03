@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -113,11 +114,10 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        console.log('📅 Fetching EVENT INSTANCES from PCO (with pagination)...');
+        console.log('📅 Fetching FUTURE event instances from PCO (with pagination)...');
 
-        // Fetch from today forward, with pagination
-        const today = new Date().toISOString().split('T')[0];
-        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=after,${today}&order=starts_at&per_page=100&include=event,event_resource_requests,tags`;
+        // Use filter=future which fetches all future event instances
+        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100&include=event,event_resource_requests,tags`;
         
         console.log('🔗 Base URL:', baseUrl);
         
