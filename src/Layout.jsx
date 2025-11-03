@@ -96,7 +96,7 @@ export default function Layout({ children, currentPageName }) {
   const [notifications] = useState(3);
   const [searchQuery, setSearchQuery] = useState("");
   // Updated searchResults state to include tasks
-  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [], tasks: [] });
+  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [] }); // Removed tasks
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef(null);
@@ -161,7 +161,7 @@ export default function Layout({ children, currentPageName }) {
       if (searchQuery.length >= 2) {
         performLiveSearch(searchQuery);
       } else {
-        setSearchResults({ staff: [], files: [], modules: [], tasks: [] }); // Clear tasks as well
+        setSearchResults({ staff: [], files: [], modules: [] }); // Removed tasks
         setShowResults(false);
       }
     }, 300); // 300ms debounce
@@ -177,7 +177,7 @@ export default function Layout({ children, currentPageName }) {
 
     try {
       const lowerQuery = query.toLowerCase();
-      const newResults = { staff: [], files: [], modules: [], tasks: [] };
+      const newResults = { staff: [], files: [], modules: [] }; // Removed tasks
 
       // Search staff
       console.log('📋 Searching staff...');
@@ -218,24 +218,10 @@ export default function Layout({ children, currentPageName }) {
         console.error('Error details:', error.response?.data || error.message);
       }
 
-      // Search ClickUp tasks
-      try {
-        console.log('✅ Searching ClickUp tasks...');
-        const tasksResponse = await base44.functions.invoke('searchClickUpTasks', { query });
-        console.log('✅ ClickUp tasks response:', tasksResponse.data);
-        // Assuming tasksResponse.data contains an array of task objects
-        newResults.tasks = (tasksResponse.data || []).slice(0, 5);
-        console.log('✅ Found', newResults.tasks.length, 'tasks');
-      } catch (error) {
-        console.error('❌ ClickUp task search error:', error);
-        console.error('Error details:', error.response?.data || error.message);
-      }
-
       console.log('🎯 Final results:', {
         staff: newResults.staff.length,
         modules: newResults.modules.length,
-        files: newResults.files.length,
-        tasks: newResults.tasks.length
+        files: newResults.files.length
       });
 
       setSearchResults(newResults);
@@ -270,13 +256,11 @@ export default function Layout({ children, currentPageName }) {
     } else if (type === 'staff') {
       // Navigate to Staff Directory with this person pre-filtered
       navigate(createPageUrl('StaffDirectory') + `?name=${encodeURIComponent(item.full_name)}`);
-    } else if (type === 'task') { // Handle task clicks
-      window.open(item.url, '_blank'); // Assuming item.url exists for tasks
     }
   };
 
   // Updated totalResults to include tasks
-  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length + searchResults.tasks.length;
+  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length; // Removed tasks
 
   const handleDismissLightBubble = () => {
     setShowLightBubble(false);
@@ -399,7 +383,7 @@ export default function Layout({ children, currentPageName }) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10" />
                 <input
                   type="text"
-                  placeholder="Search apps, files, ClickUp tasks, and people..." // Updated placeholder
+                  placeholder="Search apps, files, and people..." // Updated placeholder
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
@@ -486,30 +470,6 @@ export default function Layout({ children, currentPageName }) {
                           <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
                           {file.isFolder && file.fileCount && (
                             <p className="text-xs text-slate-500">{file.fileCount} file{file.fileCount !== 1 ? 's' : ''}</p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Task Results */}
-                {searchResults.tasks.length > 0 && (
-                  <div className="p-2 border-t border-slate-100">
-                    <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
-                      Tasks ({searchResults.tasks.length})
-                    </div>
-                    {searchResults.tasks.map((task) => (
-                      <button
-                        key={task.id}
-                        onClick={() => handleResultClick('task', task)}
-                        className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                      >
-                        <ListChecks className="w-4 h-4 flex-shrink-0 text-amber-500" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{task.name}</p>
-                          {task.listName && (
-                            <p className="text-xs text-slate-500 truncate">{task.listName}</p>
                           )}
                         </div>
                       </button>
