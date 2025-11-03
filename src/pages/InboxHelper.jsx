@@ -5,14 +5,9 @@ import {
   Inbox, 
   Tag, 
   Clock, 
-  AlertCircle, 
-  CheckCircle, 
-  Filter,
-  ArrowLeft,
+  AlertCircle,
   Loader2,
   ExternalLink,
-  Ticket,
-  Sparkles,
   RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,13 +29,6 @@ import AppHeader from "../components/shared/AppHeader";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
-// Map email addresses to ticket categories
-const EMAIL_TO_CATEGORY_MAP = {
-  'maintenance@fbca.org': { category: 'facility', team: 'facilities', label: 'Maintenance' },
-  'support@fbca.org': { category: 'technical', team: 'it', label: 'IT Support' },
-  'cleaning@fbca.org': { category: 'facility', team: 'facilities', label: 'Janitorial' }
-};
-
 export default function InboxHelper() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -50,8 +38,6 @@ export default function InboxHelper() {
   const [showEmailDetail, setShowEmailDetail] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [creatingTickets, setCreatingTickets] = useState(new Set());
-  const [ticketCreatedFor, setTicketCreatedFor] = useState(new Set());
 
   useEffect(() => {
     loadUser();
@@ -75,98 +61,6 @@ export default function InboxHelper() {
     } catch (error) {
       console.error("Error loading emails:", error);
       toast.error("Failed to load emails");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateTicket = async (email, categoryInfo) => {
-    const emailId = email.messageId || email.subject + email.from;
-    
-    if (creatingTickets.has(emailId)) return;
-    
-    setCreatingTickets(prev => new Set([...prev, emailId]));
-    
-    try {
-      const response = await base44.functions.invoke('createTicketFromEmail', {
-        email_id: email.messageId,
-        subject: email.subject,
-        body: email.bodyPreview || '',
-        from_email: email.from,
-        from_name: email.fromName,
-        attachments: []
-      });
-
-      if (response.data.ok) {
-        setTicketCreatedFor(prev => new Set([...prev, emailId]));
-        toast.success(
-          <div>
-            <p className="font-semibold">Ticket Created!</p>
-            <p className="text-sm">#{response.data.ticket.ticket_number}</p>
-            <p className="text-xs text-slate-500">
-              Assigned to: {response.data.assignment.team}
-            </p>
-          </div>
-        );
-      } else {
-        throw new Error(response.data.error || 'Failed to create ticket');
-      }
-    } catch (error) {
-      console.error("Error creating ticket:", error);
-      toast.error("Failed to create ticket: " + error.message);
-    } finally {
-      setCreatingTickets(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(emailId);
-        return newSet;
-      });
-    }
-  };
-
-  const handleAutoCreateTickets = async () => {
-    setLoading(true);
-    let created = 0;
-    
-    try {
-      // Get all emails from the monitored addresses
-      const monitoredEmails = [];
-      
-      Object.entries(categorizedEmails).forEach(([category, emails]) => {
-        emails.forEach(email => {
-          // Check if email is TO one of our monitored addresses
-          const toAddress = email.to?.toLowerCase() || '';
-          if (EMAIL_TO_CATEGORY_MAP[toAddress]) {
-            const emailId = email.messageId || email.subject + email.from;
-            if (!ticketCreatedFor.has(emailId)) {
-              monitoredEmails.push({ email, categoryInfo: EMAIL_TO_CATEGORY_MAP[toAddress] });
-            }
-          }
-        });
-      });
-
-      if (monitoredEmails.length === 0) {
-        toast.info("No new support emails found");
-        return;
-      }
-
-      toast.info(`Creating ${monitoredEmails.length} tickets...`);
-
-      // Create tickets for each email
-      for (const { email, categoryInfo } of monitoredEmails) {
-        try {
-          await handleCreateTicket(email, categoryInfo);
-          created++;
-        } catch (error) {
-          console.error("Error creating ticket for email:", email.subject, error);
-        }
-      }
-
-      if (created > 0) {
-        toast.success(`Created ${created} support tickets`);
-      }
-    } catch (error) {
-      console.error("Error auto-creating tickets:", error);
-      toast.error("Failed to auto-create tickets");
     } finally {
       setLoading(false);
     }
@@ -212,61 +106,19 @@ export default function InboxHelper() {
         <AppHeader
           icon={Inbox}
           title="Inbox Helper"
-          description="Categorized emails and support ticket creation"
+          description="View and manage categorized emails"
           iconColor="from-blue-500 to-cyan-500"
           action={
-            <div className="flex gap-2">
-              <Button 
-                onClick={loadEmails} 
-                variant="outline"
-                disabled={loading}
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button
-                onClick={handleAutoCreateTickets}
-                disabled={loading}
-                className="bg-gradient-to-r from-purple-500 to-indigo-500"
-              >
-                <Ticket className="w-4 h-4 mr-2" />
-                Auto-Create Support Tickets
-              </Button>
-              <Button 
-                onClick={() => navigate(createPageUrl('SupportTickets'))}
-                variant="outline"
-              >
-                View All Tickets
-              </Button>
-            </div>
+            <Button 
+              onClick={loadEmails} 
+              variant="outline"
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           }
         />
-
-        {/* Support Email Info Card */}
-        <Card className="border-purple-200 bg-purple-50">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              Monitored Support Addresses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-3">
-              {Object.entries(EMAIL_TO_CATEGORY_MAP).map(([email, info]) => (
-                <div key={email} className="flex items-center gap-2 p-2 bg-white rounded-lg">
-                  <Mail className="w-4 h-4 text-purple-600" />
-                  <div>
-                    <p className="text-sm font-medium">{email}</p>
-                    <p className="text-xs text-slate-500">{info.label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-slate-600 mt-3">
-              Emails sent to these addresses can be automatically converted to support tickets
-            </p>
-          </CardContent>
-        </Card>
 
         {/* Filters */}
         <Card>
@@ -324,100 +176,64 @@ export default function InboxHelper() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {emails.map((email, idx) => {
-                    const emailId = email.messageId || email.subject + email.from;
-                    const isCreatingTicket = creatingTickets.has(emailId);
-                    const hasTicket = ticketCreatedFor.has(emailId);
-                    
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className={`p-4 bg-white rounded-lg border hover:shadow-md transition-all ${
-                          hasTicket ? 'border-green-300 bg-green-50' : 'border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className="mt-1">
-                              {getCategoryIcon(email.importance)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 
-                                  className="font-semibold text-slate-900 truncate cursor-pointer hover:text-blue-600"
-                                  onClick={() => {
-                                    setSelectedEmail(email);
-                                    setShowEmailDetail(true);
-                                  }}
-                                >
-                                  {email.subject}
-                                </h3>
-                                {!email.isRead && (
-                                  <Badge variant="secondary" className="text-xs">New</Badge>
-                                )}
-                                {hasTicket && (
-                                  <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Ticket Created
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-slate-600 mb-1">
-                                From: <span className="font-medium">{email.fromName || email.from}</span>
-                              </p>
-                              {email.bodyPreview && (
-                                <p className="text-xs text-slate-500 line-clamp-2 mb-2">
-                                  {email.bodyPreview}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2 text-xs text-slate-400">
-                                <Clock className="w-3 h-3" />
-                                {format(new Date(email.receivedAt), 'MMM d, h:mm a')}
-                                {email.hasAttachments && (
-                                  <>
-                                    <span>•</span>
-                                    <span>Has attachments</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                  {emails.map((email, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="p-4 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="mt-1">
+                            {getCategoryIcon(email.importance)}
                           </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            {!hasTicket && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleCreateTicket(email, null)}
-                                disabled={isCreatingTicket}
-                                className="bg-gradient-to-r from-purple-500 to-indigo-500"
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 
+                                className="font-semibold text-slate-900 truncate cursor-pointer hover:text-blue-600"
+                                onClick={() => {
+                                  setSelectedEmail(email);
+                                  setShowEmailDetail(true);
+                                }}
                               >
-                                {isCreatingTicket ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                    Creating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Ticket className="w-4 h-4 mr-1" />
-                                    Create Ticket
-                                  </>
-                                )}
-                              </Button>
+                                {email.subject}
+                              </h3>
+                              {!email.isRead && (
+                                <Badge variant="secondary" className="text-xs">New</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 mb-1">
+                              From: <span className="font-medium">{email.fromName || email.from}</span>
+                            </p>
+                            {email.bodyPreview && (
+                              <p className="text-xs text-slate-500 line-clamp-2 mb-2">
+                                {email.bodyPreview}
+                              </p>
                             )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(email.webLink, '_blank')}
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                              <Clock className="w-3 h-3" />
+                              {format(new Date(email.receivedAt), 'MMM d, h:mm a')}
+                              {email.hasAttachments && (
+                                <>
+                                  <span>•</span>
+                                  <span>Has attachments</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(email.webLink, '_blank')}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
                 </CardContent>
               </Card>
             ))}
