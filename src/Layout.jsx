@@ -42,12 +42,6 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const apps = [
   {
-    name: "Dashboard",
-    path: "Dashboard",
-    icon: LayoutDashboard,
-    color: "text-blue-500"
-  },
-  {
     name: "My Tasks",
     path: "MyTasks",
     icon: ListChecks,
