@@ -463,7 +463,7 @@ export default function Calendar() {
               {selectedEvent.resources && selectedEvent.resources.length > 0 ? (
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                   <p className="text-sm font-semibold text-green-900 mb-3">
-                    Resources ({selectedEvent.resources.length})
+                    Rooms & Resources ({selectedEvent.resources.length})
                   </p>
                   <div className="space-y-2">
                     {selectedEvent.resources.map(resource => (
@@ -497,7 +497,7 @@ export default function Calendar() {
                 </div>
               ) : (
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center">
-                  <p className="text-sm text-slate-500">No resources requested</p>
+                  <p className="text-sm text-slate-500">No rooms or resources requested</p>
                 </div>
               )}
 
