@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -46,6 +47,7 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [eventComments, setEventComments] = useState({});
+  const [eventResources, setEventResources] = useState({}); // NEW: Store event resources as a map { event_id: resource_data }
   const [loadingEventDetails, setLoadingEventDetails] = useState(false);
 
   useEffect(() => {
@@ -121,13 +123,16 @@ export default function Calendar() {
     setShowEventDetail(true);
     setLoadingEventDetails(true);
 
-    // Load event comments to get door codes
+    // Load event comments to get door codes AND event resources
     try {
-      const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
-        event_id: event.id
-      });
+      const [commentsResponse, resourcesResponse] = await Promise.all([
+        base44.functions.invoke('getPCOEventComments', { event_id: event.id }),
+        base44.functions.invoke('getPCOEventResources', { event_id: event.id })
+      ]);
       
       setEventComments(commentsResponse.data);
+      // Store resources in a map keyed by event.id
+      setEventResources(prev => ({ ...prev, [event.id]: resourcesResponse.data }));
     } catch (error) {
       console.error('Error loading event details:', error);
     } finally {
@@ -221,40 +226,50 @@ export default function Calendar() {
                 {format(date, 'EEEE, MMMM d, yyyy')}
               </h3>
               <div className="space-y-3">
-                {dayEvents.map(event => (
-                  <motion.div
-                    key={event.id}
-                    whileHover={{ scale: 1.01 }}
-                    onClick={() => handleEventClick(event)}
-                    className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-all cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-900 mb-2">
-                          {event.name}
-                        </h4>
-                        <div className="flex items-center gap-4 text-sm text-slate-600">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {format(parseISO(event.starts_at), 'h:mm a')} - 
-                            {format(parseISO(event.ends_at), 'h:mm a')}
+                {dayEvents.map(event => {
+                  // Get rooms for this event from cache if available
+                  // This will only show rooms if the event has been clicked before
+                  const cachedEventResources = eventResources[event.id]; 
+                  const rooms = cachedEventResources?.rooms || [];
+                  
+                  return (
+                    <motion.div
+                      key={event.id}
+                      whileHover={{ scale: 1.01 }}
+                      onClick={() => handleEventClick(event)}
+                      className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-all cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900 mb-2">
+                            {event.name}
+                          </h4>
+                          <div className="flex flex-col gap-1 text-sm text-slate-600">
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {format(parseISO(event.starts_at), 'h:mm a')} - 
+                              {format(parseISO(event.ends_at), 'h:mm a')}
+                            </div>
+                            {rooms.length > 0 && (
+                              <div className="flex items-center gap-1 text-blue-600">
+                                <MapPin className="w-4 h-4 text-blue-600" />
+                                <span className="font-medium">
+                                  {rooms.map(r => r.resource_name).join(', ')}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          {event.approval_status && (
-                            <Badge variant={event.approval_status === 'approved' ? 'default' : 'secondary'}>
-                              {event.approval_status}
-                            </Badge>
+                          {event.summary && (
+                            <p className="text-sm text-slate-500 mt-2 line-clamp-2">
+                              {event.summary}
+                            </p>
                           )}
                         </div>
-                        {event.summary && (
-                          <p className="text-sm text-slate-500 mt-2 line-clamp-2">
-                            {event.summary}
-                          </p>
-                        )}
+                        <ExternalLink className="w-5 h-5 text-slate-400" />
                       </div>
-                      <ExternalLink className="w-5 h-5 text-slate-400" />
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -348,7 +363,7 @@ export default function Calendar() {
 
       {/* Event Detail Modal */}
       <Dialog open={showEventDetail} onOpenChange={setShowEventDetail}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarIcon className="w-5 h-5 text-blue-600" />
@@ -361,7 +376,7 @@ export default function Calendar() {
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* Time */}
               <div className="flex items-center gap-2 text-slate-700">
                 <Clock className="w-5 h-5 text-slate-400" />
@@ -373,6 +388,81 @@ export default function Calendar() {
                 {selectedEvent && format(parseISO(selectedEvent.starts_at), 'h:mm a')} - 
                 {selectedEvent && format(parseISO(selectedEvent.ends_at), 'h:mm a')}
               </div>
+
+              {/* Rooms & Resources Section */}
+              {selectedEvent && eventResources[selectedEvent.id]?.resource_requests?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                      Rooms & Resources
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Rooms */}
+                    {selectedEvent && eventResources[selectedEvent.id]?.rooms?.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700 mb-2">Rooms</p>
+                        {eventResources[selectedEvent.id].rooms.map((room, idx) => (
+                          <div key={idx} className="ml-4 mb-3">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-blue-500" />
+                              <span className="font-medium text-slate-800">{room.resource_name}</span>
+                              {room.approval_status && (
+                                <Badge variant={room.approval_status === 'A' ? 'default' : 'secondary'} className="text-xs">
+                                  {room.approval_status === 'A' ? 'Approved' : room.approval_status === 'P' ? 'Pending' : 'Denied'}
+                                </Badge>
+                              )}
+                            </div>
+                            {room.answers?.length > 0 && (
+                              <div className="ml-6 mt-2 space-y-1">
+                                {room.answers.map((qa, qaIdx) => (
+                                  <div key={qaIdx} className="text-sm">
+                                    <span className="text-slate-600">{qa.question}:</span>
+                                    <span className="ml-2 text-slate-900 font-medium">{qa.answer}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Other Resources */}
+                    {selectedEvent && eventResources[selectedEvent.id]?.resource_requests?.filter(r => r.resource_kind !== 'Room').length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700 mb-2">Other Resources</p>
+                        {eventResources[selectedEvent.id].resource_requests
+                          .filter(r => r.resource_kind !== 'Room')
+                          .map((resource, idx) => (
+                            <div key={idx} className="ml-4 mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-600">•</span>
+                                <span className="font-medium text-slate-800">{resource.resource_name}</span>
+                                {resource.approval_status && (
+                                  <Badge variant={resource.approval_status === 'A' ? 'default' : 'secondary'} className="text-xs">
+                                    {resource.approval_status === 'A' ? 'Approved' : resource.approval_status === 'P' ? 'Pending' : 'Denied'}
+                                  </Badge>
+                                )}
+                              </div>
+                              {resource.answers?.length > 0 && (
+                                <div className="ml-6 mt-2 space-y-1">
+                                  {resource.answers.map((qa, qaIdx) => (
+                                    <div key={qaIdx} className="text-sm">
+                                      <span className="text-slate-600">{qa.question}:</span>
+                                      <span className="ml-2 text-slate-900 font-medium">{qa.answer}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Door Code */}
               {eventComments?.latest_door_code && (
@@ -410,21 +500,25 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Comments/Activity */}
+              {/* Activity Thread */}
               {eventComments?.comments && eventComments.comments.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-2">Activity</h4>
-                  <div className="space-y-2">
-                    {eventComments.comments.map(comment => (
-                      <div key={comment.id} className="bg-slate-50 rounded p-3">
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{comment.body}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {comment.created_at && format(parseISO(comment.created_at), 'MMM d, yyyy h:mm a')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {eventComments.comments.map(comment => (
+                        <div key={comment.id} className="border-l-2 border-blue-200 pl-4 py-2">
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{comment.body}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {comment.created_at && format(parseISO(comment.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* View in PCO */}
