@@ -23,7 +23,8 @@ import {
   Folder,
   ListChecks, // Used for My Tasks app and Task Results search
   ClipboardCheck, // NEW: for My Approvals app
-  Sparkles
+  Sparkles,
+  Calendar as CalendarIcon // Added CalendarIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -57,6 +58,12 @@ const apps = [
     path: "MyApprovals",
     icon: ClipboardCheck,
     color: "text-orange-500"
+  },
+  {
+    name: "Calendar",
+    path: "Calendar",
+    icon: CalendarIcon,
+    color: "text-blue-600"
   },
   {
     name: "Marketing",
