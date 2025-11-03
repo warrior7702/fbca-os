@@ -41,6 +41,8 @@ export default function Calendar() {
   const [events, setEvents] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
   const [selectedResource, setSelectedResource] = useState("all");
   const [viewMode, setViewMode] = useState("list");
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -51,6 +53,13 @@ export default function Calendar() {
 
   useEffect(() => {
     loadData();
+    
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => {
+      handleSync();
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -80,6 +89,7 @@ export default function Calendar() {
       });
       
       setEvents(validEvents);
+      setLastSync(new Date());
 
       const roomsSet = new Set();
       validEvents.forEach(event => {
@@ -103,6 +113,47 @@ export default function Calendar() {
       toast.error('Failed to load calendar data: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const currentUser = await base44.auth.me();
+      
+      if (!currentUser.pco_access_token) {
+        toast.error('Please connect Planning Center in Settings');
+        return;
+      }
+
+      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      const eventsData = eventsResponse.data?.events || [];
+      
+      const validEvents = eventsData.filter(event => {
+        return event.starts_at && event.ends_at;
+      });
+      
+      setEvents(validEvents);
+      setLastSync(new Date());
+
+      const roomsSet = new Set();
+      validEvents.forEach(event => {
+        if (event.rooms && Array.isArray(event.rooms)) {
+          event.rooms.forEach(room => {
+            roomsSet.add(JSON.stringify({ id: room.id, name: room.name }));
+          });
+        }
+      });
+      
+      const uniqueRooms = Array.from(roomsSet).map(r => JSON.parse(r));
+      setResources(uniqueRooms);
+
+      toast.success(`Synced ${validEvents.length} events from PCO`);
+    } catch (error) {
+      console.error('Error syncing calendar:', error);
+      toast.error('Failed to sync calendar: ' + (error.message || 'Unknown error'));
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -315,7 +366,16 @@ export default function Calendar() {
         <AppHeader
           icon={CalendarIcon}
           title="Calendar"
-          description={`${filteredEvents.length} events in the next 2 weeks`}
+          description={
+            <div className="flex items-center gap-2">
+              <span>{filteredEvents.length} events in the next 60 days</span>
+              {lastSync && (
+                <span className="text-xs text-slate-500">
+                  • Last synced: {format(lastSync, 'h:mm a')}
+                </span>
+              )}
+            </div>
+          }
           iconColor="from-blue-500 to-indigo-500"
           action={
             <div className="flex items-center gap-2">
@@ -339,9 +399,18 @@ export default function Calendar() {
                   Calendar
                 </Button>
               </div>
-              <Button onClick={loadData} variant="outline" size="sm">
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
+              <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                {syncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sync from PCO
+                  </>
+                )}
               </Button>
             </div>
           }
