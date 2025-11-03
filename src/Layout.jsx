@@ -43,7 +43,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const apps = [
   {
-    name: "Me", // Changed from "My Tasks" to "Me"
+    name: "My Tasks",
     path: "MyTasks",
     icon: ListChecks,
     color: "text-indigo-500"
