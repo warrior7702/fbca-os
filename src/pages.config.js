@@ -23,6 +23,7 @@ import index from './pages/index';
 import ImportCardholders from './pages/ImportCardholders';
 import TestCardholders from './pages/TestCardholders';
 import AdminSetup from './pages/AdminSetup';
+import Calendar from './pages/Calendar';
 import Layout from './Layout.jsx';
 
 
@@ -52,6 +53,7 @@ export const PAGES = {
     "ImportCardholders": ImportCardholders,
     "TestCardholders": TestCardholders,
     "AdminSetup": AdminSetup,
+    "Calendar": Calendar,
 }
 
 export const pagesConfig = {
