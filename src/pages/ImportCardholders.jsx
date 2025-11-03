@@ -59,20 +59,45 @@ export default function ImportCardholders() {
       }
       values.push(current.trim().replace(/^"|"$/g, ''));
 
-      const obj = {};
+      const obj = { firstName: '', lastName: '' }; // Initialize firstName and lastName
+      
       headers.forEach((header, idx) => {
         const value = values[idx] || '';
-        // Map all possible header variations
-        if (header.includes('name') || header === 'full_name' || header === 'fullname') {
+        
+        // Handle first name
+        if (header === 'firstname' || header === 'first_name' || header === 'first name') {
+          obj.firstName = value;
+        }
+        // Handle last name
+        else if (header === 'lastname' || header === 'last_name' || header === 'last name') {
+          obj.lastName = value;
+        }
+        // Handle full name (if provided as single column)
+        else if (header === 'name' || header === 'full_name' || header === 'fullname' || header === 'full name') {
           obj.name = value;
-        } else if (header.includes('pin') || header.includes('code') || header === 'door_code') {
-          obj.pin = value.padStart(6, '0'); // Ensure 6 digits
-        } else if (header.includes('member') || header === 'member_id' || header === 'memberid') {
+        }
+        // Handle PIN/CODE
+        else if (header.includes('pin') || header.includes('code') || header === 'door_code') {
+          obj.pin = value.padStart(6, '0');
+        }
+        // Handle member ID
+        else if (header.includes('member') || header === 'member_id' || header === 'memberid') {
           obj.member_id = value;
-        } else if (header.includes('email') || header === 'email_address') {
+        }
+        // Handle email
+        else if (header.includes('email') || header === 'email_address') {
           obj.email = value;
         }
       });
+
+      // Combine firstName + lastName if name wasn't provided directly
+      if (!obj.name && (obj.firstName || obj.lastName)) {
+        obj.name = `${obj.firstName} ${obj.lastName}`.trim();
+      }
+
+      // Clean up temporary fields
+      delete obj.firstName;
+      delete obj.lastName;
 
       if (obj.name && obj.pin) {
         cardholders.push(obj);
