@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -16,9 +17,9 @@ import {
   Tag,
   Loader2,
   Send,
-  Paperclip,
-  Sparkles,
-  X,
+  Paperclip, // Keep this for file upload
+  Sparkles, // Keep this for AI suggestions
+  X, // Keep this for removing attachments
   TrendingUp,
   RefreshCw
 } from "lucide-react";
@@ -60,12 +61,17 @@ export default function SupportTickets() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("inbox");
   
-  // New ticket form
+  // New ticket form - updated structure
   const [newTicket, setNewTicket] = useState({
-    subject: "",
-    description: "",
+    requester_name: "",
+    requester_email: "",
+    building: "",
+    room_number: "",
+    subject: "", // This will be the "brief description" from the form
+    details: "", // This will be the "provide details" from the form
     priority: "medium",
-    category: "other"
+    category: "other",
+    attachments: [] // New field for attachments
   });
 
   // Ticket comment
@@ -84,7 +90,7 @@ export default function SupportTickets() {
 
   useEffect(() => {
     filterTickets();
-  }, [tickets, searchQuery, statusFilter, priorityFilter, activeTab]);
+  }, [tickets, searchQuery, statusFilter, priorityFilter, activeTab, user]); // Added user to dependencies to ensure inbox count updates
 
   const loadUser = async () => {
     try {
@@ -137,7 +143,10 @@ export default function SupportTickets() {
         t.subject?.toLowerCase().includes(query) ||
         t.description?.toLowerCase().includes(query) ||
         t.ticket_number?.toLowerCase().includes(query) ||
-        t.requester_email?.toLowerCase().includes(query)
+        t.requester_email?.toLowerCase().includes(query) ||
+        t.requester_name?.toLowerCase().includes(query) ||
+        t.building?.toLowerCase().includes(query) ||
+        t.room_number?.toLowerCase().includes(query)
       );
     }
 
@@ -178,24 +187,30 @@ Keep response concise and actionable.`;
   };
 
   const handleCreateTicket = async () => {
-    if (!newTicket.subject || !newTicket.description) {
-      toast.error("Please fill in subject and description");
+    if (!newTicket.requester_name || !newTicket.requester_email || !newTicket.subject || !newTicket.category) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
     try {
       const ticketData = {
-        ...newTicket,
         ticket_number: generateTicketNumber(),
-        requester_email: user.email,
-        requester_name: user.full_name || user.email,
+        requester_email: newTicket.requester_email,
+        requester_name: newTicket.requester_name,
+        subject: newTicket.subject, // Brief description from form
+        description: `${newTicket.subject}\n\n${newTicket.details ? 'Additional Details: ' + newTicket.details : ''}`.trim(), // Combined for API
+        building: newTicket.building,
+        room_number: newTicket.room_number,
         status: "open",
+        priority: newTicket.priority,
+        category: newTicket.category,
         source: "web_form",
+        attachments: newTicket.attachments,
         last_activity_at: new Date().toISOString()
       };
 
-      // Find similar tickets and suggest solutions
-      const suggestion = await findSimilarTickets(newTicket.description);
+      // Find similar tickets and suggest solutions based on the main subject/brief description
+      const suggestion = await findSimilarTickets(newTicket.subject);
       if (suggestion) {
         ticketData.suggested_solution = suggestion;
       }
@@ -205,15 +220,46 @@ Keep response concise and actionable.`;
       toast.success("Ticket created successfully!");
       setShowNewTicketDialog(false);
       setNewTicket({
+        requester_name: "",
+        requester_email: "",
+        building: "",
+        room_number: "",
         subject: "",
-        description: "",
+        details: "",
         priority: "medium",
-        category: "other"
+        category: "other",
+        attachments: []
       });
       loadTickets();
     } catch (error) {
       console.error("Error creating ticket:", error);
       toast.error("Failed to create ticket");
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        return {
+          name: file.name,
+          url: file_url,
+          uploaded_at: new Date().toISOString()
+        };
+      });
+
+      const uploadedFiles = await Promise.all(uploadPromises);
+      setNewTicket({
+        ...newTicket,
+        attachments: [...newTicket.attachments, ...uploadedFiles]
+      });
+      toast.success(`${files.length} file(s) uploaded`);
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      toast.error("Failed to upload files");
     }
   };
 
@@ -493,38 +539,126 @@ Keep response concise and actionable.`;
         </Tabs>
       </div>
 
-      {/* New Ticket Dialog */}
+      {/* New Ticket Dialog - UPDATED */}
       <Dialog open={showNewTicketDialog} onOpenChange={setShowNewTicketDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 text-white border-slate-700">
           <DialogHeader>
-            <DialogTitle>Create New Ticket</DialogTitle>
+            <DialogTitle className="text-2xl text-white">FBCA Service Requests</DialogTitle>
+            <p className="text-slate-400 text-sm">Fill out the following form for all service requests.</p>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Subject</label>
-              <Input
-                value={newTicket.subject}
-                onChange={(e) => setNewTicket({...newTicket, subject: e.target.value})}
-                placeholder="Brief description of the issue"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Description</label>
-              <Textarea
-                value={newTicket.description}
-                onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
-                placeholder="Detailed description of the issue"
-                rows={5}
-              />
-            </div>
+          
+          <div className="space-y-6 py-4">
+            {/* Row 1: Name and Email */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Priority</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">
+                  Name<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={newTicket.requester_name}
+                  onChange={(e) => setNewTicket({...newTicket, requester_name: e.target.value})}
+                  placeholder="Name of Requester"
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">
+                  Email Address<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="email"
+                  value={newTicket.requester_email}
+                  onChange={(e) => setNewTicket({...newTicket, requester_email: e.target.value})}
+                  placeholder="Requester Email"
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Building and Room Number */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">
+                  Building(s)<span className="text-red-500">*</span>
+                </label>
+                <Select value={newTicket.building} onValueChange={(value) => setNewTicket({...newTicket, building: value})}>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                    <SelectValue placeholder="Select option..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="main_campus">Main Campus</SelectItem>
+                    <SelectItem value="worship_center">Worship Center</SelectItem>
+                    <SelectItem value="education_building">Education Building</SelectItem>
+                    <SelectItem value="admin_building">Admin Building</SelectItem>
+                    <SelectItem value="family_life_center">Family Life Center</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">Room Number</label>
+                <Input
+                  value={newTicket.room_number}
+                  onChange={(e) => setNewTicket({...newTicket, room_number: e.target.value})}
+                  placeholder="Room number or common name"
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Category and Brief Description */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">
+                  Ticket Category<span className="text-red-500">*</span>
+                </label>
+                <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                    <SelectValue placeholder="Select option..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="technical">Technical / IT</SelectItem>
+                    <SelectItem value="facility">Facilities / Maintenance</SelectItem>
+                    <SelectItem value="av_production">AV / Production</SelectItem>
+                    <SelectItem value="access">Access / Security</SelectItem>
+                    <SelectItem value="marketing">Marketing</SelectItem>
+                    <SelectItem value="catering">Catering / Hospitality</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">
+                  Provide brief description of the issue<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={newTicket.subject}
+                  onChange={(e) => setNewTicket({...newTicket, subject: e.target.value})}
+                  placeholder="Describe your issue"
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Row 4: Details and Priority */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">Provide details of the issue</label>
+                <Textarea
+                  value={newTicket.details}
+                  onChange={(e) => setNewTicket({...newTicket, details: e.target.value})}
+                  placeholder="Provide more details if needed"
+                  rows={3}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white">Priority</label>
                 <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({...newTicket, priority: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-slate-800 border-slate-700">
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
@@ -532,37 +666,62 @@ Keep response concise and actionable.`;
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Category</label>
-                <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="technical">Technical</SelectItem>
-                    <SelectItem value="access">Access</SelectItem>
-                    <SelectItem value="facility">Facility</SelectItem>
-                    <SelectItem value="av_production">AV/Production</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="catering">Catering</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white">Attachments</label>
+              <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Paperclip className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                  <p className="text-slate-400">Drop your files here to upload</p>
+                  <p className="text-xs text-slate-500 mt-1">or click to browse</p>
+                </label>
+              </div>
+              {newTicket.attachments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {newTicket.attachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800 p-2 rounded">
+                      <Paperclip className="w-4 h-4" />
+                      <span className="flex-1">{file.name}</span>
+                      <button
+                        onClick={() => setNewTicket({
+                          ...newTicket,
+                          attachments: newTicket.attachments.filter((_, i) => i !== idx)
+                        })}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* AI Loading State */}
             {loadingSuggestions && (
-              <div className="flex items-center gap-2 text-sm text-purple-600">
+              <div className="flex items-center gap-2 text-sm text-purple-400">
                 <Sparkles className="w-4 h-4 animate-pulse" />
                 Finding similar tickets and solutions...
               </div>
             )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewTicketDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateTicket} disabled={loadingSuggestions}>
-              Create Ticket
+            <Button 
+              onClick={handleCreateTicket} 
+              disabled={loadingSuggestions}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg h-12"
+            >
+              Submit
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -626,9 +785,34 @@ Keep response concise and actionable.`;
                       <div className="flex-1">
                         <p className="font-medium text-sm">{selectedTicket.requester_name}</p>
                         <p className="text-xs text-slate-500 mb-2">{selectedTicket.requester_email}</p>
+                        {selectedTicket.building && (
+                          <p className="text-xs text-slate-500 mb-1">
+                            Building: {selectedTicket.building}
+                            {selectedTicket.room_number && ` - Room: ${selectedTicket.room_number}`}
+                          </p>
+                        )}
                         <p className="text-sm text-slate-700 whitespace-pre-wrap">
                           {selectedTicket.description}
                         </p>
+                        {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium mb-2">Attachments:</h4>
+                            <div className="space-y-2">
+                              {selectedTicket.attachments.map((attachment, index) => (
+                                <a
+                                  key={index}
+                                  href={attachment.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                                >
+                                  <Paperclip className="w-4 h-4" />
+                                  {attachment.name}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <p className="text-xs text-slate-400 mt-2">
                           {format(new Date(selectedTicket.created_date), 'MMM d, yyyy h:mm a')}
                         </p>
