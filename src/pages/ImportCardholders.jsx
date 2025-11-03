@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ export default function ImportCardholders() {
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
   const [currentCount, setCurrentCount] = useState(null);
+  const [clearing, setClearing] = useState(false);
 
   // Load current count on mount
   React.useEffect(() => {
@@ -155,6 +157,36 @@ export default function ImportCardholders() {
     }
   };
 
+  const handleClearDatabase = async () => {
+    if (!confirm('⚠️ WARNING: This will delete ALL cardholders from the database. This cannot be undone. Are you sure?')) {
+      return;
+    }
+
+    if (!confirm('Are you REALLY sure? This will permanently delete all cardholder records.')) {
+      return;
+    }
+
+    setClearing(true);
+    try {
+      console.log('🗑️ Clearing database...');
+      const response = await base44.functions.invoke('clearCardholders');
+
+      if (response.data.ok) {
+        toast.success(`Deleted ${response.data.deleted} cardholders`);
+        await loadCurrentCount(); // Refresh count
+        setPreview(null);
+        setResult(null);
+      } else {
+        throw new Error(response.data.error || 'Clear failed');
+      }
+    } catch (err) {
+      console.error('❌ Clear error:', err);
+      toast.error('Failed to clear database: ' + err.message);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const downloadTemplate = () => {
     const template = `name,pin,member_id,email
 John Doe,123456,M001,john@example.com
@@ -276,7 +308,7 @@ Bob Wilson,111222,M003,bob@example.com`;
               </label>
             </div>
 
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -285,6 +317,29 @@ Bob Wilson,111222,M003,bob@example.com`;
                 <Download className="w-4 h-4 mr-2" />
                 Download CSV Template
               </Button>
+
+              {/* Clear Database Button */}
+              {currentCount !== null && currentCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearDatabase}
+                  disabled={clearing}
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  {clearing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Clearing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      Clear Database ({currentCount})
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
