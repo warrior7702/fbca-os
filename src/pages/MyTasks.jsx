@@ -23,7 +23,10 @@ import {
   Maximize2,
   ListChecks,
   Info, // Added Info icon
-  RefreshCw // Added RefreshCw icon
+  RefreshCw, // Added RefreshCw icon
+  Ticket as TicketIcon, // Added TicketIcon
+  AlertCircle, // Added AlertCircle
+  Sparkles // Added Sparkles icon for suggested solution
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -34,6 +37,7 @@ import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import EmailDetailModal from "../components/emails/EmailDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+import { useNavigate } from "react-router-dom"; // Assuming react-router-dom for navigation
 
 const CATEGORY_COLORS = {
   'Action Needed': '#c43e00',
@@ -56,10 +60,33 @@ export default function MyTasks() {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showEmailDetail, setShowEmailDetail] = useState(false); // Re-used for new modal trigger
+  const [supportTickets, setSupportTickets] = useState([]); // New state for support tickets
+  const [loadingTickets, setLoadingTickets] = useState(false); // New loading state
+
+  const navigate = useNavigate(); // Initialize useNavigate
+
+  // Helper to create page URLs based on name, assuming a simple convention
+  const createPageUrl = (pageName) => {
+    switch (pageName) {
+      case 'SupportTickets': return '/support-tickets'; // Example route
+      // Add other page mappings as needed
+      default: return `/${pageName.toLowerCase()}`;
+    }
+  };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // New useEffect hook to load support tickets when user data is available
+  useEffect(() => {
+    if (user) {
+      // The outline suggests separate load functions for tasks, emails, etc.
+      // but the original file has a single `loadData`.
+      // `loadSupportTickets` will be called here as it depends on `user` being available.
+      loadSupportTickets();
+    }
+  }, [user]); // Re-run when user object changes
 
   const loadData = async () => {
     setLoading(true);
@@ -161,6 +188,28 @@ export default function MyTasks() {
     }
   };
 
+  const loadSupportTickets = async () => {
+    setLoadingTickets(true);
+    try {
+      if (user?.email) { // Ensure user and email are available
+        const allTickets = await base44.entities.Ticket.filter({
+          assigned_to: user.email,
+          status: { $in: ['open', 'in_progress', 'pending'] }
+        });
+        setSupportTickets(allTickets);
+        console.log('✅ Support Tickets loaded:', allTickets.length);
+      } else {
+        console.warn('⚠️ User email not available for support ticket load.');
+        setSupportTickets([]); // Clear tickets if user email is not present
+      }
+    } catch (error) {
+      console.error('Error loading support tickets:', error);
+      toast.error('Failed to load support tickets');
+    } finally {
+      setLoadingTickets(false);
+    }
+  };
+
   const handleTaskClick = (task) => {
     // Microsoft To Do tasks open in browser
     if (task.source === 'microsoft_todo') {
@@ -253,6 +302,16 @@ export default function MyTasks() {
       .join(' ');
   };
 
+  const getTicketPriorityColor = (priority) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-blue-500';
+      default: return 'bg-slate-500';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -285,6 +344,38 @@ export default function MyTasks() {
             </Button>
           }
         />
+
+        {/* Stats Cards (Placeholder, actual stats are not in original code for this section) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {/* Example existing stat card (assuming there were others) */}
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300">
+                  Today
+                </Badge>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
+              <p className="text-sm text-slate-600">Tasks Due</p>
+            </CardContent>
+          </Card>
+
+          {/* Support Tickets Card */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <TicketIcon className="w-5 h-5 text-purple-600" />
+                <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                  {loadingTickets ? <Loader2 className="h-3 w-3 animate-spin" /> : supportTickets.length}
+                </Badge>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{supportTickets.length}</p>
+              <p className="text-sm text-slate-600">Support Tickets</p>
+            </CardContent>
+          </Card>
+        </div>
+
 
         {/* My Day */}
         <Card>
@@ -532,6 +623,79 @@ export default function MyTasks() {
               </div>
             )}
           </motion.div>
+        )}
+
+        {/* Support Tickets Section - NEW */}
+        {supportTickets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TicketIcon className="w-5 h-5 text-purple-600" />
+                  My Support Tickets ({supportTickets.length})
+                </CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {supportTickets.slice(0, 5).map((ticket) => (
+                <motion.div
+                  key={ticket.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-slate-900 truncate">
+                        {ticket.subject}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.status}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                      {ticket.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-mono">{ticket.ticket_number}</span>
+                      {ticket.category && (
+                        <>
+                          <span>•</span>
+                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
+                        </>
+                      )}
+                      {ticket.created_date && (
+                        <>
+                          <span>•</span>
+                          <span>{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                        </>
+                      )}
+                    </div>
+                    {ticket.suggested_solution && (
+                      <div className="mt-2 flex items-start gap-1 text-xs text-purple-600">
+                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">AI suggested solution available</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              {supportTickets.length > 5 && (
+                <p className="text-xs text-slate-500 text-center pt-2">
+                  +{supportTickets.length - 5} more tickets
+                </p>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 
