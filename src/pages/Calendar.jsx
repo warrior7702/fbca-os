@@ -66,14 +66,25 @@ export default function Calendar() {
         return;
       }
 
-      // Load events
+      // Load events (now includes rooms data)
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      console.log('📅 Calendar events response:', eventsResponse.data);
+      
       const eventsData = eventsResponse.data.events || [];
       setEvents(eventsData);
 
-      // Extract unique resources from events (we'll need to enhance this later)
-      // For now, we'll load resources from PCO directly
-      await loadResources(currentUser);
+      // Extract unique room resources from events
+      const roomsSet = new Set();
+      eventsData.forEach(event => {
+        if (event.rooms && Array.isArray(event.rooms)) {
+          event.rooms.forEach(room => {
+            roomsSet.add(JSON.stringify({ id: room.id, name: room.name }));
+          });
+        }
+      });
+      
+      const uniqueRooms = Array.from(roomsSet).map(r => JSON.parse(r));
+      setResources(uniqueRooms);
 
       toast.success(`Loaded ${eventsData.length} events`);
     } catch (error) {
@@ -84,46 +95,12 @@ export default function Calendar() {
     }
   };
 
-  const loadResources = async (currentUser) => {
-    try {
-      // We need to get the PCO token
-      const tokenResponse = await base44.functions.invoke('getPCOToken');
-      
-      if (!tokenResponse.data.ok) {
-        console.error('Failed to get PCO token');
-        return;
-      }
-
-      const accessToken = tokenResponse.data.access_token;
-
-      // Fetch all resources from PCO
-      const resourcesResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/resources?per_page=100',
-        {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        }
-      );
-
-      if (resourcesResponse.ok) {
-        const resourcesData = await resourcesResponse.json();
-        const resourcesList = (resourcesData.data || []).map(r => ({
-          id: r.id,
-          name: r.attributes?.name,
-          kind: r.attributes?.kind
-        }));
-        setResources(resourcesList);
-      }
-    } catch (error) {
-      console.error('Error loading resources:', error);
-    }
-  };
-
   const handleEventClick = async (event) => {
     setSelectedEvent(event);
     setShowEventDetail(true);
     setLoadingEventDetails(true);
 
-    // Load event comments to get door codes AND event resources
+    // Load event comments and full resources details
     try {
       const [commentsResponse, resourcesResponse] = await Promise.all([
         base44.functions.invoke('getPCOEventComments', { event_id: event.id }),
@@ -131,7 +108,6 @@ export default function Calendar() {
       ]);
       
       setEventComments(commentsResponse.data);
-      // Store resources in a map keyed by event.id
       setEventResources(prev => ({ ...prev, [event.id]: resourcesResponse.data }));
     } catch (error) {
       console.error('Error loading event details:', error);
@@ -143,9 +119,8 @@ export default function Calendar() {
   const filteredEvents = selectedResource === "all" 
     ? events 
     : events.filter(event => {
-        // This filtering will need to be enhanced when we add resource data to events
-        // For now, showing all events
-        return true;
+        // Filter events that have the selected room
+        return event.rooms && event.rooms.some(room => room.id === selectedResource);
       });
 
   const groupEventsByDate = () => {
@@ -227,10 +202,7 @@ export default function Calendar() {
               </h3>
               <div className="space-y-3">
                 {dayEvents.map(event => {
-                  // Get rooms for this event from cache if available
-                  // This will only show rooms if the event has been clicked before
-                  const cachedEventResources = eventResources[event.id]; 
-                  const rooms = cachedEventResources?.rooms || [];
+                  const rooms = event.rooms || [];
                   
                   return (
                     <motion.div
@@ -254,7 +226,7 @@ export default function Calendar() {
                               <div className="flex items-center gap-1 text-blue-600">
                                 <MapPin className="w-4 h-4 text-blue-600" />
                                 <span className="font-medium">
-                                  {rooms.map(r => r.resource_name).join(', ')}
+                                  {rooms.map(r => r.name).join(', ')}
                                 </span>
                               </div>
                             )}
@@ -278,6 +250,11 @@ export default function Calendar() {
           <div className="text-center py-12">
             <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">No events found</p>
+            {selectedResource !== "all" && (
+              <p className="text-xs text-slate-400 mt-2">
+                Try selecting "All Resources" to see all events
+              </p>
+            )}
           </div>
         )}
       </div>
