@@ -93,10 +93,14 @@ export default function Calendar() {
       const uniqueRooms = Array.from(roomsSet).map(r => JSON.parse(r));
       setResources(uniqueRooms);
 
-      toast.success(`Loaded ${validEvents.length} events`);
+      if (validEvents.length === 0) {
+        toast.info('No upcoming events found in PCO Calendar');
+      } else {
+        toast.success(`Loaded ${validEvents.length} events`);
+      }
     } catch (error) {
       console.error('Error loading calendar data:', error);
-      toast.error('Failed to load calendar data');
+      toast.error('Failed to load calendar data: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
