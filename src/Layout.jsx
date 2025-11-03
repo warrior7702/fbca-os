@@ -55,7 +55,7 @@ const apps = [
     color: "text-orange-500"
   },
   {
-    name: "Calendar",
+    name: "Church Calendar",
     path: "Calendar",
     icon: CalendarIcon,
     color: "text-blue-600"

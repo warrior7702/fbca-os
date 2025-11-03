@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -70,19 +71,25 @@ export default function Calendar() {
         return;
       }
 
+      console.log('🔍 Fetching calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-      console.log('📅 Calendar events response:', eventsResponse.data);
+      console.log('📅 Full calendar events response:', eventsResponse);
+      console.log('📅 Events data:', eventsResponse.data);
       
       const eventsData = eventsResponse.data?.events || [];
+      console.log('📅 Events array length:', eventsData.length);
+      console.log('📅 First few events:', eventsData.slice(0, 3));
       
       // Filter out events with invalid dates
       const validEvents = eventsData.filter(event => {
         const hasValidDates = event.starts_at && event.ends_at;
         if (!hasValidDates) {
-          console.warn('⚠️ Skipping event with invalid dates:', event.name);
+          console.warn('⚠️ Skipping event with invalid dates:', event.name, event);
         }
         return hasValidDates;
       });
+      
+      console.log('✅ Valid events count:', validEvents.length);
       
       setEvents(validEvents);
       setLastSync(new Date());
@@ -105,7 +112,8 @@ export default function Calendar() {
         toast.success(`Loaded ${validEvents.length} events`);
       }
     } catch (error) {
-      console.error('Error loading calendar data:', error);
+      console.error('❌ Error loading calendar data:', error);
+      console.error('❌ Error details:', error.response?.data);
       toast.error('Failed to load calendar data: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
@@ -292,7 +300,7 @@ export default function Calendar() {
 
         <AppHeader
           icon={CalendarIcon}
-          title="Calendar"
+          title="Church Calendar"
           description={
             <div className="flex items-center gap-2">
               <span>{filteredEvents.length} events in the next 60 days</span>
