@@ -136,9 +136,9 @@ Deno.serve(async (req) => {
         
         for (const eventId of eventIds) {
             try {
-                // Fetch event with resource requests and tags
+                // Fetch event with tags
                 const eventResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=event_resource_requests,tags`,
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
                     {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
@@ -147,86 +147,89 @@ Deno.serve(async (req) => {
                     }
                 );
 
-                if (eventResponse.ok) {
-                    const eventData = await eventResponse.json();
-                    const event = eventData.data;
+                if (!eventResponse.ok) {
+                    console.error(`Failed to fetch event ${eventId}`);
+                    continue;
+                }
+
+                const eventData = await eventResponse.json();
+                const event = eventData.data;
+                
+                // Extract tags from included
+                const tags = [];
+                if (eventData.included) {
+                    for (const item of eventData.included) {
+                        if (item.type === 'Tag') {
+                            tags.push(item.attributes?.name);
+                        }
+                    }
+                }
+                
+                // NOW fetch event_resource_requests separately with resource included
+                const requestsResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                const resourceRequests = [];
+                
+                if (requestsResponse.ok) {
+                    const requestsData = await requestsResponse.json();
                     
-                    // Build resource requests array with details
-                    const resourceRequests = [];
-                    const tags = [];
-                    
-                    if (eventData.included) {
-                        for (const item of eventData.included) {
-                            if (item.type === 'EventResourceRequest') {
-                                resourceRequests.push({
+                    // Build a map of resources from included
+                    const resourceMap = {};
+                    if (requestsData.included) {
+                        for (const item of requestsData.included) {
+                            if (item.type === 'Resource') {
+                                resourceMap[item.id] = {
                                     id: item.id,
-                                    resource_id: item.relationships?.resource?.data?.id,
-                                    approval_status: item.attributes?.approval_status,
-                                    quantity: item.attributes?.quantity
-                                });
-                            } else if (item.type === 'Tag') {
-                                tags.push(item.attributes?.name);
+                                    name: item.attributes?.name,
+                                    kind: item.attributes?.kind
+                                };
                             }
                         }
                     }
                     
-                    eventDataMap[eventId] = {
-                        name: event.attributes?.name,
-                        summary: event.attributes?.summary,
-                        description: event.attributes?.description,
-                        visible_in_church_center: event.attributes?.visible_in_church_center,
-                        approval_status: event.attributes?.approval_status,
-                        resource_requests: resourceRequests,
-                        tags: tags
-                    };
+                    // Build resource requests with full resource info
+                    for (const request of (requestsData.data || [])) {
+                        const resourceId = request.relationships?.resource?.data?.id;
+                        const resource = resourceMap[resourceId];
+                        
+                        if (resource) {
+                            resourceRequests.push({
+                                id: request.id,
+                                resource_id: resourceId,
+                                resource_name: resource.name,
+                                resource_kind: resource.kind,
+                                approval_status: request.attributes?.approval_status,
+                                quantity: request.attributes?.quantity
+                            });
+                        }
+                    }
+                    
+                    console.log(`  ✅ Event ${eventId}: Found ${resourceRequests.length} resource requests`);
                 }
+                
+                eventDataMap[eventId] = {
+                    name: event.attributes?.name,
+                    summary: event.attributes?.summary,
+                    description: event.attributes?.description,
+                    visible_in_church_center: event.attributes?.visible_in_church_center,
+                    approval_status: event.attributes?.approval_status,
+                    resource_requests: resourceRequests,
+                    tags: tags
+                };
             } catch (error) {
                 console.error(`❌ Error fetching event ${eventId}:`, error);
             }
         }
 
         console.log('📊 Fetched full data for', Object.keys(eventDataMap).length, 'events');
-
-        // Now fetch resource details (with kind) for all unique resource IDs
-        const resourceDetailsMap = {};
-        const allResourceIds = new Set();
-        
-        Object.values(eventDataMap).forEach(eventData => {
-            eventData.resource_requests.forEach(req => {
-                if (req.resource_id) allResourceIds.add(req.resource_id);
-            });
-        });
-
-        console.log('📊 Fetching details for', allResourceIds.size, 'unique resources...');
-
-        for (const resourceId of allResourceIds) {
-            try {
-                const resourceResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-                
-                if (resourceResponse.ok) {
-                    const resourceData = await resourceResponse.json();
-                    const resource = resourceData.data;
-                    
-                    resourceDetailsMap[resourceId] = {
-                        id: resource.id,
-                        name: resource.attributes?.name,
-                        kind: resource.attributes?.kind
-                    };
-                }
-            } catch (error) {
-                console.error(`❌ Error fetching resource ${resourceId}:`, error);
-            }
-        }
-
-        console.log('📊 Fetched details for', Object.keys(resourceDetailsMap).length, 'resources');
 
         // Process event instances
         const eventsWithResources = [];
@@ -243,19 +246,16 @@ Deno.serve(async (req) => {
                 continue;
             }
             
-            // Build resources array with full details
+            // Build resources array from resource requests
             const resources = [];
             if (eventData?.resource_requests) {
                 for (const request of eventData.resource_requests) {
-                    const resourceDetails = resourceDetailsMap[request.resource_id];
-                    if (resourceDetails) {
-                        resources.push({
-                            id: resourceDetails.id,
-                            name: resourceDetails.name,
-                            kind: resourceDetails.kind,
-                            approval_status: request.approval_status
-                        });
-                    }
+                    resources.push({
+                        id: request.resource_id,
+                        name: request.resource_name,
+                        kind: request.resource_kind,
+                        approval_status: request.approval_status
+                    });
                 }
             }
             
