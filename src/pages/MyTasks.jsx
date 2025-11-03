@@ -334,7 +334,7 @@ export default function MyTasks() {
 
         <AppHeader
           icon={ListChecks}
-          title="My Tasks"
+          title="Me"
           description={`Welcome back, ${displayName}`}
           iconColor="from-blue-500 to-indigo-500"
           action={
@@ -344,6 +344,38 @@ export default function MyTasks() {
             </Button>
           }
         />
+
+        {/* Task Calendar - NEW PROMINENT SECTION */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
+              <Calendar className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Task Calendar</h2>
+              <p className="text-slate-600">Your upcoming tasks and schedule</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFullCalendar(true)}
+                >
+                  <Maximize2 className="w-4 h-4 mr-2" />
+                  Full Calendar
+                </Button>
+              </div>
+              <TaskCalendar
+                tasks={allTasks}
+                onTaskClick={handleTaskClick}
+                weekCount={3}
+              />
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Stats Cards (Placeholder, actual stats are not in original code for this section) */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -439,34 +471,6 @@ export default function MyTasks() {
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Task Calendar */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Task Calendar
-              </CardTitle>
-              <CardDescription>Your upcoming tasks</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFullCalendar(true)}
-            >
-              <Maximize2 className="w-4 h-4 mr-2" />
-              Full Calendar
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <TaskCalendar
-              tasks={allTasks}
-              onTaskClick={handleTaskClick}
-              weekCount={2}
-            />
           </CardContent>
         </Card>
 

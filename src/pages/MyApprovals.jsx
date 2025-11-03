@@ -18,7 +18,6 @@ import {
   Users,
   Key,
   User, // Added User icon for cardholder search results
-  ListChecks // Added ListChecks icon for Task Calendar section
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -26,7 +25,6 @@ import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import MyScheduleCalendar from "../components/approvals/MyScheduleCalendar"; // New import
-import TaskCalendar from "../components/tasks/TaskCalendar"; // New import
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -381,7 +379,7 @@ export default function MyApprovals() {
           }
         />
 
-        {/* My Schedule Calendar Section - NEW */}
+        {/* My Schedule Calendar Section */}
         <div>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
@@ -393,24 +391,6 @@ export default function MyApprovals() {
             </div>
           </div>
           <MyScheduleCalendar approvals={approvals} />
-        </div>
-
-        {/* Task Calendar Section */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
-              <ListChecks className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">Task Calendar</h2>
-              <p className="text-slate-600">Your upcoming tasks</p>
-            </div>
-          </div>
-          <Card>
-            <CardContent className="p-6">
-              <TaskCalendar userId={user?.id} />
-            </CardContent>
-          </Card>
         </div>
 
         {/* Pending Approvals List */}

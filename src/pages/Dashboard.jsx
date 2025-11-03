@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const defaultApps = [
-  { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
+  { id: "mytasks", name: "Me", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
   { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" }, // Changed name here
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
