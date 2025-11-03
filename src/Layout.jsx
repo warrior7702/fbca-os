@@ -86,8 +86,6 @@ const apps = [
   }
 ];
 
-// Removed wallpapers object - back to Dashboard only
-
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -95,14 +93,12 @@ export default function Layout({ children, currentPageName }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications] = useState(3);
   const [searchQuery, setSearchQuery] = useState("");
-  // Updated searchResults state to include tasks
-  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [] }); // Removed tasks
+  const [searchResults, setSearchResults] = useState({ staff: [], files: [], modules: [] });
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef(null);
   const [hasConnectionAlert, setHasConnectionAlert] = useState(false);
   const [showLightBubble, setShowLightBubble] = useState(false);
-  // Removed wallpaper state - back to Dashboard only
 
   useEffect(() => {
     const loadUser = async () => {
@@ -110,9 +106,6 @@ export default function Layout({ children, currentPageName }) {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
         
-        // Removed wallpaper loading - back to Dashboard only
-        
-        // Check if user needs to connect accounts
         const hasPCO = !!currentUser?.pco_access_token;
         const hasClickUp = !!currentUser?.clickup_access_token;
         const hasMicrosoft = !!currentUser?.microsoft_access_token;
@@ -120,14 +113,11 @@ export default function Layout({ children, currentPageName }) {
         
         setHasConnectionAlert(missingConnections);
         
-        // Show bubble after a delay if there are missing connections
         if (missingConnections && !sessionStorage.getItem('lightBubbleDismissed')) {
           setTimeout(() => setShowLightBubble(true), 2000);
         }
       } catch (error) {
         console.error("Error loading user:", error);
-        // User is not logged in or there was an error - show the alert
-        // This alerts the user to connect accounts, which includes logging in if not authenticated.
         setHasConnectionAlert(true);
         if (!sessionStorage.getItem('lightBubbleDismissed')) {
           setTimeout(() => setShowLightBubble(true), 2000);
@@ -136,12 +126,10 @@ export default function Layout({ children, currentPageName }) {
     };
     loadUser();
 
-    // Update clock every second
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
-    // Click outside to close search results
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowResults(false);
@@ -155,16 +143,15 @@ export default function Layout({ children, currentPageName }) {
     };
   }, []);
 
-  // Debounced live search
   useEffect(() => {
     const delaySearch = setTimeout(() => {
       if (searchQuery.length >= 2) {
         performLiveSearch(searchQuery);
       } else {
-        setSearchResults({ staff: [], files: [], modules: [] }); // Removed tasks
+        setSearchResults({ staff: [], files: [], modules: [] });
         setShowResults(false);
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(delaySearch);
   }, [searchQuery]);
@@ -177,21 +164,26 @@ export default function Layout({ children, currentPageName }) {
 
     try {
       const lowerQuery = query.toLowerCase();
-      const newResults = { staff: [], files: [], modules: [] }; // Removed tasks
+      const newResults = { staff: [], files: [], modules: [] };
 
       // Search staff
       console.log('📋 Searching staff...');
-      const staffResponse = await base44.entities.StaffContact.filter({});
-      
-      newResults.staff = (staffResponse || [])
-        .filter(person => {
-          return person.full_name?.toLowerCase().includes(lowerQuery) ||
-                 person.first_name?.toLowerCase().includes(lowerQuery) ||
-                 person.last_name?.toLowerCase().includes(lowerQuery) ||
-                 person.email?.toLowerCase().includes(lowerQuery);
-        })
-        .slice(0, 5);
-      console.log('✅ Found', newResults.staff.length, 'staff members');
+      try {
+        const staffResponse = await base44.entities.StaffContact.filter({});
+        console.log('📋 Staff response:', staffResponse?.length || 0, 'records');
+        
+        newResults.staff = (staffResponse || [])
+          .filter(person => {
+            return person.full_name?.toLowerCase().includes(lowerQuery) ||
+                   person.first_name?.toLowerCase().includes(lowerQuery) ||
+                   person.last_name?.toLowerCase().includes(lowerQuery) ||
+                   person.email?.toLowerCase().includes(lowerQuery);
+          })
+          .slice(0, 5);
+        console.log('✅ Found', newResults.staff.length, 'staff members');
+      } catch (staffError) {
+        console.error('❌ Staff search error:', staffError);
+      }
 
       // Search modules
       console.log('📦 Searching modules...');
@@ -203,19 +195,16 @@ export default function Layout({ children, currentPageName }) {
         .slice(0, 3);
       console.log('✅ Found', newResults.modules.length, 'modules');
 
-      // Search files (already grouped by folder from backend)
+      // Search files
       try {
         console.log('📁 Searching OneDrive files...');
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
         console.log('📁 OneDrive response:', filesResponse.data);
         newResults.files = (filesResponse.data.files || []).slice(0, 5);
         console.log('✅ Found', newResults.files.length, 'files/folders');
-        if (newResults.files.length > 0) {
-          console.log('📁 File results:', newResults.files.map(f => ({ name: f.name, isFolder: f.isFolder })));
-        }
-      } catch (error) {
-        console.error('❌ File search error:', error);
-        console.error('Error details:', error.response?.data || error.message);
+      } catch (fileError) {
+        console.error('❌ File search error:', fileError);
+        console.error('Error details:', fileError.response?.data || fileError.message);
       }
 
       console.log('🎯 Final results:', {
@@ -227,6 +216,8 @@ export default function Layout({ children, currentPageName }) {
       setSearchResults(newResults);
     } catch (error) {
       console.error('❌ Live search error:', error);
+      // Still set whatever results we have, or clear if a critical error
+      setSearchResults({ staff: [], files: [], modules: [] });
     } finally {
       setSearching(false);
     }
@@ -254,20 +245,18 @@ export default function Layout({ children, currentPageName }) {
     } else if (type === 'file') {
       window.open(item.webUrl, '_blank');
     } else if (type === 'staff') {
-      // Navigate to Staff Directory with this person pre-filtered
       navigate(createPageUrl('StaffDirectory') + `?name=${encodeURIComponent(item.full_name)}`);
     }
   };
 
-  // Updated totalResults to include tasks
-  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length; // Removed tasks
+  const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length;
+
+  console.log('🔢 Total search results:', totalResults, 'Show results:', showResults);
 
   const handleDismissLightBubble = () => {
     setShowLightBubble(false);
     sessionStorage.setItem('lightBubbleDismissed', 'true');
   };
-
-  // Removed wallpaper URL logic
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -383,10 +372,18 @@ export default function Layout({ children, currentPageName }) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10" />
                 <input
                   type="text"
-                  placeholder="Search apps, files, and people..." // Updated placeholder
+                  placeholder="Search apps, files, and people..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
+                  onChange={(e) => {
+                    console.log('🔍 Search query changed:', e.target.value);
+                    setSearchQuery(e.target.value);
+                  }}
+                  onFocus={() => {
+                    console.log('🔍 Search focused, query:', searchQuery);
+                    if (searchQuery.length >= 2) {
+                      setShowResults(true);
+                    }
+                  }}
                   className="w-full h-9 pl-10 pr-4 bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 rounded-lg text-white placeholder-white/40 text-sm outline-none transition-colors relative z-10"
                 />
                 {searching && (
@@ -396,12 +393,18 @@ export default function Layout({ children, currentPageName }) {
             </form>
 
             {/* Live Search Results Dropdown */}
-            {showResults && totalResults > 0 && (
+            {showResults && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute bottom-12 left-0 right-0 bg-white rounded-lg shadow-2xl border border-slate-200 max-h-96 overflow-y-auto z-50"
               >
+                {totalResults === 0 && !searching && (
+                  <div className="p-4 text-center text-slate-500 text-sm">
+                    No results found for "{searchQuery}"
+                  </div>
+                )}
+
                 {/* Staff Results */}
                 {searchResults.staff.length > 0 && (
                   <div className="p-2">
@@ -478,18 +481,20 @@ export default function Layout({ children, currentPageName }) {
                 )}
 
                 {/* View All Results */}
-                <div className="p-2 border-t border-slate-100">
-                  <button
-                    onClick={() => {
-                      navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
-                      setShowResults(false);
-                      setSearchQuery("");
-                    }}
-                    className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium py-2"
-                  >
-                    View all results for "{searchQuery}"
-                  </button>
-                </div>
+                {totalResults > 0 && (
+                  <div className="p-2 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        navigate(createPageUrl('Search') + `?q=${encodeURIComponent(searchQuery)}`);
+                        setShowResults(false);
+                        setSearchQuery("");
+                      }}
+                      className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium py-2"
+                    >
+                      View all results for "{searchQuery}"
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </div>
