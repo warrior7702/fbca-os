@@ -13,6 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   CheckSquare,
   Calendar as CalendarIcon, // Aliased to CalendarIcon as per instruction and new usage
   Mail,
@@ -70,6 +77,8 @@ export default function MyTasks() {
   const [myScheduleEvents, setMyScheduleEvents] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [myApprovalGroups, setMyApprovalGroups] = useState([]);
+  const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
+  const [showScheduleDetail, setShowScheduleDetail] = useState(false);
 
 
   const navigate = useNavigate();
@@ -444,12 +453,12 @@ export default function MyTasks() {
         />
 
         {/* NEW: My Schedule - Two Week Calendar */}
-        <Card className="border-2 border-green-200 bg-green-50/50">
+        <Card className="border-2 border-indigo-200 bg-indigo-50/50">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-2xl flex items-center gap-2">
-                  <CalendarIcon className="w-6 h-6 text-green-600" />
+                  <CalendarIcon className="w-6 h-6 text-indigo-600" />
                   My Schedule
                 </CardTitle>
                 <p className="text-slate-600 text-sm mt-1">
@@ -468,7 +477,7 @@ export default function MyTasks() {
           <CardContent>
             {loadingSchedule ? (
               <div className="text-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
                 <p className="text-slate-600">Loading your schedule...</p>
               </div>
             ) : myScheduleEvents.length === 0 ? (
@@ -484,10 +493,10 @@ export default function MyTasks() {
                   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
                   
                   return (
-                    <div key={weekIndex} className="bg-white rounded-lg border border-green-200 overflow-hidden">
+                    <div key={weekIndex} className="bg-white rounded-lg border border-indigo-200 overflow-hidden">
                       {/* Week header */}
-                      <div className="bg-green-100 px-3 py-2 border-b border-green-200">
-                        <p className="text-sm font-semibold text-green-900">
+                      <div className="bg-indigo-100 px-3 py-2 border-b border-indigo-200">
+                        <p className="text-sm font-semibold text-indigo-900">
                           Week of {format(weekStart, 'MMM d, yyyy')}
                         </p>
                       </div>
@@ -497,13 +506,13 @@ export default function MyTasks() {
                         {weekDays.map((day) => (
                           <div key={day.toISOString()} className="text-center py-2 border-r border-slate-200 last:border-r-0">
                             <div className={`text-xs font-semibold ${
-                              isSameDay(day, new Date()) ? 'text-green-600' : 'text-slate-600'
+                              isSameDay(day, new Date()) ? 'text-indigo-600' : 'text-slate-600'
                             }`}>
                               {format(day, 'EEE')}
                             </div>
                             <div className={`text-sm font-bold mt-1 ${
                               isSameDay(day, new Date()) 
-                                ? 'bg-green-600 text-white w-7 h-7 rounded-full flex items-center justify-center mx-auto' 
+                                ? 'bg-indigo-600 text-white w-7 h-7 rounded-full flex items-center justify-center mx-auto' 
                                 : 'text-slate-900'
                             }`}>
                               {format(day, 'd')}
@@ -529,10 +538,13 @@ export default function MyTasks() {
                                   key={event.id}
                                   initial={{ opacity: 0, scale: 0.9 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  className="text-xs p-2 bg-green-100 hover:bg-green-200 rounded border border-green-300 cursor-pointer transition-all group"
-                                  onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${event.event_id}`, '_blank')}
+                                  className="text-xs p-2 bg-indigo-100 hover:bg-indigo-200 rounded border border-indigo-300 cursor-pointer transition-all group"
+                                  onClick={() => {
+                                    setSelectedScheduleEvent(event);
+                                    setShowScheduleDetail(true);
+                                  }}
                                 >
-                                  <div className="font-semibold text-green-900 truncate mb-1">
+                                  <div className="font-semibold text-indigo-900 truncate mb-1">
                                     {format(parseISO(event.starts_at), 'h:mm a')}
                                   </div>
                                   <div className="text-slate-700 font-medium truncate mb-1" title={event.name}>
@@ -557,21 +569,13 @@ export default function MyTasks() {
                                   
                                   {/* Door Code Badge */}
                                   {event.posted_door_code && (
-                                    <div className="flex items-center gap-1 mt-1 p-1 bg-white rounded border border-green-400">
-                                      <Key className="w-3 h-3 text-green-700 flex-shrink-0" />
-                                      <span className="text-[10px] font-mono font-bold text-green-700">
+                                    <div className="flex items-center gap-1 mt-1 p-1 bg-white rounded border border-indigo-400">
+                                      <Key className="w-3 h-3 text-indigo-700 flex-shrink-0" />
+                                      <span className="text-[10px] font-mono font-bold text-indigo-700">
                                         {event.posted_door_code}#
                                       </span>
                                     </div>
                                   )}
-                                  
-                                  {/* Hover: View in PCO */}
-                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity mt-1">
-                                    <div className="flex items-center gap-1 text-[10px] text-green-700 font-medium">
-                                      <ExternalLink className="w-3 h-3" />
-                                      <span>View Details</span>
-                                    </div>
-                                  </div>
                                 </motion.div>
                               ))}
                             </div>
@@ -966,6 +970,125 @@ export default function MyTasks() {
         task={selectedTask}
         onUpdate={handleTaskUpdate}
       />
+
+      {/* Schedule Event Detail Modal */}
+      <Dialog open={showScheduleDetail} onOpenChange={setShowScheduleDetail}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{selectedScheduleEvent?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedScheduleEvent && format(parseISO(selectedScheduleEvent.starts_at), 'EEEE, MMMM d, yyyy • h:mm a')}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedScheduleEvent && (
+            <div className="space-y-4 mt-4">
+              {/* Time */}
+              <div className="flex items-center gap-3 text-sm">
+                <Clock className="w-4 h-4 text-slate-500" />
+                <div>
+                  <span className="font-medium">
+                    {format(parseISO(selectedScheduleEvent.starts_at), 'h:mm a')} - {format(parseISO(selectedScheduleEvent.ends_at), 'h:mm a')}
+                  </span>
+                  <span className="text-slate-500 ml-2">
+                    ({formatDistanceToNow(parseISO(selectedScheduleEvent.starts_at), { addSuffix: true })})
+                  </span>
+                </div>
+              </div>
+
+              {/* Resources */}
+              {selectedScheduleEvent.resources && selectedScheduleEvent.resources.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm text-slate-700 mb-2">
+                    Rooms & Resources ({selectedScheduleEvent.resources.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedScheduleEvent.resources.map((resource, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <div>
+                          <p className="font-medium text-slate-900">{resource.name}</p>
+                          <p className="text-xs text-slate-500">{resource.kind}</p>
+                        </div>
+                        {resource.approval_status && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${
+                              resource.approval_status === 'A' ? 'bg-green-50 border-green-300 text-green-700' : 
+                              resource.approval_status === 'P' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' : 
+                              'bg-red-50 border-red-300 text-red-700'
+                            }`}
+                          >
+                            {resource.approval_status === 'A' ? 'Approved' : 
+                             resource.approval_status === 'P' ? 'Pending' : 
+                             'Rejected'}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Door Code */}
+              {selectedScheduleEvent.posted_door_code && (
+                <div className="p-4 bg-indigo-50 border-2 border-indigo-300 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Key className="w-5 h-5 text-indigo-700" />
+                    <span className="text-sm font-semibold text-indigo-900">Door Code Posted</span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-indigo-700 my-2">
+                    {selectedScheduleEvent.posted_door_code}#
+                  </div>
+                  {selectedScheduleEvent.posted_by && (
+                    <p className="text-xs text-indigo-600">
+                      Posted by: {selectedScheduleEvent.posted_by}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Summary/Description */}
+              {selectedScheduleEvent.summary && (
+                <div>
+                  <h3 className="font-semibold text-sm text-slate-700 mb-2">Details</h3>
+                  <p className="text-sm text-slate-600">{selectedScheduleEvent.summary}</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {selectedScheduleEvent.tags && selectedScheduleEvent.tags.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm text-slate-700 mb-2">Tags</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedScheduleEvent.tags.map((tag, idx) => (
+                      <Badge key={idx} variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${selectedScheduleEvent.event_id}`, '_blank')}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View in Planning Center
+                </Button>
+                <Button
+                  onClick={() => setShowScheduleDetail(false)}
+                  variant="outline"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Email Detail Modal */}
       <EmailDetailModal
