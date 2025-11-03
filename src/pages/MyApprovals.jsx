@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-// CardholderLookup is no longer needed
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -72,7 +72,8 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  // showCardholderLookup and currentApprovalForLookup states are removed
+  const [showCardholderLookup, setShowCardholderLookup] = useState(false);
+  const [currentApprovalForLookup, setCurrentApprovalForLookup] = useState(null);
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -230,7 +231,21 @@ export default function MyApprovals() {
     }
   };
 
-  // handleOpenCardholderLookup and handleSelectCardholder are removed
+  const handleOpenCardholderLookup = (approval) => {
+    setCurrentApprovalForLookup(approval);
+    setShowCardholderLookup(true);
+  };
+
+  const handleSelectCardholder = (cardholder) => {
+    if (currentApprovalForLookup) {
+      setDoorCodes(prev => ({
+        ...prev,
+        [currentApprovalForLookup.request_id]: cardholder.pin
+      }));
+    }
+    setShowCardholderLookup(false);
+    setCurrentApprovalForLookup(null);
+  };
 
   const handleSendCode = async (approval) => {
     const doorCode = doorCodes[approval.request_id];
@@ -416,7 +431,14 @@ export default function MyApprovals() {
                               className="flex-1"
                               maxLength={10}
                             />
-                            {/* Removed the Search button */}
+                            <Button
+                              onClick={() => handleOpenCardholderLookup(approval)}
+                              variant="outline"
+                              className="flex-shrink-0"
+                            >
+                              <Key className="w-4 h-4 mr-2" />
+                              Search
+                            </Button>
                             <Button
                               onClick={() => handleSendCode(approval)}
                               disabled={sendingCode === approval.request_id}
@@ -453,7 +475,15 @@ export default function MyApprovals() {
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
-      {/* CardholderLookup component is removed */}
+
+      <CardholderLookup
+        isOpen={showCardholderLookup}
+        onClose={() => {
+          setShowCardholderLookup(false);
+          setCurrentApprovalForLookup(null);
+        }}
+        onSelect={handleSelectCardholder}
+      />
     </div>
   );
 }
