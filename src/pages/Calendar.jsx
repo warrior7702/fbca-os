@@ -416,60 +416,120 @@ export default function Calendar() {
 
       {/* Event Detail Dialog */}
       <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{selectedEvent?.name}</DialogTitle>
+            <DialogTitle className="text-2xl pr-8">{selectedEvent?.name}</DialogTitle>
           </DialogHeader>
           {selectedEvent && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 text-slate-600">
-                <CalendarIcon className="w-5 h-5" />
-                <div>
-                  <p className="font-semibold">
+            <div className="space-y-6">
+              {/* Date & Time */}
+              <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                <CalendarIcon className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-900 mb-1">
                     {format(parseISO(selectedEvent.starts_at), 'EEEE, MMMM d, yyyy')}
                   </p>
-                  <p className="text-sm">
+                  <p className="text-sm text-slate-600">
                     {format(parseISO(selectedEvent.starts_at), 'h:mm a')} - {format(parseISO(selectedEvent.ends_at), 'h:mm a')}
                   </p>
                 </div>
               </div>
 
-              {selectedEvent.resources && selectedEvent.resources.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Resources:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedEvent.resources.map(resource => (
-                      <Badge key={resource.id} variant="secondary">
-                        {resource.name} ({resource.kind})
-                      </Badge>
-                    ))}
-                  </div>
+              {/* Summary */}
+              {selectedEvent.summary && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">Summary</p>
+                  <p className="text-slate-700">{selectedEvent.summary}</p>
                 </div>
               )}
 
-              {selectedEvent.tags && selectedEvent.tags.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Tags:</p>
+              {/* Description */}
+              {selectedEvent.description && (
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
+                  <p className="text-slate-600 whitespace-pre-wrap">{selectedEvent.description}</p>
+                </div>
+              )}
+
+              {/* Resources */}
+              {selectedEvent.resources && selectedEvent.resources.length > 0 ? (
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm font-semibold text-green-900 mb-3">
+                    Resources ({selectedEvent.resources.length})
+                  </p>
+                  <div className="space-y-2">
+                    {selectedEvent.resources.map(resource => (
+                      <div key={resource.id} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                        <div>
+                          <p className="font-medium text-slate-900">{resource.name}</p>
+                          <p className="text-xs text-slate-500">{resource.kind}</p>
+                        </div>
+                        {resource.approval_status && (
+                          <Badge variant={resource.approval_status === 'A' ? 'default' : 'outline'}>
+                            {resource.approval_status === 'A' ? 'Approved' : 
+                             resource.approval_status === 'P' ? 'Pending' : 
+                             resource.approval_status === 'R' ? 'Rejected' : 'Unknown'}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                  <p className="text-sm text-slate-500">No resources requested</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {selectedEvent.tags && selectedEvent.tags.length > 0 ? (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-sm font-semibold text-purple-900 mb-3">Tags</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedEvent.tags.map(tag => (
-                      <Badge key={tag} variant="outline">
+                      <Badge key={tag} variant="outline" className="bg-white border-purple-300 text-purple-700">
                         {tag}
                       </Badge>
                     ))}
                   </div>
                 </div>
-              )}
-
-              {selectedEvent.description && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Description:</p>
-                  <p className="text-slate-600">{selectedEvent.description}</p>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                  <p className="text-sm text-slate-500">No tags</p>
                 </div>
               )}
 
+              {/* Event Status */}
+              <div className="flex items-center gap-4 text-sm text-slate-600">
+                <div>
+                  <span className="font-medium">Approval Status: </span>
+                  <Badge variant={selectedEvent.approval_status === 'A' ? 'default' : 'outline'}>
+                    {selectedEvent.approval_status === 'A' ? 'Approved' : 
+                     selectedEvent.approval_status === 'P' ? 'Pending' : 
+                     selectedEvent.approval_status === 'R' ? 'Rejected' : 'Unknown'}
+                  </Badge>
+                </div>
+                {selectedEvent.visible_in_church_center !== undefined && (
+                  <div>
+                    <span className="font-medium">Church Center: </span>
+                    <span>{selectedEvent.visible_in_church_center ? 'Visible' : 'Hidden'}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Debug Info */}
+              <details className="p-3 bg-slate-100 rounded text-xs">
+                <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-900">
+                  Debug Info
+                </summary>
+                <pre className="mt-2 overflow-auto text-[10px]">
+                  {JSON.stringify(selectedEvent, null, 2)}
+                </pre>
+              </details>
+
               <Button
                 onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${selectedEvent.event_id}`, '_blank')}
-                className="w-full"
+                className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 View in Planning Center
               </Button>
