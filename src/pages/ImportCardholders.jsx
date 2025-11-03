@@ -213,10 +213,10 @@ export default function ImportCardholders() {
   };
 
   const downloadTemplate = () => {
-    const template = `name,pin,member_id,email
-John Doe,123456,M001,john@example.com
-Jane Smith,654321,M002,jane@example.com
-Bob Wilson,111222,M003,bob@example.com`;
+    const template = `FirstName,LastName,CODE
+John,Doe,123456
+Jane,Smith,654321
+Bob,Wilson,111222`;
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
