@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -74,6 +75,7 @@ export default function SupportTickets() {
   const [newComment, setNewComment] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [processingEmails, setProcessingEmails] = useState(false);
 
   const navigate = useNavigate();
 
@@ -264,6 +266,43 @@ Keep response concise and actionable.`;
     }
   };
 
+  const handleProcessEmails = async () => {
+    setProcessingEmails(true);
+    try {
+      toast.info("Processing service emails...");
+      
+      const response = await base44.functions.invoke('processServiceEmails');
+      
+      if (response.data.success) {
+        const { summary } = response.data;
+        
+        if (summary.tickets_created > 0) {
+          toast.success(
+            <div>
+              <p className="font-semibold">Email Processing Complete!</p>
+              <p className="text-sm">Created {summary.tickets_created} ticket(s)</p>
+              <p className="text-xs text-slate-500">
+                Processed: {summary.total_processed} | Skipped: {summary.emails_skipped}
+              </p>
+            </div>
+          );
+          loadTickets(); // Refresh ticket list
+        } else {
+          toast.info("No new emails to process");
+        }
+        
+        if (summary.errors_count > 0) {
+          toast.warning(`${summary.errors_count} email(s) had errors`);
+        }
+      }
+    } catch (error) {
+      console.error("Error processing emails:", error);
+      toast.error("Failed to process emails: " + error.message);
+    } finally {
+      setProcessingEmails(false);
+    }
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -435,10 +474,25 @@ Keep response concise and actionable.`;
           action={
             <div className="flex items-center gap-2">
               {(isSupportStaff || isSuperUser) && (
-                <Button onClick={loadTickets} variant="outline" size="sm">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
+                <>
+                  <Button 
+                    onClick={handleProcessEmails} 
+                    variant="outline" 
+                    size="sm"
+                    disabled={processingEmails}
+                  >
+                    {processingEmails ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4 mr-2" />
+                    )}
+                    Process Emails
+                  </Button>
+                  <Button onClick={loadTickets} variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </>
               )}
               <Button onClick={() => {
                 setNewTicket({
@@ -473,6 +527,43 @@ Keep response concise and actionable.`;
                 >
                   Copy Link
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Email Monitoring Info Card - For Support Staff */}
+        {(isSupportStaff || isSuperUser) && (
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Mail className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-purple-900 mb-1">Automated Email Monitoring</h3>
+                  <p className="text-sm text-purple-700 mb-3">
+                    The system monitors these inboxes and auto-creates tickets from @fbca.org emails:
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="flex items-center gap-2 p-2 bg-white rounded">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="text-xs font-medium">maintenance@fbca.org</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-white rounded">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-xs font-medium">support@fbca.org</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-white rounded">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs font-medium">cleaning@fbca.org</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-purple-600">
+                    Click "Process Emails" to manually check for new emails and create tickets. 
+                    Spam is automatically filtered - only @fbca.org and official notifications are processed.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
