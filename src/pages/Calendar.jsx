@@ -76,9 +76,21 @@ export default function Calendar() {
       console.log('📅 Full calendar events response:', eventsResponse);
       console.log('📅 Events data:', eventsResponse.data);
       
+      if (!eventsResponse.data) {
+        console.error('❌ No data in response');
+        toast.error('Failed to load calendar data - no response data');
+        setLoading(false);
+        return;
+      }
+
       const eventsData = eventsResponse.data?.events || [];
       console.log('📅 Events array length:', eventsData.length);
-      console.log('📅 First few events:', eventsData.slice(0, 3));
+      
+      if (eventsData.length > 0) {
+        console.log('📅 First few events:', eventsData.slice(0, 3));
+      } else {
+        console.warn('⚠️ No events returned from API');
+      }
       
       // Filter out events with invalid dates
       const validEvents = eventsData.filter(event => {
