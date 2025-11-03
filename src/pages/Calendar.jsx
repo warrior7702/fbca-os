@@ -170,6 +170,14 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
 
+  // Helper function to strip HTML tags from text
+  const stripHtml = (html) => {
+    if (!html) return '';
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -435,19 +443,19 @@ export default function Calendar() {
                 </div>
               </div>
 
-              {/* Summary */}
+              {/* Summary - strip HTML */}
               {selectedEvent.summary && (
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-sm font-semibold text-blue-900 mb-2">Summary</p>
-                  <p className="text-slate-700">{selectedEvent.summary}</p>
+                  <p className="text-slate-700 whitespace-pre-wrap">{stripHtml(selectedEvent.summary)}</p>
                 </div>
               )}
 
-              {/* Description */}
+              {/* Description - strip HTML */}
               {selectedEvent.description && (
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
-                  <p className="text-slate-600 whitespace-pre-wrap">{selectedEvent.description}</p>
+                  <p className="text-slate-600 whitespace-pre-wrap">{stripHtml(selectedEvent.description)}</p>
                 </div>
               )}
 
@@ -459,18 +467,30 @@ export default function Calendar() {
                   </p>
                   <div className="space-y-2">
                     {selectedEvent.resources.map(resource => (
-                      <div key={resource.id} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                        <div>
+                      <div key={resource.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200">
+                        <div className="flex-1">
                           <p className="font-medium text-slate-900">{resource.name}</p>
-                          <p className="text-xs text-slate-500">{resource.kind}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-slate-500">{resource.kind}</span>
+                            {resource.approval_status && (
+                              <>
+                                <span className="text-xs text-slate-400">•</span>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${
+                                    resource.approval_status === 'A' ? 'bg-green-50 border-green-300 text-green-700' : 
+                                    resource.approval_status === 'P' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' : 
+                                    'bg-red-50 border-red-300 text-red-700'
+                                  }`}
+                                >
+                                  {resource.approval_status === 'A' ? 'Approved' : 
+                                   resource.approval_status === 'P' ? 'Pending' : 
+                                   resource.approval_status === 'R' ? 'Rejected' : 'Unknown'}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        {resource.approval_status && (
-                          <Badge variant={resource.approval_status === 'A' ? 'default' : 'outline'}>
-                            {resource.approval_status === 'A' ? 'Approved' : 
-                             resource.approval_status === 'P' ? 'Pending' : 
-                             resource.approval_status === 'R' ? 'Rejected' : 'Unknown'}
-                          </Badge>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -500,10 +520,16 @@ export default function Calendar() {
               )}
 
               {/* Event Status */}
-              <div className="flex items-center gap-4 text-sm text-slate-600">
+              <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
                 <div>
                   <span className="font-medium">Approval Status: </span>
-                  <Badge variant={selectedEvent.approval_status === 'A' ? 'default' : 'outline'}>
+                  <Badge 
+                    className={
+                      selectedEvent.approval_status === 'A' ? 'bg-green-100 text-green-700 border-green-300' : 
+                      selectedEvent.approval_status === 'P' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 
+                      'bg-slate-100 text-slate-700'
+                    }
+                  >
                     {selectedEvent.approval_status === 'A' ? 'Approved' : 
                      selectedEvent.approval_status === 'P' ? 'Pending' : 
                      selectedEvent.approval_status === 'R' ? 'Rejected' : 'Unknown'}
