@@ -25,13 +25,17 @@ import {
 export default function Calendar() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
-  const [resources, setResources] = useState([]);
+  const [resourceKinds, setResourceKinds] = useState([]);
+  const [eventTags, setEventTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
-  const [selectedResource, setSelectedResource] = useState("all");
+  const [selectedResourceKind, setSelectedResourceKind] = useState("all");
+  const [selectedTag, setSelectedTag] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedDayEvents, setSelectedDayEvents] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -70,19 +74,35 @@ export default function Calendar() {
       setEvents(validEvents);
       setLastSync(new Date());
 
-      // Extract unique rooms
-      const roomsSet = new Set();
+      // Extract unique resource kinds
+      const kindsSet = new Set();
       validEvents.forEach(event => {
-        if (event.rooms && Array.isArray(event.rooms)) {
-          event.rooms.forEach(room => {
-            roomsSet.add(JSON.stringify({ id: room.id, name: room.name }));
+        if (event.resources && Array.isArray(event.resources)) {
+          event.resources.forEach(resource => {
+            if (resource.kind) {
+              kindsSet.add(resource.kind);
+            }
           });
         }
       });
       
-      const uniqueRooms = Array.from(roomsSet).map(r => JSON.parse(r));
-      console.log('🏠 Unique rooms:', uniqueRooms.length);
-      setResources(uniqueRooms);
+      const uniqueKinds = Array.from(kindsSet).sort();
+      console.log('🔧 Unique resource kinds:', uniqueKinds);
+      setResourceKinds(uniqueKinds);
+
+      // Extract unique tags
+      const tagsSet = new Set();
+      validEvents.forEach(event => {
+        if (event.tags && Array.isArray(event.tags)) {
+          event.tags.forEach(tag => {
+            tagsSet.add(tag);
+          });
+        }
+      });
+      
+      const uniqueTags = Array.from(tagsSet).sort();
+      console.log('🏷️ Unique tags:', uniqueTags);
+      setEventTags(uniqueTags);
 
       if (validEvents.length === 0) {
         toast.info('No upcoming events with valid dates found in PCO Calendar');
@@ -104,11 +124,16 @@ export default function Calendar() {
     setSyncing(false);
   };
 
-  const filteredEvents = selectedResource === "all" 
-    ? events 
-    : events.filter(event => 
-        event.rooms?.some(room => room.id === selectedResource)
-      );
+  // Filter events by resource kind and tag
+  const filteredEvents = events.filter(event => {
+    const kindMatch = selectedResourceKind === "all" || 
+      event.resources?.some(r => r.kind === selectedResourceKind);
+    
+    const tagMatch = selectedTag === "all" || 
+      event.tags?.includes(selectedTag);
+    
+    return kindMatch && tagMatch;
+  });
 
   // Calendar grid generation
   const monthStart = startOfMonth(currentMonth);
@@ -133,6 +158,11 @@ export default function Calendar() {
       const eventDate = parseISO(event.starts_at);
       return isSameDay(eventDate, day);
     });
+  };
+
+  const handleShowAllDayEvents = (day, dayEvents) => {
+    setSelectedDate(day);
+    setSelectedDayEvents(dayEvents);
   };
 
   const calendarDays = generateCalendarDays();
@@ -168,21 +198,37 @@ export default function Calendar() {
           }
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <div className="flex gap-2">
-              <Select value={selectedResource} onValueChange={setSelectedResource}>
+            <div className="flex gap-2 flex-wrap">
+              <Select value={selectedResourceKind} onValueChange={setSelectedResourceKind}>
                 <SelectTrigger className="w-48">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Filter by room" />
+                  <SelectValue placeholder="Resource Kind" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Rooms</SelectItem>
-                  {resources.map(room => (
-                    <SelectItem key={room.id} value={room.id}>
-                      {room.name}
+                  <SelectItem value="all">All Resource Kinds</SelectItem>
+                  {resourceKinds.map(kind => (
+                    <SelectItem key={kind} value={kind}>
+                      {kind}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-48">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tags</SelectItem>
+                  {eventTags.map(tag => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Button
                 onClick={handleSync}
                 disabled={syncing}
@@ -281,14 +327,23 @@ export default function Calendar() {
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: idx * 0.05 }}
-                          onClick={() => setSelectedEvent(event)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEvent(event);
+                          }}
                           className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
                         >
                           {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
                         </motion.div>
                       ))}
                       {dayEvents.length > 3 && (
-                        <div className="text-xs text-slate-500 font-medium pl-1">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowAllDayEvents(day, dayEvents);
+                          }}
+                          className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
+                        >
                           +{dayEvents.length - 3} more
                         </div>
                       )}
@@ -300,6 +355,61 @@ export default function Calendar() {
           </div>
         )}
       </div>
+
+      {/* Day Events List Dialog */}
+      <Dialog open={!!selectedDayEvents} onOpenChange={() => setSelectedDayEvents(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            </DialogTitle>
+            <p className="text-slate-600">
+              {selectedDayEvents?.length || 0} event{selectedDayEvents?.length !== 1 ? 's' : ''}
+            </p>
+          </DialogHeader>
+          <div className="space-y-3 mt-4">
+            {selectedDayEvents?.map((event) => (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => {
+                  setSelectedDayEvents(null);
+                  setSelectedEvent(event);
+                }}
+                className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all cursor-pointer bg-white hover:bg-blue-50"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">{event.name}</h3>
+                    <p className="text-sm text-slate-600 mb-2">
+                      {format(parseISO(event.starts_at), 'h:mm a')} - {format(parseISO(event.ends_at), 'h:mm a')}
+                    </p>
+                    {event.resources && event.resources.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {event.resources.map(resource => (
+                          <Badge key={resource.id} variant="secondary" className="text-xs">
+                            {resource.name} ({resource.kind})
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {event.tags && event.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {event.tags.map(tag => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Event Detail Dialog */}
       <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
@@ -321,13 +431,26 @@ export default function Calendar() {
                 </div>
               </div>
 
-              {selectedEvent.rooms && selectedEvent.rooms.length > 0 && (
+              {selectedEvent.resources && selectedEvent.resources.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Rooms:</p>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Resources:</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedEvent.rooms.map(room => (
-                      <Badge key={room.id} variant="secondary">
-                        {room.name}
+                    {selectedEvent.resources.map(resource => (
+                      <Badge key={resource.id} variant="secondary">
+                        {resource.name} ({resource.kind})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedEvent.tags && selectedEvent.tags.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Tags:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEvent.tags.map(tag => (
+                      <Badge key={tag} variant="outline">
+                        {tag}
                       </Badge>
                     ))}
                   </div>

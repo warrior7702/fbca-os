@@ -65,10 +65,10 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        console.log('📅 Fetching EVENT INSTANCES (not events) from PCO...');
+        console.log('📅 Fetching EVENT INSTANCES from PCO...');
 
-        // Get event instances with filter=future to get upcoming events
-        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100&include=event,event_resource_requests`;
+        // Get event instances with tags included
+        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100&include=event,event_resource_requests,tags`;
         
         console.log('🔗 Request URL:', instancesUrl);
         
@@ -102,9 +102,10 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Build event map from included data
+        // Build maps from included data
         const eventMap = {};
         const resourceRequestsMap = {};
+        const tagsMap = {};
         
         if (instancesData.included) {
             for (const item of instancesData.included) {
@@ -123,12 +124,15 @@ Deno.serve(async (req) => {
                             quantity: item.attributes?.quantity
                         });
                     }
+                } else if (item.type === 'Tag') {
+                    tagsMap[item.id] = item.attributes?.name;
                 }
             }
         }
 
         console.log('📊 Event map size:', Object.keys(eventMap).length);
         console.log('📊 Resource requests map size:', Object.keys(resourceRequestsMap).length);
+        console.log('📊 Tags map size:', Object.keys(tagsMap).length);
 
         // Process event instances
         const eventsWithResources = [];
@@ -138,25 +142,26 @@ Deno.serve(async (req) => {
             const event = eventMap[eventId];
             const resourceRequests = resourceRequestsMap[eventId] || [];
             
-            // Each instance has dates in its attributes
             const starts_at = instance.attributes?.starts_at;
             const ends_at = instance.attributes?.ends_at;
-            
-            console.log('📝 Processing instance:', event?.attributes?.name || 'Unknown', {
-                instance_id: instance.id,
-                event_id: eventId,
-                starts_at,
-                ends_at,
-                has_dates: !!(starts_at && ends_at)
-            });
             
             if (!starts_at || !ends_at) {
                 console.warn('⚠️ Skipping instance without dates:', instance.id);
                 continue;
             }
             
-            // Fetch resource details for this event
-            const rooms = [];
+            // Get tags for this event
+            const eventTags = [];
+            const tagRelationships = event?.relationships?.tags?.data || [];
+            for (const tagRef of tagRelationships) {
+                const tagName = tagsMap[tagRef.id];
+                if (tagName) {
+                    eventTags.push(tagName);
+                }
+            }
+            
+            // Fetch resource details with kind
+            const resources = [];
             for (const request of resourceRequests) {
                 try {
                     const resourceResponse = await fetch(
@@ -173,14 +178,12 @@ Deno.serve(async (req) => {
                         const resourceData = await resourceResponse.json();
                         const resource = resourceData.data;
                         
-                        if (resource.attributes?.kind === 'Room') {
-                            rooms.push({
-                                id: resource.id,
-                                name: resource.attributes?.name,
-                                kind: resource.attributes?.kind,
-                                approval_status: request.approval_status
-                            });
-                        }
+                        resources.push({
+                            id: resource.id,
+                            name: resource.attributes?.name,
+                            kind: resource.attributes?.kind, // AV, Room, Equipment, etc.
+                            approval_status: request.approval_status
+                        });
                     }
                 } catch (resourceError) {
                     console.error('❌ Error fetching resource:', resourceError);
@@ -188,7 +191,7 @@ Deno.serve(async (req) => {
             }
             
             eventsWithResources.push({
-                id: instance.id, // Use instance ID as unique identifier
+                id: instance.id,
                 event_id: eventId,
                 name: event?.attributes?.name || 'Untitled Event',
                 starts_at: starts_at,
@@ -197,19 +200,21 @@ Deno.serve(async (req) => {
                 description: event?.attributes?.description,
                 visible_in_church_center: event?.attributes?.visible_in_church_center,
                 approval_status: event?.attributes?.approval_status,
-                rooms: rooms,
+                resources: resources, // Now includes all resource kinds with their kind attribute
+                tags: eventTags,
                 resource_count: resourceRequests.length,
-                has_valid_dates: true // All instances we include have valid dates
+                has_valid_dates: true
             });
         }
 
         console.log('🎯 Processed', eventsWithResources.length, 'event instances with valid dates');
         
         if (eventsWithResources.length > 0) {
-            console.log('📊 First 3 processed instances:');
-            eventsWithResources.slice(0, 3).forEach(e => {
-                console.log(`  - ${e.name} (starts: ${e.starts_at})`);
-            });
+            console.log('📊 First event sample:');
+            const sample = eventsWithResources[0];
+            console.log(`  - Name: ${sample.name}`);
+            console.log(`  - Tags: ${sample.tags.join(', ')}`);
+            console.log(`  - Resources: ${sample.resources.map(r => `${r.name} (${r.kind})`).join(', ')}`);
         }
 
         return Response.json({ 
