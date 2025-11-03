@@ -158,8 +158,6 @@ export default function Layout({ children, currentPageName }) {
 
   const performLiveSearch = async (query) => {
     setSearching(true);
-    // Don't set showResults here, let the onFocus handle it based on totalResults
-    // setShowResults(true); 
 
     console.log('🔍 Starting live search for:', query);
 
@@ -168,10 +166,8 @@ export default function Layout({ children, currentPageName }) {
       const newResults = { staff: [], files: [], modules: [] };
 
       // Search staff
-      console.log('📋 Searching staff...');
       try {
         const staffResponse = await base44.entities.StaffContact.filter({});
-        console.log('📋 Staff response:', staffResponse?.length || 0, 'records');
         
         newResults.staff = (staffResponse || [])
           .filter(person => {
@@ -187,7 +183,6 @@ export default function Layout({ children, currentPageName }) {
       }
 
       // Search modules
-      console.log('📦 Searching modules...');
       newResults.modules = apps
         .filter(app => 
           app.name.toLowerCase().includes(lowerQuery) ||
@@ -198,14 +193,11 @@ export default function Layout({ children, currentPageName }) {
 
       // Search files
       try {
-        console.log('📁 Searching OneDrive files...');
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
-        console.log('📁 OneDrive response:', filesResponse.data);
         newResults.files = (filesResponse.data.files || []).slice(0, 5);
         console.log('✅ Found', newResults.files.length, 'files/folders');
       } catch (fileError) {
         console.error('❌ File search error:', fileError);
-        console.error('Error details:', fileError.response?.data || fileError.message);
       }
 
       console.log('🎯 Final results:', {
@@ -215,18 +207,16 @@ export default function Layout({ children, currentPageName }) {
       });
 
       setSearchResults(newResults);
-      // After updating search results, if there are any, and search query is long enough, show results
-      if ((newResults.staff.length + newResults.files.length + newResults.modules.length) > 0) {
+      
+      // Show results if we have any
+      const total = newResults.staff.length + newResults.files.length + newResults.modules.length;
+      if (total > 0) {
         setShowResults(true);
-      } else {
-        setShowResults(false);
       }
       
     } catch (error) {
       console.error('❌ Live search error:', error);
-      // Still set whatever results we have, or clear if a critical error
       setSearchResults({ staff: [], files: [], modules: [] });
-      setShowResults(false);
     } finally {
       setSearching(false);
     }

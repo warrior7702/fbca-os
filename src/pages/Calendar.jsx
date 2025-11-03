@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
@@ -55,7 +56,6 @@ export default function Calendar() {
 
       console.log('🔍 Fetching calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-      console.log('📅 Full response:', eventsResponse);
       
       if (!eventsResponse.data) {
         console.error('❌ No data in response');
@@ -66,17 +66,14 @@ export default function Calendar() {
       }
 
       const eventsData = eventsResponse.data?.events || [];
-      console.log('📅 Events data length:', eventsData.length);
+      console.log('📅 Loaded', eventsData.length, 'events');
       
-      const validEvents = eventsData.filter(event => event.has_valid_dates);
-      console.log('✅ Valid events for display:', validEvents.length);
-      
-      setEvents(validEvents);
+      setEvents(eventsData);
       setLastSync(new Date());
 
       // Extract unique resource kinds
       const kindsSet = new Set();
-      validEvents.forEach(event => {
+      eventsData.forEach(event => {
         if (event.resources && Array.isArray(event.resources)) {
           event.resources.forEach(resource => {
             if (resource.kind) {
@@ -87,12 +84,11 @@ export default function Calendar() {
       });
       
       const uniqueKinds = Array.from(kindsSet).sort();
-      console.log('🔧 Unique resource kinds:', uniqueKinds);
       setResourceKinds(uniqueKinds);
 
       // Extract unique tags
       const tagsSet = new Set();
-      validEvents.forEach(event => {
+      eventsData.forEach(event => {
         if (event.tags && Array.isArray(event.tags)) {
           event.tags.forEach(tag => {
             tagsSet.add(tag);
@@ -101,14 +97,9 @@ export default function Calendar() {
       });
       
       const uniqueTags = Array.from(tagsSet).sort();
-      console.log('🏷️ Unique tags:', uniqueTags);
       setEventTags(uniqueTags);
 
-      if (validEvents.length === 0) {
-        toast.info('No upcoming events with valid dates found in PCO Calendar');
-      } else {
-        toast.success(`Loaded ${validEvents.length} events`);
-      }
+      toast.success(`Loaded ${eventsData.length} events`);
     } catch (error) {
       console.error('❌ Error loading calendar data:', error);
       toast.error('Failed to load calendar: ' + (error.message || 'Unknown error'));
@@ -135,6 +126,13 @@ export default function Calendar() {
     return kindMatch && tagMatch;
   });
 
+  console.log('📊 Rendering with:', {
+    totalEvents: events.length,
+    filteredEvents: filteredEvents.length,
+    selectedResourceKind,
+    selectedTag
+  });
+
   // Calendar grid generation
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -154,10 +152,21 @@ export default function Calendar() {
   };
 
   const getEventsForDay = (day) => {
-    return filteredEvents.filter(event => {
-      const eventDate = parseISO(event.starts_at);
-      return isSameDay(eventDate, day);
+    const dayEvents = filteredEvents.filter(event => {
+      try {
+        const eventDate = parseISO(event.starts_at);
+        return isSameDay(eventDate, day);
+      } catch (error) {
+        console.error('Error parsing event date:', event.starts_at, error);
+        return false;
+      }
     });
+    
+    if (dayEvents.length > 0) {
+      console.log(`📅 ${format(day, 'MMM d')}: ${dayEvents.length} events`);
+    }
+    
+    return dayEvents;
   };
 
   const handleShowAllDayEvents = (day, dayEvents) => {
