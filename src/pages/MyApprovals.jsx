@@ -13,35 +13,38 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
-  MapPin, // Added
-  User, // Added
-  XCircle, // Added
-  Building2, // Added
-  Users, // Added
-  FileText // Added
+  MapPin, 
+  User, 
+  XCircle, 
+  Building2, 
+  Users, 
+  FileText 
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format } from "date-fns"; // Fixed syntax
+import { format } from "date-fns"; 
 import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
-import ConnectionWarning from "../components/shared/ConnectionWarning"; // Retained
+import ConnectionWarning from "../components/shared/ConnectionWarning"; 
+import CardholderLookup from "../components/approvals/CardholderLookup"; // Added back
 
 export default function MyApprovals() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [user, setUser] = useState(null); // Reordered
+  const [user, setUser] = useState(null); 
   const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false); // Retained
+  const [showDetailModal, setShowDetailModal] = useState(false); 
   const [viewMode, setViewMode] = useState('list');
-  const [answerPreviews, setAnswerPreviews] = useState({}); // Renamed from approvalsWithAnswers
+  const [answerPreviews, setAnswerPreviews] = useState({}); 
   const [sentCodes, setSentCodes] = useState(() => {
     // Load sent codes from localStorage on mount
     const saved = localStorage.getItem('sentDoorCodes');
     return saved ? JSON.parse(saved) : {};
   });
+  const [selectedCardholders, setSelectedCardholders] = useState({}); // Added back
+  const [savingCode, setSavingCode] = useState({}); // Added back
 
   useEffect(() => {
     loadUser();
@@ -99,14 +102,13 @@ export default function MyApprovals() {
   const loadAllAnswerPreviews = async () => {
     // Only load previews for the first few approvals to avoid rate limits
     for (const approval of approvals.slice(0, 10)) { 
-      if (!answerPreviews[approval.request_id]) { // Changed from approvalsWithAnswers
+      if (!answerPreviews[approval.request_id]) { 
         loadAnswerPreview(approval);
       }
     }
   };
 
   const loadAnswerPreview = async (approval) => {
-    // loadingAnswers state and its usage are removed as per new outline
     try {
       const response = await base44.functions.invoke('getApprovalDetails', {
         request_id: approval.request_id,
@@ -122,7 +124,7 @@ export default function MyApprovals() {
             answer: response.data.answers[q.id]
           }));
 
-        setAnswerPreviews(prev => ({ // Changed from setApprovalsWithAnswers
+        setAnswerPreviews(prev => ({ 
           ...prev,
           [approval.request_id]: answeredQuestions
         }));
@@ -130,10 +132,46 @@ export default function MyApprovals() {
     } catch (error) {
       console.error('Error loading answer preview:', error);
     }
-    // setLoadingAnswers and its usage are removed as per new outline
   };
 
-  // handleCardholderSelect and handleSendCodeToPCO functions removed as per new outline (related states removed)
+  const handleSendCodeToPCO = async (approval, cardholder) => {
+    setSavingCode(prev => ({ ...prev, [approval.request_id]: true }));
+    
+    try {
+      console.log('📤 Sending badge code to PCO:', cardholder.pin);
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: approval.request_id,
+        event_id: approval.event_id,
+        badge_code: `${cardholder.pin}#`,
+        append: true
+      });
+
+      if (response.data.ok) {
+        toast.success(`Badge code ${cardholder.pin}# sent to ${approval.event_name}!`);
+        
+        // Mark as sent in local storage
+        setSentCodes(prev => {
+          const updated = {
+            ...prev,
+            [approval.request_id]: {
+              code: cardholder.pin,
+              cardholder: cardholder.name,
+              sentAt: new Date().toISOString()
+            }
+          };
+          return updated;
+        });
+      } else {
+        toast.error('Failed to send badge code: ' + (response.data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error sending badge code:', error);
+      toast.error('Failed to send badge code');
+    } finally {
+      setSavingCode(prev => ({ ...prev, [approval.request_id]: false }));
+    }
+  };
 
   const handleApprove = async (approval, formData = null) => {
     try {
@@ -202,8 +240,7 @@ export default function MyApprovals() {
       if (response.data.success) {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
-        setAnswerPreviews({}); // Changed from setApprovalsWithAnswers
-        // expandedPreviews and selectedCardholders states were removed, so their set functions are removed here
+        setAnswerPreviews({}); 
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -217,8 +254,6 @@ export default function MyApprovals() {
     setSelectedApproval(approval);
     setShowDetailModal(true);
   };
-
-  // toggleExpandPreview function removed as expandedPreviews state was removed
 
   const handleModalClose = () => {
     setShowDetailModal(false);
@@ -352,9 +387,10 @@ export default function MyApprovals() {
                 </motion.div>
               ) : (
                 approvals.map((approval, index) => {
-                  const answerPreview = answerPreviews[approval.request_id]; // Changed from approvalsWithAnswers
-                  // loadingPreview and isExpanded states were removed
-                  // selectedCardholder, savingCode, codeSent states were removed
+                  const answerPreview = answerPreviews[approval.request_id]; 
+                  const selectedCardholder = selectedCardholders[approval.request_id];
+                  const isSavingCode = savingCode[approval.request_id];
+                  const codeSent = sentCodes[approval.request_id];
                   
                   return (
                     <motion.div
@@ -387,32 +423,85 @@ export default function MyApprovals() {
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Building2 className="w-4 h-4" /> {/* Changed from Box */}
+                                  <Building2 className="w-4 h-4" /> 
                                   <span>{approval.resource_name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Users className="w-4 h-4" /> {/* Changed from Clock */}
+                                  <Users className="w-4 h-4" /> 
                                   <span className="text-xs text-slate-500">
                                     Group: {approval.approval_group_name}
                                   </span>
                                 </div>
                               </div>
-
-                              {/* loadingPreview was removed */}
                               
                               {answerPreview && answerPreview.length > 0 && (
                                 <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                                   <p className="text-xs font-semibold text-slate-700 mb-2">Request Details:</p>
                                   <div className="space-y-1">
-                                    {/* isExpanded logic removed, now shows all answers */}
                                     {answerPreview.map((qa, idx) => (
                                       <div key={idx} className="text-xs">
                                         <span className="text-slate-600">{qa.question}:</span>
                                         <span className="ml-1 text-slate-800 font-medium">{qa.answer}</span>
                                       </div>
                                     ))}
-                                    {/* Toggle button removed */}
                                   </div>
+                                </div>
+                              )}
+
+                              {/* Door Code Assignment Section */}
+                              {approval.resource_name?.toLowerCase().includes('building access') && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                  <p className="text-sm font-semibold text-blue-900 mb-2">
+                                    🔑 Assign Building Access Code
+                                  </p>
+                                  
+                                  {codeSent ? (
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                      <div className="flex items-center gap-2 text-green-700 mb-1">
+                                        <CheckCircle className="w-4 h-4" />
+                                        <span className="font-semibold">Code Sent!</span>
+                                      </div>
+                                      <p className="text-sm text-green-600">
+                                        Badge {codeSent.code}# assigned to {codeSent.cardholder}
+                                      </p>
+                                      <p className="text-xs text-green-500 mt-1">
+                                        Sent {new Date(codeSent.sentAt).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <CardholderLookup
+                                        onSelect={(cardholder) => {
+                                          setSelectedCardholders(prev => ({
+                                            ...prev,
+                                            [approval.request_id]: cardholder
+                                          }));
+                                        }}
+                                        selectedCardholder={selectedCardholder}
+                                      />
+                                      
+                                      {selectedCardholder && (
+                                        <Button
+                                          onClick={() => handleSendCodeToPCO(approval, selectedCardholder)}
+                                          disabled={isSavingCode}
+                                          size="sm"
+                                          className="w-full mt-3 bg-blue-600 hover:bg-blue-700"
+                                        >
+                                          {isSavingCode ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                              Sending...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CheckCircle className="w-4 h-4 mr-2" />
+                                              Send Code {selectedCardholder.pin}# to PCO
+                                            </>
+                                          )}
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -422,13 +511,10 @@ export default function MyApprovals() {
                               size="sm"
                               className="bg-orange-600 hover:bg-orange-700"
                             >
-                              <FileText className="w-4 h-4 mr-1" /> {/* Changed from Eye */}
+                              <FileText className="w-4 h-4 mr-1" /> 
                               Details
                             </Button>
                           </div>
-
-                          {/* Door Code Assignment section removed as per new outline */}
-                          {/* CardholderLookup component and related state/logic removed */}
                         </CardContent>
                       </Card>
                     </motion.div>
