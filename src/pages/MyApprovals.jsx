@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -70,6 +72,8 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
+  const [showCardholderLookup, setShowCardholderLookup] = useState(false);
+  const [currentApprovalForLookup, setCurrentApprovalForLookup] = useState(null);
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -225,6 +229,22 @@ export default function MyApprovals() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleOpenCardholderLookup = (approval) => {
+    setCurrentApprovalForLookup(approval);
+    setShowCardholderLookup(true);
+  };
+
+  const handleSelectCardholder = (cardholder) => {
+    if (currentApprovalForLookup) {
+      setDoorCodes(prev => ({
+        ...prev,
+        [currentApprovalForLookup.request_id]: cardholder.pin
+      }));
+    }
+    setShowCardholderLookup(false);
+    setCurrentApprovalForLookup(null);
   };
 
   const handleSendCode = async (approval) => {
@@ -412,9 +432,17 @@ export default function MyApprovals() {
                               maxLength={10}
                             />
                             <Button
+                              onClick={() => handleOpenCardholderLookup(approval)}
+                              variant="outline"
+                              className="flex-shrink-0"
+                            >
+                              <Key className="w-4 h-4 mr-2" />
+                              Search
+                            </Button>
+                            <Button
                               onClick={() => handleSendCode(approval)}
                               disabled={sendingCode === approval.request_id}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
                             >
                               {sendingCode === approval.request_id ? (
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -446,6 +474,15 @@ export default function MyApprovals() {
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
+      />
+
+      <CardholderLookup
+        isOpen={showCardholderLookup}
+        onClose={() => {
+          setShowCardholderLookup(false);
+          setCurrentApprovalForLookup(null);
+        }}
+        onSelect={handleSelectCardholder}
       />
     </div>
   );
