@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
@@ -66,6 +67,12 @@ export default function Calendar() {
       const eventsData = eventsResponse.data.events;
       console.log('✅ Loaded', eventsData.length, 'events');
       
+      // Log first few events to check dates
+      if (eventsData.length > 0) {
+        console.log('📅 First event:', eventsData[0].name, 'on', eventsData[0].starts_at);
+        console.log('📅 Last event:', eventsData[eventsData.length - 1].name, 'on', eventsData[eventsData.length - 1].starts_at);
+      }
+      
       setEvents(eventsData);
       setLastSync(new Date());
 
@@ -124,6 +131,8 @@ export default function Calendar() {
     return kindMatch && tagMatch;
   });
 
+  console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Month: ${format(currentMonth, 'MMMM yyyy')}`);
+
   // Calendar grid generation
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -143,14 +152,18 @@ export default function Calendar() {
   };
 
   const getEventsForDay = (day) => {
-    return filteredEvents.filter(event => {
+    const dayEvents = filteredEvents.filter(event => {
       try {
         const eventDate = parseISO(event.starts_at);
-        return isSameDay(eventDate, day);
+        const match = isSameDay(eventDate, day);
+        return match;
       } catch (error) {
+        console.error('Error parsing event date:', event.starts_at, error);
         return false;
       }
     });
+    
+    return dayEvents;
   };
 
   const handleShowAllDayEvents = (day, dayEvents) => {
@@ -303,7 +316,7 @@ export default function Calendar() {
                     key={index}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.01 }}
+                    transition={{ delay: index * 0.005 }}
                     className={`min-h-32 border border-slate-200 p-2 ${
                       !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
                     } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
