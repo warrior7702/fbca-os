@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -22,7 +21,6 @@ import {
   Calendar as CalendarIcon,
   Clock,
   MapPin,
-  User,
   Loader2,
   RefreshCw,
   Filter,
@@ -32,8 +30,8 @@ import {
   FileText,
   ExternalLink
 } from "lucide-react";
-import { format, parseISO, startOfDay, addDays, isSameDay } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { format, parseISO, startOfDay, addDays } from "date-fns";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
@@ -43,11 +41,11 @@ export default function Calendar() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedResource, setSelectedResource] = useState("all");
-  const [viewMode, setViewMode] = useState("list"); // "list" or "calendar"
+  const [viewMode, setViewMode] = useState("list");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [eventComments, setEventComments] = useState({});
-  const [eventResources, setEventResources] = useState({}); // NEW: Store event resources as a map { event_id: resource_data }
+  const [eventResources, setEventResources] = useState({});
   const [loadingEventDetails, setLoadingEventDetails] = useState(false);
 
   useEffect(() => {
@@ -66,14 +64,12 @@ export default function Calendar() {
         return;
       }
 
-      // Load events (now includes rooms data)
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       console.log('📅 Calendar events response:', eventsResponse.data);
       
-      const eventsData = eventsResponse.data.events || [];
+      const eventsData = eventsResponse.data?.events || [];
       setEvents(eventsData);
 
-      // Extract unique room resources from events
       const roomsSet = new Set();
       eventsData.forEach(event => {
         if (event.rooms && Array.isArray(event.rooms)) {
@@ -100,15 +96,14 @@ export default function Calendar() {
     setShowEventDetail(true);
     setLoadingEventDetails(true);
 
-    // Load event comments and full resources details
     try {
       const [commentsResponse, resourcesResponse] = await Promise.all([
         base44.functions.invoke('getPCOEventComments', { event_id: event.id }),
         base44.functions.invoke('getPCOEventResources', { event_id: event.id })
       ]);
       
-      setEventComments(commentsResponse.data);
-      setEventResources(prev => ({ ...prev, [event.id]: resourcesResponse.data }));
+      setEventComments(commentsResponse.data || {});
+      setEventResources(prev => ({ ...prev, [event.id]: resourcesResponse.data || {} }));
     } catch (error) {
       console.error('Error loading event details:', error);
     } finally {
@@ -119,7 +114,6 @@ export default function Calendar() {
   const filteredEvents = selectedResource === "all" 
     ? events 
     : events.filter(event => {
-        // Filter events that have the selected room
         return event.rooms && event.rooms.some(room => room.id === selectedResource);
       });
 
@@ -137,7 +131,6 @@ export default function Calendar() {
 
   const renderCalendarView = () => {
     const grouped = groupEventsByDate();
-    const sortedDates = Object.keys(grouped).sort();
 
     return (
       <div className="grid grid-cols-7 gap-2">
@@ -147,7 +140,6 @@ export default function Calendar() {
           </div>
         ))}
         
-        {/* Calendar cells */}
         {Array.from({ length: 35 }).map((_, idx) => {
           const date = addDays(startOfDay(new Date()), idx - 7);
           const dateKey = format(date, 'yyyy-MM-dd');
@@ -272,6 +264,8 @@ export default function Calendar() {
     );
   }
 
+  const currentEventResources = selectedEvent ? eventResources[selectedEvent.id] : null;
+
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -312,7 +306,6 @@ export default function Calendar() {
           }
         />
 
-        {/* Filters */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
@@ -334,11 +327,9 @@ export default function Calendar() {
           </CardContent>
         </Card>
 
-        {/* Calendar View */}
         {viewMode === 'calendar' ? renderCalendarView() : renderListView()}
       </div>
 
-      {/* Event Detail Modal */}
       <Dialog open={showEventDetail} onOpenChange={setShowEventDetail}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -354,7 +345,6 @@ export default function Calendar() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Time */}
               <div className="flex items-center gap-2 text-slate-700">
                 <Clock className="w-5 h-5 text-slate-400" />
                 <span>
@@ -366,8 +356,7 @@ export default function Calendar() {
                 {selectedEvent && format(parseISO(selectedEvent.ends_at), 'h:mm a')}
               </div>
 
-              {/* Rooms & Resources Section */}
-              {selectedEvent && eventResources[selectedEvent.id]?.resource_requests?.length > 0 && (
+              {currentEventResources?.resource_requests?.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -376,11 +365,10 @@ export default function Calendar() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Rooms */}
-                    {selectedEvent && eventResources[selectedEvent.id]?.rooms?.length > 0 && (
+                    {currentEventResources.rooms?.length > 0 && (
                       <div>
                         <p className="text-sm font-semibold text-slate-700 mb-2">Rooms</p>
-                        {eventResources[selectedEvent.id].rooms.map((room, idx) => (
+                        {currentEventResources.rooms.map((room, idx) => (
                           <div key={idx} className="ml-4 mb-3">
                             <div className="flex items-center gap-2">
                               <MapPin className="w-4 h-4 text-blue-500" />
@@ -406,11 +394,10 @@ export default function Calendar() {
                       </div>
                     )}
 
-                    {/* Other Resources */}
-                    {selectedEvent && eventResources[selectedEvent.id]?.resource_requests?.filter(r => r.resource_kind !== 'Room').length > 0 && (
+                    {currentEventResources.resource_requests?.filter(r => r.resource_kind !== 'Room').length > 0 && (
                       <div>
-                        <p className="text-sm font-semibold text-slate-700 mb-2">Other Resources</p>
-                        {eventResources[selectedEvent.id].resource_requests
+                        <p className="text-sm font-semibold text-slate-700 mb-2">Resources not in a room</p>
+                        {currentEventResources.resource_requests
                           .filter(r => r.resource_kind !== 'Room')
                           .map((resource, idx) => (
                             <div key={idx} className="ml-4 mb-3">
@@ -441,7 +428,6 @@ export default function Calendar() {
                 </Card>
               )}
 
-              {/* Door Code */}
               {eventComments?.latest_door_code && (
                 <Card className="border-green-200 bg-green-50">
                   <CardHeader>
@@ -458,7 +444,6 @@ export default function Calendar() {
                 </Card>
               )}
 
-              {/* Summary */}
               {selectedEvent?.summary && (
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
@@ -469,7 +454,6 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Description */}
               {selectedEvent?.description && (
                 <div>
                   <h4 className="font-semibold text-slate-900 mb-2">Description</h4>
@@ -477,8 +461,7 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Activity Thread */}
-              {eventComments?.comments && eventComments.comments.length > 0 && (
+              {eventComments?.comments?.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Activity</CardTitle>
@@ -498,7 +481,6 @@ export default function Calendar() {
                 </Card>
               )}
 
-              {/* View in PCO */}
               <Button
                 onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${selectedEvent?.id}`, '_blank')}
                 variant="outline"
