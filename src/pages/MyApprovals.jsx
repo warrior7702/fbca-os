@@ -24,7 +24,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns"; 
-import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
+// Removed: import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning"; 
 import CardholderLookup from "../components/approvals/CardholderLookup"; // Added back
@@ -34,8 +34,8 @@ export default function MyApprovals() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [user, setUser] = useState(null); 
-  const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false); 
+  // Removed: const [selectedApproval, setSelectedApproval] = useState(null);
+  // Removed: const [showDetailModal, setShowDetailModal] = useState(false); 
   const [viewMode, setViewMode] = useState('list');
   const [answerPreviews, setAnswerPreviews] = useState({}); 
   const [sentCodes, setSentCodes] = useState(() => {
@@ -250,20 +250,7 @@ export default function MyApprovals() {
     }
   };
 
-  const handleViewDetails = async (approval) => {
-    setSelectedApproval(approval);
-    setShowDetailModal(true);
-  };
-
-  const handleModalClose = () => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-  };
-
-  const handleApprovalSuccess = async () => {
-    await loadApprovals();
-    handleModalClose(); 
-  };
+  // Removed: handleViewDetails, handleModalClose, handleApprovalSuccess
 
   if (loading) {
     return (
@@ -340,7 +327,7 @@ export default function MyApprovals() {
           </div>
         )}
 
-        {/* Open in Planning Center - List View (Retained) */}
+        {/* Open in Planning Center - List View */}
         {viewMode === 'list' && (
           <div className="mb-6">
             <a 
@@ -366,7 +353,10 @@ export default function MyApprovals() {
         {viewMode === 'calendar' && approvals.length > 0 && (
           <ApprovalCalendar 
             approvals={approvals} 
-            onApprovalClick={handleViewDetails}
+            onApprovalClick={(approval) => {
+              // Open in PCO instead of modal
+              window.open(`https://calendar.planningcenteronline.com/events/${approval.event_id}`, '_blank');
+            }}
           />
         )}
 
@@ -506,14 +496,7 @@ export default function MyApprovals() {
                               )}
                             </div>
 
-                            <Button
-                              onClick={() => handleViewDetails(approval)}
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700"
-                            >
-                              <FileText className="w-4 h-4 mr-1" /> 
-                              Details
-                            </Button>
+                            {/* Removed: Details button */}
                           </div>
                         </CardContent>
                       </Card>
@@ -526,12 +509,7 @@ export default function MyApprovals() {
         )}
       </div>
 
-      <ApprovalDetailModal
-        approval={selectedApproval}
-        open={showDetailModal}
-        onClose={handleModalClose}
-        onSuccess={handleApprovalSuccess}
-      />
+      {/* Removed: ApprovalDetailModal */}
     </div>
   );
 }
