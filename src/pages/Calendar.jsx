@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
@@ -54,19 +53,18 @@ export default function Calendar() {
         return;
       }
 
-      console.log('🔍 Fetching calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       
-      if (!eventsResponse.data) {
-        console.error('❌ No data in response');
-        toast.error('Failed to load calendar - no response data');
+      if (!eventsResponse.data || !eventsResponse.data.events) {
+        console.error('No events in response');
+        toast.error('Failed to load calendar events');
         setEvents([]);
         setLoading(false);
         return;
       }
 
-      const eventsData = eventsResponse.data?.events || [];
-      console.log('📅 Loaded', eventsData.length, 'events');
+      const eventsData = eventsResponse.data.events;
+      console.log('✅ Loaded', eventsData.length, 'events');
       
       setEvents(eventsData);
       setLastSync(new Date());
@@ -101,7 +99,7 @@ export default function Calendar() {
 
       toast.success(`Loaded ${eventsData.length} events`);
     } catch (error) {
-      console.error('❌ Error loading calendar data:', error);
+      console.error('Error loading calendar:', error);
       toast.error('Failed to load calendar: ' + (error.message || 'Unknown error'));
       setEvents([]);
     } finally {
@@ -126,13 +124,6 @@ export default function Calendar() {
     return kindMatch && tagMatch;
   });
 
-  console.log('📊 Rendering with:', {
-    totalEvents: events.length,
-    filteredEvents: filteredEvents.length,
-    selectedResourceKind,
-    selectedTag
-  });
-
   // Calendar grid generation
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -152,21 +143,14 @@ export default function Calendar() {
   };
 
   const getEventsForDay = (day) => {
-    const dayEvents = filteredEvents.filter(event => {
+    return filteredEvents.filter(event => {
       try {
         const eventDate = parseISO(event.starts_at);
         return isSameDay(eventDate, day);
       } catch (error) {
-        console.error('Error parsing event date:', event.starts_at, error);
         return false;
       }
     });
-    
-    if (dayEvents.length > 0) {
-      console.log(`📅 ${format(day, 'MMM d')}: ${dayEvents.length} events`);
-    }
-    
-    return dayEvents;
   };
 
   const handleShowAllDayEvents = (day, dayEvents) => {
