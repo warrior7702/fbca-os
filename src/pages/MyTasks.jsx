@@ -268,10 +268,36 @@ export default function MyTasks() {
       // Sort by date
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      // DON'T fetch door codes here - we'll do it on-demand when user clicks an event
+      // Fetch door codes for each event
+      console.log('🚪 Fetching door codes for events...');
+      for (const event of myEvents) {
+        try {
+          const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
+            event_id: event.event_id
+          });
+
+          if (commentsResponse.data.comments) {
+            // Find door code comments
+            const doorCodeComment = commentsResponse.data.comments.find(c =>
+              c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+            );
+
+            if (doorCodeComment) {
+              // Extract door code from comment
+              const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+              if (match) {
+                event.posted_door_code = match[1];
+                event.posted_by = doorCodeComment.created_by;
+                console.log('  ✅ Found door code for', event.name, ':', event.posted_door_code);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('  ❌ Error fetching comments for event:', event.event_id, error);
+        }
+      }
+
       console.log('✅ My Schedule loaded successfully:', myEvents.length, 'events');
-      console.log('ℹ️ Door codes will be loaded when you click an event');
-      
       setMyScheduleEvents(myEvents);
     } catch (error) {
       console.error('❌ Error loading schedule:', error);
@@ -279,66 +305,6 @@ export default function MyTasks() {
       toast.error('Failed to load schedule: ' + error.message);
     } finally {
       setLoadingSchedule(false);
-    }
-  };
-
-  // NEW: Load door code for a specific event when clicked
-  const loadEventDoorCode = async (event) => {
-    if (event.posted_door_code || event.loading_door_code) {
-      return; // Already loaded or currently loading
-    }
-
-    // Mark as loading
-    setMyScheduleEvents(prev => prev.map(e => 
-      e.id === event.id ? { ...e, loading_door_code: true } : e
-    ));
-
-    try {
-      const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
-        event_id: event.event_id
-      });
-
-      if (commentsResponse.data.comments) {
-        const doorCodeComment = commentsResponse.data.comments.find(c =>
-          c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-        );
-
-        if (doorCodeComment) {
-          const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-          if (match) {
-            // Update the event with door code
-            setMyScheduleEvents(prev => prev.map(e => 
-              e.id === event.id 
-                ? { ...e, posted_door_code: match[1], posted_by: doorCodeComment.created_by, loading_door_code: false } 
-                : e
-            ));
-            
-            // Also update selectedScheduleEvent if this is the one being viewed
-            if (selectedScheduleEvent?.id === event.id) {
-              setSelectedScheduleEvent(prev => ({
-                ...prev,
-                posted_door_code: match[1],
-                posted_by: doorCodeComment.created_by
-              }));
-            }
-            
-            console.log('✅ Loaded door code for', event.name);
-            return;
-          }
-        }
-      }
-      
-      // No door code found - mark as loaded so we don't try again
-      setMyScheduleEvents(prev => prev.map(e => 
-        e.id === event.id ? { ...e, loading_door_code: false, no_door_code: true } : e
-      ));
-      
-    } catch (error) {
-      console.error('Error fetching door code for event:', event.event_id, error);
-      // Mark as failed
-      setMyScheduleEvents(prev => prev.map(e => 
-        e.id === event.id ? { ...e, loading_door_code: false } : e
-      ));
     }
   };
 
@@ -576,8 +542,6 @@ export default function MyTasks() {
                                   onClick={() => {
                                     setSelectedScheduleEvent(event);
                                     setShowScheduleDetail(true);
-                                    // Load door code when event is clicked
-                                    loadEventDoorCode(event);
                                   }}
                                 >
                                   <div className="font-semibold text-indigo-900 truncate mb-1">
@@ -986,10 +950,9 @@ export default function MyTasks() {
         onTaskClick={handleTaskClick}
         onTaskUpdate={async (taskId, updates) => {
           try {
-            await base44.functions.invoke('updateClickUpTask', { // Changed to generic updateClickUpTask
+            await base44.functions.invoke('updateClickUpTaskDueDate', {
               task_id: taskId,
-              due_date: updates.due_date,
-              // Add other updatable fields as needed
+              due_date: updates.due_date
             });
             toast.success('Task updated');
             loadData();
@@ -1066,13 +1029,8 @@ export default function MyTasks() {
                 </div>
               )}
 
-              {/* Door Code - with loading state */}
-              {selectedScheduleEvent.loading_door_code ? (
-                <div className="p-4 bg-indigo-50 border-2 border-indigo-300 rounded-lg flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 text-indigo-700 animate-spin" />
-                  <span className="text-sm text-indigo-900">Loading door code...</span>
-                </div>
-              ) : selectedScheduleEvent.posted_door_code ? (
+              {/* Door Code */}
+              {selectedScheduleEvent.posted_door_code && (
                 <div className="p-4 bg-indigo-50 border-2 border-indigo-300 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <Key className="w-5 h-5 text-indigo-700" />
@@ -1087,11 +1045,7 @@ export default function MyTasks() {
                     </p>
                   )}
                 </div>
-              ) : selectedScheduleEvent.no_door_code ? (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
-                  <p className="text-sm text-slate-500">No door code posted yet</p>
-                </div>
-              ) : null}
+              )}
 
               {/* Summary/Description */}
               {selectedScheduleEvent.summary && (
