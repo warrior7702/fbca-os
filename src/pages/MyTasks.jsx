@@ -81,6 +81,193 @@ export default function MyTasks() {
     }
   };
 
+  const loadMySchedule = async () => {
+    console.log('🗓️ ========== LOADING MY SCHEDULE ==========');
+    console.log('User:', user);
+    
+    setLoadingSchedule(true);
+    
+    try {
+      // Load from database (fast) - no blocking sync
+      console.log('📞 Getting my pending approvals from database...');
+      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
+      console.log('✅ Approvals response:', approvalsResponse.data);
+      
+      const approvals = approvalsResponse.data.pending_approvals || [];
+      console.log('✅ Approvals count:', approvals.length);
+      
+      if (approvals.length === 0) {
+        console.log('⚠️ No approvals found');
+        setMyScheduleEvents([]);
+        return;
+      }
+
+      const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
+      console.log('📋 My resources:', myResourceNames);
+
+      // Get calendar events
+      console.log('📞 Getting calendar events...');
+      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      
+      if (!eventsResponse.data || !eventsResponse.data.events) {
+        console.error('❌ No events data returned');
+        throw new Error('No events data returned from getPCOCalendarEvents');
+      }
+      
+      const allEvents = eventsResponse.data.events || [];
+      console.log('📅 Total events:', allEvents.length);
+
+      // Filter to my events
+      const myEvents = allEvents.filter(event => {
+        return event.resources && event.resources.some(r => myResourceNames.includes(r.name));
+      });
+
+      console.log('🎯 Matched events:', myEvents.length);
+      
+      if (myEvents.length === 0) {
+        console.warn('⚠️ No events matched my resources');
+        setMyScheduleEvents([]);
+        return;
+      }
+      
+      myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+      // Show events immediately
+      console.log('✅ Setting events to state (without door codes yet)');
+      setMyScheduleEvents(myEvents);
+
+      // Fetch door codes in parallel (only for next 2 weeks)
+      const twoWeeksFromNow = new Date();
+      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+      
+      const recentEvents = myEvents.filter(event => {
+        const eventDate = new Date(event.starts_at);
+        return eventDate <= twoWeeksFromNow;
+      });
+
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`); // Modified log
+      
+      // Fetch PCO door codes in parallel with timeout
+      const doorCodePromises = recentEvents.map(event => 
+        Promise.race([
+          base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
+            .then(commentsResponse => {
+              if (commentsResponse.data.comments) {
+                const doorCodeComment = commentsResponse.data.comments.find(c =>
+                  c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+                );
+
+                if (doorCodeComment) {
+                  const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+                  if (match) {
+                    return {
+                      event_id: event.event_id,
+                      posted_door_code: match[1],
+                      posted_by: doorCodeComment.created_by
+                    };
+                  }
+                }
+              }
+              return { event_id: event.event_id };
+            })
+            .catch(error => {
+              console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
+              return { event_id: event.event_id };
+            }),
+          // Timeout after 5 seconds
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), 5000)
+          )
+        ]).catch(error => {
+          if (error.message === 'timeout') {
+            console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
+          }
+          return { event_id: event.event_id };
+        })
+      );
+
+      // Wait for all door code fetches (with timeout)
+      const doorCodeResults = await Promise.all(doorCodePromises);
+      
+      // Also fetch ClickUp door codes
+      console.log('🔍 Checking ClickUp for door codes...');
+      let clickupCodes = {};
+      try {
+        const clickupResponse = await base44.functions.invoke('getEventClickUpCodes', {
+          event_names: recentEvents.map(e => e.name)
+        });
+        clickupCodes = clickupResponse.data.door_codes || {};
+        console.log('✅ Got ClickUp codes:', Object.keys(clickupCodes).length);
+      } catch (error) {
+        console.error('Error fetching ClickUp codes:', error);
+      }
+      
+      // Update events with door codes from both sources
+      const updatedEvents = myEvents.map(event => {
+        const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
+        const clickupData = clickupCodes[event.name];
+        
+        const updates = { ...event };
+        
+        if (doorCodeData?.posted_door_code) {
+          updates.posted_door_code = doorCodeData.posted_door_code;
+          updates.posted_by = doorCodeData.posted_by;
+        }
+        
+        if (clickupData) {
+          updates.clickup_door_code = clickupData.code;
+          updates.clickup_task_url = clickupData.task_url;
+          updates.clickup_task_name = clickupData.task_name;
+        }
+        
+        return updates;
+      });
+
+      console.log('✅ Final events:', {
+        total: updatedEvents.length,
+        with_pco_codes: updatedEvents.filter(e => e.posted_door_code).length,
+        with_clickup_codes: updatedEvents.filter(e => e.clickup_door_code).length
+      });
+      
+      setMyScheduleEvents(updatedEvents);
+      console.log('✅ SUCCESS! Schedule loaded');
+      
+    } catch (error) {
+      console.error('❌ FATAL ERROR in loadMySchedule:');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      const errorMsg = error.message || 'Unknown error';
+      toast.error(`Failed to load schedule: ${errorMsg}`);
+      
+      setMyScheduleEvents([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh clicked - refreshing schedule');
+    
+    // Just reload the schedule - don't sync approvals (that should happen in background)
+    await loadMySchedule();
+    
+    toast.success('Schedule refreshed!');
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    console.log('📢 User changed:', user?.email);
+    if (user) {
+      loadSupportTickets();
+      console.log('📢 About to call loadMySchedule()');
+      loadMySchedule();
+    }
+  }, [user]);
+
   const loadData = async () => {
     setLoading(true);
     setLoadingEmails(true);
@@ -147,168 +334,6 @@ export default function MyTasks() {
     }
   };
 
-  const loadMySchedule = async () => {
-    console.log('🗓️ ========== LOADING MY SCHEDULE ==========');
-    console.log('User:', user);
-    
-    setLoadingSchedule(true);
-    
-    try {
-      // Load from database (fast) - no blocking sync
-      console.log('📞 Getting my pending approvals from database...');
-      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
-      console.log('✅ Approvals response:', approvalsResponse.data);
-      
-      const approvals = approvalsResponse.data.pending_approvals || [];
-      console.log('✅ Approvals count:', approvals.length);
-      
-      if (approvals.length === 0) {
-        console.log('⚠️ No approvals found');
-        setMyScheduleEvents([]);
-        return;
-      }
-
-      const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
-      console.log('📋 My resources:', myResourceNames);
-
-      // Get calendar events
-      console.log('📞 Getting calendar events...');
-      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-      
-      if (!eventsResponse.data || !eventsResponse.data.events) {
-        console.error('❌ No events data returned');
-        throw new Error('No events data returned from getPCOCalendarEvents');
-      }
-      
-      const allEvents = eventsResponse.data.events || [];
-      console.log('📅 Total events:', allEvents.length);
-
-      // Filter to my events
-      const myEvents = allEvents.filter(event => {
-        return event.resources && event.resources.some(r => myResourceNames.includes(r.name));
-      });
-
-      console.log('🎯 Matched events:', myEvents.length);
-      
-      if (myEvents.length === 0) {
-        console.warn('⚠️ No events matched my resources');
-        setMyScheduleEvents([]);
-        return;
-      }
-      
-      myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-      // Show events immediately - NO door code fetching here (too slow!)
-      // Door codes will be fetched only when user clicks on an event
-      console.log('✅ Setting events to state');
-      setMyScheduleEvents(myEvents);
-      console.log('✅ SUCCESS! Schedule loaded with', myEvents.length, 'events');
-      
-    } catch (error) {
-      console.error('❌ FATAL ERROR in loadMySchedule:');
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      
-      const errorMsg = error.message || 'Unknown error';
-      toast.error(`Failed to load schedule: ${errorMsg}`);
-      
-      setMyScheduleEvents([]);
-    } finally {
-      setLoadingSchedule(false);
-    }
-  };
-
-  const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh clicked - refreshing schedule');
-    await loadMySchedule();
-    toast.success('Schedule refreshed!');
-  };
-
-  const handleEventClick = async (event) => {
-    console.log('🔍 Event clicked:', event.name);
-    
-    // Show modal immediately
-    setSelectedEvent(event);
-    setShowEventDetail(true);
-    
-    // Fetch door codes in background if we don't have them
-    if (!event.posted_door_code && !event.clickup_door_code) {
-      console.log('🚪 Fetching door codes for:', event.name);
-      
-      // Fetch from PCO comments
-      base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
-        .then(commentsResponse => {
-          if (commentsResponse.data.comments) {
-            const doorCodeComment = commentsResponse.data.comments.find(c =>
-              c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-            );
-
-            if (doorCodeComment) {
-              const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-              if (match) {
-                console.log('✅ Found PCO door code:', match[1]);
-                // Update the event in state
-                setMyScheduleEvents(prev => prev.map(e => 
-                  e.event_id === event.event_id 
-                    ? { ...e, posted_door_code: match[1], posted_by: doorCodeComment.person_name || 'Staff' }
-                    : e
-                ));
-                // Update selected event for modal
-                setSelectedEvent(prev => ({
-                  ...prev,
-                  posted_door_code: match[1],
-                  posted_by: doorCodeComment.person_name || 'Staff'
-                }));
-              }
-            }
-          }
-        })
-        .catch(error => console.error('Error fetching PCO door code:', error));
-      
-      // Fetch from ClickUp
-      base44.functions.invoke('getEventClickUpCodes', { event_names: [event.name] })
-        .then(clickupResponse => {
-          const clickupData = clickupResponse.data.door_codes?.[event.name];
-          if (clickupData) {
-            console.log('✅ Found ClickUp door code:', clickupData.code);
-            // Update the event in state
-            setMyScheduleEvents(prev => prev.map(e => 
-              e.event_id === event.event_id 
-                ? { 
-                    ...e, 
-                    clickup_door_code: clickupData.code,
-                    clickup_task_url: clickupData.task_url,
-                    clickup_task_name: clickupData.task_name
-                  }
-                : e
-            ));
-            // Update selected event for modal
-            setSelectedEvent(prev => ({
-              ...prev,
-              clickup_door_code: clickupData.code,
-              clickup_task_url: clickupData.task_url,
-              clickup_task_name: clickupData.task_name
-            }));
-          }
-        })
-        .catch(error => console.error('Error fetching ClickUp door code:', error));
-    }
-  };
-
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    console.log('📢 User changed:', user?.email);
-    if (user) {
-      loadSupportTickets();
-      console.log('📢 About to call loadMySchedule()');
-      loadMySchedule();
-    }
-  }, [user]);
-
   const handleTaskClick = (task) => {
     if (task.source === 'microsoft_todo') {
       if (task.url) window.open(task.url, '_blank', 'noopener,noreferrer');
@@ -343,6 +368,11 @@ export default function MyTasks() {
 
   const handleTaskUpdate = async () => {
     await loadData();
+  };
+
+  const handleEventClick = (event) => { // Added handler
+    setSelectedEvent(event);
+    setShowEventDetail(true);
   };
 
   const allTasks = [...clickupTasks, ...todoTasks];
