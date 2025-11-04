@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
 import { Clock, Key, MapPin } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
+export default function ScheduleCalendar({ events, weekCount = 2 }) {
   const today = new Date();
   const startDate = startOfWeek(today, { weekStartsOn: 0 }); // Start on Sunday
 
@@ -58,8 +58,7 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                       {dayEvents.map((event) => (
                         <Card 
                           key={event.id} 
-                          className="border border-green-200 bg-green-50 hover:shadow-md hover:border-green-400 transition-all cursor-pointer"
-                          onClick={() => onEventClick?.(event)}
+                          className="border border-green-200 bg-green-50 hover:shadow-md transition-shadow cursor-pointer"
                         >
                           <CardContent className="p-2 space-y-1">
                             <p className="text-xs font-semibold text-slate-900 line-clamp-2">
@@ -81,11 +80,11 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                               </div>
                             )}
 
-                            {(event.posted_door_code || event.clickup_door_code) && (
+                            {event.posted_door_code && (
                               <div className="mt-1 p-1 bg-green-200 rounded flex items-center gap-1">
                                 <Key className="w-3 h-3 text-green-700" />
                                 <span className="text-[10px] font-mono font-bold text-green-700">
-                                  {event.posted_door_code || event.clickup_door_code}#
+                                  {event.posted_door_code}#
                                 </span>
                               </div>
                             )}

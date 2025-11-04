@@ -39,7 +39,6 @@ import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import EmailDetailModal from "../components/emails/EmailDetailModal";
-import EventDetailModal from "../components/tasks/EventDetailModal"; // Added import
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { useNavigate } from "react-router-dom";
@@ -69,8 +68,6 @@ export default function MyTasks() {
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [myScheduleEvents, setMyScheduleEvents] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState(null); // Added state
-  const [showEventDetail, setShowEventDetail] = useState(false); // Added state
 
   const navigate = useNavigate();
 
@@ -145,9 +142,9 @@ export default function MyTasks() {
         return eventDate <= twoWeeksFromNow;
       });
 
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`); // Modified log
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events in parallel`);
       
-      // Fetch PCO door codes in parallel with timeout
+      // Fetch door codes in parallel with timeout
       const doorCodePromises = recentEvents.map(event => 
         Promise.race([
           base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
@@ -189,46 +186,20 @@ export default function MyTasks() {
       // Wait for all door code fetches (with timeout)
       const doorCodeResults = await Promise.all(doorCodePromises);
       
-      // Also fetch ClickUp door codes
-      console.log('🔍 Checking ClickUp for door codes...');
-      let clickupCodes = {};
-      try {
-        const clickupResponse = await base44.functions.invoke('getEventClickUpCodes', {
-          event_names: recentEvents.map(e => e.name)
-        });
-        clickupCodes = clickupResponse.data.door_codes || {};
-        console.log('✅ Got ClickUp codes:', Object.keys(clickupCodes).length);
-      } catch (error) {
-        console.error('Error fetching ClickUp codes:', error);
-      }
-      
-      // Update events with door codes from both sources
+      // Update events with door codes
       const updatedEvents = myEvents.map(event => {
         const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
-        const clickupData = clickupCodes[event.name];
-        
-        const updates = { ...event };
-        
         if (doorCodeData?.posted_door_code) {
-          updates.posted_door_code = doorCodeData.posted_door_code;
-          updates.posted_by = doorCodeData.posted_by;
+          return {
+            ...event,
+            posted_door_code: doorCodeData.posted_door_code,
+            posted_by: doorCodeData.posted_by
+          };
         }
-        
-        if (clickupData) {
-          updates.clickup_door_code = clickupData.code;
-          updates.clickup_task_url = clickupData.task_url;
-          updates.clickup_task_name = clickupData.task_name;
-        }
-        
-        return updates;
+        return event;
       });
 
-      console.log('✅ Final events:', {
-        total: updatedEvents.length,
-        with_pco_codes: updatedEvents.filter(e => e.posted_door_code).length,
-        with_clickup_codes: updatedEvents.filter(e => e.clickup_door_code).length
-      });
-      
+      console.log('✅ Final events with door codes:', updatedEvents.filter(e => e.posted_door_code).length, 'have codes');
       setMyScheduleEvents(updatedEvents);
       console.log('✅ SUCCESS! Schedule loaded');
       
@@ -368,11 +339,6 @@ export default function MyTasks() {
 
   const handleTaskUpdate = async () => {
     await loadData();
-  };
-
-  const handleEventClick = (event) => { // Added handler
-    setSelectedEvent(event);
-    setShowEventDetail(true);
   };
 
   const allTasks = [...clickupTasks, ...todoTasks];
@@ -520,11 +486,7 @@ export default function MyTasks() {
                 <p className="text-slate-600">Loading your schedule...</p>
               </div>
             ) : (
-              <ScheduleCalendar 
-                events={myScheduleEvents} 
-                weekCount={2} 
-                onEventClick={handleEventClick} // Added prop
-              />
+              <ScheduleCalendar events={myScheduleEvents} weekCount={2} />
             )}
           </CardContent>
         </Card>
@@ -864,12 +826,6 @@ export default function MyTasks() {
         open={showEmailDetail}
         onOpenChange={setShowEmailDetail}
         email={selectedEmail}
-      />
-
-      <EventDetailModal // Added new modal
-        open={showEventDetail}
-        onOpenChange={setShowEventDetail}
-        event={selectedEvent}
       />
     </div>
   );
