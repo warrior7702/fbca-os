@@ -19,7 +19,7 @@ import {
   Building2,
   Inbox,
   Video,
-  CalendarIcon
+  // CalendarIcon is removed as the Calendar app is no longer in defaultApps
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -27,9 +27,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const defaultApps = [
-  { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
+  { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks", showBadge: true },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
-  { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" }, // Changed name here
+  // Calendar app removed
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
@@ -56,8 +56,7 @@ const getDefaultPositions = () => {
   return {
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
-    calendar: { row: 0, col: 2 }, // Position for the new Calendar app
-    email: { row: 0, col: 3 }, // Adjusted email position
+    email: { row: 0, col: 2 }, // Adjusted email position from col 3 to 2
     marketing: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
@@ -76,10 +75,12 @@ export default function Dashboard() {
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
   const [approvalsCount, setApprovalsCount] = useState(0);
+  const [tasksDueToday, setTasksDueToday] = useState(0); // New state for tasks due today
 
   useEffect(() => {
     loadUser();
     loadApprovals();
+    loadTasksCount(); // Call new function to load tasks count
   }, []);
 
   useEffect(() => {
@@ -142,6 +143,27 @@ export default function Dashboard() {
       setApprovalsCount(response.data?.count || 0);
     } catch (error) {
       console.error('Failed to load approvals count:', error);
+    }
+  };
+
+  const loadTasksCount = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Get all tasks
+      const tasksResponse = await base44.entities.Task.filter({});
+      const todaysTasks = (tasksResponse.data || []).filter(task => { // Assuming tasksResponse has a .data property
+        if (!task.due_at || task.status === 'Done') return false;
+        const dueDate = new Date(task.due_at);
+        return dueDate >= today && dueDate < tomorrow;
+      });
+
+      setTasksDueToday(todaysTasks.length);
+    } catch (error) {
+      console.error('Failed to load tasks count:', error);
     }
   };
 
@@ -250,6 +272,16 @@ export default function Dashboard() {
             Array.from({ length: COLS }, (_, col) => {
               const app = getAppAtPosition(row, col);
               
+              // Get badge count for this app based on its ID
+              let badgeCount = 0;
+              if (app?.showBadge) {
+                if (app.id === 'myapprovals') {
+                  badgeCount = approvalsCount;
+                } else if (app.id === 'mytasks') {
+                  badgeCount = tasksDueToday;
+                }
+              }
+              
               return (
                 <div
                   key={`${row}-${col}`}
@@ -270,9 +302,9 @@ export default function Dashboard() {
                         >
                           <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                             <app.icon className="w-8 h-8 text-white" />
-                            {app.showBadge && approvalsCount > 0 && (
+                            {badgeCount > 0 && ( // Display badge if count is greater than 0
                               <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                {approvalsCount}
+                                {badgeCount}
                               </Badge>
                             )}
                           </div>
@@ -289,9 +321,9 @@ export default function Dashboard() {
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
-                                {app.showBadge && approvalsCount > 0 && (
+                                {badgeCount > 0 && ( // Display badge if count is greater than 0
                                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {approvalsCount}
+                                    {badgeCount}
                                   </Badge>
                                 )}
                               </div>
@@ -308,9 +340,9 @@ export default function Dashboard() {
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
-                                {app.showBadge && approvalsCount > 0 && (
+                                {badgeCount > 0 && ( // Display badge if count is greater than 0
                                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {approvalsCount}
+                                    {badgeCount}
                                   </Badge>
                                 )}
                               </div>
