@@ -29,13 +29,14 @@ import { Badge } from "@/components/ui/badge";
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
-  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
+  { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" }, // Changed name here
   { id: "marketing", name: "Marketing", icon: Megaphone, color: "from-purple-500 to-pink-500", path: "Marketing" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
   { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" },
   { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
+  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
   { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "InboxHelper" },
   { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-cyan-500 to-blue-600", path: "MyMeetings" }
 ];
@@ -55,13 +56,14 @@ const getDefaultPositions = () => {
   return {
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
-    mydepartment: { row: 0, col: 2 }, // Updated position
-    email: { row: 0, col: 3 }, // Updated position
+    calendar: { row: 0, col: 2 }, // Position for the new Calendar app
+    email: { row: 0, col: 3 }, // Adjusted email position
     marketing: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     staffdir: { row: 1, col: 2 },
     ticketing: { row: 2, col: 0 },
-    inboxhelper: { row: 2, col: 1 }, // Updated position
+    mydepartment: { row: 2, col: 1 },
+    inboxhelper: { row: 2, col: 2 },
     mymeetings: { row: 3, col: 0 },
     settings: { row: 5, col: 0 }
   };
