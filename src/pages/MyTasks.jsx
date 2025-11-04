@@ -37,6 +37,8 @@ import {
   User, // Added User icon
   Key,  // Added Key icon
   Clock, // Added Clock icon for schedule
+  ChevronDown, // Added for collapsible
+  ChevronRight // Added for collapsible
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow, addDays, startOfWeek, isSameDay } from "date-fns"; // Added addDays, startOfWeek, isSameDay
 import { motion } from "framer-motion";
@@ -1010,7 +1012,7 @@ export default function MyTasks() {
 
       {/* Schedule Event Detail Modal */}
       <Dialog open={showScheduleDetail} onOpenChange={setShowScheduleDetail}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl">{selectedScheduleEvent?.name}</DialogTitle>
             <DialogDescription>
@@ -1033,40 +1035,7 @@ export default function MyTasks() {
                 </div>
               </div>
 
-              {/* Resources */}
-              {selectedScheduleEvent.resources && selectedScheduleEvent.resources.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm text-slate-700 mb-2">
-                    Rooms & Resources ({selectedScheduleEvent.resources.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedScheduleEvent.resources.map((resource, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-                        <div>
-                          <p className="font-medium text-slate-900">{resource.name}</p>
-                          <p className="text-xs text-slate-500">{resource.kind}</p>
-                        </div>
-                        {resource.approval_status && (
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${
-                              resource.approval_status === 'A' ? 'bg-green-50 border-green-300 text-green-700' : 
-                              resource.approval_status === 'P' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' : 
-                              'bg-red-50 border-red-300 text-red-700'
-                            }`}
-                          >
-                            {resource.approval_status === 'A' ? 'Approved' : 
-                             resource.approval_status === 'P' ? 'Pending' : 
-                             'Rejected'}
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Door Code - with loading state */}
+              {/* Door Code - TOP POSITION */}
               {selectedScheduleEvent.loading_door_code ? (
                 <div className="p-4 bg-indigo-50 border-2 border-indigo-300 rounded-lg flex items-center gap-3">
                   <Loader2 className="w-5 h-5 text-indigo-700 animate-spin" />
@@ -1092,6 +1061,76 @@ export default function MyTasks() {
                   <p className="text-sm text-slate-500">No door code posted yet</p>
                 </div>
               ) : null}
+
+              {/* Collapsible Rooms Section */}
+              {selectedScheduleEvent.resources && selectedScheduleEvent.resources.filter(r => r.kind === 'Room').length > 0 && (
+                <CollapsibleSection
+                  title="Rooms"
+                  count={selectedScheduleEvent.resources.filter(r => r.kind === 'Room').length}
+                >
+                  <div className="space-y-2">
+                    {selectedScheduleEvent.resources
+                      .filter(r => r.kind === 'Room')
+                      .map((resource, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div>
+                            <p className="font-medium text-slate-900">{resource.name}</p>
+                            <p className="text-xs text-slate-500">{resource.kind}</p>
+                          </div>
+                          {resource.approval_status && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                resource.approval_status === 'A' ? 'bg-green-50 border-green-300 text-green-700' : 
+                                resource.approval_status === 'P' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' : 
+                                'bg-red-50 border-red-300 text-red-700'
+                              }`}
+                            >
+                              {resource.approval_status === 'A' ? 'Approved' : 
+                               resource.approval_status === 'P' ? 'Pending' : 
+                               'Rejected'}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </CollapsibleSection>
+              )}
+
+              {/* Collapsible Resources Section */}
+              {selectedScheduleEvent.resources && selectedScheduleEvent.resources.filter(r => r.kind !== 'Room').length > 0 && (
+                <CollapsibleSection
+                  title="Resources"
+                  count={selectedScheduleEvent.resources.filter(r => r.kind !== 'Room').length}
+                >
+                  <div className="space-y-2">
+                    {selectedScheduleEvent.resources
+                      .filter(r => r.kind !== 'Room')
+                      .map((resource, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div>
+                            <p className="font-medium text-slate-900">{resource.name}</p>
+                            <p className="text-xs text-slate-500">{resource.kind}</p>
+                          </div>
+                          {resource.approval_status && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                resource.approval_status === 'A' ? 'bg-green-50 border-green-300 text-green-700' : 
+                                resource.approval_status === 'P' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' : 
+                                'bg-red-50 border-red-300 text-red-700'
+                              }`}
+                            >
+                              {resource.approval_status === 'A' ? 'Approved' : 
+                               resource.approval_status === 'P' ? 'Pending' : 
+                               'Rejected'}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </CollapsibleSection>
+              )}
 
               {/* Summary/Description */}
               {selectedScheduleEvent.summary && (
@@ -1142,6 +1181,35 @@ export default function MyTasks() {
         onOpenChange={setShowEmailDetail}
         email={selectedEmail}
       />
+    </div>
+  );
+}
+
+// NEW: Collapsible Section Component
+function CollapsibleSection({ title, count, children }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-slate-900">{title}</span>
+          <Badge variant="secondary" className="text-xs">{count}</Badge>
+        </div>
+        {isOpen ? (
+          <ChevronDown className="w-4 h-4 text-slate-500" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-slate-500" />
+        )}
+      </button>
+      {isOpen && (
+        <div className="p-3 bg-white">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
