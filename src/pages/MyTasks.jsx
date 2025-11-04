@@ -85,17 +85,8 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      // FIRST: Sync my approvals to ensure we have fresh data
-      console.log('📞 Step 1: Syncing my approvals...');
-      try {
-        await base44.functions.invoke('syncMyApprovals');
-        console.log('✅ Approvals synced');
-      } catch (syncError) {
-        console.warn('⚠️ Approval sync failed, continuing anyway:', syncError.message);
-      }
-      
-      // SECOND: Get my pending approvals
-      console.log('📞 Step 2: Getting my pending approvals...');
+      // Load from database FIRST (fast) - don't sync on every page load
+      console.log('📞 Getting my pending approvals from database...');
       const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
       console.log('✅ Approvals response:', approvalsResponse.data);
       
@@ -103,7 +94,7 @@ export default function MyTasks() {
       console.log('✅ Approvals count:', approvals.length);
       
       if (approvals.length === 0) {
-        console.log('⚠️ No approvals found - showing empty schedule');
+        console.log('⚠️ No approvals found - will show empty schedule');
         setMyScheduleEvents([]);
         return;
       }
@@ -111,8 +102,8 @@ export default function MyTasks() {
       const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
       console.log('📋 My resources:', myResourceNames);
 
-      // THIRD: Get calendar events
-      console.log('📞 Step 3: Getting calendar events...');
+      // Get calendar events
+      console.log('📞 Getting calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       
       if (!eventsResponse.data || !eventsResponse.data.events) {
@@ -123,7 +114,7 @@ export default function MyTasks() {
       const allEvents = eventsResponse.data.events || [];
       console.log('📅 Total events:', allEvents.length);
 
-      // FOURTH: Filter to my events
+      // Filter to my events
       const myEvents = allEvents.filter(event => {
         return event.resources && event.resources.some(r => myResourceNames.includes(r.name));
       });
@@ -138,7 +129,7 @@ export default function MyTasks() {
       
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      // FIFTH: Fetch door codes (only for next 2 weeks)
+      // Fetch door codes (only for next 2 weeks)
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
@@ -147,7 +138,7 @@ export default function MyTasks() {
         return eventDate <= twoWeeksFromNow;
       });
 
-      console.log(`🚪 Step 4: Fetching door codes for ${recentEvents.length} events`);
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`);
       
       for (const event of recentEvents) {
         try {
@@ -182,12 +173,31 @@ export default function MyTasks() {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
       
-      // Show user-friendly error
       const errorMsg = error.message || 'Unknown error';
       toast.error(`Failed to load schedule: ${errorMsg}`);
       
       setMyScheduleEvents([]);
     } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh clicked - syncing approvals first');
+    setLoadingSchedule(true);
+    
+    try {
+      // First sync approvals
+      console.log('📞 Syncing approvals...');
+      await base44.functions.invoke('syncMyApprovals');
+      console.log('✅ Approvals synced');
+      toast.success('Approvals synced!');
+      
+      // Then reload schedule
+      await loadMySchedule();
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+      toast.error('Sync failed: ' + error.message);
       setLoadingSchedule(false);
     }
   };
@@ -430,10 +440,13 @@ export default function MyTasks() {
                   Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <Button onClick={() => {
-                console.log('🔄 Manual refresh clicked, user:', user);
-                loadMySchedule();
-              }} disabled={loadingSchedule} variant="outline" size="sm">
+              <Button 
+                onClick={handleManualRefresh} 
+                disabled={loadingSchedule} 
+                variant="outline" 
+                size="sm"
+                title="Sync latest approvals and reload schedule"
+              >
                 {loadingSchedule ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -447,7 +460,6 @@ export default function MyTasks() {
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
                 <p className="text-slate-600">Loading your schedule...</p>
-                <p className="text-xs text-slate-400 mt-2">Check console (F12) for detailed logs</p>
               </div>
             ) : (
               <ScheduleCalendar events={myScheduleEvents} weekCount={2} />
