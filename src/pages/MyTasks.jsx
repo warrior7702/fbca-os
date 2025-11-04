@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import AppHeader from "@/components/shared/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   CheckSquare,
-  Calendar as CalendarIcon, // Aliased to CalendarIcon as per instruction and new usage
+  Calendar as CalendarIcon,
   Mail,
   ExternalLink,
   Loader2,
@@ -34,19 +35,23 @@ import {
   Ticket as TicketIcon,
   AlertCircle,
   Sparkles,
-  User, // Added User icon
-  Key,  // Added Key icon
-  Clock, // Added Clock icon for schedule
+  User,
+  Key,
+  Clock,
+  CheckCircle2, // Added
+  Circle, // Added
+  MoreVertical, // Added
+  Filter // Added
 } from "lucide-react";
-import { format, isToday, parseISO, formatDistanceToNow, addDays, startOfWeek, isSameDay } from "date-fns"; // Added addDays, startOfWeek, isSameDay
-import { motion } from "framer-motion";
-import TaskCalendar from "../components/tasks/TaskCalendar";
-import FullCalendarModal from "../components/tasks/FullCalendarModal";
-import TaskCard from "../components/tasks/TaskCard";
-import TaskDetailModal from "../components/tasks/TaskDetailModal";
-import EmailDetailModal from "../components/emails/EmailDetailModal";
+import { format, isToday, parseISO, formatDistanceToNow, addDays, startOfWeek, isSameDay } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion"; // Added AnimatePresence
+import TaskCalendar from "@/components/tasks/TaskCalendar";
+import FullCalendarModal from "@/components/tasks/FullCalendarModal";
+import TaskCard from "@/components/tasks/TaskCard";
+import TaskDetailModal from "@/components/tasks/TaskDetailModal";
+import EmailDetailModal from "@/components/emails/EmailDetailModal";
 import { toast } from "sonner";
-import ConnectionWarning from "../components/shared/ConnectionWarning";
+import ConnectionWarning from "@/components/shared/ConnectionWarning";
 import { useNavigate } from "react-router-dom";
 
 const CATEGORY_COLORS = {
