@@ -136,58 +136,69 @@ export default function MyTasks() {
       console.log('✅ Setting events to state (without door codes yet)');
       setMyScheduleEvents(myEvents);
 
-      // Fetch door codes in parallel (only for next 2 weeks)
-      const twoWeeksFromNow = new Date();
-      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+      // Only fetch door codes for NEXT 7 DAYS to reduce API calls
+      const oneWeekFromNow = new Date();
+      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
       
       const recentEvents = myEvents.filter(event => {
         const eventDate = new Date(event.starts_at);
-        return eventDate <= twoWeeksFromNow;
+        return eventDate <= oneWeekFromNow;
       });
 
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`); // Modified log
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events (next 7 days only)`);
       
-      // Fetch PCO door codes in parallel with timeout
-      const doorCodePromises = recentEvents.map(event => 
-        Promise.race([
-          base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
-            .then(commentsResponse => {
-              if (commentsResponse.data.comments) {
-                const doorCodeComment = commentsResponse.data.comments.find(c =>
-                  c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-                );
+      // Fetch PCO door codes in batches of 5 to avoid overwhelming the API
+      const batchSize = 5;
+      const doorCodeResults = [];
+      
+      for (let i = 0; i < recentEvents.length; i += batchSize) {
+        const batch = recentEvents.slice(i, i + batchSize);
+        console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recentEvents.length / batchSize)}`);
+        
+        const batchPromises = batch.map(event => 
+          Promise.race([
+            base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
+              .then(commentsResponse => {
+                console.log(`✅ Got comments for event ${event.name}`);
+                if (commentsResponse.data.comments) {
+                  const doorCodeComment = commentsResponse.data.comments.find(c =>
+                    c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+                  );
 
-                if (doorCodeComment) {
-                  const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-                  if (match) {
-                    return {
-                      event_id: event.event_id,
-                      posted_door_code: match[1],
-                      posted_by: doorCodeComment.created_by
-                    };
+                  if (doorCodeComment) {
+                    const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+                    if (match) {
+                      console.log(`🔑 Found door code for ${event.name}: ${match[1]}`);
+                      return {
+                        event_id: event.event_id,
+                        event_name: event.name,
+                        posted_door_code: match[1],
+                        posted_by: doorCodeComment.person_name || 'Staff'
+                      };
+                    }
                   }
                 }
-              }
-              return { event_id: event.event_id };
-            })
-            .catch(error => {
-              console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
-              return { event_id: event.event_id };
-            }),
-          // Timeout after 5 seconds
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('timeout')), 5000)
-          )
-        ]).catch(error => {
-          if (error.message === 'timeout') {
-            console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
-          }
-          return { event_id: event.event_id };
-        })
-      );
+                return { event_id: event.event_id, event_name: event.name };
+              })
+              .catch(error => {
+                console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
+                return { event_id: event.event_id, event_name: event.name };
+              }),
+            // Timeout after 5 seconds
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('timeout')), 5000)
+            )
+          ]).catch(error => {
+            if (error.message === 'timeout') {
+              console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
+            }
+            return { event_id: event.event_id, event_name: event.name };
+          })
+        );
 
-      // Wait for all door code fetches (with timeout)
-      const doorCodeResults = await Promise.all(doorCodePromises);
+        const batchResults = await Promise.all(batchPromises);
+        doorCodeResults.push(...batchResults);
+      }
       
       // Also fetch ClickUp door codes
       console.log('🔍 Checking ClickUp for door codes...');
@@ -210,11 +221,13 @@ export default function MyTasks() {
         const updates = { ...event };
         
         if (doorCodeData?.posted_door_code) {
+          console.log(`🎯 Adding PCO door code to ${event.name}: ${doorCodeData.posted_door_code}`);
           updates.posted_door_code = doorCodeData.posted_door_code;
           updates.posted_by = doorCodeData.posted_by;
         }
         
         if (clickupData) {
+          console.log(`🎯 Adding ClickUp door code to ${event.name}: ${clickupData.code}`);
           updates.clickup_door_code = clickupData.code;
           updates.clickup_task_url = clickupData.task_url;
           updates.clickup_task_name = clickupData.task_name;
