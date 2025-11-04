@@ -85,7 +85,7 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      // Load from database FIRST (fast) - don't sync on every page load
+      // Load from database (fast) - no blocking sync
       console.log('📞 Getting my pending approvals from database...');
       const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
       console.log('✅ Approvals response:', approvalsResponse.data);
@@ -94,7 +94,7 @@ export default function MyTasks() {
       console.log('✅ Approvals count:', approvals.length);
       
       if (approvals.length === 0) {
-        console.log('⚠️ No approvals found - will show empty schedule');
+        console.log('⚠️ No approvals found');
         setMyScheduleEvents([]);
         return;
       }
@@ -129,7 +129,11 @@ export default function MyTasks() {
       
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      // Fetch door codes (only for next 2 weeks)
+      // Show events immediately
+      console.log('✅ Setting events to state (without door codes yet)');
+      setMyScheduleEvents(myEvents);
+
+      // Fetch door codes in parallel (only for next 2 weeks)
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
@@ -138,34 +142,65 @@ export default function MyTasks() {
         return eventDate <= twoWeeksFromNow;
       });
 
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`);
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events in parallel`);
       
-      for (const event of recentEvents) {
-        try {
-          const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
-            event_id: event.event_id
-          });
+      // Fetch door codes in parallel with timeout
+      const doorCodePromises = recentEvents.map(event => 
+        Promise.race([
+          base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
+            .then(commentsResponse => {
+              if (commentsResponse.data.comments) {
+                const doorCodeComment = commentsResponse.data.comments.find(c =>
+                  c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+                );
 
-          if (commentsResponse.data.comments) {
-            const doorCodeComment = commentsResponse.data.comments.find(c =>
-              c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-            );
-
-            if (doorCodeComment) {
-              const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-              if (match) {
-                event.posted_door_code = match[1];
-                event.posted_by = doorCodeComment.created_by;
+                if (doorCodeComment) {
+                  const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+                  if (match) {
+                    return {
+                      event_id: event.event_id,
+                      posted_door_code: match[1],
+                      posted_by: doorCodeComment.created_by
+                    };
+                  }
+                }
               }
-            }
+              return { event_id: event.event_id };
+            })
+            .catch(error => {
+              console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
+              return { event_id: event.event_id };
+            }),
+          // Timeout after 5 seconds
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), 5000)
+          )
+        ]).catch(error => {
+          if (error.message === 'timeout') {
+            console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
           }
-        } catch (error) {
-          console.error('Error fetching comments for event:', event.event_id, error.message);
-        }
-      }
+          return { event_id: event.event_id };
+        })
+      );
 
-      console.log('✅ Final: Setting', myEvents.length, 'events to state');
-      setMyScheduleEvents(myEvents);
+      // Wait for all door code fetches (with timeout)
+      const doorCodeResults = await Promise.all(doorCodePromises);
+      
+      // Update events with door codes
+      const updatedEvents = myEvents.map(event => {
+        const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
+        if (doorCodeData?.posted_door_code) {
+          return {
+            ...event,
+            posted_door_code: doorCodeData.posted_door_code,
+            posted_by: doorCodeData.posted_by
+          };
+        }
+        return event;
+      });
+
+      console.log('✅ Final events with door codes:', updatedEvents.filter(e => e.posted_door_code).length, 'have codes');
+      setMyScheduleEvents(updatedEvents);
       console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
@@ -183,23 +218,12 @@ export default function MyTasks() {
   };
 
   const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh clicked - syncing approvals first');
-    setLoadingSchedule(true);
+    console.log('🔄 Manual refresh clicked - refreshing schedule');
     
-    try {
-      // First sync approvals
-      console.log('📞 Syncing approvals...');
-      await base44.functions.invoke('syncMyApprovals');
-      console.log('✅ Approvals synced');
-      toast.success('Approvals synced!');
-      
-      // Then reload schedule
-      await loadMySchedule();
-    } catch (error) {
-      console.error('❌ Sync error:', error);
-      toast.error('Sync failed: ' + error.message);
-      setLoadingSchedule(false);
-    }
+    // Just reload the schedule - don't sync approvals (that should happen in background)
+    await loadMySchedule();
+    
+    toast.success('Schedule refreshed!');
   };
 
   useEffect(() => {
@@ -445,7 +469,7 @@ export default function MyTasks() {
                 disabled={loadingSchedule} 
                 variant="outline" 
                 size="sm"
-                title="Sync latest approvals and reload schedule"
+                title="Refresh schedule"
               >
                 {loadingSchedule ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
