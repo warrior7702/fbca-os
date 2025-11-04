@@ -85,7 +85,17 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getMyPendingApprovals...');
+      // FIRST: Sync my approvals to ensure we have fresh data
+      console.log('📞 Step 1: Syncing my approvals...');
+      try {
+        await base44.functions.invoke('syncMyApprovals');
+        console.log('✅ Approvals synced');
+      } catch (syncError) {
+        console.warn('⚠️ Approval sync failed, continuing anyway:', syncError.message);
+      }
+      
+      // SECOND: Get my pending approvals
+      console.log('📞 Step 2: Getting my pending approvals...');
       const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
       console.log('✅ Approvals response:', approvalsResponse.data);
       
@@ -93,7 +103,7 @@ export default function MyTasks() {
       console.log('✅ Approvals count:', approvals.length);
       
       if (approvals.length === 0) {
-        console.log('⚠️ No approvals');
+        console.log('⚠️ No approvals found - showing empty schedule');
         setMyScheduleEvents([]);
         return;
       }
@@ -101,19 +111,34 @@ export default function MyTasks() {
       const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
       console.log('📋 My resources:', myResourceNames);
 
-      console.log('📞 Calling getPCOCalendarEvents...');
+      // THIRD: Get calendar events
+      console.log('📞 Step 3: Getting calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      
+      if (!eventsResponse.data || !eventsResponse.data.events) {
+        console.error('❌ No events data returned');
+        throw new Error('No events data returned from getPCOCalendarEvents');
+      }
+      
       const allEvents = eventsResponse.data.events || [];
       console.log('📅 Total events:', allEvents.length);
 
+      // FOURTH: Filter to my events
       const myEvents = allEvents.filter(event => {
         return event.resources && event.resources.some(r => myResourceNames.includes(r.name));
       });
 
       console.log('🎯 Matched events:', myEvents.length);
+      
+      if (myEvents.length === 0) {
+        console.warn('⚠️ No events matched my resources');
+        setMyScheduleEvents([]);
+        return;
+      }
+      
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      // OPTIMIZATION: Only fetch door codes for events in the next 2 weeks
+      // FIFTH: Fetch door codes (only for next 2 weeks)
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
@@ -122,7 +147,7 @@ export default function MyTasks() {
         return eventDate <= twoWeeksFromNow;
       });
 
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events (next 2 weeks only, skipping ${myEvents.length - recentEvents.length} future events)`);
+      console.log(`🚪 Step 4: Fetching door codes for ${recentEvents.length} events`);
       
       for (const event of recentEvents) {
         try {
@@ -144,16 +169,23 @@ export default function MyTasks() {
             }
           }
         } catch (error) {
-          console.error('Error fetching comments:', error);
+          console.error('Error fetching comments for event:', event.event_id, error.message);
         }
       }
 
-      console.log('✅ Final events:', myEvents.length);
+      console.log('✅ Final: Setting', myEvents.length, 'events to state');
       setMyScheduleEvents(myEvents);
+      console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
-      console.error('❌ ERROR:', error);
-      toast.error('Failed to load schedule: ' + error.message);
+      console.error('❌ FATAL ERROR in loadMySchedule:');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      // Show user-friendly error
+      const errorMsg = error.message || 'Unknown error';
+      toast.error(`Failed to load schedule: ${errorMsg}`);
+      
       setMyScheduleEvents([]);
     } finally {
       setLoadingSchedule(false);
