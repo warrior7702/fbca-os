@@ -12,9 +12,7 @@ async function refreshTokenIfNeeded(base44, user) {
 
     const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             grant_type: 'refresh_token',
             refresh_token: user.pco_refresh_token,
@@ -37,45 +35,6 @@ async function refreshTokenIfNeeded(base44, user) {
     });
 
     return tokens.access_token;
-}
-
-async function fetchAllInstances(accessToken, baseUrl) {
-    let allInstances = [];
-    let nextUrl = baseUrl;
-    let pageCount = 0;
-    const maxPages = 5; // Reduced from 10 - only fetch first 5 pages (500 instances max)
-    
-    while (nextUrl && pageCount < maxPages) {
-        pageCount++;
-        console.log(`📄 Fetching page ${pageCount}...`);
-        
-        const response = await fetch(nextUrl, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ PCO instances fetch failed:', response.status, errorText);
-            throw new Error(`Failed to fetch calendar events: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.data && data.data.length > 0) {
-            allInstances = allInstances.concat(data.data);
-            console.log(`  ✅ Got ${data.data.length} instances (total: ${allInstances.length})`);
-        }
-        
-        nextUrl = data.links?.next;
-    }
-    
-    console.log(`📊 Total pages fetched: ${pageCount}`);
-    console.log(`📊 Total instances: ${allInstances.length}`);
-    
-    return allInstances;
 }
 
 Deno.serve(async (req) => {
@@ -104,162 +63,99 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        // CRITICAL FIX: Only fetch events for next 60 days, not ALL future events
+        // ULTRA AGGRESSIVE: Only fetch next 21 days (3 weeks)
         const now = new Date();
-        const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
+        const threeWeeksFromNow = new Date(now.getTime() + (21 * 24 * 60 * 60 * 1000));
         
         const startDate = now.toISOString();
-        const endDate = sixtyDaysFromNow.toISOString();
+        const endDate = threeWeeksFromNow.toISOString();
 
         console.log('📅 Fetching events from', startDate, 'to', endDate);
 
-        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&order=starts_at&per_page=100`;
+        // Fetch event instances with resources included in ONE CALL
+        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&include=event,event_resource_requests.resource&order=starts_at&per_page=100`;
         
-        console.log('🔗 Base URL:', baseUrl);
+        console.log('🔗 Fetching instances with includes...');
         
-        const instances = await fetchAllInstances(accessToken, baseUrl);
+        // Only fetch 2 pages max (200 events)
+        let allInstances = [];
+        let allIncluded = [];
+        let nextUrl = baseUrl;
+        let pageCount = 0;
+        const maxPages = 2;
         
-        console.log('📦 Total event instances fetched:', instances.length);
+        while (nextUrl && pageCount < maxPages) {
+            pageCount++;
+            console.log(`📄 Fetching page ${pageCount}/${maxPages}...`);
+            
+            const response = await fetch(nextUrl, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ PCO fetch failed:', response.status, errorText);
+                throw new Error(`Failed to fetch calendar events: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.data && data.data.length > 0) {
+                allInstances = allInstances.concat(data.data);
+                if (data.included) {
+                    allIncluded = allIncluded.concat(data.included);
+                }
+                console.log(`  ✅ Got ${data.data.length} instances (total: ${allInstances.length})`);
+            }
+            
+            nextUrl = data.links?.next;
+        }
         
-        if (instances.length === 0) {
-            console.warn('⚠️ No event instances in response from PCO');
+        console.log('📦 Total instances:', allInstances.length);
+        console.log('📦 Total included:', allIncluded.length);
+        
+        if (allInstances.length === 0) {
             return Response.json({ 
                 events: [],
-                message: 'No upcoming event instances found in PCO Calendar for next 60 days'
+                message: 'No upcoming event instances found for next 3 weeks'
             });
         }
 
-        // Get unique event IDs
-        const eventIds = new Set();
-        instances.forEach(instance => {
-            const eventId = instance.relationships?.event?.data?.id;
-            if (eventId) eventIds.add(eventId);
+        // Build lookup maps from included data
+        const eventsMap = {};
+        const resourcesMap = {};
+        const resourceRequestsMap = {};
+
+        for (const item of allIncluded) {
+            if (item.type === 'Event') {
+                eventsMap[item.id] = item;
+            } else if (item.type === 'Resource') {
+                resourcesMap[item.id] = item;
+            } else if (item.type === 'EventResourceRequest') {
+                resourceRequestsMap[item.id] = item;
+            }
+        }
+
+        console.log('📊 Parsed included data:', {
+            events: Object.keys(eventsMap).length,
+            resources: Object.keys(resourcesMap).length,
+            requests: Object.keys(resourceRequestsMap).length
         });
 
-        console.log('📊 Unique events:', eventIds.size);
-
-        // Fetch full event data with resources and tags for each unique event (in parallel batches)
-        const eventDataMap = {};
-        const eventIdArray = Array.from(eventIds);
-        const batchSize = 10; // Process 10 events at a time
-        
-        for (let i = 0; i < eventIdArray.length; i += batchSize) {
-            const batch = eventIdArray.slice(i, i + batchSize);
-            console.log(`🔄 Processing event batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(eventIdArray.length / batchSize)}`);
-            
-            const batchPromises = batch.map(async (eventId) => {
-                try {
-                    // Fetch event with tags
-                    const eventResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            }
-                        }
-                    );
-
-                    if (!eventResponse.ok) {
-                        console.error(`Failed to fetch event ${eventId}`);
-                        return null;
-                    }
-
-                    const eventData = await eventResponse.json();
-                    const event = eventData.data;
-                    
-                    // Extract tags from included
-                    const tags = [];
-                    if (eventData.included) {
-                        for (const item of eventData.included) {
-                            if (item.type === 'Tag') {
-                                tags.push(item.attributes?.name);
-                            }
-                        }
-                    }
-                    
-                    // Fetch event_resource_requests separately
-                    const requestsResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            }
-                        }
-                    );
-
-                    const resourceRequests = [];
-                    
-                    if (requestsResponse.ok) {
-                        const requestsData = await requestsResponse.json();
-                        
-                        // Build a map of resources from included
-                        const resourceMap = {};
-                        if (requestsData.included) {
-                            for (const item of requestsData.included) {
-                                if (item.type === 'Resource') {
-                                    resourceMap[item.id] = {
-                                        id: item.id,
-                                        name: item.attributes?.name,
-                                        kind: item.attributes?.kind
-                                    };
-                                }
-                            }
-                        }
-                        
-                        // Build resource requests with full resource info
-                        for (const request of (requestsData.data || [])) {
-                            const resourceId = request.relationships?.resource?.data?.id;
-                            const resource = resourceMap[resourceId];
-                            
-                            if (resource) {
-                                resourceRequests.push({
-                                    id: request.id,
-                                    resource_id: resourceId,
-                                    resource_name: resource.name,
-                                    resource_kind: resource.kind,
-                                    approval_status: request.attributes?.approval_status,
-                                    quantity: request.attributes?.quantity
-                                });
-                            }
-                        }
-                    }
-                    
-                    return {
-                        eventId,
-                        data: {
-                            name: event.attributes?.name,
-                            summary: event.attributes?.summary,
-                            description: event.attributes?.description,
-                            visible_in_church_center: event.attributes?.visible_in_church_center,
-                            approval_status: event.attributes?.approval_status,
-                            resource_requests: resourceRequests,
-                            tags: tags
-                        }
-                    };
-                } catch (error) {
-                    console.error(`❌ Error fetching event ${eventId}:`, error);
-                    return null;
-                }
-            });
-
-            const batchResults = await Promise.all(batchPromises);
-            batchResults.forEach(result => {
-                if (result) {
-                    eventDataMap[result.eventId] = result.data;
-                }
-            });
-        }
-
-        console.log('📊 Fetched full data for', Object.keys(eventDataMap).length, 'events');
-
-        // Process event instances
+        // Build final events array
         const eventsWithResources = [];
         
-        for (const instance of instances) {
+        for (const instance of allInstances) {
             const eventId = instance.relationships?.event?.data?.id;
-            const eventData = eventDataMap[eventId];
+            const event = eventsMap[eventId];
+            
+            if (!event) {
+                console.warn('⚠️ No event data for instance:', instance.id);
+                continue;
+            }
             
             const starts_at = instance.attributes?.starts_at;
             const ends_at = instance.attributes?.ends_at;
@@ -269,15 +165,23 @@ Deno.serve(async (req) => {
                 continue;
             }
             
-            // Build resources array from resource requests
+            // Build resources array from relationships
             const resources = [];
-            if (eventData?.resource_requests) {
-                for (const request of eventData.resource_requests) {
+            const requestRelationships = instance.relationships?.event_resource_requests?.data || [];
+            
+            for (const requestRef of requestRelationships) {
+                const request = resourceRequestsMap[requestRef.id];
+                if (!request) continue;
+                
+                const resourceId = request.relationships?.resource?.data?.id;
+                const resource = resourcesMap[resourceId];
+                
+                if (resource) {
                     resources.push({
-                        id: request.resource_id,
-                        name: request.resource_name,
-                        kind: request.resource_kind,
-                        approval_status: request.approval_status
+                        id: resourceId,
+                        name: resource.attributes?.name,
+                        kind: resource.attributes?.kind,
+                        approval_status: request.attributes?.approval_status
                     });
                 }
             }
@@ -285,26 +189,18 @@ Deno.serve(async (req) => {
             eventsWithResources.push({
                 id: instance.id,
                 event_id: eventId,
-                name: eventData?.name || 'Untitled Event',
+                name: event.attributes?.name || 'Untitled Event',
                 starts_at: starts_at,
                 ends_at: ends_at,
-                summary: eventData?.summary,
-                description: eventData?.description,
-                visible_in_church_center: eventData?.visible_in_church_center,
-                approval_status: eventData?.approval_status,
+                summary: event.attributes?.summary,
+                description: event.attributes?.description,
                 resources: resources,
-                tags: eventData?.tags || [],
-                resource_count: resources.length,
-                has_valid_dates: true
+                tags: [], // Skip tags for speed
+                resource_count: resources.length
             });
         }
 
-        console.log('🎯 Processed', eventsWithResources.length, 'event instances');
-        
-        if (eventsWithResources.length > 0) {
-            const withResources = eventsWithResources.filter(e => e.resources.length > 0).length;
-            console.log(`📊 Events with resources: ${withResources}`);
-        }
+        console.log('🎯 Final result:', eventsWithResources.length, 'events');
 
         return Response.json({ 
             events: eventsWithResources,
