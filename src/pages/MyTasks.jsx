@@ -411,8 +411,308 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        {/* MY DAY SECTION AND REST OF PAGE OMITTED FOR BREVITY - THEY REMAIN UNCHANGED */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5" />
+                My Day
+              </CardTitle>
+              <Badge variant="secondary">{myDayTasks.length} task{myDayTasks.length !== 1 ? 's' : ''}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {myDayTasks.length === 0 ? (
+              <p className="text-slate-500 text-center py-4">No tasks due today! 🎉</p>
+            ) : (
+              <div className="space-y-3">
+                {myDayTasks.map((task) => {
+                  const isMicrosoftToDo = task.source === 'microsoft_todo';
+                  const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
 
+                  return (
+                    <div
+                      key={`${task.source}-${task.id}`}
+                      onClick={() => handleTaskClick(task)}
+                      className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                      style={{ borderLeftColor: listColor }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: listColor }}
+                            />
+                            <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={getStatusColor(task.status)}>
+                              {formatStatus(task.status)}
+                            </Badge>
+                            {isMicrosoftToDo ? (
+                              <span className="text-xs text-slate-500 font-medium">From To Do</span>
+                            ) : task.list_name && (
+                              <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => handleCompleteTask(task, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <CheckSquare className="w-4 h-4 mr-1" />
+                          Complete
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5" />
+                Task Calendar
+              </CardTitle>
+              <CardDescription>Your upcoming tasks</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFullCalendar(true)}
+            >
+              <Maximize2 className="w-4 h-4 mr-2" />
+              Full Calendar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <TaskCalendar
+              tasks={allTasks}
+              onTaskClick={handleTaskClick}
+              weekCount={2}
+            />
+          </CardContent>
+        </Card>
+
+        {user?.microsoft_access_token && todoTasks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-blue-600" />
+                Microsoft To Do
+              </CardTitle>
+              <CardDescription>{todoTasks.length} task{todoTasks.length !== 1 ? 's' : ''}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {todoTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => handleTaskClick(task)}
+                    className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                    style={{ borderLeftColor: '#0078d4' }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: '#0078d4' }}
+                          />
+                          <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={getStatusColor(task.status)}>
+                            {formatStatus(task.status)}
+                          </Badge>
+                          <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                          {task.due_date && (
+                            <span className="text-xs text-slate-400">
+                              Due: {format(new Date(task.due_date), 'MMM d')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleCompleteTask(task, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <CheckSquare className="w-4 h-4 mr-1" />
+                        Complete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+          >
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Mail className="w-5 h-5 text-blue-600" />
+              Categorized Emails
+            </h2>
+            {loadingEmails ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
+                  const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
+
+                  return (
+                    <Card key={category} className="bg-slate-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="h-3 w-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: categoryColor }}
+                            />
+                            {category}
+                          </span>
+                          <Badge variant="secondary">{categoryEmails.length}</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                          {categoryEmails.slice(0, 5).map((email, idx) => (
+                            <motion.div
+                              key={email.messageId || email.id}
+                              whileHover={{ scale: 1.01 }}
+                              onClick={() => {
+                                setSelectedEmail(email);
+                                setShowEmailDetail(true);
+                              }}
+                              className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-xs truncate ${
+                                    email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
+                                  }`}>
+                                    {email.subject || '(No Subject)'}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 truncate mt-1">
+                                    From: {email.fromName || email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown Sender"}
+                                  </p>
+                                  {email.bodyPreview && (
+                                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                                      {email.bodyPreview}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {email.hasAttachments && (
+                                    <Paperclip className="w-4 h-4 text-slate-400" />
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                          {categoryEmails.length > 5 && (
+                            <p className="text-[10px] text-slate-400 text-center pt-1">
+                              +{categoryEmails.length - 5} more emails
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {supportTickets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TicketIcon className="w-5 h-5 text-purple-600" />
+                  My Support Tickets ({supportTickets.length})
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {supportTickets.slice(0, 5).map((ticket) => (
+                <motion.div
+                  key={ticket.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-slate-900 truncate">
+                        {ticket.subject}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.status}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                      {ticket.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-mono">{ticket.ticket_number}</span>
+                      {ticket.category && (
+                        <>
+                          <span>•</span>
+                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
+                        </>
+                      )}
+                      {ticket.created_date && (
+                        <>
+                          <span>•</span>
+                          <span>{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                        </>
+                      )}
+                    </div>
+                    {ticket.suggested_solution && (
+                      <div className="mt-2 flex items-start gap-1 text-xs text-purple-600">
+                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">AI suggested solution available</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              {supportTickets.length > 5 && (
+                <p className="text-xs text-slate-500 text-center pt-2">
+                  +{supportTickets.length - 5} more tickets
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <FullCalendarModal
