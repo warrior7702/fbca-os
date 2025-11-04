@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -112,7 +113,18 @@ export default function MyTasks() {
       console.log('🎯 Matched events:', myEvents.length);
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      for (const event of myEvents) {
+      // OPTIMIZATION: Only fetch door codes for events in the next 2 weeks
+      const twoWeeksFromNow = new Date();
+      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+      
+      const recentEvents = myEvents.filter(event => {
+        const eventDate = new Date(event.starts_at);
+        return eventDate <= twoWeeksFromNow;
+      });
+
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events (next 2 weeks only, skipping ${myEvents.length - recentEvents.length} future events)`);
+      
+      for (const event of recentEvents) {
         try {
           const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
             event_id: event.event_id
@@ -136,7 +148,7 @@ export default function MyTasks() {
         }
       }
 
-      console.log('✅ Final events:', myEvents);
+      console.log('✅ Final events:', myEvents.length);
       setMyScheduleEvents(myEvents);
       
     } catch (error) {
