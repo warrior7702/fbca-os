@@ -186,7 +186,7 @@ export default function ScheduleCalendar({ events = [], weekCount = 2 }) {
               {/* Action Buttons */}
               <div className="flex gap-2 mt-6">
                 <a
-                  href={`https://api.planningcenteronline.com/calendar/v2/events/${expandedEvent.id}`} {/* Assuming event.id maps to the URL */}
+                  href={`https://api.planningcenteronline.com/calendar/v2/events/${expandedEvent.event_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
