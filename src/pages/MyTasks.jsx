@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   CheckSquare,
-  Calendar as CalendarIcon, // Aliased to CalendarIcon as per instruction and new usage
+  Calendar as CalendarIcon,
   Mail,
   ExternalLink,
   Loader2,
@@ -27,13 +27,14 @@ import {
   Ticket as TicketIcon,
   AlertCircle,
   Sparkles,
-  User, // Added User icon
-  Key,  // Added Key icon
-  Clock, // Added Clock icon for schedule
+  User,
+  Key,
+  Clock,
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
+import ScheduleCalendar from "../components/tasks/ScheduleCalendar"; // Added ScheduleCalendar import
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
@@ -471,8 +472,8 @@ export default function MyTasks() {
           </Card>
         </div>
 
-        {/* NEW: My Schedule Section */}
-        <Card className="border-2 border-green-200 bg-green-50">
+        {/* NEW: My Schedule Section with 2-Week Calendar */}
+        <Card className="border-2 border-green-200 bg-white">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -481,7 +482,7 @@ export default function MyTasks() {
                   My Schedule
                 </CardTitle>
                 <p className="text-slate-600 text-sm mt-1">
-                  Upcoming events requiring your approval group • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                  Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
               <Button onClick={loadMySchedule} disabled={loadingSchedule} variant="outline" size="sm">
@@ -499,79 +500,8 @@ export default function MyTasks() {
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
                 <p className="text-slate-600">Loading your schedule...</p>
               </div>
-            ) : myScheduleEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                <p className="text-slate-600">No upcoming events with your approval groups</p>
-              </div>
             ) : (
-              <div className="space-y-3">
-                {myScheduleEvents.slice(0, 10).map((event) => (
-                  <Card key={event.id} className="border border-green-200 hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg text-slate-900 mb-2">{event.name}</h3>
-
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mb-3">
-                            <div className="flex items-center gap-1">
-                              <CalendarIcon className="w-4 h-4 text-green-600" />
-                              {format(parseISO(event.starts_at), 'EEE, MMM d')}
-                            </div>
-                            <span>•</span>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4 text-green-600" />
-                              {format(parseISO(event.starts_at), 'h:mm a')}
-                            </div>
-                          </div>
-
-                          {event.resources && event.resources.length > 0 && (
-                            <div className="space-y-1 mb-3">
-                              <p className="text-xs font-semibold text-slate-700">Resources:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {event.resources.map((resource, idx) => (
-                                  <Badge key={idx} variant="outline" className="bg-white text-xs">
-                                    {resource.name} ({resource.kind})
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {event.posted_door_code && (
-                            <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Key className="w-4 h-4 text-green-700" />
-                                <span className="text-sm font-semibold text-green-900">Door Code Posted:</span>
-                                <span className="text-sm font-mono font-bold text-green-700">{event.posted_door_code}#</span>
-                              </div>
-                              {event.posted_by && (
-                                <p className="text-xs text-green-700 mt-1 ml-6">
-                                  Posted by: {event.posted_by}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <Button
-                          onClick={() => window.open(`https://calendar.planningcenteronline.com/events/${event.event_id}`, '_blank')}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {myScheduleEvents.length > 10 && (
-                  <p className="text-sm text-slate-500 text-center pt-2">
-                    Showing first 10 events • {myScheduleEvents.length - 10} more
-                  </p>
-                )}
-              </div>
+              <ScheduleCalendar events={myScheduleEvents} weekCount={2} />
             )}
           </CardContent>
         </Card>
