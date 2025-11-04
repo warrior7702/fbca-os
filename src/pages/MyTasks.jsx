@@ -85,25 +85,88 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      // Load from database (fast) - no blocking sync
-      console.log('📞 Getting my pending approvals from database...');
-      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
-      console.log('✅ Approvals response:', approvalsResponse.data);
+      // STEP 1: Get MY approval groups and their resources
+      console.log('📞 Step 1: Getting my approval groups...');
       
-      const approvals = approvalsResponse.data.pending_approvals || [];
-      console.log('✅ Approvals count:', approvals.length);
+      // First get PCO token
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      if (!tokenResponse.data?.ok) {
+        throw new Error('Failed to get PCO token');
+      }
       
-      if (approvals.length === 0) {
-        console.log('⚠️ No approvals found');
+      const accessToken = tokenResponse.data.access_token;
+      
+      // Get my PCO person ID
+      const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      
+      if (!meResponse.ok) {
+        throw new Error('Failed to get PCO user info');
+      }
+      
+      const meData = await meResponse.json();
+      const myPersonId = meData.data?.id;
+      console.log('👤 My PCO Person ID:', myPersonId);
+      
+      // Get all approval groups
+      const groupsResponse = await fetch(
+        'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      
+      if (!groupsResponse.ok) {
+        throw new Error('Failed to fetch approval groups');
+      }
+      
+      const groupsData = await groupsResponse.json();
+      const myResourceNames = new Set();
+      
+      // Check each group to see if I'm a member, and collect ALL resources from my groups
+      for (const group of (groupsData.data || [])) {
+        // Check if I'm in this group
+        const membersResponse = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        if (membersResponse.ok) {
+          const membersData = await membersResponse.json();
+          const isMember = (membersData.data || []).some(person => person.id === myPersonId);
+          
+          if (isMember) {
+            console.log('✅ Member of group:', group.attributes?.name);
+            
+            // Get ALL resources for this group
+            const resourcesResponse = await fetch(
+              `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+              { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            
+            if (resourcesResponse.ok) {
+              const resourcesData = await resourcesResponse.json();
+              (resourcesData.data || []).forEach(resource => {
+                const resourceName = resource.attributes?.name;
+                if (resourceName) {
+                  myResourceNames.add(resourceName);
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      const resourceNamesArray = Array.from(myResourceNames);
+      console.log('📋 My resources (all from my groups):', resourceNamesArray.length, 'resources');
+
+      if (resourceNamesArray.length === 0) {
+        console.log('⚠️ No resources found for my groups');
         setMyScheduleEvents([]);
         return;
       }
 
-      const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
-      console.log('📋 My resources:', myResourceNames);
-
-      // Get calendar events
-      console.log('📞 Getting calendar events...');
+      // STEP 2: Get calendar events
+      console.log('📞 Step 2: Getting calendar events...');
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       
       if (!eventsResponse.data || !eventsResponse.data.events) {
@@ -114,9 +177,9 @@ export default function MyTasks() {
       const allEvents = eventsResponse.data.events || [];
       console.log('📅 Total events:', allEvents.length);
 
-      // Filter to my events
+      // STEP 3: Filter to my events (any event using my resources)
       const myEvents = allEvents.filter(event => {
-        return event.resources && event.resources.some(r => myResourceNames.includes(r.name));
+        return event.resources && event.resources.some(r => resourceNamesArray.includes(r.name));
       });
 
       console.log('🎯 Matched events:', myEvents.length);
@@ -133,7 +196,7 @@ export default function MyTasks() {
       console.log('✅ Setting events to state (without door codes yet)');
       setMyScheduleEvents(myEvents);
 
-      // Fetch door codes in parallel (only for next 2 weeks)
+      // STEP 4: Fetch door codes in parallel (only for next 2 weeks)
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
