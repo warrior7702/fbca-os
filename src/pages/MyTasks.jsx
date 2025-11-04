@@ -162,6 +162,7 @@ export default function MyTasks() {
       if (resourceNamesArray.length === 0) {
         console.log('⚠️ No resources found for my groups');
         setMyScheduleEvents([]);
+        setLoadingSchedule(false);
         return;
       }
 
@@ -187,16 +188,20 @@ export default function MyTasks() {
       if (myEvents.length === 0) {
         console.warn('⚠️ No events matched my resources');
         setMyScheduleEvents([]);
+        setLoadingSchedule(false);
         return;
       }
       
       myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-      // Show events immediately
-      console.log('✅ Setting events to state (without door codes yet)');
+      // Show events immediately - THIS IS THE KEY FIX
+      console.log('✅ Setting', myEvents.length, 'events to state NOW');
       setMyScheduleEvents(myEvents);
-
-      // STEP 4: Fetch door codes in parallel (only for next 2 weeks)
+      setLoadingSchedule(false); // Mark as done loading even before door codes
+      
+      // STEP 4: Fetch door codes in BACKGROUND (don't let errors affect the schedule)
+      console.log('🚪 Now fetching door codes in background...');
+      
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
@@ -205,66 +210,72 @@ export default function MyTasks() {
         return eventDate <= twoWeeksFromNow;
       });
 
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events in parallel`);
+      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`);
       
-      // Fetch door codes in parallel with timeout
-      const doorCodePromises = recentEvents.map(event => 
-        Promise.race([
-          base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
-            .then(commentsResponse => {
-              if (commentsResponse.data.comments) {
-                const doorCodeComment = commentsResponse.data.comments.find(c =>
-                  c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-                );
+      // Fetch door codes in parallel with timeout - wrapped in try/catch to not affect schedule
+      try {
+        const doorCodePromises = recentEvents.map(event => 
+          Promise.race([
+            base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
+              .then(commentsResponse => {
+                if (commentsResponse.data.comments) {
+                  const doorCodeComment = commentsResponse.data.comments.find(c =>
+                    c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+                  );
 
-                if (doorCodeComment) {
-                  const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-                  if (match) {
-                    return {
-                      event_id: event.event_id,
-                      posted_door_code: match[1],
-                      posted_by: doorCodeComment.created_by
-                    };
+                  if (doorCodeComment) {
+                    const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+                    if (match) {
+                      return {
+                        event_id: event.event_id,
+                        posted_door_code: match[1],
+                        posted_by: doorCodeComment.created_by
+                      };
+                    }
                   }
                 }
-              }
-              return { event_id: event.event_id };
-            })
-            .catch(error => {
-              console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
-              return { event_id: event.event_id };
-            }),
-          // Timeout after 5 seconds
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('timeout')), 5000)
-          )
-        ]).catch(error => {
-          if (error.message === 'timeout') {
-            console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
+                return { event_id: event.event_id };
+              })
+              .catch(error => {
+                console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
+                return { event_id: event.event_id };
+              }),
+            // Timeout after 5 seconds
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('timeout')), 5000)
+            )
+          ]).catch(error => {
+            if (error.message === 'timeout') {
+              console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
+            }
+            return { event_id: event.event_id };
+          })
+        );
+
+        // Wait for all door code fetches (with timeout)
+        const doorCodeResults = await Promise.all(doorCodePromises);
+        
+        // Update events with door codes
+        const updatedEvents = myEvents.map(event => {
+          const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
+          if (doorCodeData?.posted_door_code) {
+            return {
+              ...event,
+              posted_door_code: doorCodeData.posted_door_code,
+              posted_by: doorCodeData.posted_by
+            };
           }
-          return { event_id: event.event_id };
-        })
-      );
+          return event;
+        });
 
-      // Wait for all door code fetches (with timeout)
-      const doorCodeResults = await Promise.all(doorCodePromises);
-      
-      // Update events with door codes
-      const updatedEvents = myEvents.map(event => {
-        const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
-        if (doorCodeData?.posted_door_code) {
-          return {
-            ...event,
-            posted_door_code: doorCodeData.posted_door_code,
-            posted_by: doorCodeData.posted_by
-          };
-        }
-        return event;
-      });
+        console.log('✅ Door codes fetched:', updatedEvents.filter(e => e.posted_door_code).length, 'have codes');
+        setMyScheduleEvents(updatedEvents);
+      } catch (doorCodeError) {
+        console.warn('⚠️ Door code fetching failed, but keeping schedule:', doorCodeError.message);
+        // Don't clear the schedule - we already have events showing
+      }
 
-      console.log('✅ Final events with door codes:', updatedEvents.filter(e => e.posted_door_code).length, 'have codes');
-      setMyScheduleEvents(updatedEvents);
-      console.log('✅ SUCCESS! Schedule loaded');
+      console.log('✅ SUCCESS! Schedule fully loaded');
       
     } catch (error) {
       console.error('❌ FATAL ERROR in loadMySchedule:');
@@ -275,17 +286,13 @@ export default function MyTasks() {
       toast.error(`Failed to load schedule: ${errorMsg}`);
       
       setMyScheduleEvents([]);
-    } finally {
       setLoadingSchedule(false);
     }
   };
 
   const handleManualRefresh = async () => {
     console.log('🔄 Manual refresh clicked - refreshing schedule');
-    
-    // Just reload the schedule - don't sync approvals (that should happen in background)
     await loadMySchedule();
-    
     toast.success('Schedule refreshed!');
   };
 
@@ -547,6 +554,10 @@ export default function MyTasks() {
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
                 <p className="text-slate-600">Loading your schedule...</p>
+              </div>
+            ) : myScheduleEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-600">No upcoming events found</p>
               </div>
             ) : (
               <ScheduleCalendar events={myScheduleEvents} weekCount={2} />
