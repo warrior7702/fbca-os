@@ -84,12 +84,12 @@ export default function MyTasks() {
 
   useEffect(() => {
     loadData();
-    loadMySchedule(); // Load schedule on initial mount
   }, []);
 
   useEffect(() => {
     if (user) {
       loadSupportTickets();
+      loadMySchedule(); // Only load schedule after user is loaded
     }
   }, [user]);
 
@@ -213,16 +213,19 @@ export default function MyTasks() {
 
   // NEW: Load calendar events with my approval groups
   const loadMySchedule = async () => {
+    console.log('🗓️ Starting loadMySchedule...');
     setLoadingSchedule(true);
     try {
-      console.log('🗓️ Loading My Schedule...');
-
+      console.log('📞 Calling getMyPendingApprovals...');
+      
       // First get my approval groups from pending approvals
       const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
+      console.log('✅ Approvals response:', approvalsResponse.data);
+      
       const approvals = approvalsResponse.data.pending_approvals || [];
-
+      
       console.log('✅ My pending approvals:', approvals.length);
-
+      
       if (approvals.length === 0) {
         console.log('⚠️ No pending approvals found - schedule will be empty');
         setMyScheduleEvents([]);
@@ -234,10 +237,14 @@ export default function MyTasks() {
       const myResourceNames = [...new Set(approvals.map(a => a.resource_name).filter(Boolean))];
       console.log('📋 My approval resources:', myResourceNames);
 
+      console.log('📞 Calling getPCOCalendarEvents...');
+      
       // Fetch calendar events
       const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+      console.log('✅ Events response:', eventsResponse.data);
+      
       const allEvents = eventsResponse.data.events || [];
-
+      
       console.log('📅 Total calendar events fetched:', allEvents.length);
 
       // Filter events that have resources matching my approval resources
@@ -245,16 +252,16 @@ export default function MyTasks() {
         if (!event.resources || event.resources.length === 0) {
           return false;
         }
-
+        
         // Check if any of the event's resources match my approval resources
         const hasMyResource = event.resources.some(resource =>
           myResourceNames.includes(resource.name)
         );
-
+        
         if (hasMyResource) {
           console.log('✅ Found matching event:', event.name, 'with resources:', event.resources.map(r => r.name));
         }
-
+        
         return hasMyResource;
       });
 
@@ -296,9 +303,11 @@ export default function MyTasks() {
       setMyScheduleEvents(myEvents);
     } catch (error) {
       console.error('❌ Error loading schedule:', error);
-      console.error('Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
       toast.error('Failed to load schedule: ' + error.message);
+      setMyScheduleEvents([]); // Set empty array on error
     } finally {
+      console.log('🏁 Finishing loadMySchedule, setting loadingSchedule to false');
       setLoadingSchedule(false);
     }
   };
