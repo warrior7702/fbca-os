@@ -24,7 +24,7 @@ import {
   ListChecks, // Used for My Tasks app and Task Results search
   ClipboardCheck, // NEW: for My Approvals app
   Sparkles,
-  Calendar as CalendarIcon, // Added CalendarIcon
+  // Calendar as CalendarIcon, // Removed as Church Calendar app is removed
   Building2 // NEW: Added Building2 icon for My Department
 } from "lucide-react";
 import {
@@ -53,12 +53,6 @@ const apps = [
     path: "MyApprovals",
     icon: ClipboardCheck,
     color: "text-orange-500"
-  },
-  {
-    name: "Church Calendar",
-    path: "Calendar",
-    icon: CalendarIcon,
-    color: "text-blue-600"
   },
   {
     name: "My Department",
