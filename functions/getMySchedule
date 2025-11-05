@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
         const currentUser = await base44.auth.me();
 
         if (!currentUser) {
+            console.error('❌ No current user');
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
 
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
         const user = users[0];
 
         if (!user || !user.pco_access_token) {
+            console.log('❌ No PCO token');
             return Response.json({ events: [], message: 'PCO not connected' });
         }
 
@@ -59,13 +61,17 @@ Deno.serve(async (req) => {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (!meResponse.ok) throw new Error('Failed to get PCO user');
+        if (!meResponse.ok) {
+            console.error('❌ Failed to get PCO user:', meResponse.status);
+            throw new Error('Failed to get PCO user');
+        }
         
         const meData = await meResponse.json();
         const myPersonId = meData.data?.id;
         console.log('👤 My PCO Person ID:', myPersonId);
 
         if (!myPersonId) {
+            console.error('❌ No person ID in response');
             return Response.json({ 
                 events: [], 
                 message: 'Could not determine your PCO person ID'
@@ -79,41 +85,49 @@ Deno.serve(async (req) => {
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
-        if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
+        if (!groupsResponse.ok) {
+            console.error('❌ Failed to fetch approval groups:', groupsResponse.status);
+            throw new Error('Failed to fetch approval groups');
+        }
 
         const groupsData = await groupsResponse.json();
         const myGroupIds = [];
         const myResourceIds = new Set();
         
+        console.log('📋 Total groups to check:', (groupsData.data || []).length);
+        
         // Check each group for my membership
         for (const group of (groupsData.data || [])) {
-            const membersResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-            
-            if (!membersResponse.ok) continue;
-            
-            const membersData = await membersResponse.json();
-            const isMember = (membersData.data || []).some(person => person.id === myPersonId);
-            
-            if (!isMember) continue;
-            
-            myGroupIds.push(group.id);
-            console.log('  ✅ Member of group:', group.attributes?.name);
-            
-            // Get resources for this group
-            const resourcesResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-            
-            if (resourcesResponse.ok) {
-                const resourcesData = await resourcesResponse.json();
-                (resourcesData.data || []).forEach(resource => {
-                    myResourceIds.add(resource.id);
-                    console.log('    📦 Resource:', resource.attributes?.name);
-                });
+            try {
+                const membersResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+                
+                if (!membersResponse.ok) continue;
+                
+                const membersData = await membersResponse.json();
+                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
+                
+                if (!isMember) continue;
+                
+                myGroupIds.push(group.id);
+                console.log('  ✅ Member of group:', group.attributes?.name);
+                
+                // Get resources for this group
+                const resourcesResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+                
+                if (resourcesResponse.ok) {
+                    const resourcesData = await resourcesResponse.json();
+                    (resourcesData.data || []).forEach(resource => {
+                        myResourceIds.add(resource.id);
+                    });
+                }
+            } catch (error) {
+                console.error('❌ Error checking group:', group.id, error.message);
             }
         }
 
@@ -121,6 +135,7 @@ Deno.serve(async (req) => {
         console.log('📋 Summary: Managing', myResourceIds.size, 'total resources');
 
         if (myGroupIds.length === 0) {
+            console.log('ℹ️ User not in any approval groups');
             return Response.json({ 
                 events: [], 
                 message: 'You are not in any approval groups',
@@ -131,14 +146,23 @@ Deno.serve(async (req) => {
 
         // STEP 3: Get ALL calendar events
         console.log('📞 Step 3: Getting all calendar events...');
-        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-
-        if (!eventsResponse.data || !eventsResponse.data.events) {
-            throw new Error('No events data returned');
+        
+        let allEvents = [];
+        try {
+            const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+            console.log('✅ Got response from getPCOCalendarEvents');
+            
+            if (!eventsResponse || !eventsResponse.data) {
+                console.error('❌ No data in response');
+                throw new Error('No events data returned from getPCOCalendarEvents');
+            }
+            
+            allEvents = eventsResponse.data.events || [];
+            console.log('📅 Total events from PCO:', allEvents.length);
+        } catch (error) {
+            console.error('❌ Error calling getPCOCalendarEvents:', error.message);
+            throw new Error(`Failed to get calendar events: ${error.message}`);
         }
-
-        const allEvents = eventsResponse.data.events || [];
-        console.log('📅 Total events from PCO:', allEvents.length);
 
         // STEP 4: Filter to events with MY APPROVED resources
         console.log('📞 Step 4: Filtering to my approved resources...');
@@ -159,10 +183,6 @@ Deno.serve(async (req) => {
             const hasMyApprovedResource = event.resources.some(resource => {
                 const isMyResource = myResourceIds.has(resource.id);
                 const isApproved = resource.approval_status === 'A';
-                
-                if (isMyResource && isApproved) {
-                    console.log('  ✅ Match:', event.name, '- Resource:', resource.name);
-                }
                 
                 return isMyResource && isApproved;
             });
@@ -193,7 +213,6 @@ Deno.serve(async (req) => {
             console.log('📋 Sample events:');
             eventsIn2Weeks.slice(0, 3).forEach(event => {
                 console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()})`);
-                console.log(`    Resources: ${event.resources.map(r => r.name).join(', ')}`);
             });
         }
 
@@ -206,6 +225,7 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('❌ Get my schedule error:', error);
+        console.error('❌ Error stack:', error.stack);
         return Response.json({
             error: error.message,
             events: [],
