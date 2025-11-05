@@ -17,13 +17,14 @@ import {
   MapPin,
   Users,
   Key,
-  User
+  User // Added User icon for cardholder search results
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+// Removed CardholderLookup import as it's no longer used
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -72,11 +73,14 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [postedDoorCodes, setPostedDoorCodes] = useState({});
+  const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
 
+  // New state variables for inline cardholder search
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
   const [cardholderSearchResults, setCardholderSearchResults] = useState({});
   const [searchingCardholder, setSearchingCardholder] = useState({});
+
+  // Removed: showCardholderLookup and currentApprovalForLookup states as they are replaced by inline search
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -142,7 +146,7 @@ export default function MyApprovals() {
   useEffect(() => {
     if (approvals.length > 0) {
       loadAllAnswerPreviews();
-      loadPostedDoorCodes();
+      loadPostedDoorCodes(); // NEW: Load door codes that were already posted
     }
   }, [approvals]);
 
@@ -216,6 +220,7 @@ export default function MyApprovals() {
     }
   };
 
+  // NEW: Load posted door codes for all approvals
   const loadPostedDoorCodes = async () => {
     for (const approval of approvals) {
       try {
@@ -253,7 +258,7 @@ export default function MyApprovals() {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
-        setPostedDoorCodes({});
+        setPostedDoorCodes({}); // Clear posted codes cache
         setLastSync(new Date());
       }
     } catch (error) {
@@ -264,8 +269,9 @@ export default function MyApprovals() {
     }
   };
 
+  // New searchCardholders function
   const searchCardholders = async (requestId, query) => {
-    if (!query || query.length < 2) {
+    if (!query || query.length < 2) { // Only search if query is at least 2 characters long
       setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
       return;
     }
@@ -275,7 +281,7 @@ export default function MyApprovals() {
     try {
       const response = await base44.functions.invoke('cardholdersSearch', {
         q: query,
-        limit: 5
+        limit: 5 // Limiting results to 5 for better UX
       });
 
       if (response.data.ok) {
@@ -296,22 +302,25 @@ export default function MyApprovals() {
     }
   };
 
+  // New handleCardholderSearchChange function with debouncing
   const handleCardholderSearchChange = (requestId, value) => {
     setCardholderSearchQuery(prev => ({ ...prev, [requestId]: value }));
 
+    // Debounce search to avoid too many API calls
     if (window.cardholderSearchTimeout) {
       clearTimeout(window.cardholderSearchTimeout);
     }
 
     window.cardholderSearchTimeout = setTimeout(() => {
       searchCardholders(requestId, value);
-    }, 300);
+    }, 300); // 300ms debounce
   };
 
+  // New handleSelectCardholder for inline results
   const handleSelectCardholder = (requestId, cardholder) => {
-    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin }));
-    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin }));
-    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
+    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin })); // Set the actual door code
+    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin })); // Update input field with selected PIN
+    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] })); // Clear search results
   };
 
   const handleSendCode = async (approval) => {
@@ -325,53 +334,30 @@ export default function MyApprovals() {
     setSendingCode(approval.request_id);
     
     try {
-      console.log('🚪 Step 1: Posting door code to PCO event...');
+      console.log('🚪 Posting door code to PCO event...');
       
-      // Step 1: Post the door code
-      const noteResponse = await base44.functions.invoke('writePCONote', {
+      const response = await base44.functions.invoke('writePCONote', {
         event_id: approval.event_id,
         badge_code: doorCode.trim()
       });
 
-      if (!noteResponse.data.ok) {
-        throw new Error(noteResponse.data.error || 'Failed to post door code');
+      if (response.data.ok) {
+        toast.success('Door code posted to event activity in PCO!');
+        
+        // Update posted door codes state to show the code was posted
+        setPostedDoorCodes(prev => ({
+          ...prev,
+          [approval.request_id]: doorCode.trim()
+        }));
+        
+        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
+        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
+      } else {
+        toast.error(response.data.error || 'Failed to post door code');
       }
-
-      console.log('✅ Step 1 complete: Door code posted');
-      console.log('🎯 Step 2: Approving resource request...');
-
-      // Step 2: Approve the resource request
-      const approvalResponse = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id,
-        action: 'approve'
-      });
-
-      if (!approvalResponse.data.ok) {
-        throw new Error(approvalResponse.data.error || 'Failed to approve request');
-      }
-
-      console.log('✅ Step 2 complete: Request approved');
-      toast.success('Door code posted and request approved!');
-      
-      // Update posted door codes state
-      setPostedDoorCodes(prev => ({
-        ...prev,
-        [approval.request_id]: doorCode.trim()
-      }));
-      
-      // Clear inputs
-      setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' }));
-      setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' }));
-
-      // Step 3: Refresh the approvals list to remove this one
-      console.log('🔄 Step 3: Refreshing approvals list...');
-      setTimeout(() => {
-        handleSync();
-      }, 1000); // Small delay to let PCO update
-
     } catch (error) {
-      console.error('Error in approval process:', error);
-      toast.error('Failed: ' + error.message);
+      console.error('Error posting door code:', error);
+      toast.error('Failed to post door code to PCO');
     } finally {
       setSendingCode(null);
     }
@@ -457,7 +443,7 @@ export default function MyApprovals() {
               approvals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
-                const postedCode = postedDoorCodes[approval.request_id];
+                const postedCode = postedDoorCodes[approval.request_id]; // Get posted code
 
                 return (
                   <motion.div
@@ -520,6 +506,7 @@ export default function MyApprovals() {
                           </div>
                         )}
 
+                        {/* Show posted door code if available */}
                         {postedCode && (
                           <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                             <Key className="w-4 h-4 text-green-600" />
@@ -530,6 +517,7 @@ export default function MyApprovals() {
                         )}
 
                         <div className="space-y-2 pt-4">
+                          {/* Door Code Input with Inline Search */}
                           <div className="relative">
                             <Input
                               type="text"
@@ -542,12 +530,13 @@ export default function MyApprovals() {
                               }}
                               className="w-full"
                               maxLength={50}
-                              disabled={!!postedCode}
+                              disabled={!!postedCode} // Disable if code already posted
                             />
                             {searchingCardholder[approval.request_id] && (
                               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
                             )}
                             
+                            {/* Inline Search Results */}
                             {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
                               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                                 {cardholderSearchResults[approval.request_id].map((cardholder) => (
@@ -579,6 +568,7 @@ export default function MyApprovals() {
                             )}
                           </div>
 
+                          {/* Action Buttons */}
                           <div className="flex gap-2">
                             <Button
                               onClick={() => handleSendCode(approval)}
@@ -590,7 +580,7 @@ export default function MyApprovals() {
                               ) : (
                                 <Key className="w-4 h-4 mr-2" />
                               )}
-                              {postedCode ? 'Code Already Posted' : 'Send to PCO & Approve'}
+                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
                             </Button>
                             <Button
                               onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
@@ -616,6 +606,7 @@ export default function MyApprovals() {
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
+      {/* Removed CardholderLookup modal entirely as its functionality is now inline */}
     </div>
   );
 }
