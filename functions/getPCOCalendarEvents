@@ -43,7 +43,7 @@ async function fetchAllInstances(accessToken, baseUrl) {
     let allInstances = [];
     let nextUrl = baseUrl;
     let pageCount = 0;
-    const maxPages = 5; // Reduced from 10 - only fetch first 5 pages (500 instances max)
+    const maxPages = 3; // REDUCED: Only fetch 3 pages (300 instances max)
     
     while (nextUrl && pageCount < maxPages) {
         pageCount++;
@@ -104,16 +104,8 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        // CRITICAL FIX: Only fetch events for next 60 days, not ALL future events
-        const now = new Date();
-        const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-        
-        const startDate = now.toISOString();
-        const endDate = sixtyDaysFromNow.toISOString();
-
-        console.log('📅 Fetching events from', startDate, 'to', endDate);
-
-        const baseUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&order=starts_at&per_page=100`;
+        // SIMPLIFIED: Just use filter=future, no date filtering (PCO API doesn't like complex filters)
+        const baseUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
         
         console.log('🔗 Base URL:', baseUrl);
         
@@ -125,9 +117,13 @@ Deno.serve(async (req) => {
             console.warn('⚠️ No event instances in response from PCO');
             return Response.json({ 
                 events: [],
-                message: 'No upcoming event instances found in PCO Calendar for next 60 days'
+                message: 'No upcoming event instances found in PCO Calendar'
             });
         }
+
+        // Filter to next 60 days on our side
+        const now = new Date();
+        const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
 
         // Get unique event IDs
         const eventIds = new Set();
@@ -268,6 +264,12 @@ Deno.serve(async (req) => {
                 console.warn('⚠️ Skipping instance without dates:', instance.id);
                 continue;
             }
+
+            // Filter to 60 days on our side
+            const startDate = new Date(starts_at);
+            if (startDate > sixtyDaysFromNow) {
+                continue; // Skip events beyond 60 days
+            }
             
             // Build resources array from resource requests
             const resources = [];
@@ -299,19 +301,20 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log('🎯 Processed', eventsWithResources.length, 'event instances');
+        console.log('🎯 Processed', eventsWithResources.length, 'event instances (within 60 days)');
         
         if (eventsWithResources.length > 0) {
             const withResources = eventsWithResources.filter(e => e.resources.length > 0).length;
             console.log(`📊 Events with resources: ${withResources}`);
+            console.log(`📋 First few events:`, eventsWithResources.slice(0, 3).map(e => ({ name: e.name, date: e.starts_at, resources: e.resources.length })));
         }
 
         return Response.json({ 
             events: eventsWithResources,
             count: eventsWithResources.length,
             date_range: {
-                start: startDate,
-                end: endDate
+                start: now.toISOString(),
+                end: sixtyDaysFromNow.toISOString()
             }
         });
 
