@@ -66,7 +66,8 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
       return r.answers || [];
     })
     .find(a => {
-      const question = a.question?.toLowerCase() || '';
+      // Safely convert question to string and lowercase
+      const question = String(a.question || '').toLowerCase();
       return question.includes('access') && (question.includes('time') || question.includes('begin') || question.includes('end'));
     });
 
