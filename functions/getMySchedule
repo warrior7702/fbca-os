@@ -56,44 +56,49 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
         // Get all events (getPCOCalendarEvents does this already)
+        console.log('📞 Calling getPCOCalendarEvents...');
         const allEventsResponse = await base44.asServiceRole.functions.invoke('getPCOCalendarEvents');
-        const allEvents = allEventsResponse.data?.events || [];
+        
+        console.log('📦 Response status:', allEventsResponse.status);
+        console.log('📦 Response data keys:', Object.keys(allEventsResponse.data || {}));
+        
+        if (!allEventsResponse.data) {
+            console.error('❌ getPCOCalendarEvents returned no data');
+            return Response.json({ 
+                events: [], 
+                message: 'No data from calendar function',
+                debug: { status: allEventsResponse.status }
+            });
+        }
+        
+        if (allEventsResponse.data.error) {
+            console.error('❌ getPCOCalendarEvents returned error:', allEventsResponse.data.error);
+            return Response.json({ 
+                events: [], 
+                message: 'Calendar function error: ' + allEventsResponse.data.error,
+                debug: allEventsResponse.data
+            });
+        }
+        
+        const allEvents = allEventsResponse.data.events || [];
 
         console.log('📅 Got', allEvents.length, 'total calendar events');
-
-        // Now filter to events that require building access (have resources from Building Access group)
-        const buildingAccessEvents = [];
         
-        for (const event of allEvents) {
-            // Check if any of the resources are from Building Access group
-            const hasBuildingAccessResource = event.resources?.some(resource => {
-                // You can identify building access resources by name or kind
-                // Common patterns: room names, building names, doors, etc.
-                const resourceName = resource.name?.toLowerCase() || '';
-                return resourceName.includes('door') || 
-                       resourceName.includes('room') || 
-                       resourceName.includes('building') ||
-                       resourceName.includes('access') ||
-                       resourceName.includes('key');
-            });
-
-            if (hasBuildingAccessResource) {
-                buildingAccessEvents.push(event);
-            }
+        if (allEvents.length > 0) {
+            console.log('📋 Sample event:', allEvents[0]);
         }
 
-        console.log('🚪 Found', buildingAccessEvents.length, 'events requiring building access');
-
-        // Sort by start date
-        buildingAccessEvents.sort((a, b) => 
-            new Date(a.starts_at) - new Date(b.starts_at)
-        );
-
-        console.log('🎯 Returning', buildingAccessEvents.length, 'events');
+        // Return ALL events for now (no filtering)
+        console.log('🎯 Returning ALL', allEvents.length, 'events (no filtering)');
 
         return Response.json({
-            events: buildingAccessEvents,
-            count: buildingAccessEvents.length
+            events: allEvents,
+            count: allEvents.length,
+            debug: {
+                total_from_pco: allEvents.length,
+                response_had_error: !!allEventsResponse.data.error,
+                response_had_message: !!allEventsResponse.data.message
+            }
         });
 
     } catch (error) {
