@@ -85,197 +85,28 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      // STEP 1: Get MY approval groups and their resources
-      console.log('📞 Step 1: Getting my approval groups...');
+      // Call the dedicated backend function that handles everything
+      console.log('📞 Calling getMySchedule...');
+      const response = await base44.functions.invoke('getMySchedule');
       
-      // First get PCO token
-      const tokenResponse = await base44.functions.invoke('getPCOToken');
-      if (!tokenResponse.data?.ok) {
-        throw new Error('Failed to get PCO token');
+      console.log('✅ Response:', response.data);
+      
+      if (!response.data) {
+        throw new Error('No data returned from getMySchedule');
       }
       
-      const accessToken = tokenResponse.data.access_token;
+      const events = response.data.events || [];
+      const resourceCount = response.data.resources_count || 0;
       
-      // Get my PCO person ID
-      const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      console.log(`✅ Got ${events.length} events for ${resourceCount} resources`);
       
-      if (!meResponse.ok) {
-        throw new Error('Failed to get PCO user info');
+      if (events.length === 0) {
+        console.log('⚠️ No events found');
+        toast.info(response.data.message || 'No upcoming events found');
       }
       
-      const meData = await meResponse.json();
-      const myPersonId = meData.data?.id;
-      console.log('👤 My PCO Person ID:', myPersonId);
-      
-      // Get all approval groups
-      const groupsResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-        { headers: { 'Authorization': `Bearer ${accessToken}` } }
-      );
-      
-      if (!groupsResponse.ok) {
-        throw new Error('Failed to fetch approval groups');
-      }
-      
-      const groupsData = await groupsResponse.json();
-      const myResourceNames = new Set();
-      
-      // Check each group to see if I'm a member, and collect ALL resources from my groups
-      for (const group of (groupsData.data || [])) {
-        // Check if I'm in this group
-        const membersResponse = await fetch(
-          `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-        
-        if (membersResponse.ok) {
-          const membersData = await membersResponse.json();
-          const isMember = (membersData.data || []).some(person => person.id === myPersonId);
-          
-          if (isMember) {
-            console.log('✅ Member of group:', group.attributes?.name);
-            
-            // Get ALL resources for this group
-            const resourcesResponse = await fetch(
-              `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-              { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-            
-            if (resourcesResponse.ok) {
-              const resourcesData = await resourcesResponse.json();
-              (resourcesData.data || []).forEach(resource => {
-                const resourceName = resource.attributes?.name;
-                if (resourceName) {
-                  myResourceNames.add(resourceName);
-                }
-              });
-            }
-          }
-        }
-      }
-      
-      const resourceNamesArray = Array.from(myResourceNames);
-      console.log('📋 My resources (all from my groups):', resourceNamesArray.length, 'resources');
-
-      if (resourceNamesArray.length === 0) {
-        console.log('⚠️ No resources found for my groups');
-        setMyScheduleEvents([]);
-        setLoadingSchedule(false);
-        return;
-      }
-
-      // STEP 2: Get calendar events
-      console.log('📞 Step 2: Getting calendar events...');
-      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-      
-      if (!eventsResponse.data || !eventsResponse.data.events) {
-        console.error('❌ No events data returned');
-        throw new Error('No events data returned from getPCOCalendarEvents');
-      }
-      
-      const allEvents = eventsResponse.data.events || [];
-      console.log('📅 Total events:', allEvents.length);
-
-      // STEP 3: Filter to my events (any event using my resources)
-      const myEvents = allEvents.filter(event => {
-        return event.resources && event.resources.some(r => resourceNamesArray.includes(r.name));
-      });
-
-      console.log('🎯 Matched events:', myEvents.length);
-      
-      if (myEvents.length === 0) {
-        console.warn('⚠️ No events matched my resources');
-        setMyScheduleEvents([]);
-        setLoadingSchedule(false);
-        return;
-      }
-      
-      myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-      // Show events immediately - THIS IS THE KEY FIX
-      console.log('✅ Setting', myEvents.length, 'events to state NOW');
-      setMyScheduleEvents(myEvents);
-      setLoadingSchedule(false); // Mark as done loading even before door codes
-      
-      // STEP 4: Fetch door codes in BACKGROUND (don't let errors affect the schedule)
-      console.log('🚪 Now fetching door codes in background...');
-      
-      const twoWeeksFromNow = new Date();
-      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-      
-      const recentEvents = myEvents.filter(event => {
-        const eventDate = new Date(event.starts_at);
-        return eventDate <= twoWeeksFromNow;
-      });
-
-      console.log(`🚪 Fetching door codes for ${recentEvents.length} events`);
-      
-      // Fetch door codes in parallel with timeout - wrapped in try/catch to not affect schedule
-      try {
-        const doorCodePromises = recentEvents.map(event => 
-          Promise.race([
-            base44.functions.invoke('getPCOEventComments', { event_id: event.event_id })
-              .then(commentsResponse => {
-                if (commentsResponse.data.comments) {
-                  const doorCodeComment = commentsResponse.data.comments.find(c =>
-                    c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-                  );
-
-                  if (doorCodeComment) {
-                    const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-                    if (match) {
-                      return {
-                        event_id: event.event_id,
-                        posted_door_code: match[1],
-                        posted_by: doorCodeComment.created_by
-                      };
-                    }
-                  }
-                }
-                return { event_id: event.event_id };
-              })
-              .catch(error => {
-                console.error(`Error fetching comments for event ${event.event_id}:`, error.message);
-                return { event_id: event.event_id };
-              }),
-            // Timeout after 5 seconds
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('timeout')), 5000)
-            )
-          ]).catch(error => {
-            if (error.message === 'timeout') {
-              console.warn(`⏱️ Timeout fetching door code for event ${event.event_id}`);
-            }
-            return { event_id: event.event_id };
-          })
-        );
-
-        // Wait for all door code fetches (with timeout)
-        const doorCodeResults = await Promise.all(doorCodePromises);
-        
-        // Update events with door codes
-        const updatedEvents = myEvents.map(event => {
-          const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
-          if (doorCodeData?.posted_door_code) {
-            return {
-              ...event,
-              posted_door_code: doorCodeData.posted_door_code,
-              posted_by: doorCodeData.posted_by
-            };
-          }
-          return event;
-        });
-
-        console.log('✅ Door codes fetched:', updatedEvents.filter(e => e.posted_door_code).length, 'have codes');
-        setMyScheduleEvents(updatedEvents);
-      } catch (doorCodeError) {
-        console.warn('⚠️ Door code fetching failed, but keeping schedule:', doorCodeError.message);
-        // Don't clear the schedule - we already have events showing
-      }
-
-      console.log('✅ SUCCESS! Schedule fully loaded');
+      setMyScheduleEvents(events);
+      console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
       console.error('❌ FATAL ERROR in loadMySchedule:');
@@ -286,6 +117,7 @@ export default function MyTasks() {
       toast.error(`Failed to load schedule: ${errorMsg}`);
       
       setMyScheduleEvents([]);
+    } finally {
       setLoadingSchedule(false);
     }
   };

@@ -1,0 +1,226 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
+        }
+
+        console.log('✅ Getting schedule for user:', currentUser.email);
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            console.log('⚠️ No PCO token');
+            return Response.json({ events: [], message: 'PCO not connected' });
+        }
+
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
+        // STEP 1: Get my PCO person ID
+        console.log('📞 Step 1: Getting my PCO person ID...');
+        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!meResponse.ok) {
+            throw new Error('Failed to get PCO user info');
+        }
+
+        const meData = await meResponse.json();
+        const myPersonId = meData.data?.id;
+        console.log('👤 My PCO Person ID:', myPersonId);
+
+        // STEP 2: Get all approval groups and check membership in parallel
+        console.log('📞 Step 2: Getting approval groups...');
+        const groupsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!groupsResponse.ok) {
+            throw new Error('Failed to fetch approval groups');
+        }
+
+        const groupsData = await groupsResponse.json();
+        const myResourceNames = new Set();
+
+        // Check membership and get resources for each group IN PARALLEL
+        const groupPromises = (groupsData.data || []).map(async (group) => {
+            try {
+                // Check membership
+                const membersResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                if (!membersResponse.ok) return [];
+
+                const membersData = await membersResponse.json();
+                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
+
+                if (!isMember) return [];
+
+                console.log('✅ Member of group:', group.attributes?.name);
+
+                // Get resources for this group
+                const resourcesResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                if (!resourcesResponse.ok) return [];
+
+                const resourcesData = await resourcesResponse.json();
+                return (resourcesData.data || [])
+                    .map(resource => resource.attributes?.name)
+                    .filter(name => name);
+            } catch (error) {
+                console.error(`Error processing group ${group.id}:`, error);
+                return [];
+            }
+        });
+
+        // Wait for all group checks to complete
+        const groupResults = await Promise.all(groupPromises);
+        groupResults.forEach(resources => {
+            resources.forEach(name => myResourceNames.add(name));
+        });
+
+        const resourceNamesArray = Array.from(myResourceNames);
+        console.log('📋 My resources:', resourceNamesArray.length, 'resources');
+
+        if (resourceNamesArray.length === 0) {
+            console.log('⚠️ No resources found');
+            return Response.json({ events: [], message: 'No resources found for your approval groups' });
+        }
+
+        // STEP 3: Get calendar events (use existing function)
+        console.log('📞 Step 3: Getting calendar events...');
+        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+
+        if (!eventsResponse.data || !eventsResponse.data.events) {
+            throw new Error('No events data returned');
+        }
+
+        const allEvents = eventsResponse.data.events || [];
+        console.log('📅 Total events:', allEvents.length);
+
+        // STEP 4: Filter to my events
+        const myEvents = allEvents.filter(event => {
+            return event.resources && event.resources.some(r => resourceNamesArray.includes(r.name));
+        });
+
+        console.log('🎯 Matched events:', myEvents.length);
+        myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+        // STEP 5: Fetch door codes for upcoming events (next 2 weeks) IN PARALLEL
+        const twoWeeksFromNow = new Date();
+        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+
+        const recentEvents = myEvents.filter(event => {
+            const eventDate = new Date(event.starts_at);
+            return eventDate <= twoWeeksFromNow;
+        });
+
+        console.log(`🚪 Fetching door codes for ${recentEvents.length} events in parallel...`);
+
+        const doorCodePromises = recentEvents.map(async (event) => {
+            try {
+                const response = await base44.functions.invoke('getPCOEventComments', {
+                    event_id: event.event_id
+                });
+
+                if (response.data.comments) {
+                    const doorCodeComment = response.data.comments.find(c =>
+                        c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+                    );
+
+                    if (doorCodeComment) {
+                        const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+                        if (match) {
+                            return {
+                                event_id: event.event_id,
+                                posted_door_code: match[1],
+                                posted_by: doorCodeComment.created_by
+                            };
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Error fetching door code for event ${event.event_id}:`, error.message);
+            }
+            return { event_id: event.event_id };
+        });
+
+        const doorCodeResults = await Promise.all(doorCodePromises);
+
+        // Merge door codes into events
+        const eventsWithDoorCodes = myEvents.map(event => {
+            const doorCodeData = doorCodeResults.find(r => r.event_id === event.event_id);
+            if (doorCodeData?.posted_door_code) {
+                return {
+                    ...event,
+                    posted_door_code: doorCodeData.posted_door_code,
+                    posted_by: doorCodeData.posted_by
+                };
+            }
+            return event;
+        });
+
+        console.log('✅ SUCCESS! Returning', eventsWithDoorCodes.length, 'events');
+        console.log('✅ Events with door codes:', eventsWithDoorCodes.filter(e => e.posted_door_code).length);
+
+        return Response.json({
+            events: eventsWithDoorCodes,
+            count: eventsWithDoorCodes.length,
+            resources_count: resourceNamesArray.length,
+            my_resources: resourceNamesArray
+        });
+
+    } catch (error) {
+        console.error('❌ Get my schedule error:', error);
+        return Response.json({
+            error: error.message,
+            events: [],
+            details: error.stack
+        }, { status: 500 });
+    }
+});
