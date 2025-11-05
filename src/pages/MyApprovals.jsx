@@ -334,30 +334,57 @@ export default function MyApprovals() {
     setSendingCode(approval.request_id);
     
     try {
-      console.log('🚪 Posting door code to PCO event...');
+      console.log('🚪 Step 1: Posting door code to PCO event...');
       
-      const response = await base44.functions.invoke('writePCONote', {
+      // Step 1: Post the door code
+      const noteResponse = await base44.functions.invoke('writePCONote', {
         event_id: approval.event_id,
         badge_code: doorCode.trim()
       });
 
-      if (response.data.ok) {
-        toast.success('Door code posted to event activity in PCO!');
-        
-        // Update posted door codes state to show the code was posted
-        setPostedDoorCodes(prev => ({
-          ...prev,
-          [approval.request_id]: doorCode.trim()
-        }));
-        
-        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
-        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
-      } else {
-        toast.error(response.data.error || 'Failed to post door code');
+      if (!noteResponse.data.ok) {
+        throw new Error(noteResponse.data.error || 'Failed to post door code');
       }
+
+      console.log('✅ Step 1 complete: Door code posted');
+      console.log('🎯 Step 2: Approving resource request...');
+
+      // Step 2: Approve the resource request
+      const approvalResponse = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id,
+        action: 'approve'
+      });
+
+      if (!approvalResponse.data.ok) {
+        throw new Error(approvalResponse.data.error || 'Failed to approve request');
+      }
+
+      console.log('✅ Step 2 complete: Request approved');
+      toast.success('Door code posted and request approved!');
+      
+      // Update posted door codes state
+      setPostedDoorCodes(prev => ({
+        ...prev,
+        [approval.request_id]: doorCode.trim()
+      }));
+      
+      // Clear inputs
+      setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' }));
+      setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' }));
+
+      // Step 3: Remove from local state immediately for instant UI feedback
+      console.log('🗑️ Step 3: Removing from local state');
+      setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      
+      // Step 4: Refresh in background (optional, for other potential changes)
+      console.log('🔄 Step 4: Background sync...');
+      setTimeout(() => {
+        handleSync();
+      }, 2000); // 2 second delay to let PCO process the approval
+
     } catch (error) {
-      console.error('Error posting door code:', error);
-      toast.error('Failed to post door code to PCO');
+      console.error('Error in approval process:', error);
+      toast.error('Failed: ' + error.message);
     } finally {
       setSendingCode(null);
     }
@@ -580,7 +607,7 @@ export default function MyApprovals() {
                               ) : (
                                 <Key className="w-4 h-4 mr-2" />
                               )}
-                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
+                              {postedCode ? 'Code Already Posted' : 'Send to PCO & Approve'}
                             </Button>
                             <Button
                               onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
