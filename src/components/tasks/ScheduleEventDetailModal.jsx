@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, Lock } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Package, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { base44 } from "@/api/base44Client";
 
@@ -138,7 +138,7 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Key className="w-5 h-5 text-yellow-700" />
+                      <Lock className="w-5 h-5 text-yellow-700" />
                       <span className="font-semibold text-yellow-900">Building Access Code</span>
                     </div>
                     <div className="text-2xl font-mono font-bold text-yellow-900 bg-yellow-200 px-4 py-2 rounded-lg">
@@ -219,7 +219,7 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                   className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors mb-3"
                 >
                   <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                    <Key className="w-5 h-5 text-green-600" />
+                    <Package className="w-5 h-5 text-green-600" />
                     Resources ({otherResources.length})
                   </h3>
                   {resourcesExpanded ? (

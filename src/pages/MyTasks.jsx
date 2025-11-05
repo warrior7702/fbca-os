@@ -287,6 +287,12 @@ export default function MyTasks() {
     }
   };
 
+  // Calculate events today
+  const eventsToday = myScheduleEvents.filter(event => {
+    const eventDate = new Date(event.starts_at);
+    return isToday(eventDate);
+  }).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -345,6 +351,19 @@ export default function MyTasks() {
             </CardContent>
           </Card>
 
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <CalendarIcon className="w-5 h-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 border-green-300">
+                  {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday}
+                </Badge>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{eventsToday}</p>
+              <p className="text-sm text-slate-600">Events Today</p>
+            </CardContent>
+          </Card>
+
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -386,7 +405,7 @@ export default function MyTasks() {
             ) : (
               <ScheduleCalendar 
                 events={myScheduleEvents} 
-                weekCount={2}
+                weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
             )}
