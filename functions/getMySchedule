@@ -55,258 +55,45 @@ Deno.serve(async (req) => {
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // STEP 1: Get my PCO person ID
-        console.log('📞 Step 1: Getting my PCO person ID...');
-        const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        // Get all events (getPCOCalendarEvents does this already)
+        const allEventsResponse = await base44.asServiceRole.functions.invoke('getPCOCalendarEvents');
+        const allEvents = allEventsResponse.data?.events || [];
 
-        if (!meResponse.ok) {
-            throw new Error('Failed to get PCO person ID');
-        }
+        console.log('📅 Got', allEvents.length, 'total calendar events');
+
+        // Now filter to events that require building access (have resources from Building Access group)
+        const buildingAccessEvents = [];
         
-        const meData = await meResponse.json();
-        const myPersonId = meData.data?.id;
-        console.log('👤 My PCO Person ID:', myPersonId);
-
-        if (!myPersonId) {
-            return Response.json({ 
-                events: [], 
-                message: 'Could not determine your PCO person ID'
+        for (const event of allEvents) {
+            // Check if any of the resources are from Building Access group
+            const hasBuildingAccessResource = event.resources?.some(resource => {
+                // You can identify building access resources by name or kind
+                // Common patterns: room names, building names, doors, etc.
+                const resourceName = resource.name?.toLowerCase() || '';
+                return resourceName.includes('door') || 
+                       resourceName.includes('room') || 
+                       resourceName.includes('building') ||
+                       resourceName.includes('access') ||
+                       resourceName.includes('key');
             });
-        }
 
-        // STEP 2: Get ALL approval groups and check membership
-        console.log('📞 Step 2: Getting approval groups...');
-        const groupsResponse = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        if (!groupsResponse.ok) {
-            throw new Error('Failed to fetch approval groups');
-        }
-
-        const groupsData = await groupsResponse.json();
-        const myGroupIds = [];
-        const resourceToGroup = {};
-
-        console.log('📋 Found', (groupsData.data || []).length, 'total approval groups');
-
-        // Check each group for membership
-        for (const group of (groupsData.data || [])) {
-            // Get group members
-            const membersResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-            
-            if (membersResponse.ok) {
-                const membersData = await membersResponse.json();
-                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
-                
-                if (isMember) {
-                    myGroupIds.push(group.id);
-                    console.log('✅ Member of group:', group.attributes?.name);
-                }
-            }
-
-            // Get group resources (for filtering later)
-            const resourcesResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-
-            if (resourcesResponse.ok) {
-                const resourcesData = await resourcesResponse.json();
-                for (const resource of (resourcesData.data || [])) {
-                    resourceToGroup[resource.id] = {
-                        groupId: group.id,
-                        groupName: group.attributes?.name
-                    };
-                }
+            if (hasBuildingAccessResource) {
+                buildingAccessEvents.push(event);
             }
         }
 
-        console.log('📋 I am in', myGroupIds.length, 'approval groups');
-
-        if (myGroupIds.length === 0) {
-            return Response.json({ 
-                events: [], 
-                message: 'You are not in any approval groups'
-            });
-        }
-
-        // STEP 3: Get PENDING event resource requests ONLY (P = Pending)
-        console.log('📞 Step 3: Fetching PENDING resource requests...');
-        
-        // Query ONLY pending (P) - simpler, more reliable
-        const requestsUrl = 'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&include=event,resource&per_page=100';
-        
-        console.log('🔍 Query URL:', requestsUrl);
-        
-        const requestsResponse = await fetch(requestsUrl, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        if (!requestsResponse.ok) {
-            const errorText = await requestsResponse.text();
-            console.error('❌ Requests fetch failed:', errorText);
-            throw new Error('Failed to fetch resource requests');
-        }
-
-        const requestsData = await requestsResponse.json();
-        console.log('📊 Fetched', (requestsData.data || []).length, 'PENDING resource requests (before filtering)');
-
-        // Log first few requests for debugging
-        if (requestsData.data && requestsData.data.length > 0) {
-            console.log('📋 Sample requests (first 3):');
-            requestsData.data.slice(0, 3).forEach((req, idx) => {
-                const resourceId = req.relationships?.resource?.data?.id;
-                const eventId = req.relationships?.event?.data?.id;
-                console.log(`  ${idx + 1}. Request ${req.id}: Resource ${resourceId}, Event ${eventId}, Status: ${req.attributes?.approval_status}`);
-            });
-        }
-
-        // Build maps for events and resources from included data
-        const eventsMap = {};
-        const resourcesMap = {};
-
-        if (requestsData.included) {
-            for (const item of requestsData.included) {
-                if (item.type === 'Event') {
-                    eventsMap[item.id] = {
-                        id: item.id,
-                        name: item.attributes?.name,
-                        summary: item.attributes?.summary
-                    };
-                } else if (item.type === 'Resource') {
-                    resourcesMap[item.id] = {
-                        id: item.id,
-                        name: item.attributes?.name,
-                        kind: item.attributes?.kind
-                    };
-                }
-            }
-        }
-
-        // Filter requests to MY groups only
-        const myRequests = (requestsData.data || []).filter(request => {
-            const resourceId = request.relationships?.resource?.data?.id;
-            const groupInfo = resourceToGroup[resourceId];
-            const isMyGroup = groupInfo && myGroupIds.includes(groupInfo.groupId);
-            
-            if (isMyGroup) {
-                console.log(`✅ Request ${request.id} is for MY group: ${groupInfo.groupName}, Resource: ${resourcesMap[resourceId]?.name}`);
-            }
-            
-            return isMyGroup;
-        });
-
-        console.log('📋 Found', myRequests.length, 'PENDING requests for MY groups');
-
-        // Get event IDs we care about
-        const eventIds = new Set();
-        myRequests.forEach(req => {
-            const eventId = req.relationships?.event?.data?.id;
-            if (eventId) eventIds.add(eventId);
-        });
-
-        console.log('📊 Unique events with my pending requests:', eventIds.size);
-
-        // STEP 4: Fetch FUTURE event instances (simple query)
-        console.log('📞 Step 4: Fetching event instances (next 2 weeks)...');
-        
-        // Use simple filter=future without date filters
-        const instancesUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
-        
-        const instancesResponse = await fetch(instancesUrl, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        if (!instancesResponse.ok) {
-            const errorText = await instancesResponse.text();
-            console.error('❌ Event instances fetch failed:', instancesResponse.status, errorText);
-            throw new Error('Failed to fetch event instances: ' + instancesResponse.status);
-        }
-
-        const instancesData = await instancesResponse.json();
-        const instances = instancesData.data || [];
-        
-        console.log('📅 Found', instances.length, 'future event instances');
-
-        // Filter to 2-week window and matching events on our side
-        const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
-        // Build final events array
-        const eventsWithMyResources = [];
-
-        for (const instance of instances) {
-            const eventId = instance.relationships?.event?.data?.id;
-            const startsAt = instance.attributes?.starts_at;
-            
-            if (!startsAt) continue;
-            
-            const startDate = new Date(startsAt);
-            
-            // Filter to 2-week window
-            if (startDate > twoWeeksFromNow) continue;
-            
-            // Check if this event has any of my group's resource requests
-            const eventRequests = myRequests.filter(req => 
-                req.relationships?.event?.data?.id === eventId
-            );
-
-            if (eventRequests.length === 0) continue;
-
-            const event = eventsMap[eventId];
-            if (!event || !event.name || event.name === 'Untitled Event') continue;
-
-            const resources = eventRequests.map(req => {
-                const resourceId = req.relationships?.resource?.data?.id;
-                const resource = resourcesMap[resourceId];
-                return {
-                    id: resourceId,
-                    name: resource?.name || 'Unknown Resource',
-                    kind: resource?.kind,
-                    approval_status: req.attributes?.approval_status // Should be 'P' for pending
-                };
-            });
-
-            eventsWithMyResources.push({
-                id: instance.id,
-                event_id: eventId,
-                name: event.name,
-                starts_at: instance.attributes?.starts_at,
-                ends_at: instance.attributes?.ends_at,
-                summary: event.summary,
-                resources: resources
-            });
-        }
+        console.log('🚪 Found', buildingAccessEvents.length, 'events requiring building access');
 
         // Sort by start date
-        eventsWithMyResources.sort((a, b) => 
+        buildingAccessEvents.sort((a, b) => 
             new Date(a.starts_at) - new Date(b.starts_at)
         );
 
-        console.log('🎯 Returning', eventsWithMyResources.length, 'events with pending approvals');
-        
-        if (eventsWithMyResources.length > 0) {
-            console.log('📋 Sample events:');
-            eventsWithMyResources.slice(0, 3).forEach(event => {
-                const pendingCount = event.resources.filter(r => r.approval_status === 'P').length;
-                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()}) - ${pendingCount} pending`);
-            });
-        } else {
-            console.log('ℹ️ No events found with pending approvals in your groups for the next 2 weeks');
-        }
+        console.log('🎯 Returning', buildingAccessEvents.length, 'events');
 
         return Response.json({
-            events: eventsWithMyResources,
-            count: eventsWithMyResources.length,
-            my_groups_count: myGroupIds.length
+            events: buildingAccessEvents,
+            count: buildingAccessEvents.length
         });
 
     } catch (error) {
