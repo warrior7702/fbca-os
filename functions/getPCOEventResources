@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
 
                 console.log('📝 Processing request:', request.id, 'for resource:', resource.name);
 
-                // Fetch answers for this request - FIXED ENDPOINT
+                // Fetch answers for this request
                 try {
                     const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`;
                     console.log('🔗 Fetching answers from:', answersUrl);
@@ -142,25 +142,45 @@ Deno.serve(async (req) => {
                         (answersData.data || []).forEach(answer => {
                             console.log('🎯 Answer object:', JSON.stringify(answer, null, 2));
                             
-                            const question = answer.attributes?.question;
+                            // Extract question text - handle both string and object
+                            let questionText;
+                            const questionAttr = answer.attributes?.question;
+                            
+                            if (typeof questionAttr === 'string') {
+                                questionText = questionAttr;
+                            } else if (typeof questionAttr === 'object' && questionAttr !== null) {
+                                // If question is an object, try to extract the text
+                                questionText = questionAttr.question || questionAttr.text || JSON.stringify(questionAttr);
+                            } else {
+                                questionText = null;
+                            }
+                            
+                            // Extract answer value
                             let value = answer.attributes?.value || 
                                        answer.attributes?.answer ||
                                        answer.attributes?.text ||
-                                       answer.attributes?.answer_text; // Added new attribute here
+                                       answer.attributes?.answer_text;
                             
-                            console.log('  Question:', question);
+                            console.log('  Question:', questionText);
                             console.log('  Value:', value);
                             
+                            // Handle boolean values
                             if (typeof value === 'boolean') {
                                 value = value ? 'Yes' : 'No';
                             }
                             
-                            if (question && value !== null && value !== undefined && value !== '') {
+                            // Handle object values
+                            if (typeof value === 'object' && value !== null) {
+                                value = JSON.stringify(value);
+                            }
+                            
+                            // Only add if we have both question and answer
+                            if (questionText && value !== null && value !== undefined && value !== '') {
                                 answers.push({
-                                    question: question,
+                                    question: String(questionText),
                                     answer: String(value)
                                 });
-                                console.log('  ✅ Added answer:', question, '=', value);
+                                console.log('  ✅ Added answer:', questionText, '=', value);
                             } else {
                                 console.log('  ⏭️ Skipped answer (missing question or value)');
                             }
