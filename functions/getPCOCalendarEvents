@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
             console.log(`📊 Events with resources: ${withResources}`);
             console.log(`📊 Events with tags: ${withTags}`);
             
-            // Log a sample event with resources
+            // Log a few sample events with resources
             const sampleWithResources = eventsWithResources.find(e => e.resources.length > 0);
             if (sampleWithResources) {
                 console.log('📋 Sample event with resources:', {

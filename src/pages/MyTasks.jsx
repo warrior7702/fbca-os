@@ -84,9 +84,9 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getMySchedule...');
+      console.log('📞 Calling getMySchedule (which filters getPCOCalendarEvents)...');
       
-      // Call the refined getMySchedule function
+      // Call getMySchedule which will filter the events from getPCOCalendarEvents
       const response = await base44.functions.invoke('getMySchedule');
       
       console.log('✅ Response:', response.data);
