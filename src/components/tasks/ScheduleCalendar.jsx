@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
 import { Clock, Key, MapPin } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, weekCount = 2 }) {
+export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
   const startDate = startOfWeek(today, { weekStartsOn: 0 }); // Start on Sunday
 
@@ -58,7 +58,8 @@ export default function ScheduleCalendar({ events, weekCount = 2 }) {
                       {dayEvents.map((event) => (
                         <Card 
                           key={event.id} 
-                          className="border border-green-200 bg-green-50 hover:shadow-md transition-shadow cursor-pointer"
+                          className="border border-green-200 bg-green-50 hover:shadow-md transition-all cursor-pointer hover:bg-green-100"
+                          onClick={() => onEventClick && onEventClick(event)}
                         >
                           <CardContent className="p-2 space-y-1">
                             <p className="text-xs font-semibold text-slate-900 line-clamp-2">

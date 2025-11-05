@@ -39,6 +39,7 @@ import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import EmailDetailModal from "../components/emails/EmailDetailModal";
+import ScheduleEventDetailModal from "../components/tasks/ScheduleEventDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { useNavigate } from "react-router-dom";
@@ -68,6 +69,8 @@ export default function MyTasks() {
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [myScheduleEvents, setMyScheduleEvents] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
+  const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
 
   const navigate = useNavigate();
 
@@ -137,6 +140,11 @@ export default function MyTasks() {
       loadMySchedule();
     }
   }, [user]);
+
+  const handleScheduleEventClick = (event) => {
+    setSelectedScheduleEvent(event);
+    setShowScheduleEventDetail(true);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -376,7 +384,11 @@ export default function MyTasks() {
                 <p className="text-slate-600">No upcoming events found</p>
               </div>
             ) : (
-              <ScheduleCalendar events={myScheduleEvents} weekCount={2} />
+              <ScheduleCalendar 
+                events={myScheduleEvents} 
+                weekCount={2}
+                onEventClick={handleScheduleEventClick}
+              />
             )}
           </CardContent>
         </Card>
@@ -716,6 +728,12 @@ export default function MyTasks() {
         open={showEmailDetail}
         onOpenChange={setShowEmailDetail}
         email={selectedEmail}
+      />
+
+      <ScheduleEventDetailModal
+        open={showScheduleEventDetail}
+        onOpenChange={setShowScheduleEventDetail}
+        event={selectedScheduleEvent}
       />
     </div>
   );
