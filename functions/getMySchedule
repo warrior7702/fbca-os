@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
             });
         }
 
-        // STEP 2: Get ALL approval groups and check membership (same as Vercel code)
+        // STEP 2: Get ALL approval groups and check membership
         console.log('📞 Step 2: Getting approval groups...');
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
         });
 
         if (!requestsResponse.ok) {
+            const errorText = await requestsResponse.text();
+            console.error('❌ Requests fetch failed:', errorText);
             throw new Error('Failed to fetch resource requests');
         }
 
@@ -193,36 +195,45 @@ Deno.serve(async (req) => {
 
         console.log('📊 Unique events:', eventIds.size);
 
-        // STEP 4: Fetch future event instances for 2-week window
+        // STEP 4: Fetch FUTURE event instances (simple query)
         console.log('📞 Step 4: Fetching event instances (next 2 weeks)...');
         
-        const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-        
-        const startDate = now.toISOString();
-        const endDate = twoWeeksFromNow.toISOString();
-
-        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&order=starts_at&per_page=100`;
+        // Use simple filter=future without date filters
+        const instancesUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
         
         const instancesResponse = await fetch(instancesUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
         if (!instancesResponse.ok) {
-            throw new Error('Failed to fetch event instances');
+            const errorText = await instancesResponse.text();
+            console.error('❌ Event instances fetch failed:', instancesResponse.status, errorText);
+            throw new Error('Failed to fetch event instances: ' + instancesResponse.status);
         }
 
         const instancesData = await instancesResponse.json();
         const instances = instancesData.data || [];
         
-        console.log('📅 Found', instances.length, 'event instances in 2-week window');
+        console.log('📅 Found', instances.length, 'future event instances');
+
+        // Filter to 2-week window and matching events on our side
+        const now = new Date();
+        const twoWeeksFromNow = new Date(now);
+        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
 
         // Build final events array
         const eventsWithMyResources = [];
 
         for (const instance of instances) {
             const eventId = instance.relationships?.event?.data?.id;
+            const startsAt = instance.attributes?.starts_at;
+            
+            if (!startsAt) continue;
+            
+            const startDate = new Date(startsAt);
+            
+            // Filter to 2-week window
+            if (startDate > twoWeeksFromNow) continue;
             
             // Check if this event has any of my group's resource requests
             const eventRequests = myRequests.filter(req => 
