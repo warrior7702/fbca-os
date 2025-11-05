@@ -157,19 +157,30 @@ export default function Dashboard() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
+      console.log('📅 Loading tasks due today...');
+      console.log('Today range:', today, 'to', tomorrow);
+
       // Get ClickUp tasks if connected
       if (currentUser?.clickup_access_token) {
         try {
           const clickupResponse = await base44.functions.invoke('getMyClickUpTasks');
           const clickupTasks = clickupResponse.data.tasks || [];
+          console.log('📋 Total ClickUp tasks:', clickupTasks.length);
+          
           const clickupDueToday = clickupTasks.filter(task => {
             if (!task.due_date) return false;
-            const dueDate = new Date(parseInt(task.due_date)); // ClickUp due_date is unix timestamp in milliseconds
-            return dueDate >= today && dueDate < tomorrow;
+            const dueDate = new Date(task.due_date); // Already in ISO format from function
+            const isDueToday = dueDate >= today && dueDate < tomorrow;
+            if (isDueToday) {
+              console.log('✅ ClickUp task due today:', task.name, 'due:', dueDate); // Changed task.title to task.name as per ClickUp API
+            }
+            return isDueToday;
           });
+          
+          console.log('✅ ClickUp tasks due today:', clickupDueToday.length);
           todayCount += clickupDueToday.length;
         } catch (error) {
-          console.error('Failed to load ClickUp tasks:', error);
+          console.error('❌ Failed to load ClickUp tasks:', error);
         }
       }
 
@@ -178,20 +189,29 @@ export default function Dashboard() {
         try {
           const todoResponse = await base44.functions.invoke('getMicrosoftToDo');
           const todoTasks = todoResponse.data.tasks || todoResponse.data || [];
+          console.log('📋 Total Microsoft To Do tasks:', todoTasks.length);
+          
           const todoDueToday = todoTasks.filter(task => {
             if (!task.due_date) return false;
-            const dueDate = new Date(task.due_date); // Microsoft To Do due_date is ISO string
-            return dueDate >= today && dueDate < tomorrow;
+            const dueDate = new Date(task.due_date);
+            const isDueToday = dueDate >= today && dueDate < tomorrow;
+            if (isDueToday) {
+              console.log('✅ Microsoft task due today:', task.title, 'due:', dueDate);
+            }
+            return isDueToday;
           });
+          
+          console.log('✅ Microsoft tasks due today:', todoDueToday.length);
           todayCount += todoDueToday.length;
         } catch (error) {
-          console.error('Failed to load Microsoft To Do tasks:', error);
+          console.error('❌ Failed to load Microsoft To Do tasks:', error);
         }
       }
 
+      console.log('🎯 Total tasks due today:', todayCount);
       setTasksDueToday(todayCount);
     } catch (error) {
-      console.error('Failed to load tasks due today:', error);
+      console.error('❌ Failed to load tasks due today:', error);
     }
   };
 
