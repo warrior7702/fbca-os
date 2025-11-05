@@ -52,8 +52,9 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const rooms = resources.filter(r => r.resource_kind === 'Room');
   const otherResources = resources.filter(r => r.resource_kind !== 'Room');
 
-  // Find the "What time do you want access to begin and end?" answer
+  // Find the "What time do you want access to begin and end?" answer specifically from Building Access resource
   const accessTimeAnswer = resources
+    .filter(r => r.resource_name?.toLowerCase().includes('building access'))
     .flatMap(r => r.answers || [])
     .find(a => a.question?.toLowerCase().includes('what time do you want access to begin and end'));
 
@@ -99,20 +100,20 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                     {format(startDate, 'EEEE, MMMM d, yyyy')}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-green-600" />
-                    <span>
-                      {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Clock className="w-4 h-4 text-green-600" />
+                  <span>
+                    {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
+                  </span>
+                </div>
+                {accessTimeAnswer && (
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Lock className="w-4 h-4 text-green-600" />
+                    <span className="text-sm">
+                      {accessTimeAnswer.answer}
                     </span>
                   </div>
-                  {accessTimeAnswer && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Lock className="w-4 h-4 text-green-600" />
-                      <span>{accessTimeAnswer.answer}</span>
-                    </div>
-                  )}
-                </div>
+                )}
               </CardContent>
             </Card>
 
