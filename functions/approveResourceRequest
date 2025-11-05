@@ -12,9 +12,9 @@ async function pcoGet(url, token) {
   return j;
 }
 
-async function pcoPost(url, token, body = {}) {
+async function pcoPatch(url, token, body = {}) {
   const r = await fetch(url, {
-    method: 'POST',
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -22,14 +22,66 @@ async function pcoPost(url, token, body = {}) {
     body: JSON.stringify(body)
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`POST ${url} :: ${r.status} :: ${text}`);
-  return text ? JSON.parse(text).catch(() => ({})) : { ok: true };
+  if (!r.ok) throw new Error(`PATCH ${url} :: ${r.status} :: ${text}`);
+  return text ? JSON.parse(text) : { ok: true };
+}
+
+async function refreshTokenIfNeeded(base44, user) {
+  const expiresAt = new Date(user.pco_token_expires_at);
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+  if (expiresAt > fiveMinutesFromNow) {
+    return user.pco_access_token;
+  }
+
+  const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: user.pco_refresh_token,
+      client_id: Deno.env.get('PCO_CLIENT_ID'),
+      client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+    })
+  });
+
+  if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+  const tokens = await tokenResponse.json();
+  const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+  await base44.asServiceRole.entities.User.update(user.id, {
+    pco_access_token: tokens.access_token,
+    pco_refresh_token: tokens.refresh_token,
+    pco_token_expires_at: newExpiresAt
+  });
+
+  return tokens.access_token;
 }
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const me = await base44.auth.me();
+    const currentUser = await base44.auth.me();
+
+    if (!currentUser) {
+      return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Get full user record from database (has tokens)
+    const users = await base44.asServiceRole.entities.User.filter({ 
+      email: currentUser.email 
+    });
+    const user = users[0];
+
+    if (!user || !user.pco_access_token) {
+      return Response.json({
+        ok: false,
+        error: 'PCO not connected. Please connect PCO in Settings.'
+      }, { status: 401 });
+    }
+
+    console.log('🔐 User:', user.email);
 
     // ---- 0) parse payload safely (support JSON or form POST) ----
     let body = {};
@@ -51,61 +103,145 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ---- 1) require a user token; don't use the service token for writes ----
-    const userToken = me?.pco_access_token;
-    const personId = me?.pco_user_id; // e.g. "149670080"
-    if (!userToken || !personId) {
-      return Response.json(
-        { ok: false, error: 'No user PCO token; user must connect PCO first.' },
-        { status: 401 }
-      );
-    }
+    // ---- 1) Get token (refresh if needed) ----
+    const userToken = await refreshTokenIfNeeded(base44, user);
+    
+    console.log('✅ Got user token');
 
-    // ---- 2) get user's approval-group memberships ----
-    const mems = await pcoGet(
-      `${PCO.base}/resource_approval_group_memberships?where[person_id]=${personId}&per_page=200&include=resource_approval_group`,
-      userToken
-    );
-    const myGroupIds = (mems.data || [])
-      .map(m => m?.relationships?.resource_approval_group?.data?.id)
-      .filter(Boolean);
+    // ---- 2) Get my PCO Person ID from Calendar API ----
+    const meResponse = await pcoGet(`${PCO.base}/me`, userToken);
+    const personId = meResponse.data?.id;
 
-    // ---- 3) pull bookings for this request; approval group lives here ----
-    const bookings = await pcoGet(
-      `${PCO.base}/event_resource_requests/${request_id}/resource_bookings?per_page=100&include=approval_group,resource`,
-      userToken
-    );
-
-    const bookingGroupIds = new Set();
-    for (const b of (bookings.data || [])) {
-      const rel = b?.relationships?.approval_group?.data;
-      if (rel?.id) bookingGroupIds.add(rel.id);
-    }
-
-    // ---- 4) check eligibility (overlap between my groups and bookings' groups) ----
-    let eligible = false;
-    let overlap = [];
-    if (bookingGroupIds.size) {
-      overlap = [...bookingGroupIds].filter(id => myGroupIds.includes(id));
-      eligible = overlap.length > 0;
-    }
-
-    if (!eligible) {
+    if (!personId) {
       return Response.json({
         ok: false,
-        error: 'Forbidden (not in booking approval group)',
+        error: 'Could not get your PCO Person ID'
+      }, { status: 500 });
+    }
+
+    console.log('🔍 My PCO Person ID:', personId);
+
+    // ---- 3) Get all approval groups and check membership ----
+    const groupsResponse = await pcoGet(
+      `${PCO.base}/resource_approval_groups?per_page=100`,
+      userToken
+    );
+
+    const myGroupIds = [];
+    const groupResourceMap = {}; // Map group ID to list of resource IDs
+    
+    for (const group of groupsResponse.data || []) {
+      // Get members of this group
+      const membersResponse = await pcoGet(
+        `${PCO.base}/resource_approval_groups/${group.id}/people?per_page=100`,
+        userToken
+      );
+      
+      // Check if I'm in this group
+      const isMember = (membersResponse.data || []).some(person => person.id === personId);
+      if (isMember) {
+        myGroupIds.push(group.id);
+        console.log('✅ Member of group:', group.attributes?.name, '(', group.id, ')');
+        
+        // Get resources for this group
+        const resourcesResponse = await pcoGet(
+          `${PCO.base}/resource_approval_groups/${group.id}/resources?per_page=100`,
+          userToken
+        );
+        
+        groupResourceMap[group.id] = (resourcesResponse.data || []).map(r => r.id);
+        console.log('  ↳ Manages', groupResourceMap[group.id].length, 'resources');
+      }
+    }
+
+    console.log('📋 My group IDs:', myGroupIds);
+
+    if (myGroupIds.length === 0) {
+      return Response.json({
+        ok: false,
+        error: 'You are not in any approval groups. Contact your PCO admin.',
+        diag: { personId, groupCount: (groupsResponse.data || []).length }
+      }, { status: 403 });
+    }
+
+    // ---- 4) Get the request details to find the resource ----
+    const requestResponse = await pcoGet(
+      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
+      userToken
+    );
+
+    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
+    console.log('📦 Request is for resource:', resourceId);
+
+    if (!resourceId) {
+      return Response.json({
+        ok: false,
+        error: 'Could not find resource for this request'
+      }, { status: 404 });
+    }
+
+    // ---- 5) Check if I have permission to approve this resource ----
+    let hasPermission = false;
+    
+    // Check if any of my groups manage this resource
+    for (const groupId of myGroupIds) {
+      const groupResources = groupResourceMap[groupId] || [];
+      if (groupResources.includes(resourceId)) {
+        hasPermission = true;
+        console.log('✅ Group', groupId, 'manages this resource');
+        break;
+      }
+    }
+
+    console.log('✅ Has permission:', hasPermission);
+
+    if (!hasPermission) {
+      return Response.json({
+        ok: false,
+        error: 'You are not authorized to approve this resource',
         diag: {
-          personId, myGroupIds, bookingGroupIds: [...bookingGroupIds], overlap
+          personId,
+          myGroupIds,
+          resourceId,
+          message: 'None of your approval groups manage this resource'
         }
       }, { status: 403 });
     }
 
-    // ---- 5) call PCO approve/deny as the user ----
-    const url = `${PCO.base}/event_resource_requests/${request_id}/${action}`;
-    const result = await pcoPost(url, userToken, note ? { note } : {});
+    // ---- 6) PATCH the request to approve/deny ----
+    const statusCode = action === 'approve' ? 'A' : 'R'; // A=Approved, R=Rejected
+    const url = `${PCO.base}/event_resource_requests/${request_id}`;
+    
+    console.log('🚀 Patching PCO request:', url);
+    console.log('  Status:', statusCode);
+    
+    const patchBody = {
+      data: {
+        type: 'EventResourceRequest',
+        id: request_id,
+        attributes: {
+          approval_status: statusCode
+        }
+      }
+    };
+
+    // Add note if provided
+    if (note) {
+      patchBody.data.attributes.notes = note;
+    }
+
+    const result = await pcoPatch(url, userToken, patchBody);
+
+    console.log('✅ PCO request', action === 'approve' ? 'approved' : 'denied', 'successfully');
 
     return Response.json({ ok: true, action, request_id, result });
   } catch (e) {
-    return Response.json({ ok: false, error: String(e) }, { status: 500 });
+    console.error('❌ Approve error:', e);
+    console.error('Stack:', e.stack);
+    return Response.json({ 
+      ok: false, 
+      error: String(e),
+      details: e.message 
+    }, { status: 500 });
   }
 });
