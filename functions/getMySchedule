@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
         // STEP 1: Get my PCO person ID
-        console.log('📞 Getting my PCO person ID...');
+        console.log('📞 Step 1: Getting my PCO person ID...');
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
@@ -65,8 +65,15 @@ Deno.serve(async (req) => {
         const myPersonId = meData.data?.id;
         console.log('👤 My PCO Person ID:', myPersonId);
 
-        // STEP 2: Get my approval groups
-        console.log('📞 Getting approval groups...');
+        if (!myPersonId) {
+            return Response.json({ 
+                events: [], 
+                message: 'Could not determine your PCO person ID'
+            });
+        }
+
+        // STEP 2: Get my approval groups by checking membership
+        console.log('📞 Step 2: Finding my approval groups...');
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -78,7 +85,7 @@ Deno.serve(async (req) => {
         const myGroupIds = [];
         const myResourceIds = new Set();
         
-        // Check each group for membership
+        // Check each group for my membership
         for (const group of (groupsData.data || [])) {
             const membersResponse = await fetch(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -93,7 +100,7 @@ Deno.serve(async (req) => {
             if (!isMember) continue;
             
             myGroupIds.push(group.id);
-            console.log('✅ Member of group:', group.attributes?.name);
+            console.log('  ✅ Member of group:', group.attributes?.name);
             
             // Get resources for this group
             const resourcesResponse = await fetch(
@@ -105,22 +112,25 @@ Deno.serve(async (req) => {
                 const resourcesData = await resourcesResponse.json();
                 (resourcesData.data || []).forEach(resource => {
                     myResourceIds.add(resource.id);
+                    console.log('    📦 Resource:', resource.attributes?.name);
                 });
             }
         }
 
-        console.log('📋 I am in', myGroupIds.length, 'groups');
-        console.log('📋 Managing', myResourceIds.size, 'resources');
+        console.log('📋 Summary: I am in', myGroupIds.length, 'approval groups');
+        console.log('📋 Summary: Managing', myResourceIds.size, 'total resources');
 
         if (myGroupIds.length === 0) {
             return Response.json({ 
                 events: [], 
-                message: 'You are not in any approval groups'
+                message: 'You are not in any approval groups',
+                my_groups_count: 0,
+                my_resources_count: 0
             });
         }
 
-        // STEP 3: Get ALL calendar events using existing function
-        console.log('📞 Getting all calendar events...');
+        // STEP 3: Get ALL calendar events
+        console.log('📞 Step 3: Getting all calendar events...');
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
 
         if (!eventsResponse.data || !eventsResponse.data.events) {
@@ -128,25 +138,42 @@ Deno.serve(async (req) => {
         }
 
         const allEvents = eventsResponse.data.events || [];
-        console.log('📅 Total events:', allEvents.length);
+        console.log('📅 Total events from PCO:', allEvents.length);
 
-        // STEP 4: Filter to events with APPROVED resources from my groups
+        // STEP 4: Filter to events with MY APPROVED resources
+        console.log('📞 Step 4: Filtering to my approved resources...');
         const myEvents = allEvents.filter(event => {
-            if (!event.resources || event.resources.length === 0) return false;
+            // Skip events without proper names
+            if (!event.name || event.name === 'Untitled Event' || event.name.trim() === '') {
+                return false;
+            }
+
+            // Skip events without resources
+            if (!event.resources || event.resources.length === 0) {
+                return false;
+            }
             
             // Check if ANY resource is:
             // 1. In my resource list (from my approval groups)
             // 2. Has approval_status = 'A' (approved)
-            return event.resources.some(resource => {
+            const hasMyApprovedResource = event.resources.some(resource => {
                 const isMyResource = myResourceIds.has(resource.id);
                 const isApproved = resource.approval_status === 'A';
+                
+                if (isMyResource && isApproved) {
+                    console.log('  ✅ Match:', event.name, '- Resource:', resource.name);
+                }
+                
                 return isMyResource && isApproved;
             });
+            
+            return hasMyApprovedResource;
         });
 
-        console.log('🎯 Events with approved resources from my groups:', myEvents.length);
+        console.log('🎯 Events with my approved resources:', myEvents.length);
 
         // STEP 5: Filter to 2-week window
+        console.log('📞 Step 5: Filtering to 2-week window...');
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
@@ -160,6 +187,15 @@ Deno.serve(async (req) => {
 
         // Sort by date
         eventsIn2Weeks.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+        // Log a few sample events
+        if (eventsIn2Weeks.length > 0) {
+            console.log('📋 Sample events:');
+            eventsIn2Weeks.slice(0, 3).forEach(event => {
+                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()})`);
+                console.log(`    Resources: ${event.resources.map(r => r.name).join(', ')}`);
+            });
+        }
 
         return Response.json({
             events: eventsIn2Weeks,

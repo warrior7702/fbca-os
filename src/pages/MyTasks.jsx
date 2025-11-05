@@ -84,20 +84,26 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getPCOCalendarEvents directly...');
+      console.log('📞 Calling getMySchedule...');
       
-      // Just get ALL calendar events - no filtering
-      const response = await base44.functions.invoke('getPCOCalendarEvents');
+      // Call the refined getMySchedule function
+      const response = await base44.functions.invoke('getMySchedule');
       
       console.log('✅ Response:', response.data);
       
-      if (!response.data || !response.data.events) {
-        throw new Error('No events data returned');
+      if (!response.data) {
+        throw new Error('No data returned');
       }
       
       const events = response.data.events || [];
       
-      console.log(`✅ Got ${events.length} total events`);
+      console.log(`✅ Got ${events.length} events for my schedule`);
+      console.log(`📊 I'm in ${response.data.my_groups_count || 0} approval groups`);
+      console.log(`📊 Managing ${response.data.my_resources_count || 0} resources`);
+      
+      if (events.length === 0 && response.data.message) {
+        console.log('ℹ️', response.data.message);
+      }
       
       setMyScheduleEvents(events);
       console.log('✅ SUCCESS! Schedule loaded');
