@@ -137,10 +137,13 @@ Deno.serve(async (req) => {
             });
         }
 
-        // STEP 3: Get event resource requests (Pending or Approved)
-        console.log('📞 Step 3: Fetching resource requests...');
+        // STEP 3: Get PENDING event resource requests ONLY (P = Pending)
+        console.log('📞 Step 3: Fetching PENDING resource requests...');
         
-        const requestsUrl = 'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P,A&include=event,resource&per_page=100';
+        // Query ONLY pending (P) - simpler, more reliable
+        const requestsUrl = 'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&include=event,resource&per_page=100';
+        
+        console.log('🔍 Query URL:', requestsUrl);
         
         const requestsResponse = await fetch(requestsUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -153,7 +156,17 @@ Deno.serve(async (req) => {
         }
 
         const requestsData = await requestsResponse.json();
-        console.log('📊 Fetched', (requestsData.data || []).length, 'resource requests');
+        console.log('📊 Fetched', (requestsData.data || []).length, 'PENDING resource requests (before filtering)');
+
+        // Log first few requests for debugging
+        if (requestsData.data && requestsData.data.length > 0) {
+            console.log('📋 Sample requests (first 3):');
+            requestsData.data.slice(0, 3).forEach((req, idx) => {
+                const resourceId = req.relationships?.resource?.data?.id;
+                const eventId = req.relationships?.event?.data?.id;
+                console.log(`  ${idx + 1}. Request ${req.id}: Resource ${resourceId}, Event ${eventId}, Status: ${req.attributes?.approval_status}`);
+            });
+        }
 
         // Build maps for events and resources from included data
         const eventsMap = {};
@@ -181,10 +194,16 @@ Deno.serve(async (req) => {
         const myRequests = (requestsData.data || []).filter(request => {
             const resourceId = request.relationships?.resource?.data?.id;
             const groupInfo = resourceToGroup[resourceId];
-            return groupInfo && myGroupIds.includes(groupInfo.groupId);
+            const isMyGroup = groupInfo && myGroupIds.includes(groupInfo.groupId);
+            
+            if (isMyGroup) {
+                console.log(`✅ Request ${request.id} is for MY group: ${groupInfo.groupName}, Resource: ${resourcesMap[resourceId]?.name}`);
+            }
+            
+            return isMyGroup;
         });
 
-        console.log('📋 Found', myRequests.length, 'requests for my groups');
+        console.log('📋 Found', myRequests.length, 'PENDING requests for MY groups');
 
         // Get event IDs we care about
         const eventIds = new Set();
@@ -193,7 +212,7 @@ Deno.serve(async (req) => {
             if (eventId) eventIds.add(eventId);
         });
 
-        console.log('📊 Unique events:', eventIds.size);
+        console.log('📊 Unique events with my pending requests:', eventIds.size);
 
         // STEP 4: Fetch FUTURE event instances (simple query)
         console.log('📞 Step 4: Fetching event instances (next 2 weeks)...');
@@ -252,7 +271,7 @@ Deno.serve(async (req) => {
                     id: resourceId,
                     name: resource?.name || 'Unknown Resource',
                     kind: resource?.kind,
-                    approval_status: req.attributes?.approval_status // 'P' or 'A'
+                    approval_status: req.attributes?.approval_status // Should be 'P' for pending
                 };
             });
 
@@ -272,15 +291,16 @@ Deno.serve(async (req) => {
             new Date(a.starts_at) - new Date(b.starts_at)
         );
 
-        console.log('🎯 Returning', eventsWithMyResources.length, 'events');
+        console.log('🎯 Returning', eventsWithMyResources.length, 'events with pending approvals');
         
         if (eventsWithMyResources.length > 0) {
             console.log('📋 Sample events:');
             eventsWithMyResources.slice(0, 3).forEach(event => {
                 const pendingCount = event.resources.filter(r => r.approval_status === 'P').length;
-                const approvedCount = event.resources.filter(r => r.approval_status === 'A').length;
-                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()}) - ${pendingCount} pending, ${approvedCount} approved`);
+                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()}) - ${pendingCount} pending`);
             });
+        } else {
+            console.log('ℹ️ No events found with pending approvals in your groups for the next 2 weeks');
         }
 
         return Response.json({
