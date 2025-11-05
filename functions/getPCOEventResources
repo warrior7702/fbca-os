@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -114,9 +115,9 @@ Deno.serve(async (req) => {
 
                 console.log('📝 Processing request:', request.id, 'for resource:', resource.name);
 
-                // Fetch answers for this request
+                // Fetch answers for this request - FIXED ENDPOINT
                 try {
-                    const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_answers?per_page=100`;
+                    const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`;
                     console.log('🔗 Fetching answers from:', answersUrl);
                     
                     const answersResponse = await fetch(answersUrl, {
@@ -144,7 +145,8 @@ Deno.serve(async (req) => {
                             const question = answer.attributes?.question;
                             let value = answer.attributes?.value || 
                                        answer.attributes?.answer ||
-                                       answer.attributes?.text;
+                                       answer.attributes?.text ||
+                                       answer.attributes?.answer_text; // Added new attribute here
                             
                             console.log('  Question:', question);
                             console.log('  Value:', value);
