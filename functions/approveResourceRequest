@@ -110,6 +110,35 @@ Deno.serve(async (req) => {
     const userToken = await refreshTokenIfNeeded(base44, user);
     console.log('✅ Got valid token');
 
+    // DIAGNOSTIC: Check who this token actually belongs to
+    console.log('🔍 DIAGNOSTIC: Checking token owner across all PCO APIs...');
+    
+    // Check People API
+    try {
+      const peopleMe = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      if (peopleMe.ok) {
+        const peopleData = await peopleMe.json();
+        console.log('  👤 People API /me:', peopleData.data?.id, '-', peopleData.data?.attributes?.name);
+      }
+    } catch (e) {
+      console.log('  ⚠️ People API failed:', e.message);
+    }
+    
+    // Check Calendar API
+    try {
+      const calendarMe = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      if (calendarMe.ok) {
+        const calendarData = await calendarMe.json();
+        console.log('  📅 Calendar API /me:', calendarData.data?.id, '-', calendarData.data?.attributes?.name);
+      }
+    } catch (e) {
+      console.log('  ⚠️ Calendar API failed:', e.message);
+    }
+
     const statusCode = action === 'approve' ? 'A' : 'R';
     const url = `${PCO.base}/event_resource_requests/${request_id}`;
     
@@ -179,9 +208,26 @@ Deno.serve(async (req) => {
         console.error('❌ PCO API error: 403 Forbidden');
         console.error('   Response:', responseText);
         
-        let errorMessage = 'You don\'t have permission to approve this request. ';
-        errorMessage += 'Make sure you\'re in the correct approval group in Planning Center. ';
-        errorMessage += 'Contact your PCO admin if you need access.';
+        // Try to parse the error to see which user ID it mentions
+        try {
+          const errorData = JSON.parse(responseText);
+          const errorDetail = errorData.errors?.[0]?.meta?.description || '';
+          console.error('   🔍 Error detail:', errorDetail);
+          
+          // Extract user ID from error message
+          const userIdMatch = errorDetail.match(/User with id (\d+)/);
+          if (userIdMatch) {
+            console.error('   🆔 PCO says token belongs to user:', userIdMatch[1]);
+            console.error('   🆔 But we expected user: 149670080 (Billy Nelms)');
+            console.error('   ❌ TOKEN MISMATCH CONFIRMED!');
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+        
+        let errorMessage = 'Permission denied. ';
+        errorMessage += 'It looks like your OAuth token belongs to a different PCO account than expected. ';
+        errorMessage += 'Please disconnect and reconnect Planning Center in Settings to refresh your credentials.';
         
         return Response.json({ 
           ok: false, 
