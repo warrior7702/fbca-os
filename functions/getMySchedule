@@ -33,19 +33,16 @@ async function refreshTokenIfNeeded(base44, user) {
     return tokens.access_token;
 }
 
-// Helper to add delay between requests
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Fetch with retry logic
-async function fetchWithRetry(url, options, maxRetries = 3) {
+async function fetchWithRetry(url, options, maxRetries = 2) {
     for (let i = 0; i < maxRetries; i++) {
         try {
             const response = await fetch(url, options);
             if (response.ok) return response;
             
-            // If rate limited, wait and retry
             if (response.status === 429) {
                 const retryAfter = parseInt(response.headers.get('Retry-After') || '2');
                 console.log(`⏳ Rate limited, waiting ${retryAfter}s...`);
@@ -53,15 +50,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
                 continue;
             }
             
-            // For other errors, throw
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            throw new Error(`HTTP ${response.status}`);
         } catch (error) {
             if (i === maxRetries - 1) throw error;
-            
-            // Exponential backoff
-            const waitTime = Math.min(1000 * Math.pow(2, i), 10000);
-            console.log(`⚠️ Attempt ${i + 1} failed, retrying in ${waitTime}ms...`);
-            await delay(waitTime);
+            await delay(1000 * (i + 1));
         }
     }
 }
@@ -108,15 +100,13 @@ Deno.serve(async (req) => {
         const groupsData = await groupsResponse.json();
         const myResourceNames = new Set();
 
-        // STEP 3: Check membership sequentially with rate limiting (not parallel)
+        // STEP 3: Check membership sequentially
         console.log(`📋 Checking ${groupsData.data?.length || 0} groups...`);
         
         for (const group of (groupsData.data || [])) {
             try {
-                // Add small delay between requests to avoid rate limiting
                 await delay(100);
                 
-                // Check membership
                 const membersResponse = await fetchWithRetry(
                     `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -129,10 +119,8 @@ Deno.serve(async (req) => {
 
                 console.log('✅ Member of group:', group.attributes?.name);
 
-                // Add small delay before fetching resources
                 await delay(100);
 
-                // Get resources for this group
                 const resourcesResponse = await fetchWithRetry(
                     `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -147,7 +135,6 @@ Deno.serve(async (req) => {
                 });
             } catch (error) {
                 console.error(`⚠️ Error processing group ${group.id}:`, error.message);
-                // Continue with other groups even if one fails
             }
         }
 
@@ -158,15 +145,11 @@ Deno.serve(async (req) => {
             console.log('⚠️ No resources found');
             return Response.json({ 
                 events: [], 
-                message: 'No resources found for your approval groups',
-                debug: {
-                    checked_groups: groupsData.data?.length || 0,
-                    my_person_id: myPersonId
-                }
+                message: 'No resources found for your approval groups'
             });
         }
 
-        // STEP 4: Get calendar events (use existing function)
+        // STEP 4: Get calendar events
         console.log('📞 Step 4: Getting calendar events...');
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
 
@@ -185,65 +168,11 @@ Deno.serve(async (req) => {
         console.log('🎯 Matched events:', myEvents.length);
         myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        // STEP 6: Fetch door codes ONLY for next 2 weeks - sequentially with rate limiting
-        const twoWeeksFromNow = new Date();
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
-        const recentEvents = myEvents.filter(event => {
-            const eventDate = new Date(event.starts_at);
-            return eventDate <= twoWeeksFromNow;
-        });
-
-        console.log(`🚪 Fetching door codes for ${recentEvents.length} events (sequentially)...`);
-
-        const eventsWithDoorCodes = [];
-        
-        for (const event of myEvents) {
-            // Only fetch door codes for recent events
-            if (!recentEvents.find(e => e.event_id === event.event_id)) {
-                eventsWithDoorCodes.push(event);
-                continue;
-            }
-
-            try {
-                // Add delay to avoid rate limiting
-                await delay(150);
-                
-                const response = await base44.functions.invoke('getPCOEventComments', {
-                    event_id: event.event_id
-                });
-
-                if (response.data.comments) {
-                    const doorCodeComment = response.data.comments.find(c =>
-                        c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
-                    );
-
-                    if (doorCodeComment) {
-                        const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
-                        if (match) {
-                            eventsWithDoorCodes.push({
-                                ...event,
-                                posted_door_code: match[1],
-                                posted_by: doorCodeComment.created_by
-                            });
-                            continue;
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error(`⚠️ Error fetching door code for event ${event.event_id}:`, error.message);
-            }
-            
-            // Add event without door code
-            eventsWithDoorCodes.push(event);
-        }
-
-        console.log('✅ SUCCESS! Returning', eventsWithDoorCodes.length, 'events');
-        console.log('✅ Events with door codes:', eventsWithDoorCodes.filter(e => e.posted_door_code).length);
+        console.log('✅ SUCCESS! Returning', myEvents.length, 'events (without door codes - will be fetched separately)');
 
         return Response.json({
-            events: eventsWithDoorCodes,
-            count: eventsWithDoorCodes.length,
+            events: myEvents,
+            count: myEvents.length,
             resources_count: resourceNamesArray.length,
             my_resources: resourceNamesArray
         });
