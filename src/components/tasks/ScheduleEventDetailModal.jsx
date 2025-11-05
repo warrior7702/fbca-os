@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { base44 } from "@/api/base44Client";
 
@@ -11,6 +11,8 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const [loading, setLoading] = useState(false);
   const [resources, setResources] = useState([]);
   const [doorCodes, setDoorCodes] = useState([]);
+  const [roomsExpanded, setRoomsExpanded] = useState(true);
+  const [resourcesExpanded, setResourcesExpanded] = useState(true);
 
   useEffect(() => {
     if (open && event) {
@@ -44,6 +46,10 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const startDate = parseISO(event.starts_at);
   const endDate = parseISO(event.ends_at);
   const latestDoorCode = doorCodes[doorCodes.length - 1];
+
+  // Separate rooms from other resources
+  const rooms = resources.filter(r => r.resource_kind === 'Room');
+  const otherResources = resources.filter(r => r.resource_kind !== 'Room');
 
   const getApprovalStatusColor = (status) => {
     switch (status) {
@@ -113,53 +119,128 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
               </Card>
             )}
 
-            {/* Resources */}
-            {resources.length > 0 && (
+            {/* Rooms Section - Collapsible */}
+            {rooms.length > 0 && (
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-green-600" />
-                  Resources ({resources.length})
-                </h3>
-                <div className="space-y-2">
-                  {resources.map((resource) => (
-                    <Card key={resource.request_id} className="border-slate-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-900">{resource.resource_name}</p>
-                            <p className="text-sm text-slate-500">{resource.resource_kind}</p>
-                            {resource.quantity && (
-                              <p className="text-xs text-slate-500 mt-1">Quantity: {resource.quantity}</p>
-                            )}
-                          </div>
-                          <Badge className={getApprovalStatusColor(resource.approval_status)}>
-                            <span className="flex items-center gap-1">
-                              {getApprovalStatusIcon(resource.approval_status)}
-                              {resource.approval_status === 'A' && 'Approved'}
-                              {resource.approval_status === 'P' && 'Pending'}
-                              {resource.approval_status === 'R' && 'Rejected'}
-                            </span>
-                          </Badge>
-                        </div>
-                        
-                        {/* Resource Answers */}
-                        {resource.answers && resource.answers.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-slate-200">
-                            <p className="text-xs font-semibold text-slate-600 mb-2">Details:</p>
-                            <div className="space-y-1">
-                              {resource.answers.map((answer, idx) => (
-                                <div key={idx} className="text-xs">
-                                  <span className="text-slate-500">{answer.question}:</span>{' '}
-                                  <span className="text-slate-700 font-medium">{answer.answer}</span>
-                                </div>
-                              ))}
+                <button
+                  onClick={() => setRoomsExpanded(!roomsExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors mb-3"
+                >
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                    Rooms ({rooms.length})
+                  </h3>
+                  {roomsExpanded ? (
+                    <ChevronDown className="w-5 h-5 text-slate-600" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-slate-600" />
+                  )}
+                </button>
+                
+                {roomsExpanded && (
+                  <div className="space-y-2">
+                    {rooms.map((resource) => (
+                      <Card key={resource.request_id} className="border-slate-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-900">{resource.resource_name}</p>
+                              {resource.quantity && (
+                                <p className="text-xs text-slate-500 mt-1">Quantity: {resource.quantity}</p>
+                              )}
                             </div>
+                            <Badge className={getApprovalStatusColor(resource.approval_status)}>
+                              <span className="flex items-center gap-1">
+                                {getApprovalStatusIcon(resource.approval_status)}
+                                {resource.approval_status === 'A' && 'Approved'}
+                                {resource.approval_status === 'P' && 'Pending'}
+                                {resource.approval_status === 'R' && 'Rejected'}
+                              </span>
+                            </Badge>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          
+                          {/* Resource Answers */}
+                          {resource.answers && resource.answers.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-200">
+                              <p className="text-xs font-semibold text-slate-600 mb-2">Details:</p>
+                              <div className="space-y-1">
+                                {resource.answers.map((answer, idx) => (
+                                  <div key={idx} className="text-xs">
+                                    <span className="text-slate-500">{answer.question}:</span>{' '}
+                                    <span className="text-slate-700 font-medium">{answer.answer}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Other Resources Section - Collapsible */}
+            {otherResources.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setResourcesExpanded(!resourcesExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors mb-3"
+                >
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <Key className="w-5 h-5 text-green-600" />
+                    Resources ({otherResources.length})
+                  </h3>
+                  {resourcesExpanded ? (
+                    <ChevronDown className="w-5 h-5 text-slate-600" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-slate-600" />
+                  )}
+                </button>
+                
+                {resourcesExpanded && (
+                  <div className="space-y-2">
+                    {otherResources.map((resource) => (
+                      <Card key={resource.request_id} className="border-slate-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-900">{resource.resource_name}</p>
+                              <p className="text-sm text-slate-500">{resource.resource_kind}</p>
+                              {resource.quantity && (
+                                <p className="text-xs text-slate-500 mt-1">Quantity: {resource.quantity}</p>
+                              )}
+                            </div>
+                            <Badge className={getApprovalStatusColor(resource.approval_status)}>
+                              <span className="flex items-center gap-1">
+                                {getApprovalStatusIcon(resource.approval_status)}
+                                {resource.approval_status === 'A' && 'Approved'}
+                                {resource.approval_status === 'P' && 'Pending'}
+                                {resource.approval_status === 'R' && 'Rejected'}
+                              </span>
+                            </Badge>
+                          </div>
+                          
+                          {/* Resource Answers */}
+                          {resource.answers && resource.answers.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-200">
+                              <p className="text-xs font-semibold text-slate-600 mb-2">Details:</p>
+                              <div className="space-y-1">
+                                {resource.answers.map((answer, idx) => (
+                                  <div key={idx} className="text-xs">
+                                    <span className="text-slate-500">{answer.question}:</span>{' '}
+                                    <span className="text-slate-700 font-medium">{answer.answer}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
