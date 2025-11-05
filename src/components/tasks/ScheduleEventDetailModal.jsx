@@ -28,6 +28,9 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
       const resourcesResponse = await base44.functions.invoke('getPCOEventResources', {
         event_id: event.event_id
       });
+      
+      console.log('📦 Resources loaded:', resourcesResponse.data.resource_requests?.length || 0);
+      
       setResources(resourcesResponse.data.resource_requests || []);
 
       // Fetch comments/door codes
@@ -53,9 +56,21 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const otherResources = resources.filter(r => r.resource_kind !== 'Room');
 
   // Find the "What time do you want access to begin and end?" answer
+  // Make the search more flexible - look for keywords
   const accessTimeAnswer = resources
-    .flatMap(r => r.answers || [])
-    .find(a => a.question?.toLowerCase().includes('what time do you want access to begin and end'));
+    .flatMap(r => {
+      console.log('🔍 Checking resource:', r.resource_name, 'Answers:', r.answers?.length || 0);
+      if (r.answers) {
+        r.answers.forEach(a => console.log('  📝 Question:', a.question, 'Answer:', a.answer));
+      }
+      return r.answers || [];
+    })
+    .find(a => {
+      const q = (a.question || '').toLowerCase();
+      return q.includes('time') && q.includes('access') && q.includes('begin') && q.includes('end');
+    });
+
+  console.log('🔒 Access time answer found:', accessTimeAnswer);
 
   const getApprovalStatusColor = (status) => {
     switch (status) {
