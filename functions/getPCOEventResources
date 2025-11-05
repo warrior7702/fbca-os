@@ -1,0 +1,193 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+async function refreshTokenIfNeeded(base44, user) {
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
+
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
+
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
+}
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
+
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
+
+        if (!user || !user.pco_access_token) {
+            return Response.json({ error: 'PCO not connected' }, { status: 400 });
+        }
+
+        const { event_id } = await req.json();
+
+        if (!event_id) {
+            return Response.json({ error: 'event_id required' }, { status: 400 });
+        }
+
+        const accessToken = await refreshTokenIfNeeded(base44, user);
+
+        // Fetch event resource requests
+        const requestsResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_resource_requests?per_page=100&include=resource`,
+            {
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (!requestsResponse.ok) {
+            console.error('Failed to fetch resource requests:', await requestsResponse.text());
+            return Response.json({ resources: [], rooms: [] });
+        }
+
+        const requestsData = await requestsResponse.json();
+        const included = requestsData.included || [];
+        
+        // Map resources by ID
+        const resourcesById = {};
+        included.forEach(item => {
+            if (item.type === 'Resource') {
+                resourcesById[item.id] = {
+                    id: item.id,
+                    name: item.attributes?.name,
+                    kind: item.attributes?.kind,
+                    room_type: item.attributes?.room_type
+                };
+            }
+        });
+
+        // Process resource requests
+        const resourceRequests = [];
+        const rooms = [];
+        const buildingAccess = [];
+
+        for (const request of (requestsData.data || [])) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const resource = resourcesById[resourceId];
+            
+            if (resource) {
+                const requestInfo = {
+                    request_id: request.id,
+                    resource_id: resourceId,
+                    resource_name: resource.name,
+                    resource_kind: resource.kind,
+                    quantity: request.attributes?.quantity,
+                    approval_status: request.attributes?.approval_status
+                };
+
+                // Fetch answers for this request
+                try {
+                    const answersResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?include=resource_question&per_page=100`,
+                        {
+                            headers: { 
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
+
+                    if (answersResponse.ok) {
+                        const answersData = await answersResponse.json();
+                        const questionsByAnswerId = {};
+                        
+                        // Build questions map from included data
+                        (answersData.included || []).forEach(item => {
+                            if (item.type === 'ResourceQuestion') {
+                                questionsByAnswerId[item.id] = {
+                                    question: item.attributes?.question,
+                                    kind: item.attributes?.kind
+                                };
+                            }
+                        });
+
+                        // Process answers
+                        const answers = [];
+                        (answersData.data || []).forEach(answer => {
+                            const questionId = answer.relationships?.resource_question?.data?.id;
+                            const question = questionsByAnswerId[questionId];
+                            
+                            if (question) {
+                                let value = answer.attributes?.answer || 
+                                           answer.attributes?.answer_text ||
+                                           answer.attributes?.answer_choice ||
+                                           answer.attributes?.answer_number ||
+                                           answer.attributes?.answer_boolean;
+                                
+                                if (typeof value === 'boolean') {
+                                    value = value ? 'Yes' : 'No';
+                                }
+                                
+                                if (value !== null && value !== undefined && value !== '') {
+                                    answers.push({
+                                        question: question.question,
+                                        answer: String(value)
+                                    });
+                                }
+                            }
+                        });
+
+                        requestInfo.answers = answers;
+                    }
+                } catch (error) {
+                    console.error('Error fetching answers for request:', request.id, error);
+                    requestInfo.answers = [];
+                }
+
+                resourceRequests.push(requestInfo);
+
+                // Categorize resources
+                if (resource.kind === 'Room') {
+                    rooms.push(requestInfo);
+                } else if (resource.name?.toLowerCase().includes('building access') || 
+                          resource.name?.toLowerCase().includes('door code')) {
+                    buildingAccess.push(requestInfo);
+                }
+            }
+        }
+
+        return Response.json({ 
+            resource_requests: resourceRequests,
+            rooms: rooms,
+            building_access: buildingAccess,
+            total_resources: resourceRequests.length
+        });
+
+    } catch (error) {
+        console.error('Get event resources error:', error);
+        return Response.json({ error: error.message }, { status: 500 });
+    }
+});
