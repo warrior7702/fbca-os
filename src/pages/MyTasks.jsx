@@ -84,22 +84,20 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getMySchedule...');
-      const response = await base44.functions.invoke('getMySchedule');
+      console.log('📞 Calling getPCOCalendarEvents directly...');
+      
+      // Just get ALL calendar events - no filtering
+      const response = await base44.functions.invoke('getPCOCalendarEvents');
       
       console.log('✅ Response:', response.data);
       
-      if (!response.data || !response.data.ok) {
-        throw new Error(response.data?.error || 'Failed to load schedule');
+      if (!response.data || !response.data.events) {
+        throw new Error('No events data returned');
       }
       
       const events = response.data.events || [];
       
-      console.log(`✅ Got ${events.length} events`);
-      
-      if (events.length === 0 && response.data.diag) {
-        console.log('ℹ️ Diagnostic info:', response.data.diag);
-      }
+      console.log(`✅ Got ${events.length} total events`);
       
       setMyScheduleEvents(events);
       console.log('✅ SUCCESS! Schedule loaded');
