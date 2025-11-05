@@ -1,264 +1,189 @@
-import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
-
-/* ---------- helpers ---------- */
-
-const json = (obj, status = 200) =>
-  new Response(JSON.stringify(obj, null, 2), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-
-function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-async function fetchWithRetry(url, options, maxRetries = 2) {
-  for (let i = 0; i <= maxRetries; i++) {
-    const res = await fetch(url, options).catch(() => null);
-    if (res && res.ok) return res;
-
-    // Handle 429 rate-limit or transient network errors
-    const status = res?.status ?? 0;
-    if (status === 429 && i < maxRetries) {
-      const retryAfter = parseInt(res.headers.get("Retry-After") || "2", 10);
-      await delay(retryAfter * 1000);
-      continue;
-    }
-    if (!res && i < maxRetries) {
-      await delay(1000 * (i + 1));
-      continue;
-    }
-
-    // final error
-    let body = "";
-    try { body = res ? await res.text() : "no-response"; } catch {}
-    const err = new Error(`HTTP ${status} for ${url}`);
-    err.status = status;
-    err.body = body;
-    throw err;
-  }
-}
-
-async function pcoGet(token, url) {
-  const r = await fetchWithRetry(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-  });
-  return r.json();
-}
-
-async function pcoCollect(token, url, maxPages = 5) {
-  let page = 1;
-  let out = [];
-  while (page <= maxPages) {
-    const sep = url.includes("?") ? "&" : "?";
-    const pageUrl = `${url}${sep}per_page=100&page=${page}`;
-    const j = await pcoGet(token, pageUrl);
-    const data = j?.data || [];
-    out = out.concat(data);
-    if (data.length < 100) break;
-    page += 1;
-  }
-  return out;
-}
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
-  // If we still have ~5 minutes left, use existing token
-  const expiresAt = new Date(user.pco_token_expires_at || 0);
-  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-  if (expiresAt > fiveMinutesFromNow && user.pco_access_token) {
-    return user.pco_access_token;
-  }
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
 
-  // Refresh
-  const tokenRes = await fetch("https://api.planningcenteronline.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: user.pco_refresh_token,
-      client_id: Deno.env.get("PCO_CLIENT_ID"),
-      client_secret: Deno.env.get("PCO_CLIENT_SECRET"),
-    }),
-  });
+    if (expiresAt > fiveMinutesFromNow) {
+        return user.pco_access_token;
+    }
 
-  if (!tokenRes.ok) {
-    const body = await tokenRes.text().catch(() => "");
-    throw new Error(`Token refresh failed (${tokenRes.status}) ${body}`);
-  }
+    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: user.pco_refresh_token,
+            client_id: Deno.env.get('PCO_CLIENT_ID'),
+            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+        })
+    });
 
-  const tokens = await tokenRes.json();
-  const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+    if (!tokenResponse.ok) throw new Error('Token refresh failed');
 
-  await base44.asServiceRole.entities.User.update(user.id, {
-    pco_access_token: tokens.access_token,
-    pco_refresh_token: tokens.refresh_token,
-    pco_token_expires_at: newExpiresAt,
-  });
+    const tokens = await tokenResponse.json();
+    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
 
-  return tokens.access_token;
+    await base44.asServiceRole.entities.User.update(user.id, {
+        pco_access_token: tokens.access_token,
+        pco_refresh_token: tokens.refresh_token,
+        pco_token_expires_at: newExpiresAt
+    });
+
+    return tokens.access_token;
 }
 
-/* ---------- main ---------- */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, options, maxRetries = 2) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok) return response;
+            
+            if (response.status === 429) {
+                const retryAfter = parseInt(response.headers.get('Retry-After') || '2');
+                console.log(`⏳ Rate limited, waiting ${retryAfter}s...`);
+                await delay(retryAfter * 1000);
+                continue;
+            }
+            
+            throw new Error(`HTTP ${response.status}`);
+        } catch (error) {
+            if (i === maxRetries - 1) throw error;
+            await delay(1000 * (i + 1));
+        }
+    }
+}
 
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const sessionUser = await base44.auth.me();
-    if (!sessionUser?.email) return json({ ok: false, error: "Unauthorized" }, 401);
+    try {
+        const base44 = createClientFromRequest(req);
+        const currentUser = await base44.auth.me();
 
-    // Load full user row (for stored PCO tokens)
-    const [user] = await base44.asServiceRole.entities.User.filter({ email: sessionUser.email });
-    if (!user?.pco_access_token || !user?.pco_refresh_token) {
-      return json({ ok: true, count: 0, events: [], message: "PCO not connected" });
-    }
+        if (!currentUser) {
+            return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
+        }
 
-    const token = await refreshTokenIfNeeded(base44, user);
+        console.log('✅ Getting schedule for user:', currentUser.email);
 
-    // Identify the PCO person tied to this token
-    // NOTE: Correct endpoint is /people/me (not /me)
-    const who = await pcoGet(token, "https://api.planningcenteronline.com/calendar/v2/people/me");
-    const personId = who?.data?.id;
-    const personName = who?.data?.attributes?.name || "Unknown";
-    if (!personId) return json({ ok: false, error: "Could not resolve PCO person for token." }, 401);
+        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+        const user = users[0];
 
-    // 2-week window
-    const now = new Date();
-    const startISO = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
-    const end = new Date(now);
-    end.setUTCDate(end.getUTCDate() + 14);
-    const endISO = end.toISOString();
+        if (!user || !user.pco_access_token) {
+            console.log('⚠️ No PCO token');
+            return Response.json({ events: [], message: 'PCO not connected' });
+        }
 
-    // Get my approval group memberships
-    const memberships = await pcoCollect(
-      token,
-      `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${personId}&include=resource_approval_group`
-    );
-    const myGroupIds = memberships
-      .map(m => m?.relationships?.resource_approval_group?.data?.id)
-      .filter(Boolean);
+        const accessToken = await refreshTokenIfNeeded(base44, user);
 
-    if (!myGroupIds.length) {
-      return json({
-        ok: true,
-        person: { id: personId, name: personName },
-        range: { startISO, endISO },
-        count: 0,
-        events: [],
-        diag: [{ step: "no-approval-groups" }],
-      });
-    }
-
-    // Fetch APPROVED resource requests
-    // (We’ll filter to only those where the resource’s approval group is one of mine)
-    const approvedReqs = await pcoCollect(
-      token,
-      "https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=A&include=event,resource"
-    );
-
-    // Filter requests to my groups (resolve a resource → group id)
-    const myApproved = [];
-    for (const r of approvedReqs) {
-      const resRel = r?.relationships?.resource?.data;
-      const evRel = r?.relationships?.event?.data;
-      if (!resRel || !evRel) continue;
-
-      // Resolve the resource’s approval group (one extra fetch, reliable)
-      try {
-        const res = await pcoGet(
-          token,
-          `https://api.planningcenteronline.com/calendar/v2/resources/${resRel.id}?include=resource_approval_group`
+        // STEP 1: Get my PCO person ID
+        console.log('📞 Step 1: Getting my PCO person ID...');
+        const meResponse = await fetchWithRetry(
+            'https://api.planningcenteronline.com/calendar/v2/me',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
-        const rag = (res?.included || []).find((x) => x.type === "ResourceApprovalGroup");
-        const groupId = rag?.id || rag?.data?.id || null;
-        if (!groupId || !myGroupIds.includes(groupId)) continue;
 
-        myApproved.push({
-          requestId: r.id,
-          eventId: evRel.id,
-          resourceId: resRel.id,
-          groupId,
+        const meData = await meResponse.json();
+        const myPersonId = meData.data?.id;
+        console.log('👤 My PCO Person ID:', myPersonId);
+
+        // STEP 2: Get all approval groups
+        console.log('📞 Step 2: Getting approval groups...');
+        const groupsResponse = await fetchWithRetry(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        const groupsData = await groupsResponse.json();
+        const myResourceNames = new Set();
+
+        // STEP 3: Check membership and collect ALL resources from my groups
+        console.log(`📋 Checking ${groupsData.data?.length || 0} groups...`);
+        
+        for (const group of (groupsData.data || [])) {
+            try {
+                await delay(100);
+                
+                const membersResponse = await fetchWithRetry(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                const membersData = await membersResponse.json();
+                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
+
+                if (!isMember) continue;
+
+                console.log('✅ Member of group:', group.attributes?.name);
+
+                await delay(100);
+
+                // Get ALL resources for this group
+                const resourcesResponse = await fetchWithRetry(
+                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                const resourcesData = await resourcesResponse.json();
+                (resourcesData.data || []).forEach(resource => {
+                    const resourceName = resource.attributes?.name;
+                    if (resourceName) {
+                        myResourceNames.add(resourceName);
+                    }
+                });
+            } catch (error) {
+                console.error(`⚠️ Error processing group ${group.id}:`, error.message);
+            }
+        }
+
+        const resourceNamesArray = Array.from(myResourceNames);
+        console.log('📋 My resources:', resourceNamesArray.length, 'resources');
+
+        if (resourceNamesArray.length === 0) {
+            console.log('⚠️ No resources found');
+            return Response.json({ 
+                events: [], 
+                message: 'No resources found for your approval groups'
+            });
+        }
+
+        // STEP 4: Get ALL future calendar events (using existing function)
+        console.log('📞 Step 4: Getting ALL future calendar events...');
+        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
+
+        if (!eventsResponse.data || !eventsResponse.data.events) {
+            throw new Error('No events data returned from getPCOCalendarEvents');
+        }
+
+        const allEvents = eventsResponse.data.events || [];
+        console.log('📅 Total future events:', allEvents.length);
+
+        // STEP 5: Filter to events using ANY of my resources
+        const myEvents = allEvents.filter(event => {
+            return event.resources && event.resources.some(r => resourceNamesArray.includes(r.name));
         });
-      } catch {
-        /* ignore this request on failure */
-      }
-    }
 
-    if (!myApproved.length) {
-      return json({
-        ok: true,
-        person: { id: personId, name: personName },
-        range: { startISO, endISO },
-        count: 0,
-        events: [],
-        diag: [{ step: "no-approved-requests-in-groups" }],
-      });
-    }
+        console.log('🎯 Events using my resources:', myEvents.length);
+        myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-    // Build schedule rows by event instances in the window
-    const uniqueEventIds = [...new Set(myApproved.map(x => x.eventId))];
-    const out = [];
-    const seenInstanceIds = new Set();
+        console.log('✅ SUCCESS! Returning', myEvents.length, 'events');
 
-    for (const eventId of uniqueEventIds) {
-      // Event instances within window
-      const instances = await pcoCollect(
-        token,
-        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?where[starts_at][gte]=${encodeURIComponent(
-          startISO
-        )}&where[starts_at][lte]=${encodeURIComponent(endISO)}`
-      );
-      if (!instances.length) continue;
-
-      // Event info
-      const ev = await pcoGet(
-        token,
-        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`
-      );
-      const eventName = ev?.data?.attributes?.name || `Event ${eventId}`;
-
-      // Related requests that matched this event
-      const requestsForEvent = myApproved.filter(x => x.eventId === eventId);
-
-      for (const inst of instances) {
-        const instId = inst.id;
-        if (seenInstanceIds.has(instId)) continue;
-        seenInstanceIds.add(instId);
-
-        out.push({
-          event_id: eventId,
-          event_instance_id: instId,
-          event_name: eventName,
-          starts_at: inst?.attributes?.starts_at,
-          ends_at: inst?.attributes?.ends_at,
-          approved_requests: requestsForEvent.map(r => ({
-            request_id: r.requestId,
-            resource_id: r.resourceId,
-            group_id: r.groupId,
-          })),
+        return Response.json({
+            events: myEvents,
+            count: myEvents.length,
+            resources_count: resourceNamesArray.length,
+            my_resources: resourceNamesArray
         });
-      }
+
+    } catch (error) {
+        console.error('❌ Get my schedule error:', error);
+        return Response.json({
+            error: error.message,
+            events: [],
+            details: error.stack
+        }, { status: 500 });
     }
-
-    // Sort by start time
-    out.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-    return json({
-      ok: true,
-      person: { id: personId, name: personName },
-      range: { startISO, endISO },
-      count: out.length,
-      events: out,
-    });
-  } catch (err) {
-    return json(
-      {
-        ok: false,
-        error: err?.message || "Unknown error",
-        status: err?.status || 500,
-        details:
-          err?.body && err.body.startsWith("{")
-            ? JSON.parse(err.body)
-            : { raw: err?.body || String(err) },
-      },
-      err?.status || 500
-    );
-  }
 });
