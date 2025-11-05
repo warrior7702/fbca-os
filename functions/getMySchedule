@@ -1,38 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-async function refreshTokenIfNeeded(base44, user) {
-    const expiresAt = new Date(user.pco_token_expires_at);
-    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-
-    if (expiresAt > fiveMinutesFromNow) {
-        return user.pco_access_token;
-    }
-
-    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: user.pco_refresh_token,
-            client_id: Deno.env.get('PCO_CLIENT_ID'),
-            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-        })
-    });
-
-    if (!tokenResponse.ok) throw new Error('Token refresh failed');
-
-    const tokens = await tokenResponse.json();
-    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-    await base44.asServiceRole.entities.User.update(user.id, {
-        pco_access_token: tokens.access_token,
-        pco_refresh_token: tokens.refresh_token,
-        pco_token_expires_at: newExpiresAt
-    });
-
-    return tokens.access_token;
-}
-
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -43,300 +10,79 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
 
-        console.log('✅ Getting schedule for:', currentUser.email);
+        const email = currentUser.email;
+        console.log('✅ Getting schedule for:', email);
 
-        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-        const user = users[0];
-
-        if (!user || !user.pco_access_token) {
-            console.log('❌ No PCO token');
-            return Response.json({ events: [], message: 'PCO not connected' });
-        }
-
-        const accessToken = await refreshTokenIfNeeded(base44, user);
-
-        // STEP 1: Get my PCO person ID
-        console.log('📞 Step 1: Getting my PCO person ID...');
-        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+        // Call the Vercel endpoint that uses service token and better logic
+        const vercelUrl = `https://pco-webhook.vercel.app/api/my-schedule?email=${encodeURIComponent(email)}&days=14`;
+        
+        console.log('📞 Calling Vercel endpoint:', vercelUrl);
+        
+        const response = await fetch(vercelUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
         });
 
-        if (!meResponse.ok) {
-            console.error('❌ Failed to get PCO user:', meResponse.status);
-            throw new Error('Failed to get PCO user');
-        }
-        
-        const meData = await meResponse.json();
-        const myPersonId = meData.data?.id;
-        console.log('👤 My PCO Person ID:', myPersonId);
-
-        if (!myPersonId) {
-            console.error('❌ No person ID in response');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Vercel endpoint failed:', response.status, errorText);
             return Response.json({ 
-                events: [], 
-                message: 'Could not determine your PCO person ID'
-            });
+                error: `Vercel endpoint failed: ${response.status}`,
+                events: [],
+                details: errorText
+            }, { status: response.status });
         }
 
-        // STEP 2: Get my approval groups by checking membership
-        console.log('📞 Step 2: Finding my approval groups...');
-        const groupsResponse = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        if (!groupsResponse.ok) {
-            console.error('❌ Failed to fetch approval groups:', groupsResponse.status);
-            throw new Error('Failed to fetch approval groups');
-        }
-
-        const groupsData = await groupsResponse.json();
-        const myGroupIds = [];
-        const myResourceIds = new Set();
+        const data = await response.json();
         
-        console.log('📋 Total groups to check:', (groupsData.data || []).length);
-        
-        // Check each group for my membership
-        for (const group of (groupsData.data || [])) {
-            try {
-                const membersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-                
-                if (!membersResponse.ok) continue;
-                
-                const membersData = await membersResponse.json();
-                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
-                
-                if (!isMember) continue;
-                
-                myGroupIds.push(group.id);
-                console.log('  ✅ Member of group:', group.attributes?.name);
-                
-                // Get resources for this group
-                const resourcesResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-                
-                if (resourcesResponse.ok) {
-                    const resourcesData = await resourcesResponse.json();
-                    (resourcesData.data || []).forEach(resource => {
-                        myResourceIds.add(resource.id);
-                    });
-                }
-            } catch (error) {
-                console.error('❌ Error checking group:', group.id, error.message);
-            }
-        }
-
-        console.log('📋 Summary: I am in', myGroupIds.length, 'approval groups');
-        console.log('📋 Summary: Managing', myResourceIds.size, 'total resources');
-
-        if (myGroupIds.length === 0) {
-            console.log('ℹ️ User not in any approval groups');
-            return Response.json({ 
-                events: [], 
-                message: 'You are not in any approval groups',
-                my_groups_count: 0,
-                my_resources_count: 0
-            });
-        }
-
-        // STEP 3: Fetch calendar events directly (2 week window)
-        console.log('📞 Step 3: Getting calendar events (next 2 weeks)...');
-        
-        const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-        
-        const startDate = now.toISOString();
-        const endDate = twoWeeksFromNow.toISOString();
-
-        // Fetch event instances
-        const instancesResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&order=starts_at&per_page=100`,
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-         if (!instancesResponse.ok) {
-            const errorStatus = instancesResponse.status;
-            const errorText = await instancesResponse.text(); // Get the response body for more details
-            console.error(`❌ PCO event instances fetch failed: Status ${errorStatus}, Response: ${errorText}`);
-            throw new Error(`Failed to fetch event instances: Status ${errorStatus} - ${errorText.substring(0, 100)}`); // Truncate for log
-        }
-
-        const instancesData = await instancesResponse.json();
-        const instances = instancesData.data || [];
-        
-        console.log('📅 Fetched', instances.length, 'event instances');
-
-        // Get unique event IDs
-        const eventIds = new Set();
-        instances.forEach(instance => {
-            const eventId = instance.relationships?.event?.data?.id;
-            if (eventId) eventIds.add(eventId);
+        console.log('✅ Vercel response:', {
+            ok: data.ok,
+            count: data.count,
+            person: data.person
         });
 
-        console.log('📊 Unique events:', eventIds.size);
-
-        // Fetch event details with resources (in batches)
-        const eventDataMap = {};
-        const eventIdArray = Array.from(eventIds);
-        const batchSize = 10;
-
-        for (let i = 0; i < eventIdArray.length; i += batchSize) {
-            const batch = eventIdArray.slice(i, i + batchSize);
-            
-            const batchPromises = batch.map(async (eventId) => {
-                try {
-                    const eventResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
-                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                    );
-
-                    if (!eventResponse.ok) return null;
-
-                    const eventData = await eventResponse.json();
-                    const event = eventData.data;
-                    
-                    // Fetch resource requests
-                    const requestsResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                    );
-
-                    const resourceRequests = [];
-                    
-                    if (requestsResponse.ok) {
-                        const requestsData = await requestsResponse.json();
-                        
-                        const resourceMap = {};
-                        if (requestsData.included) {
-                            for (const item of requestsData.included) {
-                                if (item.type === 'Resource') {
-                                    resourceMap[item.id] = {
-                                        id: item.id,
-                                        name: item.attributes?.name,
-                                        kind: item.attributes?.kind
-                                    };
-                                }
-                            }
-                        }
-                        
-                        for (const request of (requestsData.data || [])) {
-                            const resourceId = request.relationships?.resource?.data?.id;
-                            const resource = resourceMap[resourceId];
-                            
-                            if (resource) {
-                                resourceRequests.push({
-                                    id: request.id,
-                                    resource_id: resourceId,
-                                    resource_name: resource.name,
-                                    resource_kind: resource.kind,
-                                    approval_status: request.attributes?.approval_status
-                                });
-                            }
-                        }
-                    }
-                    
-                    return {
-                        eventId,
-                        data: {
-                            name: event.attributes?.name,
-                            summary: event.attributes?.summary,
-                            resource_requests: resourceRequests
-                        }
-                    };
-                } catch (error) {
-                    console.error(`❌ Error fetching event ${eventId}:`, error);
-                    return null;
-                }
-            });
-
-            const batchResults = await Promise.all(batchPromises);
-            batchResults.forEach(result => {
-                if (result) {
-                    eventDataMap[result.eventId] = result.data;
-                }
-            });
+        if (!data.ok) {
+            console.error('❌ Vercel returned error:', data.error);
+            return Response.json({
+                error: data.error,
+                events: [],
+                details: data
+            }, { status: 400 });
         }
 
-        // Build events with resources
-        const allEvents = [];
+        // Transform the data format to match what the frontend expects
+        const events = (data.events || []).map(event => ({
+            id: event.event_id,
+            event_id: event.event_id,
+            name: event.event_name,
+            starts_at: event.starts_at,
+            ends_at: event.ends_at,
+            summary: '',
+            resources: event.requests.map(req => ({
+                id: req.resource_id,
+                name: req.resource_name,
+                approval_status: req.approval_status // 'P' or 'A'
+            }))
+        }));
+
+        console.log('🎯 Returning', events.length, 'events');
         
-        for (const instance of instances) {
-            const eventId = instance.relationships?.event?.data?.id;
-            const eventData = eventDataMap[eventId];
-            
-            const starts_at = instance.attributes?.starts_at;
-            const ends_at = instance.attributes?.ends_at;
-            
-            if (!starts_at || !ends_at) continue;
-            
-            const resources = [];
-            if (eventData?.resource_requests) {
-                for (const request of eventData.resource_requests) {
-                    resources.push({
-                        id: request.resource_id,
-                        name: request.resource_name,
-                        kind: request.resource_kind,
-                        approval_status: request.approval_status
-                    });
-                }
-            }
-            
-            allEvents.push({
-                id: instance.id,
-                event_id: eventId,
-                name: eventData?.name || 'Untitled Event',
-                starts_at: starts_at,
-                ends_at: ends_at,
-                summary: eventData?.summary,
-                resources: resources
-            });
-        }
-
-        console.log('📊 Built', allEvents.length, 'events with resources');
-
-        // STEP 4: Filter to events with MY APPROVED resources
-        console.log('📞 Step 4: Filtering to my approved resources...');
-        const myEvents = allEvents.filter(event => {
-            if (!event.name || event.name === 'Untitled Event' || event.name.trim() === '') {
-                return false;
-            }
-
-            if (!event.resources || event.resources.length === 0) {
-                return false;
-            }
-            
-            const hasMyApprovedResource = event.resources.some(resource => {
-                const isMyResource = myResourceIds.has(resource.id);
-                const isApproved = resource.approval_status === 'A';
-                return isMyResource && isApproved;
-            });
-            
-            return hasMyApprovedResource;
-        });
-
-        console.log('🎯 Events with my approved resources:', myEvents.length);
-
-        // Sort by date
-        myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-        if (myEvents.length > 0) {
+        if (events.length > 0) {
             console.log('📋 Sample events:');
-            myEvents.slice(0, 3).forEach(event => {
-                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()})`);
+            events.slice(0, 3).forEach(event => {
+                const pendingCount = event.resources.filter(r => r.approval_status === 'P').length;
+                const approvedCount = event.resources.filter(r => r.approval_status === 'A').length;
+                console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()}) - ${pendingCount} pending, ${approvedCount} approved`);
             });
         }
 
         return Response.json({
-            events: myEvents,
-            count: myEvents.length,
-            my_groups_count: myGroupIds.length,
-            my_resources_count: myResourceIds.size
+            events: events,
+            count: events.length,
+            person: data.person,
+            range: data.range
         });
 
     } catch (error) {
