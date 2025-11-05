@@ -80,7 +80,6 @@ export default function MyTasks() {
 
   const loadMySchedule = async () => {
     console.log('🗓️ ========== LOADING MY SCHEDULE ==========');
-    console.log('User:', user);
     
     setLoadingSchedule(true);
     
@@ -106,11 +105,9 @@ export default function MyTasks() {
       console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
-      console.error('❌ FATAL ERROR in loadMySchedule:');
+      console.error('❌ ERROR in loadMySchedule:');
       console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
       
-      toast.error('Failed to load schedule');
       setMyScheduleEvents([]);
     } finally {
       setLoadingSchedule(false);
@@ -361,19 +358,6 @@ export default function MyTasks() {
                   Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <Button 
-                onClick={handleManualRefresh} 
-                disabled={loadingSchedule} 
-                variant="outline" 
-                size="sm"
-                title="Refresh schedule"
-              >
-                {loadingSchedule ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
