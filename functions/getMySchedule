@@ -1,63 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-async function refreshTokenIfNeeded(base44, user) {
-    const expiresAt = new Date(user.pco_token_expires_at);
-    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-
-    if (expiresAt > fiveMinutesFromNow) {
-        return user.pco_access_token;
-    }
-
-    const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: user.pco_refresh_token,
-            client_id: Deno.env.get('PCO_CLIENT_ID'),
-            client_secret: Deno.env.get('PCO_CLIENT_SECRET')
-        })
-    });
-
-    if (!tokenResponse.ok) throw new Error('Token refresh failed');
-
-    const tokens = await tokenResponse.json();
-    const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
-
-    await base44.asServiceRole.entities.User.update(user.id, {
-        pco_access_token: tokens.access_token,
-        pco_refresh_token: tokens.refresh_token,
-        pco_token_expires_at: newExpiresAt
-    });
-
-    return tokens.access_token;
-}
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function fetchWithRetry(url, options, maxRetries = 2) {
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            const response = await fetch(url, options);
-            if (response.ok) return response;
-            
-            if (response.status === 429) {
-                const retryAfter = parseInt(response.headers.get('Retry-After') || '2');
-                console.log(`⏳ Rate limited, waiting ${retryAfter}s...`);
-                await delay(retryAfter * 1000);
-                continue;
-            }
-            
-            throw new Error(`HTTP ${response.status}`);
-        } catch (error) {
-            if (i === maxRetries - 1) throw error;
-            await delay(1000 * (i + 1));
-        }
-    }
-}
-
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -69,113 +11,25 @@ Deno.serve(async (req) => {
 
         console.log('✅ Getting schedule for user:', currentUser.email);
 
-        const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-        const user = users[0];
-
-        if (!user || !user.pco_access_token) {
-            console.log('⚠️ No PCO token');
-            return Response.json({ events: [], message: 'PCO not connected' });
-        }
-
-        const accessToken = await refreshTokenIfNeeded(base44, user);
-
-        // STEP 1: Get my PCO person ID
-        console.log('📞 Step 1: Getting my PCO person ID...');
-        const meResponse = await fetchWithRetry(
-            'https://api.planningcenteronline.com/calendar/v2/me',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        const meData = await meResponse.json();
-        const myPersonId = meData.data?.id;
-        console.log('👤 My PCO Person ID:', myPersonId);
-
-        // STEP 2: Get all approval groups
-        console.log('📞 Step 2: Getting approval groups...');
-        const groupsResponse = await fetchWithRetry(
-            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        const groupsData = await groupsResponse.json();
-        const myResourceNames = new Set();
-
-        // STEP 3: Check membership and collect ALL resources from my groups
-        console.log(`📋 Checking ${groupsData.data?.length || 0} groups...`);
-        
-        for (const group of (groupsData.data || [])) {
-            try {
-                await delay(100);
-                
-                const membersResponse = await fetchWithRetry(
-                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-
-                const membersData = await membersResponse.json();
-                const isMember = (membersData.data || []).some(person => person.id === myPersonId);
-
-                if (!isMember) continue;
-
-                console.log('✅ Member of group:', group.attributes?.name);
-
-                await delay(100);
-
-                // Get ALL resources for this group
-                const resourcesResponse = await fetchWithRetry(
-                    `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-
-                const resourcesData = await resourcesResponse.json();
-                (resourcesData.data || []).forEach(resource => {
-                    const resourceName = resource.attributes?.name;
-                    if (resourceName) {
-                        myResourceNames.add(resourceName);
-                    }
-                });
-            } catch (error) {
-                console.error(`⚠️ Error processing group ${group.id}:`, error.message);
-            }
-        }
-
-        const resourceNamesArray = Array.from(myResourceNames);
-        console.log('📋 My resources:', resourceNamesArray.length, 'resources');
-
-        if (resourceNamesArray.length === 0) {
-            console.log('⚠️ No resources found');
-            return Response.json({ 
-                events: [], 
-                message: 'No resources found for your approval groups'
-            });
-        }
-
-        // STEP 4: Get ALL future calendar events (using existing function)
-        console.log('📞 Step 4: Getting ALL future calendar events...');
+        // Just call getPCOCalendarEvents - it does all the heavy lifting
+        console.log('📞 Getting calendar events...');
         const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
 
         if (!eventsResponse.data || !eventsResponse.data.events) {
-            throw new Error('No events data returned from getPCOCalendarEvents');
+            throw new Error('No events data returned');
         }
 
         const allEvents = eventsResponse.data.events || [];
-        console.log('📅 Total future events:', allEvents.length);
+        console.log('📅 Got', allEvents.length, 'events');
 
-        // STEP 5: Filter to events using ANY of my resources
-        const myEvents = allEvents.filter(event => {
-            return event.resources && event.resources.some(r => resourceNamesArray.includes(r.name));
-        });
+        // Sort by date
+        allEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        console.log('🎯 Events using my resources:', myEvents.length);
-        myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-        console.log('✅ SUCCESS! Returning', myEvents.length, 'events');
+        console.log('✅ SUCCESS! Returning', allEvents.length, 'events');
 
         return Response.json({
-            events: myEvents,
-            count: myEvents.length,
-            resources_count: resourceNamesArray.length,
-            my_resources: resourceNamesArray
+            events: allEvents,
+            count: allEvents.length
         });
 
     } catch (error) {

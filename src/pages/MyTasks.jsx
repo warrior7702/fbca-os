@@ -85,7 +85,6 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      // Call the dedicated backend function that handles everything
       console.log('📞 Calling getMySchedule...');
       const response = await base44.functions.invoke('getMySchedule');
       
@@ -96,13 +95,11 @@ export default function MyTasks() {
       }
       
       const events = response.data.events || [];
-      const resourceCount = response.data.resources_count || 0;
       
-      console.log(`✅ Got ${events.length} events for ${resourceCount} resources`);
+      console.log(`✅ Got ${events.length} events`);
       
       if (events.length === 0) {
         console.log('⚠️ No events found');
-        toast.info(response.data.message || 'No upcoming events found');
       }
       
       setMyScheduleEvents(events);
@@ -113,9 +110,7 @@ export default function MyTasks() {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
       
-      const errorMsg = error.message || 'Unknown error';
-      toast.error(`Failed to load schedule: ${errorMsg}`);
-      
+      toast.error('Failed to load schedule');
       setMyScheduleEvents([]);
     } finally {
       setLoadingSchedule(false);
