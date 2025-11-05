@@ -144,46 +144,173 @@ Deno.serve(async (req) => {
             });
         }
 
-        // STEP 3: Get ALL calendar events
-        console.log('📞 Step 3: Getting all calendar events...');
+        // STEP 3: Fetch calendar events directly (2 week window)
+        console.log('📞 Step 3: Getting calendar events (next 2 weeks)...');
         
-        let allEvents = [];
-        try {
-            const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-            console.log('✅ Got response from getPCOCalendarEvents');
+        const now = new Date();
+        const twoWeeksFromNow = new Date(now);
+        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+        
+        const startDate = now.toISOString();
+        const endDate = twoWeeksFromNow.toISOString();
+
+        // Fetch event instances
+        const instancesResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&filter[starts_at][gte]=${startDate}&filter[starts_at][lte]=${endDate}&order=starts_at&per_page=100`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!instancesResponse.ok) {
+            throw new Error('Failed to fetch event instances');
+        }
+
+        const instancesData = await instancesResponse.json();
+        const instances = instancesData.data || [];
+        
+        console.log('📅 Fetched', instances.length, 'event instances');
+
+        // Get unique event IDs
+        const eventIds = new Set();
+        instances.forEach(instance => {
+            const eventId = instance.relationships?.event?.data?.id;
+            if (eventId) eventIds.add(eventId);
+        });
+
+        console.log('📊 Unique events:', eventIds.size);
+
+        // Fetch event details with resources (in batches)
+        const eventDataMap = {};
+        const eventIdArray = Array.from(eventIds);
+        const batchSize = 10;
+
+        for (let i = 0; i < eventIdArray.length; i += batchSize) {
+            const batch = eventIdArray.slice(i, i + batchSize);
             
-            if (!eventsResponse || !eventsResponse.data) {
-                console.error('❌ No data in response');
-                throw new Error('No events data returned from getPCOCalendarEvents');
+            const batchPromises = batch.map(async (eventId) => {
+                try {
+                    const eventResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    );
+
+                    if (!eventResponse.ok) return null;
+
+                    const eventData = await eventResponse.json();
+                    const event = eventData.data;
+                    
+                    // Fetch resource requests
+                    const requestsResponse = await fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    );
+
+                    const resourceRequests = [];
+                    
+                    if (requestsResponse.ok) {
+                        const requestsData = await requestsResponse.json();
+                        
+                        const resourceMap = {};
+                        if (requestsData.included) {
+                            for (const item of requestsData.included) {
+                                if (item.type === 'Resource') {
+                                    resourceMap[item.id] = {
+                                        id: item.id,
+                                        name: item.attributes?.name,
+                                        kind: item.attributes?.kind
+                                    };
+                                }
+                            }
+                        }
+                        
+                        for (const request of (requestsData.data || [])) {
+                            const resourceId = request.relationships?.resource?.data?.id;
+                            const resource = resourceMap[resourceId];
+                            
+                            if (resource) {
+                                resourceRequests.push({
+                                    id: request.id,
+                                    resource_id: resourceId,
+                                    resource_name: resource.name,
+                                    resource_kind: resource.kind,
+                                    approval_status: request.attributes?.approval_status
+                                });
+                            }
+                        }
+                    }
+                    
+                    return {
+                        eventId,
+                        data: {
+                            name: event.attributes?.name,
+                            summary: event.attributes?.summary,
+                            resource_requests: resourceRequests
+                        }
+                    };
+                } catch (error) {
+                    console.error(`❌ Error fetching event ${eventId}:`, error);
+                    return null;
+                }
+            });
+
+            const batchResults = await Promise.all(batchPromises);
+            batchResults.forEach(result => {
+                if (result) {
+                    eventDataMap[result.eventId] = result.data;
+                }
+            });
+        }
+
+        // Build events with resources
+        const allEvents = [];
+        
+        for (const instance of instances) {
+            const eventId = instance.relationships?.event?.data?.id;
+            const eventData = eventDataMap[eventId];
+            
+            const starts_at = instance.attributes?.starts_at;
+            const ends_at = instance.attributes?.ends_at;
+            
+            if (!starts_at || !ends_at) continue;
+            
+            const resources = [];
+            if (eventData?.resource_requests) {
+                for (const request of eventData.resource_requests) {
+                    resources.push({
+                        id: request.resource_id,
+                        name: request.resource_name,
+                        kind: request.resource_kind,
+                        approval_status: request.approval_status
+                    });
+                }
             }
             
-            allEvents = eventsResponse.data.events || [];
-            console.log('📅 Total events from PCO:', allEvents.length);
-        } catch (error) {
-            console.error('❌ Error calling getPCOCalendarEvents:', error.message);
-            throw new Error(`Failed to get calendar events: ${error.message}`);
+            allEvents.push({
+                id: instance.id,
+                event_id: eventId,
+                name: eventData?.name || 'Untitled Event',
+                starts_at: starts_at,
+                ends_at: ends_at,
+                summary: eventData?.summary,
+                resources: resources
+            });
         }
+
+        console.log('📊 Built', allEvents.length, 'events with resources');
 
         // STEP 4: Filter to events with MY APPROVED resources
         console.log('📞 Step 4: Filtering to my approved resources...');
         const myEvents = allEvents.filter(event => {
-            // Skip events without proper names
             if (!event.name || event.name === 'Untitled Event' || event.name.trim() === '') {
                 return false;
             }
 
-            // Skip events without resources
             if (!event.resources || event.resources.length === 0) {
                 return false;
             }
             
-            // Check if ANY resource is:
-            // 1. In my resource list (from my approval groups)
-            // 2. Has approval_status = 'A' (approved)
             const hasMyApprovedResource = event.resources.some(resource => {
                 const isMyResource = myResourceIds.has(resource.id);
                 const isApproved = resource.approval_status === 'A';
-                
                 return isMyResource && isApproved;
             });
             
@@ -192,33 +319,19 @@ Deno.serve(async (req) => {
 
         console.log('🎯 Events with my approved resources:', myEvents.length);
 
-        // STEP 5: Filter to 2-week window
-        console.log('📞 Step 5: Filtering to 2-week window...');
-        const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
-        const eventsIn2Weeks = myEvents.filter(event => {
-            const eventDate = new Date(event.starts_at);
-            return eventDate >= now && eventDate <= twoWeeksFromNow;
-        });
-
-        console.log('📅 Events in next 2 weeks:', eventsIn2Weeks.length);
-
         // Sort by date
-        eventsIn2Weeks.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+        myEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        // Log a few sample events
-        if (eventsIn2Weeks.length > 0) {
+        if (myEvents.length > 0) {
             console.log('📋 Sample events:');
-            eventsIn2Weeks.slice(0, 3).forEach(event => {
+            myEvents.slice(0, 3).forEach(event => {
                 console.log(`  - ${event.name} (${new Date(event.starts_at).toLocaleDateString()})`);
             });
         }
 
         return Response.json({
-            events: eventsIn2Weeks,
-            count: eventsIn2Weeks.length,
+            events: myEvents,
+            count: myEvents.length,
             my_groups_count: myGroupIds.length,
             my_resources_count: myResourceIds.size
         });
