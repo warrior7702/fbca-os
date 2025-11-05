@@ -5,6 +5,8 @@ const PCO = {
   base: 'https://api.planningcenteronline.com/calendar/v2'
 };
 
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function refreshTokenIfNeeded(base44, user) {
   try {
     const expiresAt = new Date(user.pco_token_expires_at);
@@ -108,8 +110,6 @@ Deno.serve(async (req) => {
     const userToken = await refreshTokenIfNeeded(base44, user);
     console.log('✅ Got valid token');
 
-    // Simple approach: Just try to approve it
-    // If user doesn't have permission, PCO will return an error
     const statusCode = action === 'approve' ? 'A' : 'R';
     const url = `${PCO.base}/event_resource_requests/${request_id}`;
     
@@ -130,22 +130,71 @@ Deno.serve(async (req) => {
       patchBody.data.attributes.notes = note;
     }
 
-    const pcoResponse = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${userToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(patchBody)
-    });
-
-    const responseText = await pcoResponse.text();
+    // Retry logic for rate limits
+    let attempt = 0;
+    const maxAttempts = 3;
+    let lastError = null;
     
-    if (!pcoResponse.ok) {
+    while (attempt < maxAttempts) {
+      attempt++;
+      
+      if (attempt > 1) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 2s, 4s, 8s
+        console.log(`⏳ Attempt ${attempt}/${maxAttempts} - waiting ${waitTime}ms before retry...`);
+        await delay(waitTime);
+      }
+      
+      const pcoResponse = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(patchBody)
+      });
+
+      const responseText = await pcoResponse.text();
+      
+      // Success!
+      if (pcoResponse.ok) {
+        const result = responseText ? JSON.parse(responseText) : { ok: true };
+        console.log('✅ Successfully', action === 'approve' ? 'approved' : 'denied', 'request in PCO');
+        return Response.json({ 
+          ok: true, 
+          action, 
+          request_id, 
+          result 
+        });
+      }
+      
+      // Rate limit - retry
+      if (pcoResponse.status === 429) {
+        console.log('⚠️ Rate limit hit (429) - will retry...');
+        lastError = 'Rate limit exceeded. Please wait a moment and try again.';
+        continue; // Retry
+      }
+      
+      // Permissions error - don't retry
+      if (pcoResponse.status === 403) {
+        console.error('❌ PCO API error: 403 Forbidden');
+        console.error('   Response:', responseText);
+        
+        let errorMessage = 'You don\'t have permission to approve this request. ';
+        errorMessage += 'Make sure you\'re in the correct approval group in Planning Center. ';
+        errorMessage += 'Contact your PCO admin if you need access.';
+        
+        return Response.json({ 
+          ok: false, 
+          error: errorMessage,
+          status: 403,
+          details: responseText
+        }, { status: 403 });
+      }
+      
+      // Other error - parse and return
       console.error('❌ PCO API error:', pcoResponse.status);
       console.error('   Response:', responseText);
       
-      // Parse error details if available
       let errorMessage = `PCO API error: ${pcoResponse.status}`;
       try {
         const errorData = JSON.parse(responseText);
@@ -153,7 +202,6 @@ Deno.serve(async (req) => {
           errorMessage = errorData.errors[0].detail || errorData.errors[0].title || errorMessage;
         }
       } catch (e) {
-        // If we can't parse, use the raw text
         if (responseText) {
           errorMessage += ': ' + responseText.substring(0, 200);
         }
@@ -166,17 +214,14 @@ Deno.serve(async (req) => {
         details: responseText
       }, { status: 400 });
     }
-
-    const result = responseText ? JSON.parse(responseText) : { ok: true };
-
-    console.log('✅ Successfully', action === 'approve' ? 'approved' : 'denied', 'request in PCO');
-
+    
+    // All retries exhausted
+    console.error('❌ All retry attempts exhausted');
     return Response.json({ 
-      ok: true, 
-      action, 
-      request_id, 
-      result 
-    });
+      ok: false, 
+      error: lastError || 'Failed after multiple attempts',
+      status: 429
+    }, { status: 429 });
 
   } catch (error) {
     console.error('❌ Unexpected error:');
