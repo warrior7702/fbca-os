@@ -28,6 +28,8 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
       const resourcesResponse = await base44.functions.invoke('getPCOEventResources', {
         event_id: event.event_id
       });
+      
+      console.log('📦 Resources response:', resourcesResponse.data);
       setResources(resourcesResponse.data.resource_requests || []);
 
       // Fetch comments/door codes
@@ -52,11 +54,23 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const rooms = resources.filter(r => r.resource_kind === 'Room');
   const otherResources = resources.filter(r => r.resource_kind !== 'Room');
 
-  // Find the "What time do you want access to begin and end?" answer specifically from Building Access resource
+  // Find the "What time do you want access to begin and end?" answer - search more broadly
+  console.log('🔍 Searching for access time in resources:', resources.length);
+  
   const accessTimeAnswer = resources
-    .filter(r => r.resource_name?.toLowerCase().includes('building access'))
-    .flatMap(r => r.answers || [])
-    .find(a => a.question?.toLowerCase().includes('what time do you want access to begin and end'));
+    .flatMap(r => {
+      console.log(`  Resource: ${r.resource_name}, Answers:`, r.answers?.length || 0);
+      if (r.answers) {
+        r.answers.forEach(a => console.log(`    Q: "${a.question}" A: "${a.answer}"`));
+      }
+      return r.answers || [];
+    })
+    .find(a => {
+      const question = a.question?.toLowerCase() || '';
+      return question.includes('access') && (question.includes('time') || question.includes('begin') || question.includes('end'));
+    });
+
+  console.log('✅ Found access time answer:', accessTimeAnswer);
 
   const getApprovalStatusColor = (status) => {
     switch (status) {
@@ -109,8 +123,8 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                 {accessTimeAnswer && (
                   <div className="flex items-center gap-2 text-slate-700">
                     <Lock className="w-4 h-4 text-green-600" />
-                    <span className="text-sm">
-                      {accessTimeAnswer.answer}
+                    <span className="text-sm font-medium">
+                      Access: {accessTimeAnswer.answer}
                     </span>
                   </div>
                 )}
