@@ -160,8 +160,11 @@ Deno.serve(async (req) => {
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
-        if (!instancesResponse.ok) {
-            throw new Error('Failed to fetch event instances');
+         if (!instancesResponse.ok) {
+            const errorStatus = instancesResponse.status;
+            const errorText = await instancesResponse.text(); // Get the response body for more details
+            console.error(`❌ PCO event instances fetch failed: Status ${errorStatus}, Response: ${errorText}`);
+            throw new Error(`Failed to fetch event instances: Status ${errorStatus} - ${errorText.substring(0, 100)}`); // Truncate for log
         }
 
         const instancesData = await instancesResponse.json();
