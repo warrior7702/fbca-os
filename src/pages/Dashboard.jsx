@@ -76,10 +76,12 @@ export default function Dashboard() {
   const [appPositions, setAppPositions] = useState(getDefaultPositions());
   const [draggedApp, setDraggedApp] = useState(null);
   const [approvalsCount, setApprovalsCount] = useState(0);
+  const [tasksDueToday, setTasksDueToday] = useState(0);
 
   useEffect(() => {
     loadUser();
     loadApprovals();
+    loadTasksDueToday();
   }, []);
 
   useEffect(() => {
@@ -142,6 +144,54 @@ export default function Dashboard() {
       setApprovalsCount(response.data?.count || 0);
     } catch (error) {
       console.error('Failed to load approvals count:', error);
+    }
+  };
+
+  const loadTasksDueToday = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      
+      let todayCount = 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Get ClickUp tasks if connected
+      if (currentUser?.clickup_access_token) {
+        try {
+          const clickupResponse = await base44.functions.invoke('getMyClickUpTasks');
+          const clickupTasks = clickupResponse.data.tasks || [];
+          const clickupDueToday = clickupTasks.filter(task => {
+            if (!task.due_date) return false;
+            const dueDate = new Date(parseInt(task.due_date)); // ClickUp due_date is unix timestamp in milliseconds
+            return dueDate >= today && dueDate < tomorrow;
+          });
+          todayCount += clickupDueToday.length;
+        } catch (error) {
+          console.error('Failed to load ClickUp tasks:', error);
+        }
+      }
+
+      // Get Microsoft To Do tasks if connected
+      if (currentUser?.microsoft_access_token) {
+        try {
+          const todoResponse = await base44.functions.invoke('getMicrosoftToDo');
+          const todoTasks = todoResponse.data.tasks || todoResponse.data || [];
+          const todoDueToday = todoTasks.filter(task => {
+            if (!task.due_date) return false;
+            const dueDate = new Date(task.due_date); // Microsoft To Do due_date is ISO string
+            return dueDate >= today && dueDate < tomorrow;
+          });
+          todayCount += todoDueToday.length;
+        } catch (error) {
+          console.error('Failed to load Microsoft To Do tasks:', error);
+        }
+      }
+
+      setTasksDueToday(todayCount);
+    } catch (error) {
+      console.error('Failed to load tasks due today:', error);
     }
   };
 
@@ -270,9 +320,14 @@ export default function Dashboard() {
                         >
                           <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                             <app.icon className="w-8 h-8 text-white" />
-                            {app.showBadge && approvalsCount > 0 && (
+                            {app.id === 'myapprovals' && approvalsCount > 0 && (
                               <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
                                 {approvalsCount}
+                              </Badge>
+                            )}
+                            {app.id === 'mytasks' && tasksDueToday > 0 && (
+                              <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                {tasksDueToday}
                               </Badge>
                             )}
                           </div>
@@ -289,9 +344,14 @@ export default function Dashboard() {
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
-                                {app.showBadge && approvalsCount > 0 && (
+                                {app.id === 'myapprovals' && approvalsCount > 0 && (
                                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
                                     {approvalsCount}
+                                  </Badge>
+                                )}
+                                {app.id === 'mytasks' && tasksDueToday > 0 && (
+                                  <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                    {tasksDueToday}
                                   </Badge>
                                 )}
                               </div>
@@ -308,9 +368,14 @@ export default function Dashboard() {
                             >
                               <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
                                 <app.icon className="w-8 h-8 text-white" />
-                                {app.showBadge && approvalsCount > 0 && (
+                                {app.id === 'myapprovals' && approvalsCount > 0 && (
                                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
                                     {approvalsCount}
+                                  </Badge>
+                                )}
+                                {app.id === 'mytasks' && tasksDueToday > 0 && (
+                                  <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                    {tasksDueToday}
                                   </Badge>
                                 )}
                               </div>

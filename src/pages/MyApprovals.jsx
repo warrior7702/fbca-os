@@ -73,6 +73,7 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
+  const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
 
   // New state variables for inline cardholder search
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
@@ -145,6 +146,7 @@ export default function MyApprovals() {
   useEffect(() => {
     if (approvals.length > 0) {
       loadAllAnswerPreviews();
+      loadPostedDoorCodes(); // NEW: Load door codes that were already posted
     }
   }, [approvals]);
 
@@ -218,6 +220,35 @@ export default function MyApprovals() {
     }
   };
 
+  // NEW: Load posted door codes for all approvals
+  const loadPostedDoorCodes = async () => {
+    for (const approval of approvals) {
+      try {
+        const response = await base44.functions.invoke('getPCOEventComments', {
+          event_id: approval.event_id
+        });
+
+        if (response.data.comments) {
+          const doorCodeComment = response.data.comments.find(c =>
+            c.body?.includes('🚪 Building Access Approved') && c.body?.includes('Door Code:')
+          );
+
+          if (doorCodeComment) {
+            const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
+            if (match) {
+              setPostedDoorCodes(prev => ({
+                ...prev,
+                [approval.request_id]: match[1]
+              }));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading door code for approval:', error);
+      }
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -227,6 +258,7 @@ export default function MyApprovals() {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
+        setPostedDoorCodes({}); // Clear posted codes cache
         setLastSync(new Date());
       }
     } catch (error) {
@@ -311,6 +343,13 @@ export default function MyApprovals() {
 
       if (response.data.ok) {
         toast.success('Door code posted to event activity in PCO!');
+        
+        // Update posted door codes state to show the code was posted
+        setPostedDoorCodes(prev => ({
+          ...prev,
+          [approval.request_id]: doorCode.trim()
+        }));
+        
         setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
         setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
       } else {
@@ -404,6 +443,7 @@ export default function MyApprovals() {
               approvals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
+                const postedCode = postedDoorCodes[approval.request_id]; // Get posted code
 
                 return (
                   <motion.div
@@ -466,6 +506,16 @@ export default function MyApprovals() {
                           </div>
                         )}
 
+                        {/* Show posted door code if available */}
+                        {postedCode && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                            <Key className="w-4 h-4 text-green-600" />
+                            <span className="text-sm text-green-800 font-medium">
+                              Door Code Posted: <span className="font-mono font-bold">{postedCode}</span>
+                            </span>
+                          </div>
+                        )}
+
                         <div className="space-y-2 pt-4">
                           {/* Door Code Input with Inline Search */}
                           <div className="relative">
@@ -475,18 +525,19 @@ export default function MyApprovals() {
                               value={cardholderSearchQuery[approval.request_id] || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                setDoorCodes(prev => ({ ...prev, [approval.request_id]: value })); // Update the actual door code state
-                                handleCardholderSearchChange(approval.request_id, value); // Trigger search
+                                setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
+                                handleCardholderSearchChange(approval.request_id, value);
                               }}
                               className="w-full"
                               maxLength={50}
+                              disabled={!!postedCode} // Disable if code already posted
                             />
                             {searchingCardholder[approval.request_id] && (
                               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
                             )}
                             
                             {/* Inline Search Results */}
-                            {cardholderSearchResults[approval.request_id]?.length > 0 && (
+                            {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
                               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                                 {cardholderSearchResults[approval.request_id].map((cardholder) => (
                                   <button
@@ -521,7 +572,7 @@ export default function MyApprovals() {
                           <div className="flex gap-2">
                             <Button
                               onClick={() => handleSendCode(approval)}
-                              disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === ''}
+                              disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
                               className="bg-green-600 hover:bg-green-700 text-white flex-1"
                             >
                               {sendingCode === approval.request_id ? (
@@ -529,7 +580,7 @@ export default function MyApprovals() {
                               ) : (
                                 <Key className="w-4 h-4 mr-2" />
                               )}
-                              Send to PCO
+                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
                             </Button>
                             <Button
                               onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
