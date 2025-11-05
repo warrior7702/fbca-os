@@ -55,15 +55,111 @@ Deno.serve(async (req) => {
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
-        // SIMPLIFIED: Just get event instances for next 2 weeks
+        // Step 1: Get my PCO person ID
+        console.log('📞 Step 1: Getting my PCO person ID...');
+        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!meResponse.ok) {
+            console.error('❌ Failed to get PCO person ID');
+            throw new Error('Failed to get PCO person ID');
+        }
+
+        const meData = await meResponse.json();
+        const myPersonId = meData.data?.id;
+        console.log('👤 My PCO Person ID:', myPersonId);
+
+        // Step 2: Get approval groups I'm in
+        console.log('📞 Step 2: Getting approval groups...');
+        const groupsResponse = await fetch(
+            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!groupsResponse.ok) {
+            console.error('❌ Failed to get approval groups');
+            throw new Error('Failed to get approval groups');
+        }
+
+        const groupsData = await groupsResponse.json();
+        const allGroups = groupsData.data || [];
+        console.log('📋 Found', allGroups.length, 'total approval groups');
+
+        // Check which groups I'm in
+        const myGroups = [];
+        for (const group of allGroups) {
+            const membersResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (membersResponse.ok) {
+                const membersData = await membersResponse.json();
+                const isMember = membersData.data?.some(m => m.id === myPersonId);
+                
+                if (isMember) {
+                    console.log('✅ Member of group:', group.attributes?.name);
+                    myGroups.push({
+                        id: group.id,
+                        name: group.attributes?.name
+                    });
+                }
+            }
+        }
+
+        console.log('📋 I am in', myGroups.length, 'approval groups');
+
+        if (myGroups.length === 0) {
+            console.log('⚠️ Not in any approval groups - returning empty');
+            return Response.json({
+                events: [],
+                count: 0,
+                message: 'You are not in any approval groups'
+            });
+        }
+
+        // Step 3: Get resources for my groups
+        console.log('📞 Step 3: Getting resources for my groups...');
+        const myResourceIds = new Set();
+        
+        for (const group of myGroups) {
+            const resourcesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                for (const resource of (resourcesData.data || [])) {
+                    myResourceIds.add(resource.id);
+                    console.log('🔑 Managing resource:', resource.attributes?.name);
+                }
+            }
+        }
+
+        console.log('📊 Managing', myResourceIds.size, 'resources total');
+
+        if (myResourceIds.size === 0) {
+            console.log('⚠️ No resources to manage - returning empty');
+            return Response.json({
+                events: [],
+                count: 0,
+                message: 'No resources assigned to your approval groups'
+            });
+        }
+
+        // Step 4: Get ALL future event instances (no filtering yet)
+        console.log('📞 Step 4: Fetching ALL future event instances...');
+        
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
-        console.log('📅 Fetching events from', now.toISOString(), 'to', twoWeeksFromNow.toISOString());
-
-        // Fetch event instances
-        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100`;
+        
+        // Try with simple filter first
+        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
+        
+        console.log('🔗 Fetching:', instancesUrl);
         
         const instancesResponse = await fetch(instancesUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -72,106 +168,124 @@ Deno.serve(async (req) => {
         if (!instancesResponse.ok) {
             const errorText = await instancesResponse.text();
             console.error('❌ Failed to fetch event instances:', instancesResponse.status, errorText);
-            throw new Error('Failed to fetch calendar events');
+            throw new Error('Failed to fetch event instances');
         }
 
         const instancesData = await instancesResponse.json();
-        const instances = instancesData.data || [];
+        const allInstances = instancesData.data || [];
+        
+        console.log('📅 Found', allInstances.length, 'total future event instances');
 
-        console.log('📦 Fetched', instances.length, 'event instances');
+        if (allInstances.length === 0) {
+            console.log('⚠️ No future events found in PCO Calendar');
+            return Response.json({
+                events: [],
+                count: 0,
+                message: 'No future events found in PCO Calendar'
+            });
+        }
 
         // Get unique event IDs
         const eventIds = new Set();
-        instances.forEach(instance => {
+        allInstances.forEach(instance => {
             const eventId = instance.relationships?.event?.data?.id;
             if (eventId) eventIds.add(eventId);
         });
 
-        console.log('📊 Unique events:', eventIds.size);
+        console.log('📊 Found', eventIds.size, 'unique events');
 
-        // Fetch event details for each
-        const eventsMap = {};
-        for (const eventId of eventIds) {
+        // Step 5: For each event, check if it uses any of my resources
+        console.log('📞 Step 5: Checking which events use my resources...');
+        
+        const eventsWithMyResources = [];
+        
+        for (const eventId of Array.from(eventIds).slice(0, 50)) { // Limit to first 50 events for speed
             try {
+                // Get event details
                 const eventResponse = await fetch(
                     `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
 
-                if (eventResponse.ok) {
-                    const eventData = await eventResponse.json();
-                    const event = eventData.data;
-                    
-                    // Extract tags
-                    const tags = [];
-                    if (eventData.included) {
-                        for (const item of eventData.included) {
-                            if (item.type === 'Tag') {
-                                tags.push(item.attributes?.name);
-                            }
-                        }
-                    }
+                if (!eventResponse.ok) continue;
 
-                    eventsMap[eventId] = {
-                        name: event.attributes?.name,
-                        summary: event.attributes?.summary,
-                        description: event.attributes?.description,
-                        tags: tags
-                    };
+                const eventData = await eventResponse.json();
+                const event = eventData.data;
+
+                // Get resource requests for this event
+                const requestsResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                if (!requestsResponse.ok) continue;
+
+                const requestsData = await requestsResponse.json();
+                
+                // Check if any requested resources are mine
+                const myRequestedResources = [];
+                for (const request of (requestsData.data || [])) {
+                    const resourceId = request.relationships?.resource?.data?.id;
+                    if (myResourceIds.has(resourceId)) {
+                        // Find resource details from included
+                        const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+                        myRequestedResources.push({
+                            id: resourceId,
+                            name: resource?.attributes?.name || 'Unknown',
+                            approval_status: request.attributes?.approval_status
+                        });
+                    }
+                }
+
+                if (myRequestedResources.length > 0) {
+                    // This event uses my resources! Find its instances
+                    const eventInstances = allInstances.filter(i => 
+                        i.relationships?.event?.data?.id === eventId
+                    );
+
+                    for (const instance of eventInstances) {
+                        const startsAt = instance.attributes?.starts_at;
+                        const endsAt = instance.attributes?.ends_at;
+                        
+                        if (!startsAt) continue;
+                        
+                        const startDate = new Date(startsAt);
+                        if (startDate > twoWeeksFromNow) continue; // Only next 2 weeks
+
+                        eventsWithMyResources.push({
+                            id: instance.id,
+                            event_id: eventId,
+                            name: event.attributes?.name || 'Untitled Event',
+                            starts_at: startsAt,
+                            ends_at: endsAt,
+                            summary: event.attributes?.summary,
+                            resources: myRequestedResources
+                        });
+                    }
                 }
             } catch (error) {
-                console.error('❌ Error fetching event', eventId, ':', error);
+                console.error('❌ Error processing event', eventId, ':', error);
             }
         }
 
-        console.log('📊 Fetched details for', Object.keys(eventsMap).length, 'events');
-
-        // Build final events list
-        const events = [];
-        
-        for (const instance of instances) {
-            const eventId = instance.relationships?.event?.data?.id;
-            const startsAt = instance.attributes?.starts_at;
-            const endsAt = instance.attributes?.ends_at;
-            
-            if (!startsAt || !endsAt) continue;
-            
-            const startDate = new Date(startsAt);
-            
-            // Filter to 2-week window
-            if (startDate > twoWeeksFromNow) continue;
-            
-            const eventData = eventsMap[eventId];
-            if (!eventData || !eventData.name || eventData.name === 'Untitled Event') continue;
-
-            events.push({
-                id: instance.id,
-                event_id: eventId,
-                name: eventData.name,
-                starts_at: startsAt,
-                ends_at: endsAt,
-                summary: eventData.summary,
-                description: eventData.description,
-                tags: eventData.tags || [],
-                resources: [] // Empty for now
-            });
-        }
-
         // Sort by start date
-        events.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+        eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        console.log('🎯 Returning', events.length, 'events');
+        console.log('🎯 Returning', eventsWithMyResources.length, 'events');
         
-        if (events.length > 0) {
-            console.log('📋 First few events:', events.slice(0, 3).map(e => ({ 
-                name: e.name, 
-                date: new Date(e.starts_at).toLocaleDateString() 
+        if (eventsWithMyResources.length > 0) {
+            console.log('📋 First few:', eventsWithMyResources.slice(0, 3).map(e => ({
+                name: e.name,
+                date: new Date(e.starts_at).toLocaleDateString(),
+                resources: e.resources.length
             })));
         }
 
         return Response.json({
-            events: events,
-            count: events.length
+            events: eventsWithMyResources,
+            count: eventsWithMyResources.length,
+            my_groups_count: myGroups.length,
+            my_resources_count: myResourceIds.size
         });
 
     } catch (error) {
