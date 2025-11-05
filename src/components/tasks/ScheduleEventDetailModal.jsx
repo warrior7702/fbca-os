@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, DoorOpen } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { base44 } from "@/api/base44Client";
 
@@ -50,6 +50,11 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   // Separate rooms from other resources
   const rooms = resources.filter(r => r.resource_kind === 'Room');
   const otherResources = resources.filter(r => r.resource_kind !== 'Room');
+
+  // Find the "What time do you want access to begin and end?" answer
+  const accessTimeAnswer = resources
+    .flatMap(r => r.answers || [])
+    .find(a => a.question?.toLowerCase().includes('what time do you want access to begin and end'));
 
   const getApprovalStatusColor = (status) => {
     switch (status) {
@@ -99,6 +104,14 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                     {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
                   </span>
                 </div>
+                {accessTimeAnswer && (
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <DoorOpen className="w-4 h-4 text-green-600" />
+                    <span className="text-sm">
+                      <span className="font-medium">Access Time:</span> {accessTimeAnswer.answer}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
