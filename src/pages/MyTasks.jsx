@@ -89,16 +89,16 @@ export default function MyTasks() {
       
       console.log('✅ Response:', response.data);
       
-      if (!response.data) {
-        throw new Error('No data returned from getMySchedule');
+      if (!response.data || !response.data.ok) {
+        throw new Error(response.data?.error || 'Failed to load schedule');
       }
       
       const events = response.data.events || [];
       
       console.log(`✅ Got ${events.length} events`);
       
-      if (events.length === 0) {
-        console.log('⚠️ No events found');
+      if (events.length === 0 && response.data.diag) {
+        console.log('ℹ️ Diagnostic info:', response.data.diag);
       }
       
       setMyScheduleEvents(events);
@@ -108,6 +108,7 @@ export default function MyTasks() {
       console.error('❌ ERROR in loadMySchedule:');
       console.error('Error message:', error.message);
       
+      toast.error('Failed to load schedule');
       setMyScheduleEvents([]);
     } finally {
       setLoadingSchedule(false);

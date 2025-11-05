@@ -1,43 +1,248 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from "npm:@base44/sdk@0.7.1";
+
+const J = (o, s = 200) =>
+  new Response(JSON.stringify(o, null, 2), {
+    status: s,
+    headers: { "content-type": "application/json" },
+  });
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function fetchRetry(url, opt, tries = 2) {
+  for (let i = 0; i <= tries; i++) {
+    let res;
+    try { res = await fetch(url, opt); } catch { /* network */ }
+    if (res?.ok) return res;
+
+    const status = res?.status ?? 0;
+    if (status === 429 && i < tries) {
+      const ra = parseInt(res.headers.get("Retry-After") || "2", 10);
+      await sleep(ra * 1000);
+      continue;
+    }
+    if (!res && i < tries) {
+      await sleep(1000 * (i + 1));
+      continue;
+    }
+
+    const body = res ? await res.text().catch(() => "") : "no-response";
+    const e = new Error(`HTTP ${status} for ${url}`);
+    e.status = status; e.body = body;
+    throw e;
+  }
+}
+
+async function pcoJson(token, url) {
+  const r = await fetchRetry(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
+  return r.json();
+}
+
+async function pcoPages(token, url, max=5) {
+  let page = 1, out = [];
+  while (page <= max) {
+    const sep = url.includes("?") ? "&" : "?";
+    const r = await pcoJson(token, `${url}${sep}per_page=100&page=${page}`);
+    const data = r?.data || [];
+    out = out.concat(data);
+    if (data.length < 100) break;
+    page++;
+  }
+  return out;
+}
+
+async function refreshIfNeeded(base44, user) {
+  const expiresAt = new Date(user.pco_token_expires_at || 0);
+  const soon = new Date(Date.now() + 5 * 60 * 1000);
+  if (user.pco_access_token && expiresAt > soon) return user.pco_access_token;
+
+  const r = await fetch("https://api.planningcenteronline.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: user.pco_refresh_token,
+      client_id: Deno.env.get("PCO_CLIENT_ID"),
+      client_secret: Deno.env.get("PCO_CLIENT_SECRET"),
+    }),
+  });
+  if (!r.ok) throw new Error(`Token refresh failed (${r.status}): ${await r.text()}`);
+
+  const t = await r.json();
+  const exp = new Date(Date.now() + t.expires_in * 1000).toISOString();
+  await base44.asServiceRole.entities.User.update(user.id, {
+    pco_access_token: t.access_token,
+    pco_refresh_token: t.refresh_token,
+    pco_token_expires_at: exp,
+  });
+  return t.access_token;
+}
+
+/** Robust person-id resolver:
+ *  1) stored user.pco_person_id
+ *  2) Calendar API: /calendar/v2/people/me
+ *  3) People API:   /people/v2/me  (then use .relationships.primary_organization_person.data.id OR .data.id)
+ */
+async function getPersonId(base44, user, token) {
+  if (user.pco_person_id) return { id: user.pco_person_id, source: "stored" };
+
+  // Try Calendar "me"
+  try {
+    const calMe = await pcoJson(token, "https://api.planningcenteronline.com/calendar/v2/people/me");
+    const id = calMe?.data?.id;
+    const name = calMe?.data?.attributes?.name;
+    if (id) {
+      await base44.asServiceRole.entities.User.update(user.id, { pco_person_id: id });
+      return { id, name, source: "calendar/me" };
+    }
+  } catch {}
+
+  // Try People "me"
+  try {
+    const ppl = await pcoJson(token, "https://api.planningcenteronline.com/people/v2/me");
+    const id =
+      ppl?.data?.id ||
+      ppl?.data?.relationships?.primary_organization_person?.data?.id;
+    const name = ppl?.data?.attributes?.name;
+    if (id) {
+      await base44.asServiceRole.entities.User.update(user.id, { pco_person_id: id });
+      return { id, name, source: "people/me" };
+    }
+  } catch {}
+
+  throw new Error("Unable to resolve PCO person id (check app scopes for People + Calendar).");
+}
 
 Deno.serve(async (req) => {
-    try {
-        const base44 = createClientFromRequest(req);
-        const currentUser = await base44.auth.me();
+  try {
+    const base44 = createClientFromRequest(req);
+    const sessionUser = await base44.auth.me();
+    if (!sessionUser?.email) return J({ ok:false, error:"Unauthorized" }, 401);
 
-        if (!currentUser) {
-            return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
-        }
-
-        console.log('✅ Getting schedule for user:', currentUser.email);
-
-        // Just call getPCOCalendarEvents - it does all the heavy lifting
-        console.log('📞 Getting calendar events...');
-        const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
-
-        if (!eventsResponse.data || !eventsResponse.data.events) {
-            throw new Error('No events data returned');
-        }
-
-        const allEvents = eventsResponse.data.events || [];
-        console.log('📅 Got', allEvents.length, 'events');
-
-        // Sort by date
-        allEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-        console.log('✅ SUCCESS! Returning', allEvents.length, 'events');
-
-        return Response.json({
-            events: allEvents,
-            count: allEvents.length
-        });
-
-    } catch (error) {
-        console.error('❌ Get my schedule error:', error);
-        return Response.json({
-            error: error.message,
-            events: [],
-            details: error.stack
-        }, { status: 500 });
+    const [user] = await base44.asServiceRole.entities.User.filter({ email: sessionUser.email });
+    if (!user?.pco_access_token || !user?.pco_refresh_token) {
+      return J({ ok:true, count:0, events:[], message:"PCO not connected" });
     }
+
+    const token = await refreshIfNeeded(base44, user);
+    const me = await getPersonId(base44, user, token);
+    const personId = me.id;
+    const personName = me.name || "Unknown";
+
+    // 2-week window
+    const now = new Date();
+    const startISO = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    const end = new Date(now); end.setUTCDate(end.getUTCDate() + 14);
+    const endISO = end.toISOString();
+
+    // My approval groups (by membership)
+    const memberships = await pcoPages(
+      token,
+      `https://api.planningcenteronline.com/calendar/v2/resource_approval_group_memberships?where[person_id]=${personId}&include=resource_approval_group`
+    );
+    const myGroupIds = memberships
+      .map(m => m?.relationships?.resource_approval_group?.data?.id)
+      .filter(Boolean);
+
+    if (!myGroupIds.length) {
+      return J({
+        ok:true, person:{ id:personId, name:personName, source:me.source },
+        range:{ startISO, endISO }, count:0, events:[],
+        diag:[{ step:"no-approval-groups" }]
+      });
+    }
+
+    // Approved requests only
+    const reqs = await pcoPages(
+      token,
+      "https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=A&include=event,resource"
+    );
+
+    // Keep only requests whose Resource's approval-group is mine
+    const mine = [];
+    for (const r of reqs) {
+      const resRel = r?.relationships?.resource?.data;
+      const evRel  = r?.relationships?.event?.data;
+      if (!resRel || !evRel) continue;
+
+      try {
+        const res = await pcoJson(
+          token,
+          `https://api.planningcenteronline.com/calendar/v2/resources/${resRel.id}?include=resource_approval_group`
+        );
+        const rag = (res?.included || []).find(x => x.type === "ResourceApprovalGroup");
+        const groupId = rag?.id || rag?.data?.id || null;
+        if (groupId && myGroupIds.includes(groupId)) {
+          mine.push({ requestId:r.id, eventId:evRel.id, resourceId:resRel.id, groupId });
+        }
+      } catch { /* ignore single fail */ }
+    }
+
+    if (!mine.length) {
+      return J({
+        ok:true, person:{ id:personId, name:personName, source:me.source },
+        range:{ startISO, endISO }, count:0, events:[],
+        diag:[{ step:"no-approved-requests-in-groups" }]
+      });
+    }
+
+    // Build schedule by instances in window
+    const eventIds = [...new Set(mine.map(x => x.eventId))];
+    const out = [];
+    const seen = new Set();
+
+    for (const eid of eventIds) {
+      const instances = await pcoPages(
+        token,
+        `https://api.planningcenteronline.com/calendar/v2/events/${eid}/event_instances?where[starts_at][gte]=${encodeURIComponent(startISO)}&where[starts_at][lte]=${encodeURIComponent(endISO)}`
+      );
+      if (!instances.length) continue;
+
+      const ev = await pcoJson(token, `https://api.planningcenteronline.com/calendar/v2/events/${eid}`);
+      const name = ev?.data?.attributes?.name || `Event ${eid}`;
+
+      const reqsForEvent = mine.filter(x => x.eventId === eid);
+
+      for (const inst of instances) {
+        const iid = inst.id;
+        if (seen.has(iid)) continue; seen.add(iid);
+
+        out.push({
+          event_id: eid,
+          event_instance_id: iid,
+          event_name: name,
+          starts_at: inst?.attributes?.starts_at,
+          ends_at:   inst?.attributes?.ends_at,
+          approved_requests: reqsForEvent.map(r => ({
+            request_id: r.requestId,
+            resource_id: r.resourceId,
+            group_id:    r.groupId,
+          })),
+        });
+      }
+    }
+
+    out.sort((a,b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+    return J({
+      ok:true,
+      person:{ id:personId, name:personName, source:me.source },
+      range:{ startISO, endISO },
+      count: out.length,
+      events: out,
+    });
+
+  } catch (err) {
+    const payload = {
+      ok: false,
+      error: err?.message || "Unknown error",
+      status: err?.status || 500,
+    };
+    if (err?.body) {
+      try { payload.details = JSON.parse(err.body); }
+      catch { payload.details = { raw: err.body }; }
+    }
+    return J(payload, payload.status);
+  }
 });
