@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, DoorOpen } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { base44 } from "@/api/base44Client";
 
@@ -98,20 +99,20 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                     {format(startDate, 'EEEE, MMMM d, yyyy')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Clock className="w-4 h-4 text-green-600" />
-                  <span>
-                    {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
-                  </span>
-                </div>
-                {accessTimeAnswer && (
-                  <div className="flex items-center gap-2 text-slate-700">
-                    <DoorOpen className="w-4 h-4 text-green-600" />
-                    <span className="text-sm">
-                      <span className="font-medium">Access Time:</span> {accessTimeAnswer.answer}
+                <div className="flex items-center justify-between text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-green-600" />
+                    <span>
+                      {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
                     </span>
                   </div>
-                )}
+                  {accessTimeAnswer && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Lock className="w-4 h-4 text-green-600" />
+                      <span>{accessTimeAnswer.answer}</span>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
