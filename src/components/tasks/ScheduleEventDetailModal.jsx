@@ -3,14 +3,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Key, ExternalLink, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
 
 export default function ScheduleEventDetailModal({ open, onOpenChange, event }) {
   const [loading, setLoading] = useState(false);
   const [resources, setResources] = useState([]);
   const [doorCodes, setDoorCodes] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (open && event) {
@@ -31,6 +33,8 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
       const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
         event_id: event.event_id
       });
+      
+      console.log('🔑 Door codes from PCO:', commentsResponse.data.door_codes);
       setDoorCodes(commentsResponse.data.door_codes || []);
     } catch (error) {
       console.error('Error loading event details:', error);
@@ -39,11 +43,34 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const commentsResponse = await base44.functions.invoke('getPCOEventComments', {
+        event_id: event.event_id
+      });
+      
+      console.log('🔄 Refreshed door codes:', commentsResponse.data.door_codes);
+      setDoorCodes(commentsResponse.data.door_codes || []);
+      
+      if (commentsResponse.data.door_codes?.length > 0) {
+        toast.success('Door codes refreshed!');
+      } else {
+        toast.info('No door codes found');
+      }
+    } catch (error) {
+      console.error('Error refreshing:', error);
+      toast.error('Failed to refresh door codes');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (!event) return null;
 
   const startDate = parseISO(event.starts_at);
   const endDate = parseISO(event.ends_at);
-  const latestDoorCode = doorCodes[doorCodes.length - 1];
+  const latestDoorCode = doorCodes[doorCodes.length - 1]; // Get most recent door code
 
   const getApprovalStatusColor = (status) => {
     switch (status) {
@@ -63,12 +90,30 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
     }
   };
 
+  const getApprovalStatusText = (status) => {
+    switch (status) {
+      case 'A': return 'Approved';
+      case 'P': return 'Pending';
+      case 'R': return 'Rejected';
+      default: return 'Unknown';
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900">
-            {event.name}
+          <DialogTitle className="text-xl font-bold text-slate-900 flex items-center justify-between">
+            <span>{event.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -96,18 +141,39 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
               </CardContent>
             </Card>
 
-            {/* Door Code */}
+            {/* Door Code - Prominent Display */}
             {latestDoorCode && (
-              <Card className="border-yellow-300 bg-yellow-50">
+              <Card className="border-2 border-yellow-400 bg-yellow-50 shadow-lg">
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Key className="w-5 h-5 text-yellow-700" />
-                      <span className="font-semibold text-yellow-900">Building Access Code</span>
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Key className="w-6 h-6 text-yellow-700" />
+                      <span className="font-bold text-lg text-yellow-900">Building Access Code</span>
                     </div>
-                    <div className="text-2xl font-mono font-bold text-yellow-900 bg-yellow-200 px-4 py-2 rounded-lg">
+                    <div className="text-5xl font-mono font-bold text-yellow-900 bg-yellow-200 px-8 py-4 rounded-xl shadow-inner">
                       {latestDoorCode}
                     </div>
+                    <p className="text-xs text-yellow-700 mt-3">
+                      {doorCodes.length > 1 ? `Most recent of ${doorCodes.length} codes` : 'Posted to Planning Center'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* All Door Codes (if multiple) */}
+            {doorCodes.length > 1 && (
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardContent className="pt-6">
+                  <p className="text-sm font-semibold text-yellow-900 mb-2">
+                    All Door Codes ({doorCodes.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {doorCodes.map((code, idx) => (
+                      <Badge key={idx} className="bg-yellow-200 text-yellow-900 font-mono text-sm">
+                        {code}
+                      </Badge>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -135,9 +201,7 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                           <Badge className={getApprovalStatusColor(resource.approval_status)}>
                             <span className="flex items-center gap-1">
                               {getApprovalStatusIcon(resource.approval_status)}
-                              {resource.approval_status === 'A' && 'Approved'}
-                              {resource.approval_status === 'P' && 'Pending'}
-                              {resource.approval_status === 'R' && 'Rejected'}
+                              {getApprovalStatusText(resource.approval_status)}
                             </span>
                           </Badge>
                         </div>
