@@ -54,7 +54,7 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
   const rooms = resources.filter(r => r.resource_kind === 'Room');
   const otherResources = resources.filter(r => r.resource_kind !== 'Room');
 
-  // Find the "What time do you want access to begin and end?" answer - search more broadly
+  // Find access time - look more broadly for time-related answers
   console.log('🔍 Searching for access time in resources:', resources.length);
   
   const accessTimeAnswer = resources
@@ -66,9 +66,21 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
       return r.answers || [];
     })
     .find(a => {
-      // Safely convert question to string and lowercase
       const question = String(a.question || '').toLowerCase();
-      return question.includes('access') && (question.includes('time') || question.includes('begin') || question.includes('end'));
+      const answer = String(a.answer || '').toLowerCase();
+      
+      // Look for questions about access/time OR answers that look like time ranges
+      const isAccessQuestion = question.includes('access') || 
+                               question.includes('time') || 
+                               question.includes('begin') || 
+                               question.includes('end') ||
+                               question.includes('other details');
+      
+      // Check if answer looks like a time range (contains AM/PM and times)
+      const looksLikeTimeRange = answer.includes('am') || answer.includes('pm') || 
+                                 /\d+:\d+/.test(answer);
+      
+      return isAccessQuestion && looksLikeTimeRange;
     });
 
   console.log('✅ Found access time answer:', accessTimeAnswer);
