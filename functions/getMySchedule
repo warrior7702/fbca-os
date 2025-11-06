@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -32,76 +31,6 @@ async function refreshTokenIfNeeded(base44, user) {
     });
 
     return tokens.access_token;
-}
-
-async function getAccessTimeForEvent(eventId, accessToken) {
-    try {
-        // Fetch resource requests for this event
-        const requestsResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?per_page=100`,
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        if (!requestsResponse.ok) return null;
-
-        const requestsData = await requestsResponse.json();
-        
-        // For each request, check answers
-        for (const request of (requestsData.data || [])) {
-            try {
-                const answersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-
-                if (answersResponse.ok) {
-                    const answersData = await answersResponse.json();
-                    
-                    // Find access time answer
-                    for (const answer of (answersData.data || [])) {
-                        const questionAttr = answer.attributes?.question;
-                        let questionText = '';
-                        
-                        if (typeof questionAttr === 'string') {
-                            questionText = questionAttr;
-                        } else if (typeof questionAttr === 'object' && questionAttr !== null) {
-                            questionText = questionAttr.question || questionAttr.text || '';
-                        }
-                        
-                        const question = String(questionText || '').toLowerCase();
-                        let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                        
-                        if (typeof value === 'object' && value !== null) {
-                            value = JSON.stringify(value);
-                        }
-                        
-                        const answerText = String(value || '').toLowerCase();
-                        
-                        // Check if this is an access time answer
-                        const isAccessQuestion = question.includes('access') || 
-                                               question.includes('time') || 
-                                               question.includes('begin') || 
-                                               question.includes('end') ||
-                                               question.includes('other details');
-                        
-                        const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
-                                                   /\d+:\d+/.test(answerText);
-                        
-                        if (isAccessQuestion && looksLikeTimeRange) {
-                            return String(value);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching answers for request:', request.id, error);
-            }
-        }
-        
-        return null;
-    } catch (error) {
-        console.error('Error getting access time for event:', eventId, error);
-        return null;
-    }
 }
 
 Deno.serve(async (req) => {
@@ -221,7 +150,7 @@ Deno.serve(async (req) => {
         }
 
         // Step 4: Get ALL future event instances
-        console.log('📞 Step 4: Fetching ALL future event instances...');
+        console.log('📞 Step 4: Fetching future event instances...');
         
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
@@ -269,31 +198,33 @@ Deno.serve(async (req) => {
         
         const eventsWithMyResources = [];
         
-        for (const eventId of Array.from(eventIds).slice(0, 50)) {
+        // OPTIMIZED: Process in smaller batches and limit total events
+        const eventIdArray = Array.from(eventIds).slice(0, 30); // Only process first 30 events
+        
+        for (const eventId of eventIdArray) {
             try {
-                // Get event details
-                const eventResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
+                // Get event details and resource requests in parallel
+                const [eventResponse, requestsResponse] = await Promise.all([
+                    fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    ),
+                    fetch(
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    )
+                ]);
 
-                if (!eventResponse.ok) continue;
+                if (!eventResponse.ok || !requestsResponse.ok) continue;
 
                 const eventData = await eventResponse.json();
+                const requestsData = await requestsResponse.json();
                 const event = eventData.data;
 
-                // Get resource requests for this event
-                const requestsResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                );
-
-                if (!requestsResponse.ok) continue;
-
-                const requestsData = await requestsResponse.json();
-                
                 // Check if any requested resources are mine
                 const myRequestedResources = [];
+                let accessTime = null;
+                
                 for (const request of (requestsData.data || [])) {
                     const resourceId = request.relationships?.resource?.data?.id;
                     if (myResourceIds.has(resourceId)) {
@@ -303,13 +234,55 @@ Deno.serve(async (req) => {
                             name: resource?.attributes?.name || 'Unknown',
                             approval_status: request.attributes?.approval_status
                         });
+
+                        // OPTIMIZED: Get access time from answers if available (in one call)
+                        if (!accessTime && request.id) {
+                            try {
+                                const answersResponse = await fetch(
+                                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
+                                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                                );
+
+                                if (answersResponse.ok) {
+                                    const answersData = await answersResponse.json();
+                                    
+                                    for (const answer of (answersData.data || [])) {
+                                        const questionAttr = answer.attributes?.question;
+                                        const questionText = typeof questionAttr === 'string' ? questionAttr : 
+                                                           (questionAttr?.question || questionAttr?.text || '');
+                                        
+                                        const question = String(questionText || '').toLowerCase();
+                                        let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                                        
+                                        if (typeof value === 'object' && value !== null) {
+                                            value = JSON.stringify(value);
+                                        }
+                                        
+                                        const answerText = String(value || '').toLowerCase();
+                                        
+                                        const isAccessQuestion = question.includes('access') || 
+                                                               question.includes('time') || 
+                                                               question.includes('begin') || 
+                                                               question.includes('end') ||
+                                                               question.includes('other details');
+                                        
+                                        const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
+                                                                   /\d+:\d+/.test(answerText);
+                                        
+                                        if (isAccessQuestion && looksLikeTimeRange) {
+                                            accessTime = String(value);
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error fetching answers:', error);
+                            }
+                        }
                     }
                 }
 
                 if (myRequestedResources.length > 0) {
-                    // Get access time for this event
-                    const accessTime = await getAccessTimeForEvent(eventId, accessToken);
-                    
                     // Find instances for this event
                     const eventInstances = allInstances.filter(i => 
                         i.relationships?.event?.data?.id === eventId
