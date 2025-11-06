@@ -21,6 +21,7 @@ export default function PCOAPITester() {
   const [selectedDate, setSelectedDate] = useState('');
   const [groupId, setGroupId] = useState('');
   const [eventId, setEventId] = useState('');
+  const [lookupUserId, setLookupUserId] = useState('3566727'); // Pre-fill with mystery ID
   
   // NEW: Store the filter date separately (not sent to PCO)
   const [clientFilterDate, setClientFilterDate] = useState(null);
@@ -352,6 +353,92 @@ export default function PCOAPITester() {
         error: error.message
       });
       toast.error('Failed to run diagnostic: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // NEW: Lookup specific PCO user by ID
+  const testLookupUser = async () => {
+    if (!lookupUserId) {
+      toast.error('Please enter a user ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔍 Looking up PCO user ID:', lookupUserId);
+      
+      // Get token
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      if (!tokenResponse.data.ok) {
+        throw new Error('Failed to get PCO token');
+      }
+      
+      const token = tokenResponse.data.access_token;
+      
+      // Try Calendar API
+      console.log('📞 Trying Calendar API: /calendar/v2/people/' + lookupUserId);
+      const calendarResponse = await fetch(`https://api.planningcenteronline.com/calendar/v2/people/${lookupUserId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const calendarResult = {
+        status: calendarResponse.status,
+        ok: calendarResponse.ok,
+        data: null,
+        error: null
+      };
+      
+      if (calendarResponse.ok) {
+        calendarResult.data = await calendarResponse.json();
+      } else {
+        calendarResult.error = await calendarResponse.text();
+      }
+      
+      // Try People API
+      console.log('📞 Trying People API: /people/v2/people/' + lookupUserId);
+      const peopleResponse = await fetch(`https://api.planningcenteronline.com/people/v2/people/${lookupUserId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const peopleResult = {
+        status: peopleResponse.status,
+        ok: peopleResponse.ok,
+        data: null,
+        error: null
+      };
+      
+      if (peopleResponse.ok) {
+        peopleResult.data = await peopleResponse.json();
+      } else {
+        peopleResult.error = await peopleResponse.text();
+      }
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: {
+          user_id: lookupUserId,
+          calendar_api: calendarResult,
+          people_api: peopleResult
+        },
+        endpoint: 'lookupUser'
+      });
+      
+      if (!calendarResult.ok && !peopleResult.ok) {
+        toast.error(`User ${lookupUserId} not found in any PCO API`);
+      } else {
+        toast.success('User lookup complete');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to lookup user: ' + error.message);
     } finally {
       setTestLoading(false);
     }
@@ -828,6 +915,147 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: User Lookup Results
+    if (result.endpoint === 'lookupUser') {
+      const userId = data.user_id;
+      const calendar = data.calendar_api;
+      const people = data.people_api;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔍 User ID Lookup: {userId}</h3>
+          
+          {/* Calendar API Result */}
+          <Card className={`border-2 ${calendar.ok ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                {calendar.ok ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
+                Calendar API (/calendar/v2/people/{userId})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className={calendar.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                    HTTP {calendar.status}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {calendar.ok ? '✅ User EXISTS in Calendar' : '❌ User NOT FOUND in Calendar'}
+                  </span>
+                </div>
+                
+                {calendar.ok && calendar.data?.data && (
+                  <div className="mt-3 p-3 bg-white rounded border">
+                    <p className="text-sm font-semibold text-slate-700 mb-2">User Details:</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-slate-500">Name:</span>
+                        <p className="font-medium">{calendar.data.data.attributes?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Email:</span>
+                        <p className="font-medium">{calendar.data.data.attributes?.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Status:</span>
+                        <p className="font-medium">{calendar.data.data.attributes?.status || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Permissions:</span>
+                        <p className="font-medium">{calendar.data.data.attributes?.permissions || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {!calendar.ok && (
+                  <div className="mt-2 p-2 bg-white rounded border text-xs font-mono text-red-600">
+                    {calendar.error}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* People API Result */}
+          <Card className={`border-2 ${people.ok ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                {people.ok ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
+                People API (/people/v2/people/{userId})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className={people.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                    HTTP {people.status}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {people.ok ? '✅ Person EXISTS in People' : '❌ Person NOT FOUND in People'}
+                  </span>
+                </div>
+                
+                {people.ok && people.data?.data && (
+                  <div className="mt-3 p-3 bg-white rounded border">
+                    <p className="text-sm font-semibold text-slate-700 mb-2">Person Details:</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-slate-500">Name:</span>
+                        <p className="font-medium">{people.data.data.attributes?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Status:</span>
+                        <p className="font-medium">{people.data.data.attributes?.status || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Child:</span>
+                        <p className="font-medium">{people.data.data.attributes?.child ? 'Yes' : 'No'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Created:</span>
+                        <p className="font-medium">
+                          {people.data.data.attributes?.created_at 
+                            ? new Date(people.data.data.attributes.created_at).toLocaleDateString() 
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {!people.ok && (
+                  <div className="mt-2 p-2 bg-white rounded border text-xs font-mono text-red-600">
+                    {people.error}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Summary */}
+          <Alert className={!calendar.ok && !people.ok ? 'border-red-300 bg-red-50' : 'bg-blue-50 border-blue-200'}>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Verdict:</strong>
+              {!calendar.ok && !people.ok && (
+                <span className="text-red-700"> User ID {userId} does NOT exist in PCO Calendar or People databases. This is likely an orphaned ID or belongs to a deleted/archived account.</span>
+              )}
+              {calendar.ok && !people.ok && (
+                <span className="text-blue-700"> User exists in Calendar but not in People (unusual setup).</span>
+              )}
+              {!calendar.ok && people.ok && (
+                <span className="text-blue-700"> Person exists in People but not in Calendar (they may not have Calendar access).</span>
+              )}
+              {calendar.ok && people.ok && (
+                <span className="text-green-700"> User exists in both Calendar and People databases.</span>
+              )}
+            </AlertDescription>
+          </Alert>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1075,6 +1303,34 @@ export default function PCOAPITester() {
                   <Alert className="bg-purple-50 border-purple-200">
                     <AlertDescription className="text-sm">
                       <strong>What this does:</strong> Checks all PCO user IDs, identifies which ID the OAuth token belongs to, and shows if there's a mismatch causing the "User with id 3566727" error.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                {/* NEW: User ID Lookup Section */}
+                <div className="border-t pt-4 space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    Lookup PCO User by ID
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter PCO User ID (e.g., 3566727)"
+                      value={lookupUserId}
+                      onChange={(e) => setLookupUserId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testLookupUser} 
+                      disabled={testLoading}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lookup'}
+                    </Button>
+                  </div>
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertDescription className="text-sm">
+                      <strong>Prove it:</strong> Enter user ID 3566727 and click Lookup to check if this user actually exists in PCO Calendar and People databases. Pre-filled with the mystery ID from your errors.
                     </AlertDescription>
                   </Alert>
                 </div>
