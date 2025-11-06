@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -133,6 +134,7 @@ Deno.serve(async (req) => {
                     myResources.push({
                         id: resource.id,
                         name: resource.attributes?.name,
+                        kind: resource.attributes?.kind, // ADDED
                         group: group.name
                     });
                 }
@@ -215,7 +217,12 @@ Deno.serve(async (req) => {
                 ]);
 
                 if (!eventResponse.ok || !requestsResponse.ok) {
-                    skippedEvents.push({ eventId, reason: 'fetch_failed' });
+                    skippedEvents.push({ 
+                        eventId, 
+                        reason: 'fetch_failed',
+                        eventResponse: eventResponse.status, // ADDED
+                        requestsResponse: requestsResponse.status // ADDED
+                    });
                     continue;
                 }
 
@@ -235,6 +242,7 @@ Deno.serve(async (req) => {
                     allRequestedResources.push({
                         id: resourceId,
                         name: resource?.attributes?.name || 'Unknown',
+                        kind: resource?.attributes?.kind || 'Unknown', // ADDED
                         isMyResource: myResourceIds.has(resourceId)
                     });
                     
@@ -297,7 +305,8 @@ Deno.serve(async (req) => {
                         eventId, 
                         name: event.attributes?.name,
                         reason: 'no_matching_resources',
-                        requested: allRequestedResources
+                        total_resources: allRequestedResources.length, // ADDED
+                        resources_requested: allRequestedResources // ADDED
                     });
                     continue;
                 }
@@ -308,7 +317,11 @@ Deno.serve(async (req) => {
                 );
 
                 if (eventInstances.length === 0) {
-                    skippedEvents.push({ eventId, reason: 'no_instances' });
+                    skippedEvents.push({ 
+                        eventId,
+                        name: event.attributes?.name, // ADDED
+                        reason: 'no_instances' 
+                    });
                     continue;
                 }
 
@@ -317,7 +330,11 @@ Deno.serve(async (req) => {
                     const endsAt = instance.attributes?.ends_at;
                     
                     if (!startsAt) {
-                        skippedEvents.push({ eventId, reason: 'no_start_date' });
+                        skippedEvents.push({ 
+                            eventId,
+                            name: event.attributes?.name, // ADDED
+                            reason: 'no_start_date' 
+                        });
                         continue;
                     }
                     
@@ -345,7 +362,11 @@ Deno.serve(async (req) => {
                 }
             } catch (error) {
                 console.error('❌ Error processing event', eventId, ':', error);
-                skippedEvents.push({ eventId, reason: 'error', error: error.message });
+                skippedEvents.push({ 
+                    eventId, 
+                    reason: 'error', 
+                    error: error.message 
+                });
             }
         }
 
@@ -356,7 +377,7 @@ Deno.serve(async (req) => {
             step: 'final', 
             included: eventsWithMyResources.length,
             skipped: skippedEvents.length,
-            skipped_details: skippedEvents.slice(0, 10) // Show first 10 skipped
+            skipped_details: skippedEvents // MODIFIED: Show all skipped events
         });
 
         return Response.json({
