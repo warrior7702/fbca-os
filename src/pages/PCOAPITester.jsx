@@ -114,12 +114,19 @@ export default function PCOAPITester() {
       return;
     }
     
-    // Convert date to ISO format with time
-    const startDate = new Date(selectedDate);
-    startDate.setHours(0, 0, 0, 0);
+    // FIX: Create dates in UTC to avoid timezone issues
+    // selectedDate is in format "2025-11-10"
+    const [year, month, day] = selectedDate.split('-').map(Number);
     
-    const endDate = new Date(selectedDate);
-    endDate.setHours(23, 59, 59, 999);
+    // Create start of day in UTC
+    const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    
+    // Create end of day in UTC
+    const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    
+    console.log('📅 Searching date:', selectedDate);
+    console.log('📅 Start UTC:', startDate.toISOString());
+    console.log('📅 End UTC:', endDate.toISOString());
     
     await makeAPICall('/event_instances', {
       'where[starts_at]': `${startDate.toISOString()}..${endDate.toISOString()}`,
