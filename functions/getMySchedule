@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -36,7 +35,6 @@ async function refreshTokenIfNeeded(base44, user) {
 
 async function getAccessTimeForEvent(eventId, accessToken) {
     try {
-        // Fetch resource requests for this event
         const requestsResponse = await fetch(
             `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?per_page=100`,
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -46,7 +44,6 @@ async function getAccessTimeForEvent(eventId, accessToken) {
 
         const requestsData = await requestsResponse.json();
         
-        // For each request, check answers
         for (const request of (requestsData.data || [])) {
             try {
                 const answersResponse = await fetch(
@@ -57,7 +54,6 @@ async function getAccessTimeForEvent(eventId, accessToken) {
                 if (answersResponse.ok) {
                     const answersData = await answersResponse.json();
                     
-                    // Find access time answer
                     for (const answer of (answersData.data || [])) {
                         const questionAttr = answer.attributes?.question;
                         let questionText = '';
@@ -77,7 +73,6 @@ async function getAccessTimeForEvent(eventId, accessToken) {
                         
                         const answerText = String(value || '').toLowerCase();
                         
-                        // Check if this is an access time answer
                         const isAccessQuestion = question.includes('access') || 
                                                question.includes('time') || 
                                                question.includes('begin') || 
@@ -157,7 +152,6 @@ Deno.serve(async (req) => {
         const allGroups = groupsData.data || [];
         console.log('📋 Found', allGroups.length, 'total approval groups');
 
-        // Check which groups I'm in
         const myGroups = [];
         for (const group of allGroups) {
             const membersResponse = await fetch(
@@ -224,8 +218,8 @@ Deno.serve(async (req) => {
         console.log('📞 Step 4: Fetching ALL future event instances...');
         
         const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+        const threeWeeksFromNow = new Date(now);
+        threeWeeksFromNow.setDate(threeWeeksFromNow.getDate() + 21); // Extended to 3 weeks
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
@@ -265,12 +259,19 @@ Deno.serve(async (req) => {
         console.log('📊 Found', eventIds.size, 'unique events');
 
         // Step 5: For each event, check if it uses any of my resources
-        console.log('📞 Step 5: Checking which events use my resources...');
+        console.log('📞 Step 5: Checking ALL events for my resources...');
         
         const eventsWithMyResources = [];
         
-        for (const eventId of Array.from(eventIds).slice(0, 50)) {
+        // Process ALL events, not just first 50
+        let processedCount = 0;
+        for (const eventId of Array.from(eventIds)) {
             try {
+                processedCount++;
+                if (processedCount % 10 === 0) {
+                    console.log(`  Processing event ${processedCount}/${eventIds.size}...`);
+                }
+
                 // Get event details
                 const eventResponse = await fetch(
                     `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
@@ -322,7 +323,7 @@ Deno.serve(async (req) => {
                         if (!startsAt) continue;
                         
                         const startDate = new Date(startsAt);
-                        if (startDate > twoWeeksFromNow) continue;
+                        if (startDate > threeWeeksFromNow) continue;
 
                         eventsWithMyResources.push({
                             id: instance.id,
@@ -359,7 +360,8 @@ Deno.serve(async (req) => {
             events: eventsWithMyResources,
             count: eventsWithMyResources.length,
             my_groups_count: myGroups.length,
-            my_resources_count: myResourceIds.size
+            my_resources_count: myResourceIds.size,
+            total_events_checked: processedCount
         });
 
     } catch (error) {
