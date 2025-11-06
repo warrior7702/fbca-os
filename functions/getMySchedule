@@ -38,7 +38,7 @@ async function refreshTokenIfNeeded(base44, user) {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Fetch with retry on rate limit
-async function fetchWithRetry(url, headers, retries = 3, delayMs = 1000) {
+async function fetchWithRetry(url, headers, retries = 3, delayMs = 1500) { // Changed delayMs from 1000 to 1500
     for (let i = 0; i < retries; i++) {
         const response = await fetch(url, { headers });
         
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
 
         const myGroups = [];
         for (const group of allGroups) {
-            await delay(100); // Reduced from 200ms
+            await delay(150); // Changed from 100ms
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
         const myResources = [];
         
         for (const group of myGroups) {
-            await delay(100); // Reduced from 200ms
+            await delay(150); // Changed from 100ms
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
@@ -221,17 +221,17 @@ Deno.serve(async (req) => {
 
         debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: Process events in SMALL BATCHES with minimal delays
+        // Step 5: Process events in BALANCED BATCHES - sweet spot between speed and reliability
         const eventsWithMyResources = [];
         const skippedEvents = [];
         
         const eventIdArray = Array.from(eventIds);
         debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
-        const BATCH_SIZE = 10; // Increased from 5 (process more at once)
-        const BATCH_DELAY = 200; // Reduced from 500ms (faster between batches)
+        const BATCH_SIZE = 7; // Changed from 10
+        const BATCH_DELAY = 400; // Changed from 200
         
-        console.log(`⚡ Processing ${eventIdArray.length} events in batches of ${BATCH_SIZE}...`);
+        console.log(`⚖️ Processing ${eventIdArray.length} events in balanced batches of ${BATCH_SIZE}...`); // Console log message updated
         
         for (let i = 0; i < eventIdArray.length; i += BATCH_SIZE) {
             const batch = eventIdArray.slice(i, i + BATCH_SIZE);
@@ -241,8 +241,8 @@ Deno.serve(async (req) => {
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        // Small stagger within batch to avoid spike
-                        await delay(Math.random() * 50); // Random 0-50ms delay
+                        // Small stagger within batch
+                        await delay(Math.random() * 100); // Changed from 50ms
                         
                         // Fetch event and requests with retry
                         const [eventResponse, requestsResponse] = await Promise.all([
@@ -298,15 +298,15 @@ Deno.serve(async (req) => {
                                     approval_status: request.attributes?.approval_status
                                 });
 
-                                // Get access time from answers (only if needed)
+                                // Get access time from answers
                                 if (!accessTime && request.id) {
                                     try {
-                                        await delay(50); // Small delay
+                                        await delay(75); // Changed from 50ms
                                         
                                         const answersResponse = await fetchWithRetry(
                                             `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
                                             headers,
-                                            2, // Fewer retries for answers
+                                            2,
                                             1000
                                         );
 
