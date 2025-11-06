@@ -12,9 +12,9 @@ async function pcoGet(url, token) {
   return j;
 }
 
-async function pcoPatch(url, token, body = {}) {
+async function pcoPost(url, token, body = {}) {
   const r = await fetch(url, {
-    method: 'PATCH',
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -22,8 +22,8 @@ async function pcoPatch(url, token, body = {}) {
     body: JSON.stringify(body)
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`PATCH ${url} :: ${r.status} :: ${text}`);
-  return text ? JSON.parse(text) : { ok: true };
+  if (!r.ok) throw new Error(`POST ${url} :: ${r.status} :: ${text}`);
+  return text ? JSON.parse(text).catch(() => ({})) : { ok: true };
 }
 
 Deno.serve(async (req) => {
@@ -61,109 +61,51 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('🔍 Approving as person ID:', personId);
+    // ---- 2) get user's approval-group memberships ----
+    const mems = await pcoGet(
+      `${PCO.base}/resource_approval_group_memberships?where[person_id]=${personId}&per_page=200&include=resource_approval_group`,
+      userToken
+    );
+    const myGroupIds = (mems.data || [])
+      .map(m => m?.relationships?.resource_approval_group?.data?.id)
+      .filter(Boolean);
 
-    // ---- 2) Get all approval groups and check membership ----
-    const groupsResponse = await pcoGet(
-      `${PCO.base}/resource_approval_groups?per_page=100`,
+    // ---- 3) pull bookings for this request; approval group lives here ----
+    const bookings = await pcoGet(
+      `${PCO.base}/event_resource_requests/${request_id}/resource_bookings?per_page=100&include=approval_group,resource`,
       userToken
     );
 
-    const myGroupIds = [];
-    const groupResourceMap = {}; // Map group ID to list of resource IDs
-    
-    for (const group of groupsResponse.data || []) {
-      // Get members of this group
-      const membersResponse = await pcoGet(
-        `${PCO.base}/resource_approval_groups/${group.id}/people?per_page=100`,
-        userToken
-      );
-      
-      // Check if I'm in this group
-      const isMember = (membersResponse.data || []).some(person => person.id === personId);
-      if (isMember) {
-        myGroupIds.push(group.id);
-        console.log('✅ Member of group:', group.attributes?.name, '(', group.id, ')');
-        
-        // Get resources for this group
-        const resourcesResponse = await pcoGet(
-          `${PCO.base}/resource_approval_groups/${group.id}/resources?per_page=100`,
-          userToken
-        );
-        
-        groupResourceMap[group.id] = (resourcesResponse.data || []).map(r => r.id);
-        console.log('  ↳ Manages', groupResourceMap[group.id].length, 'resources');
-      }
+    const bookingGroupIds = new Set();
+    for (const b of (bookings.data || [])) {
+      const rel = b?.relationships?.approval_group?.data;
+      if (rel?.id) bookingGroupIds.add(rel.id);
     }
 
-    console.log('📋 My group IDs:', myGroupIds);
-
-    // ---- 3) Get the request details to find the resource ----
-    const requestResponse = await pcoGet(
-      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
-      userToken
-    );
-
-    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
-    console.log('📦 Request is for resource:', resourceId);
-
-    // ---- 4) Check if I have permission to approve this resource ----
-    let hasPermission = false;
-    
-    // Check if any of my groups manage this resource
-    for (const groupId of myGroupIds) {
-      const groupResources = groupResourceMap[groupId] || [];
-      if (groupResources.includes(resourceId)) {
-        hasPermission = true;
-        console.log('✅ Group', groupId, 'manages this resource');
-        break;
-      }
+    // ---- 4) check eligibility (overlap between my groups and bookings' groups) ----
+    let eligible = false;
+    let overlap = [];
+    if (bookingGroupIds.size) {
+      overlap = [...bookingGroupIds].filter(id => myGroupIds.includes(id));
+      eligible = overlap.length > 0;
     }
 
-    console.log('✅ Has permission:', hasPermission);
-
-    if (!hasPermission) {
+    if (!eligible) {
       return Response.json({
         ok: false,
-        error: 'You are not authorized to approve this resource',
+        error: 'Forbidden (not in booking approval group)',
         diag: {
-          personId,
-          myGroupIds,
-          resourceId,
-          message: 'None of your approval groups manage this resource'
+          personId, myGroupIds, bookingGroupIds: [...bookingGroupIds], overlap
         }
       }, { status: 403 });
     }
 
-    // ---- 5) PATCH the request to approve/deny ----
-    const statusCode = action === 'approve' ? 'A' : 'R'; // A=Approved, R=Rejected
-    const url = `${PCO.base}/event_resource_requests/${request_id}`;
-    
-    console.log('🚀 Patching PCO request:', url);
-    console.log('  Status:', statusCode);
-    
-    const patchBody = {
-      data: {
-        type: 'EventResourceRequest',
-        id: request_id,
-        attributes: {
-          approval_status: statusCode
-        }
-      }
-    };
-
-    // Add note if provided
-    if (note) {
-      patchBody.data.attributes.notes = note;
-    }
-
-    const result = await pcoPatch(url, userToken, patchBody);
-
-    console.log('✅ PCO request', action === 'approve' ? 'approved' : 'denied', 'successfully');
+    // ---- 5) call PCO approve/deny as the user ----
+    const url = `${PCO.base}/event_resource_requests/${request_id}/${action}`;
+    const result = await pcoPost(url, userToken, note ? { note } : {});
 
     return Response.json({ ok: true, action, request_id, result });
   } catch (e) {
-    console.error('❌ Approve error:', e);
     return Response.json({ ok: false, error: String(e) }, { status: 500 });
   }
 });
