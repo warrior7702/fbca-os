@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock } from "lucide-react";
+import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -280,80 +280,7 @@ export default function PCOAPITester() {
                 const resources = eventResources?.resources || [];
                 const included = eventResources?.included || [];
                 
-                return (
-                  <Card key={idx} className="bg-slate-50">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900">{event.attributes?.name || 'Untitled Event'}</h4>
-                          <div className="mt-2 space-y-1 text-sm text-slate-600">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4" />
-                              <span>
-                                {event.attributes?.starts_at ? new Date(event.attributes.starts_at).toLocaleString() : 'No start time'}
-                                {event.attributes?.ends_at && ` - ${new Date(event.attributes.ends_at).toLocaleTimeString()}`}
-                              </span>
-                            </div>
-                            {event.attributes?.all_day_event && (
-                              <Badge variant="outline" className="text-xs">All Day Event</Badge>
-                            )}
-                            {event.attributes?.recurrence && event.attributes.recurrence !== 'None' && (
-                              <Badge variant="outline" className="text-xs">{event.attributes.recurrence}</Badge>
-                            )}
-                            
-                            {/* Resources/Rooms Section */}
-                            {resources.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-slate-200">
-                                <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                                  Resources/Rooms ({resources.length})
-                                </p>
-                                <div className="space-y-1">
-                                  {resources.slice(0, 5).map((resource, ridx) => {
-                                    const resourceId = resource.relationships?.resource?.data?.id;
-                                    const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
-                                    const approvalStatus = resource.attributes?.approval_status;
-                                    
-                                    return (
-                                      <div key={ridx} className="flex items-center gap-2">
-                                        <Package className="w-3 h-3 text-blue-600" />
-                                        <span className="text-xs font-medium">
-                                          {resourceDetails?.attributes?.name || 'Unknown Resource'}
-                                        </span>
-                                        {approvalStatus === 'A' && (
-                                          <CheckCircle className="w-3 h-3 text-green-600" />
-                                        )}
-                                        {approvalStatus === 'P' && (
-                                          <AlertCircle className="w-3 h-3 text-yellow-600" />
-                                        )}
-                                        {approvalStatus === 'R' && (
-                                          <XCircle className="w-3 h-3 text-red-600" />
-                                        )}
-                                        {resource.attributes?.quantity && (
-                                          <span className="text-xs text-slate-500">
-                                            (qty: {resource.attributes.quantity})
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {resources.length > 5 && (
-                                    <p className="text-xs text-slate-500 italic">
-                                      + {resources.length - 5} more resources
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-500">Event ID</p>
-                          <p className="text-sm font-mono text-blue-600">{eventId}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
+                return <EventCard key={idx} event={event} resources={resources} included={included} eventId={eventId} />;
               })}
               {events.length > 10 && (
                 <p className="text-sm text-slate-500 text-center">
@@ -823,5 +750,127 @@ export default function PCOAPITester() {
         )}
       </div>
     </div>
+  );
+}
+
+// NEW: Collapsible Event Card Component
+function EventCard({ event, resources, included, eventId }) {
+  const [showResources, setShowResources] = useState(false);
+  
+  return (
+    <Card className="bg-slate-50">
+      <CardContent className="p-4">
+        <div className="space-y-3">
+          {/* Event Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <h4 className="font-semibold text-slate-900">{event.attributes?.name || 'Untitled Event'}</h4>
+              <div className="mt-2 space-y-1 text-sm text-slate-600">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span>
+                    {event.attributes?.starts_at ? new Date(event.attributes.starts_at).toLocaleString() : 'No start time'}
+                    {event.attributes?.ends_at && ` - ${new Date(event.attributes.ends_at).toLocaleTimeString()}`}
+                  </span>
+                </div>
+                {event.attributes?.all_day_event && (
+                  <Badge variant="outline" className="text-xs">All Day Event</Badge>
+                )}
+                {event.attributes?.recurrence && event.attributes.recurrence !== 'None' && (
+                  <Badge variant="outline" className="text-xs">{event.attributes.recurrence}</Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500">Event ID</p>
+              <p className="text-sm font-mono text-blue-600">{eventId}</p>
+            </div>
+          </div>
+
+          {/* Resources Toggle Button */}
+          {resources.length > 0 && (
+            <>
+              <div className="border-t border-slate-200 pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowResources(!showResources)}
+                  className="w-full justify-between hover:bg-slate-100"
+                >
+                  <span className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span className="font-medium">
+                      Resources/Rooms ({resources.length})
+                    </span>
+                  </span>
+                  {showResources ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+
+              {/* Collapsible Resources List */}
+              {showResources && (
+                <div className="bg-white rounded-lg p-3 border border-slate-200 max-h-64 overflow-y-auto">
+                  <div className="space-y-2">
+                    {resources.map((resource, ridx) => {
+                      const resourceId = resource.relationships?.resource?.data?.id;
+                      const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
+                      const approvalStatus = resource.attributes?.approval_status;
+                      
+                      return (
+                        <div key={ridx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Package className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {resourceDetails?.attributes?.name || 'Unknown Resource'}
+                              </p>
+                              {resourceDetails?.attributes?.kind && (
+                                <p className="text-xs text-slate-500">
+                                  {resourceDetails.attributes.kind}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {resource.attributes?.quantity && (
+                              <span className="text-xs text-slate-500">
+                                qty: {resource.attributes.quantity}
+                              </span>
+                            )}
+                            {approvalStatus === 'A' && (
+                              <Badge className="bg-green-100 text-green-700 text-xs">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Approved
+                              </Badge>
+                            )}
+                            {approvalStatus === 'P' && (
+                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                            {approvalStatus === 'R' && (
+                              <Badge className="bg-red-100 text-red-700 text-xs">
+                                <XCircle className="w-3 h-3 mr-1" />
+                                Rejected
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
