@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Loader2, Calendar, Package, Users, AlertCircle } from "lucide-react";
+import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function PCOAPITester() {
   const [user, setUser] = useState(null);
@@ -85,7 +87,8 @@ export default function PCOAPITester() {
         ok: response.ok,
         status: response.status,
         url: url.toString(),
-        data: data
+        data: data,
+        endpoint: endpoint // Store endpoint for translation
       });
       
       if (response.ok) {
@@ -171,6 +174,261 @@ export default function PCOAPITester() {
       'per_page': '10',
       'order': 'starts_at'
     });
+  };
+
+  // Translation helper
+  const translateResult = () => {
+    if (!result || !result.ok || !result.data) return null;
+
+    const data = result.data;
+
+    // Event instances
+    if (result.endpoint?.includes('/event_instances')) {
+      const events = data.data || [];
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">📅 Event Instances Found: {events.length}</h3>
+          {events.length > 0 ? (
+            <div className="space-y-2">
+              {events.slice(0, 5).map((event, idx) => (
+                <Card key={idx} className="bg-slate-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-slate-900">{event.attributes?.name || 'Untitled Event'}</h4>
+                        <div className="mt-2 space-y-1 text-sm text-slate-600">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            <span>
+                              {event.attributes?.starts_at ? new Date(event.attributes.starts_at).toLocaleString() : 'No start time'}
+                              {event.attributes?.ends_at && ` - ${new Date(event.attributes.ends_at).toLocaleTimeString()}`}
+                            </span>
+                          </div>
+                          {event.attributes?.all_day_event && (
+                            <Badge variant="outline" className="text-xs">All Day Event</Badge>
+                          )}
+                          {event.attributes?.recurrence && event.attributes.recurrence !== 'None' && (
+                            <Badge variant="outline" className="text-xs">{event.attributes.recurrence}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Event ID</p>
+                        <p className="text-sm font-mono text-blue-600">{event.relationships?.event?.data?.id}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {events.length > 5 && (
+                <p className="text-sm text-slate-500 text-center">
+                  + {events.length - 5} more events (see full JSON below)
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-slate-500">No events found for this date</p>
+          )}
+        </div>
+      );
+    }
+
+    // Approval groups
+    if (result.endpoint?.includes('/resource_approval_groups') && !result.endpoint.includes('/resources')) {
+      const groups = data.data || [];
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">👥 Approval Groups Found: {groups.length}</h3>
+          {groups.length > 0 ? (
+            <div className="space-y-2">
+              {groups.map((group, idx) => (
+                <Card key={idx} className="bg-slate-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-slate-900">{group.attributes?.name || 'Unnamed Group'}</h4>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Created: {group.attributes?.created_at ? new Date(group.attributes.created_at).toLocaleDateString() : 'Unknown'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Group ID</p>
+                        <p className="text-sm font-mono text-blue-600">{group.id}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500">No approval groups found</p>
+          )}
+        </div>
+      );
+    }
+
+    // Resources in a group
+    if (result.endpoint?.includes('/resources')) {
+      const resources = data.data || [];
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">📦 Resources Found: {resources.length}</h3>
+          {resources.length > 0 ? (
+            <div className="space-y-2">
+              {resources.map((resource, idx) => (
+                <Card key={idx} className="bg-slate-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-green-600" />
+                        <div>
+                          <h4 className="font-semibold text-slate-900">{resource.attributes?.name || 'Unnamed Resource'}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">{resource.attributes?.kind || 'Unknown Type'}</Badge>
+                            {resource.attributes?.room_type && (
+                              <Badge variant="outline" className="text-xs">{resource.attributes.room_type}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Resource ID</p>
+                        <p className="text-sm font-mono text-blue-600">{resource.id}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500">No resources found in this group</p>
+          )}
+        </div>
+      );
+    }
+
+    // Event resource requests
+    if (result.endpoint?.includes('/event_resource_requests')) {
+      const requests = data.data || [];
+      const included = data.included || [];
+      
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">📋 Resource Requests Found: {requests.length}</h3>
+          {requests.length > 0 ? (
+            <div className="space-y-2">
+              {requests.map((request, idx) => {
+                const resourceId = request.relationships?.resource?.data?.id;
+                const resource = included.find(i => i.type === 'Resource' && i.id === resourceId);
+                const approvalStatus = request.attributes?.approval_status;
+                
+                return (
+                  <Card key={idx} className="bg-slate-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-slate-900">
+                              {resource?.attributes?.name || 'Unknown Resource'}
+                            </h4>
+                            {approvalStatus === 'A' && (
+                              <Badge className="bg-green-100 text-green-700">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Approved
+                              </Badge>
+                            )}
+                            {approvalStatus === 'P' && (
+                              <Badge className="bg-yellow-100 text-yellow-700">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                            {approvalStatus === 'R' && (
+                              <Badge className="bg-red-100 text-red-700">
+                                <XCircle className="w-3 h-3 mr-1" />
+                                Rejected
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-600">
+                            <Badge variant="outline" className="text-xs">{resource?.attributes?.kind || 'Unknown Type'}</Badge>
+                            {request.attributes?.quantity && (
+                              <span className="ml-2 text-xs">Quantity: {request.attributes.quantity}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">Request ID</p>
+                          <p className="text-sm font-mono text-blue-600">{request.id}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-slate-500">No resource requests for this event</p>
+          )}
+        </div>
+      );
+    }
+
+    // Event details
+    if (result.endpoint?.includes('/events/') && !result.endpoint.includes('_requests')) {
+      const event = data.data;
+      const included = data.included || [];
+      const tags = included.filter(i => i.type === 'Tag');
+      
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">📅 Event Details</h3>
+          <Card className="bg-slate-50">
+            <CardContent className="p-4 space-y-3">
+              <div>
+                <h4 className="font-semibold text-lg text-slate-900">{event?.attributes?.name || 'Untitled Event'}</h4>
+                <p className="text-sm text-slate-600 mt-1">{event?.attributes?.summary || 'No summary'}</p>
+              </div>
+              
+              {event?.attributes?.description && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Description</p>
+                  <p className="text-sm text-slate-700 mt-1">{event.attributes.description}</p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Approval Status</p>
+                  <p className="text-sm text-slate-700 mt-1">{event?.attributes?.approval_status || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Percent Approved</p>
+                  <p className="text-sm text-slate-700 mt-1">{event?.attributes?.percent_approved || 0}%</p>
+                </div>
+              </div>
+              
+              {tags.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, idx) => (
+                      <Badge key={idx} variant="outline">{tag.attributes?.name}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-xs text-slate-500">Event ID: <span className="font-mono text-blue-600">{event?.id}</span></p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
@@ -369,9 +627,9 @@ export default function PCOAPITester() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               {result.url && (
-                <div className="mb-4 p-3 bg-slate-100 rounded-lg">
+                <div className="p-3 bg-slate-100 rounded-lg">
                   <p className="text-xs text-slate-500 mb-1">Request URL:</p>
                   <p className="text-xs font-mono break-all">{result.url}</p>
                 </div>
@@ -383,7 +641,19 @@ export default function PCOAPITester() {
                   <p className="text-red-700 text-sm">{result.error}</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <>
+                  {/* Translated Summary */}
+                  {translateResult() && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5" />
+                        What This Means
+                      </h3>
+                      {translateResult()}
+                    </div>
+                  )}
+
+                  {/* Summary Stats */}
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-semibold text-blue-900 mb-2">
                       Found {result.data?.data?.length || 0} items
@@ -395,12 +665,18 @@ export default function PCOAPITester() {
                     )}
                   </div>
                   
-                  <div className="border rounded-lg p-4 bg-slate-50 max-h-[600px] overflow-auto">
-                    <pre className="text-xs font-mono whitespace-pre-wrap">
-                      {JSON.stringify(result.data, null, 2)}
-                    </pre>
-                  </div>
-                </div>
+                  {/* Raw JSON */}
+                  <details className="border rounded-lg bg-slate-50">
+                    <summary className="p-4 cursor-pointer font-semibold text-slate-700 hover:bg-slate-100">
+                      View Raw JSON Response
+                    </summary>
+                    <div className="p-4 border-t max-h-[600px] overflow-auto">
+                      <pre className="text-xs font-mono whitespace-pre-wrap">
+                        {JSON.stringify(result.data, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </>
               )}
             </CardContent>
           </Card>
