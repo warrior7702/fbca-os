@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
 
         const myGroups = [];
         for (const group of allGroups) {
-            await delay(100); // REDUCED from 150ms
+            await delay(100);
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
         const myResources = [];
         
         for (const group of myGroups) {
-            await delay(100); // REDUCED from 150ms
+            await delay(100);
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
@@ -221,15 +221,15 @@ Deno.serve(async (req) => {
 
         debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: Process events - OPTIMIZED FOR SPEED
+        // Step 5: Process events in batches
         const eventsWithMyResources = [];
         const skippedEvents = [];
         
         const eventIdArray = Array.from(eventIds);
         debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
-        const BATCH_SIZE = 10; // INCREASED from 7
-        const BATCH_DELAY = 300; // REDUCED from 400ms
+        const BATCH_SIZE = 8; // Optimized batch size
+        const BATCH_DELAY = 350; // Balance between speed and reliability
         
         console.log(`⚡ Processing ${eventIdArray.length} events in batches of ${BATCH_SIZE}...`);
         
@@ -241,10 +241,9 @@ Deno.serve(async (req) => {
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        // Small stagger within batch
-                        await delay(Math.random() * 80); // REDUCED from 100ms
+                        await delay(Math.random() * 80);
                         
-                        // Fetch event and requests with retry
+                        // Fetch event and requests
                         const [eventResponse, requestsResponse] = await Promise.all([
                             fetchWithRetry(
                                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
@@ -278,17 +277,16 @@ Deno.serve(async (req) => {
                         // Check resources
                         const myRequestedResources = [];
                         const allRequestedResources = [];
-                        
-                        // REMOVED: access_time fetching entirely for speed
-                        // access_time is not critical for the UI and adds significant time
+                        const buildingAccessRequests = []; // Track building access requests for answer fetching
                         
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
                             const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+                            const resourceName = resource?.attributes?.name || 'Unknown';
                             
                             allRequestedResources.push({
                                 id: resourceId,
-                                name: resource?.attributes?.name || 'Unknown',
+                                name: resourceName,
                                 kind: resource?.attributes?.kind || 'Unknown',
                                 isMyResource: myResourceIds.has(resourceId)
                             });
@@ -296,9 +294,18 @@ Deno.serve(async (req) => {
                             if (myResourceIds.has(resourceId)) {
                                 myRequestedResources.push({
                                     id: resourceId,
-                                    name: resource?.attributes?.name || 'Unknown',
+                                    name: resourceName,
                                     approval_status: request.attributes?.approval_status
                                 });
+                                
+                                // OPTIMIZED: Only queue answer fetching for Building Access resources
+                                const isBuildingAccess = resourceName.toLowerCase().includes('building access') || 
+                                                       resourceName.toLowerCase().includes('door code') ||
+                                                       resourceName.toLowerCase().includes('access code');
+                                
+                                if (isBuildingAccess && request.id) {
+                                    buildingAccessRequests.push(request.id);
+                                }
                             }
                         }
 
@@ -312,6 +319,71 @@ Deno.serve(async (req) => {
                                     resources_requested: allRequestedResources
                                 }
                             };
+                        }
+
+                        // OPTIMIZED: Fetch answers ONLY for building access, and do it in parallel
+                        let accessTime = null;
+                        
+                        if (buildingAccessRequests.length > 0) {
+                            try {
+                                // Fetch all building access answers in parallel
+                                const answerResults = await Promise.all(
+                                    buildingAccessRequests.map(async (requestId) => {
+                                        try {
+                                            await delay(30); // Small stagger
+                                            
+                                            const answersResponse = await fetchWithRetry(
+                                                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`,
+                                                headers,
+                                                2,
+                                                1000
+                                            );
+
+                                            if (answersResponse.ok) {
+                                                const answersData = await answersResponse.json();
+                                                
+                                                // Find access time answer
+                                                for (const answer of (answersData.data || [])) {
+                                                    const questionAttr = answer.attributes?.question;
+                                                    const questionText = typeof questionAttr === 'string' ? questionAttr : 
+                                                                       (questionAttr?.question || questionAttr?.text || '');
+                                                    
+                                                    const question = String(questionText || '').toLowerCase();
+                                                    let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                                                    
+                                                    if (typeof value === 'object' && value !== null) {
+                                                        value = JSON.stringify(value);
+                                                    }
+                                                    
+                                                    const answerText = String(value || '').toLowerCase();
+                                                    
+                                                    const isAccessQuestion = question.includes('access') || 
+                                                                           question.includes('time') || 
+                                                                           question.includes('begin') || 
+                                                                           question.includes('end') ||
+                                                                           question.includes('other details');
+                                                    
+                                                    const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
+                                                                               /\d+:\d+/.test(answerText);
+                                                    
+                                                    if (isAccessQuestion && looksLikeTimeRange) {
+                                                        return String(value);
+                                                    }
+                                                }
+                                            }
+                                            return null;
+                                        } catch (error) {
+                                            console.warn(`Warning: Error fetching answer for request ${requestId}: ${error.message}`);
+                                            return null;
+                                        }
+                                    })
+                                );
+                                
+                                // Use the first valid access time found
+                                accessTime = answerResults.find(result => result !== null) || null;
+                            } catch (error) {
+                                console.error('Error fetching answers:', error);
+                            }
                         }
 
                         // Find instances for this event
@@ -349,7 +421,7 @@ Deno.serve(async (req) => {
                                 ends_at: endsAt,
                                 summary: event.attributes?.summary,
                                 resources: myRequestedResources,
-                                access_time: null // Removed to save time
+                                access_time: accessTime
                             });
                         }
                         
