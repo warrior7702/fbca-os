@@ -1,478 +1,381 @@
 
-import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Calendar, CheckCircle } from "lucide-react"; // Added Calendar and CheckCircle imports
-import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { toast } from 'sonner'; // Added toast import, assuming 'sonner' as a common toast library with shadcn/ui
+import { Loader2, Calendar, Clock, MapPin, Search, CheckCircle } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { Card, CardContent } from "@/components/ui/card";
+// Alert and AlertDescription are imported in the outline but not used in the provided JSX.
+// However, the instruction is to implement *all* changes from the outline.
+// So, I will include their imports as per the outline.
+import { Alert, AlertDescription } from "@/components/ui/alert"; 
+import CardholderLookup from "./CardholderLookup";
+import { toast } from "sonner";
+import { base44 } from "@/api/base44Client";
 
-// Mock base44 for compilation. In a real application, this would typically be an imported SDK
-// or provided via context/props, allowing interaction with backend functions (e.g., Vercel Functions, AWS Lambda).
-const base44 = {
-  functions: {
-    invoke: async (functionName, payload) => {
-      console.log(`Mocking base44.functions.invoke('${functionName}', ${JSON.stringify(payload)})`);
-      // Simulate an API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Simulate a successful response. Adjust `ok: false` and `error` to simulate failures.
-      return { data: { ok: true } }; 
-    }
-  }
-};
-
-const personnelOptions = [
-  { value: "unlock", label: "Unlock", color: "#2ecd6f" },
-  { value: "young_adult", label: "Young Adult Event", color: "#e50000" },
-  { value: "preschool", label: "Preschool Event", color: "#EA80FC" },
-  { value: "youth", label: "Youth Event", color: "#FF4081" },
-  { value: "children", label: "Children's Event", color: "#04A9F4" },
-  { value: "global", label: "Global Ministry", color: "#E65100" },
-  { value: "college", label: "College Event", color: "#0231E8" },
-  { value: "other", label: "Other", color: "#667684" }
-];
-
-const buildingOptions = [
-  { value: "FBC", label: "FBC", color: "#3082B7" },
-  { value: "PCB", label: "PCB", color: "#ff7800" },
-  { value: "STUDENT_CENTER", label: "Student Center", color: "#81B1FF" },
-  { value: "Wade", label: "Wade", color: "#9b59b6" }
-];
-
-const scheduleOptions = [
-  { value: "advanced_unlock", label: "Advanced (Unlock)" },
-  { value: "weekly_event", label: "Weekly Event" },
-  { value: "committee_meetings", label: "Committee Meetings" },
-  { value: "rehearsals", label: "Rehearsals" },
-  { value: "bible_studies", label: "Bible Studies" },
-  { value: "other", label: "Other" }
-];
-
-// Extract email from text
-const extractEmail = (text) => {
-  if (!text) return "";
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
-  const match = text.match(emailRegex);
-  return match ? match[0] : "";
-};
-
-// Find answer by question text (case-insensitive partial match)
-const findAnswer = (questions, answers, searchTerms) => {
-  if (!questions || !answers) return null;
-  
-  const question = questions.find(q => {
-    const questionText = (q.question || "").toLowerCase();
-    return searchTerms.some(term => questionText.includes(term.toLowerCase()));
-  });
-  
-  return question ? answers[question.id] : null;
-};
-
-export default function ApprovalFormModal({ approval, details, open, onClose, onComplete }) { // Changed onSuccess to onComplete and retained details, open props for existing functionality
+export default function ApprovalFormModal({ open, onOpenChange, approval, onSubmit }) {
   const [formData, setFormData] = useState({
-    access_type: "",
-    entrance: "",
-    badge_code: "",
-    start_time: "",
-    end_time: "",
+    access_type: 'door_code',
+    entrance: '',
+    badge_code: '',
+    start_time: '',
+    end_time: '',
     buildings: [],
-    schedule: "",
-    personnel: "",
-    requestor_email: "",
-    doors: "",
-    notes: ""
+    doors: '',
+    notes: '',
+    requestor_email: '',
+    schedule: '',
+    personnel: ''
   });
+
   const [submitting, setSubmitting] = useState(false);
-  const [sendingToPCO, setSendingToPCO] = useState(false); // New state for PCO send
-  const [sentToPCO, setSentToPCO] = useState(false); // New state to track if sent to PCO
+  const [showCardholderLookup, setShowCardholderLookup] = useState(false);
 
-  // Smart auto-fill when approval or details change
   useEffect(() => {
-    if (!approval) return;
+    if (open && approval) {
+      // Reset formData to default values when the modal opens or approval changes
+      setFormData({
+        access_type: 'door_code',
+        entrance: '',
+        badge_code: '',
+        start_time: '',
+        end_time: '',
+        buildings: [],
+        doors: '',
+        notes: '',
+        requestor_email: '',
+        schedule: '',
+        personnel: ''
+      });
+    }
+  }, [open, approval]);
 
-    const currentDetails = details || {};
-    const questions = currentDetails.questions || [];
-    const answers = currentDetails.answers || {};
-    const event = currentDetails.event || {};
-
-    // Extract email from event description or summary
-    let email = extractEmail(event.description) || extractEmail(event.summary) || "";
-
-    // Try to get answers from PCO questions
-    const accessType = findAnswer(questions, answers, ["type of access", "access type"]) || "Door Code";
-    const entrance = findAnswer(questions, answers, ["entrance", "enter"]) || "";
-    const badgeCode = findAnswer(questions, answers, ["badge", "code", "specific badge"]) || "";
-    const timeRange = findAnswer(questions, answers, ["time", "begin and end", "access time"]) || "";
-    const doorsAnswer = findAnswer(questions, answers, ["doors", "specific doors"]) || "";
-    const notesAnswer = findAnswer(questions, answers, ["notes", "additional", "comments"]) || event.description || "";
-
-    // Parse time range if provided (e.g., "7:00 am - 1:30 pm")
-    let startTime = "";
-    let endTime = "";
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    if (timeRange && timeRange.includes("-")) {
-      const parts = timeRange.split("-").map(t => t.trim());
-      startTime = parts[0] || "";
-      endTime = parts[1] || "";
-    }
-    
-    // Fallback to event times
-    if (!startTime && approval.event_starts_at) {
-      startTime = format(new Date(approval.event_starts_at), 'h:mm a');
-    }
-    if (!endTime && approval.event_ends_at) {
-      endTime = format(new Date(approval.event_ends_at), 'h:mm a');
-    }
+    if (formData.access_type === 'door_code') {
+      if (!formData.badge_code) {
+        toast.error('Please provide a door code');
+        return;
+      }
 
-    // Detect buildings from resource name
-    const resourceName = approval.resource_name || "";
-    const detectedBuildings = [];
-    
-    if (resourceName.toLowerCase().includes("fbc") || resourceName.toLowerCase().includes("fellowship")) {
-      detectedBuildings.push("FBC");
-    }
-    if (resourceName.toLowerCase().includes("pcb") || resourceName.toLowerCase().includes("preschool")) {
-      detectedBuildings.push("PCB");
-    }
-    if (resourceName.toLowerCase().includes("student") || resourceName.toLowerCase().includes("wade")) {
-      detectedBuildings.push("STUDENT_CENTER");
-    }
+      // Format badge code to ensure it ends with # and has 6 digits
+      let badgeCode = formData.badge_code.replace(/#/g, '').trim(); // Remove any existing #
+      
+      // Validate it's 6 digits
+      if (!/^\d{6}$/.test(badgeCode)) {
+        toast.error('Door code must be exactly 6 digits');
+        return;
+      }
 
-    // Detect schedule/personnel type from event name or description
-    let schedule = "";
-    let personnel = "";
-    const eventText = `${approval.event_name} ${event.description || ""}`.toLowerCase();
-    
-    if (eventText.includes("unlock") || eventText.includes("advanced")) {
-      schedule = "advanced_unlock";
-      personnel = "unlock";
-    } else if (eventText.includes("weekly")) {
-      schedule = "weekly_event";
-    } else if (eventText.includes("committee") || eventText.includes("meeting")) {
-      schedule = "committee_meetings";
-    } else if (eventText.includes("rehearsal")) {
-      schedule = "rehearsals";
-    } else if (eventText.includes("bible study")) {
-      schedule = "bible_studies";
-    } else if (eventText.includes("youth")) {
-      personnel = "youth";
-    } else if (eventText.includes("children")) {
-      personnel = "children";
-    } else if (eventText.includes("preschool")) {
-      personnel = "preschool";
-    } else if (eventText.includes("college")) {
-      personnel = "college";
-    } else if (eventText.includes("young adult")) {
-      personnel = "young_adult";
-    } else if (eventText.includes("global")) {
-      personnel = "global";
-    }
+      // Add the # at the end
+      badgeCode = badgeCode + '#';
 
+      setSubmitting(true);
+      try {
+        await onSubmit({
+          ...formData,
+          badge_code: badgeCode // Ensure format is xxxxxx#
+        });
+        toast.success('Request approved and task created!');
+      } catch (error) {
+        console.error('Submit error:', error);
+        toast.error('Failed to submit approval');
+      } finally {
+        setSubmitting(false);
+      }
+    } else { // Staff Unlock scenario
+      setSubmitting(true);
+      try {
+        await onSubmit({
+          ...formData,
+          badge_code: null // No badge code for staff unlock
+        });
+        toast.success('Request approved and task created for staff unlock!');
+      } catch (error) {
+        console.error('Submit error:', error);
+        toast.error('Failed to submit approval');
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  };
+
+  const handleCardholderSelect = (cardholder) => {
+    // Format the PIN to xxxxxx# format
+    const pin = String(cardholder.pin).replace(/#/g, '').trim(); // Ensure pin is string before replace
     setFormData({
-      access_type: accessType,
-      entrance: entrance,
-      badge_code: badgeCode,
-      start_time: startTime,
-      end_time: endTime,
-      buildings: detectedBuildings,
-      schedule: schedule,
-      personnel: personnel,
-      requestor_email: email,
-      doors: doorsAnswer,
-      notes: notesAnswer
+      ...formData,
+      badge_code: pin, // Store as 6 digits, # will be added on submit if needed
+      requestor_email: cardholder.email || formData.requestor_email
     });
-  }, [approval, details]);
+    setShowCardholderLookup(false);
+  };
 
   const handleBuildingToggle = (building) => {
-    setFormData(prev => ({
-      ...prev,
-      buildings: prev.buildings.includes(building)
-        ? prev.buildings.filter(b => b !== building)
-        : [...prev.buildings, building]
-    }));
-  };
-
-  const handleApproveWithTask = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      // The logic for validation and task creation would go here.
-      // Example: await yourApiService.createTask(formData);
-
-      toast.success('Request approved and task created!');
-      
-      // Call onComplete callback to reload approvals (renamed from onSuccess)
-      if (onComplete) {
-        await onComplete();
-      }
-      
-      onClose();
-    } catch (error) {
-      console.error('Approval with task error:', error);
-      toast.error('Failed to approve and create task');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const sendToPlanningCenter = async () => {
-    if (!formData.badge_code) {
-      toast.error('Please enter a door code first');
-      return;
-    }
-
-    setSendingToPCO(true);
-    try {
-      const response = await base44.functions.invoke('writePCONote', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        badge_code: formData.badge_code
-      });
-
-      if (response.data.ok) {
-        toast.success('Door code sent to Planning Center event activity!');
-        setSentToPCO(true);
-      } else {
-        toast.error('Failed to send to Planning Center: ' + (response.data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error sending to PCO:', error);
-      toast.error('Failed to send to Planning Center');
-    } finally {
-      setSendingToPCO(false);
-    }
+    setFormData({
+      ...formData,
+      buildings: formData.buildings.includes(building)
+        ? formData.buildings.filter(b => b !== building)
+        : [...formData.buildings, building]
+    });
   };
 
   if (!approval) return null;
 
+  const startDate = approval.event_starts_at ? parseISO(approval.event_starts_at) : null;
+  const endDate = approval.event_ends_at ? parseISO(approval.event_ends_at) : null;
+
+  const isBadgeCodeValid = formData.badge_code && formData.badge_code.length === 6;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">
-            Building Access Request
-          </DialogTitle>
-          <div className="text-sm text-slate-600 mt-2">
-            <p className="font-semibold">{approval.event_name}</p>
-            {approval.event_starts_at && (
-              <p>{format(new Date(approval.event_starts_at), 'EEEE, MMMM d, yyyy @ h:mm a')}</p>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              Approve Building Access Request
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Event Info Card */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="pt-6 space-y-2">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium">{approval.event_name}</span>
+                </div>
+                {startDate && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <span>
+                      {format(startDate, 'EEEE, MMMM d, yyyy')} at {format(startDate, 'h:mm a')}
+                      {endDate && ` - ${format(endDate, 'h:mm a')}`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  <span>{approval.resource_name}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Access Type */}
+            <div className="space-y-2">
+              <Label>Access Type *</Label>
+              <RadioGroup value={formData.access_type} onValueChange={(value) => setFormData({...formData, access_type: value})}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="door_code" id="door_code" />
+                  <Label htmlFor="door_code" className="font-normal cursor-pointer">Door Code (Badge)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="staff_unlock" id="staff_unlock" />
+                  <Label htmlFor="staff_unlock" className="font-normal cursor-pointer">Staff Will Unlock</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Entrance */}
+            <div className="space-y-2">
+              <Label>Entrance *</Label>
+              <RadioGroup value={formData.entrance} onValueChange={(value) => setFormData({...formData, entrance: value})}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="South Entrance" id="south" />
+                  <Label htmlFor="south" className="font-normal cursor-pointer">South Entrance</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="North Entrance" id="north" />
+                  <Label htmlFor="north" className="font-normal cursor-pointer">North Entrance</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="East Entrance" id="east" />
+                  <Label htmlFor="east" className="font-normal cursor-pointer">East Entrance</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Badge/Door Code */}
+            {formData.access_type === 'door_code' && (
+              <div className="space-y-2">
+                <Label htmlFor="badge_code">Door Code (6 digits) *</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Input
+                      id="badge_code"
+                      value={formData.badge_code}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d]/g, '').slice(0, 6);
+                        setFormData({...formData, badge_code: value});
+                      }}
+                      placeholder="123456"
+                      maxLength={6}
+                      className="font-mono text-lg pr-8"
+                    />
+                    {formData.badge_code && formData.badge_code.length === 6 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-lg">#</span>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCardholderLookup(true)}
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Lookup
+                  </Button>
+                </div>
+                {formData.badge_code && formData.badge_code.length < 6 && (
+                  <p className="text-xs text-red-600">Code must be 6 digits</p>
+                )}
+                {isBadgeCodeValid && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Valid code format: {formData.badge_code}#
+                  </p>
+                )}
+              </div>
             )}
-          </div>
-        </DialogHeader>
 
-        <form onSubmit={handleApproveWithTask} className="space-y-6 mt-4">
-          {/* Row 1: Access Type & Code */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="access_type">What type of access do you need? *</Label>
-              <Input
-                id="access_type"
-                value={formData.access_type}
-                onChange={(e) => setFormData({ ...formData, access_type: e.target.value })}
-                placeholder="e.g., Door Code"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="badge_code">CODE (Badge or Code)</Label>
-              <Input
-                id="badge_code"
-                value={formData.badge_code}
-                onChange={(e) => setFormData({ ...formData, badge_code: e.target.value })}
-                placeholder="e.g., Quilter's Building Code"
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Entrance & Schedule */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="entrance">What entrance will your guest enter? *</Label>
-              <Input
-                id="entrance"
-                value={formData.entrance}
-                onChange={(e) => setFormData({ ...formData, entrance: e.target.value })}
-                placeholder="e.g., Courtyard - Fellowship Hall"
-                required
-              />
+            {/* Access Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_time">Access Start Time</Label>
+                <Input
+                  id="start_time"
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({...formData, start_time: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_time">Access End Time</Label>
+                <Input
+                  id="end_time"
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({...formData, end_time: e.target.value})}
+                />
+              </div>
             </div>
 
+            {/* Buildings */}
             <div className="space-y-2">
-              <Label htmlFor="schedule">Schedule / Event Type</Label>
-              <Select
-                value={formData.schedule}
-                onValueChange={(value) => setFormData({ ...formData, schedule: value })}
-              >
+              <Label>Buildings to Access</Label>
+              <div className="space-y-2">
+                {['main_building', 'worship_center', 'education_building', 'family_life_center'].map((building) => (
+                  <div key={building} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={building}
+                      checked={formData.buildings.includes(building)}
+                      onCheckedChange={() => handleBuildingToggle(building)}
+                    />
+                    <Label htmlFor={building} className="font-normal cursor-pointer">
+                      {building.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Specific Doors */}
+            <div className="space-y-2">
+              <Label htmlFor="doors">Specific Doors/Rooms</Label>
+              <Input
+                id="doors"
+                value={formData.doors}
+                onChange={(e) => setFormData({...formData, doors: e.target.value})}
+                placeholder="e.g., Room 201, Kitchen, Main Sanctuary"
+              />
+            </div>
+
+            {/* Schedule Dropdown */}
+            <div className="space-y-2">
+              <Label htmlFor="schedule">Event Schedule</Label>
+              <Select value={formData.schedule} onValueChange={(value) => setFormData({...formData, schedule: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select schedule type..." />
+                  <SelectValue placeholder="Select schedule..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {scheduleOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="sunday_morning">Sunday Morning</SelectItem>
+                  <SelectItem value="sunday_evening">Sunday Evening</SelectItem>
+                  <SelectItem value="wednesday">Wednesday</SelectItem>
+                  <SelectItem value="weekday">Weekday</SelectItem>
+                  <SelectItem value="special_event">Special Event</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Row 3: Time Range */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* Personnel */}
             <div className="space-y-2">
-              <Label htmlFor="start_time">Start Time *</Label>
+              <Label htmlFor="personnel">Staff/Personnel Involved</Label>
               <Input
-                id="start_time"
-                value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                placeholder="7:00 am"
-                required
+                id="personnel"
+                value={formData.personnel}
+                onChange={(e) => setFormData({...formData, personnel: e.target.value})}
+                placeholder="Names of staff who will be present"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="end_time">End Time *</Label>
-              <Input
-                id="end_time"
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                placeholder="1:30 pm"
-                required
-              />
-            </div>
-          </div>
 
-          {/* Row 4: Buildings */}
-          <div className="space-y-2">
-            <Label>BUILDINGS</Label>
-            <div className="flex flex-wrap gap-2">
-              {buildingOptions.map((building) => (
-                <Badge
-                  key={building.value}
-                  onClick={() => handleBuildingToggle(building.value)}
-                  className={`cursor-pointer transition-all ${
-                    formData.buildings.includes(building.value)
-                      ? 'opacity-100 ring-2 ring-offset-2'
-                      : 'opacity-50'
-                  }`}
-                  style={{ backgroundColor: building.color }}
-                >
-                  {building.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Row 5: Requestor Email & Personnel */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* Requestor Email */}
             <div className="space-y-2">
-              <Label htmlFor="requestor_email">REQUESTOR EMAIL</Label>
+              <Label htmlFor="requestor_email">Requestor Email</Label>
               <Input
                 id="requestor_email"
                 type="email"
                 value={formData.requestor_email}
-                onChange={(e) => setFormData({ ...formData, requestor_email: e.target.value })}
+                onChange={(e) => setFormData({...formData, requestor_email: e.target.value})}
                 placeholder="email@fbca.org"
               />
             </div>
 
+            {/* Additional Notes */}
             <div className="space-y-2">
-              <Label htmlFor="personnel">Personnel / Event Type</Label>
-              <Select
-                value={formData.personnel}
-                onValueChange={(value) => setFormData({ ...formData, personnel: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select event type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {personnelOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: option.color }}
-                        />
-                        {option.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="notes">Additional Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                placeholder="Any special instructions or notes..."
+                rows={3}
+              />
             </div>
-          </div>
 
-          {/* Row 6: Doors */}
-          <div className="space-y-2">
-            <Label htmlFor="doors">Doors</Label>
-            <Input
-              id="doors"
-              value={formData.doors}
-              onChange={(e) => setFormData({ ...formData, doors: e.target.value })}
-              placeholder="List specific doors if needed"
-            />
-          </div>
-
-          {/* Row 7: Notes (Full Width) */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Note Info</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any additional information..."
-              rows={4}
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-            {/* New "Send to Planning Center" button */}
-            <Button
-                onClick={sendToPlanningCenter}
-                disabled={!formData.badge_code || sendingToPCO || sentToPCO}
-                variant="outline"
-                className="border-blue-300 hover:bg-blue-50"
-              >
-                {sendingToPCO ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : sentToPCO ? (
-                  <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                ) : (
-                  <Calendar className="w-4 h-4 mr-2" />
-                )}
-                {sentToPCO ? 'Sent to Planning Center ✓' : 'Send to Planning Center'}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+                Cancel
               </Button>
-            {/* Existing buttons */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Approving...
-                </>
-              ) : (
-                'Approve & Create Task'
-              )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <Button
+                type="submit"
+                disabled={submitting || (formData.access_type === 'door_code' && !isBadgeCodeValid)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  'Approve & Create Task'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <CardholderLookup
+        open={showCardholderLookup}
+        onOpenChange={setShowCardholderLookup}
+        onSelect={handleCardholderSelect}
+      />
+    </>
   );
 }
