@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -31,6 +32,76 @@ async function refreshTokenIfNeeded(base44, user) {
     });
 
     return tokens.access_token;
+}
+
+async function getAccessTimeForEvent(eventId, accessToken) {
+    try {
+        // Fetch resource requests for this event
+        const requestsResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?per_page=100`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        if (!requestsResponse.ok) return null;
+
+        const requestsData = await requestsResponse.json();
+        
+        // For each request, check answers
+        for (const request of (requestsData.data || [])) {
+            try {
+                const answersResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+
+                if (answersResponse.ok) {
+                    const answersData = await answersResponse.json();
+                    
+                    // Find access time answer
+                    for (const answer of (answersData.data || [])) {
+                        const questionAttr = answer.attributes?.question;
+                        let questionText = '';
+                        
+                        if (typeof questionAttr === 'string') {
+                            questionText = questionAttr;
+                        } else if (typeof questionAttr === 'object' && questionAttr !== null) {
+                            questionText = questionAttr.question || questionAttr.text || '';
+                        }
+                        
+                        const question = String(questionText || '').toLowerCase();
+                        let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                        
+                        if (typeof value === 'object' && value !== null) {
+                            value = JSON.stringify(value);
+                        }
+                        
+                        const answerText = String(value || '').toLowerCase();
+                        
+                        // Check if this is an access time answer
+                        const isAccessQuestion = question.includes('access') || 
+                                               question.includes('time') || 
+                                               question.includes('begin') || 
+                                               question.includes('end') ||
+                                               question.includes('other details');
+                        
+                        const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
+                                                   /\d+:\d+/.test(answerText);
+                        
+                        if (isAccessQuestion && looksLikeTimeRange) {
+                            return String(value);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching answers for request:', request.id, error);
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error getting access time for event:', eventId, error);
+        return null;
+    }
 }
 
 Deno.serve(async (req) => {
@@ -149,14 +220,13 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Step 4: Get ALL future event instances (no filtering yet)
+        // Step 4: Get ALL future event instances
         console.log('📞 Step 4: Fetching ALL future event instances...');
         
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
         
-        // Try with simple filter first
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
         console.log('🔗 Fetching:', instancesUrl);
@@ -199,7 +269,7 @@ Deno.serve(async (req) => {
         
         const eventsWithMyResources = [];
         
-        for (const eventId of Array.from(eventIds).slice(0, 50)) { // Limit to first 50 events for speed
+        for (const eventId of Array.from(eventIds).slice(0, 50)) {
             try {
                 // Get event details
                 const eventResponse = await fetch(
@@ -227,7 +297,6 @@ Deno.serve(async (req) => {
                 for (const request of (requestsData.data || [])) {
                     const resourceId = request.relationships?.resource?.data?.id;
                     if (myResourceIds.has(resourceId)) {
-                        // Find resource details from included
                         const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
                         myRequestedResources.push({
                             id: resourceId,
@@ -238,7 +307,10 @@ Deno.serve(async (req) => {
                 }
 
                 if (myRequestedResources.length > 0) {
-                    // This event uses my resources! Find its instances
+                    // Get access time for this event
+                    const accessTime = await getAccessTimeForEvent(eventId, accessToken);
+                    
+                    // Find instances for this event
                     const eventInstances = allInstances.filter(i => 
                         i.relationships?.event?.data?.id === eventId
                     );
@@ -250,7 +322,7 @@ Deno.serve(async (req) => {
                         if (!startsAt) continue;
                         
                         const startDate = new Date(startsAt);
-                        if (startDate > twoWeeksFromNow) continue; // Only next 2 weeks
+                        if (startDate > twoWeeksFromNow) continue;
 
                         eventsWithMyResources.push({
                             id: instance.id,
@@ -259,7 +331,8 @@ Deno.serve(async (req) => {
                             starts_at: startsAt,
                             ends_at: endsAt,
                             summary: event.attributes?.summary,
-                            resources: myRequestedResources
+                            resources: myRequestedResources,
+                            access_time: accessTime
                         });
                     }
                 }
@@ -277,7 +350,8 @@ Deno.serve(async (req) => {
             console.log('📋 First few:', eventsWithMyResources.slice(0, 3).map(e => ({
                 name: e.name,
                 date: new Date(e.starts_at).toLocaleDateString(),
-                resources: e.resources.length
+                resources: e.resources.length,
+                access_time: e.access_time
             })));
         }
 
