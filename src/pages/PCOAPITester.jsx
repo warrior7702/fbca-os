@@ -114,24 +114,15 @@ export default function PCOAPITester() {
       return;
     }
     
-    // FIX: Create dates in UTC to avoid timezone issues
-    // selectedDate is in format "2025-11-10"
-    const [year, month, day] = selectedDate.split('-').map(Number);
+    console.log('📅 Fetching all future events to filter by date:', selectedDate);
     
-    // Create start of day in UTC
-    const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-    
-    // Create end of day in UTC
-    const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-    
-    console.log('📅 Searching date:', selectedDate);
-    console.log('📅 Start UTC:', startDate.toISOString());
-    console.log('📅 End UTC:', endDate.toISOString());
-    
+    // PCO doesn't support date range filters well, so fetch all future events
+    // and we'll filter them client-side in the translation
     await makeAPICall('/event_instances', {
-      'where[starts_at]': `${startDate.toISOString()}..${endDate.toISOString()}`,
+      'filter': 'future',
       'per_page': '100',
-      'order': 'starts_at'
+      'order': 'starts_at',
+      '_client_filter_date': selectedDate // Store for client-side filtering
     });
   };
 
@@ -191,10 +182,55 @@ export default function PCOAPITester() {
 
     // Event instances
     if (result.endpoint?.includes('/event_instances')) {
-      const events = data.data || [];
+      let events = data.data || [];
+      
+      // CLIENT-SIDE DATE FILTERING (if _client_filter_date was passed)
+      const urlParams = new URLSearchParams(result.url.split('?')[1]);
+      const filterDate = urlParams.get('_client_filter_date');
+      
+      if (filterDate) {
+        console.log('🔍 Client-side filtering for date:', filterDate);
+        
+        // Parse the selected date (YYYY-MM-DD)
+        const [year, month, day] = filterDate.split('-').map(Number);
+        const targetDate = new Date(year, month - 1, day);
+        targetDate.setHours(0, 0, 0, 0); // Set to start of day in local time
+        
+        const nextDay = new Date(targetDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        console.log('📅 Filtering between:', targetDate, 'and', nextDay);
+        
+        // Filter events that START on the selected date
+        events = events.filter(event => {
+          const startsAt = event.attributes?.starts_at;
+          if (!startsAt) return false;
+          
+          const eventDate = new Date(startsAt);
+          // Create a new date object for comparison, setting time to 00:00:00
+          // This ensures we're comparing just the date part.
+          const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+          
+          const matches = eventDateOnly >= targetDate && eventDateOnly < nextDay;
+          
+          if (matches) {
+            console.log('✅ Match:', event.attributes?.name, 'starts:', startsAt);
+          }
+          
+          return matches;
+        });
+        
+        console.log('🎯 Filtered to', events.length, 'events on', filterDate);
+      }
+      
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">📅 Event Instances Found: {events.length}</h3>
+          {filterDate && (
+            <p className="text-sm text-slate-600">
+              Showing events on <strong>{new Date(filterDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+            </p>
+          )}
           {events.length > 0 ? (
             <div className="space-y-2">
               {events.slice(0, 5).map((event, idx) => (
@@ -234,7 +270,12 @@ export default function PCOAPITester() {
               )}
             </div>
           ) : (
-            <p className="text-slate-500">No events found for this date</p>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-slate-700">No events found for this date.</p>
+              <p className="text-sm text-slate-500 mt-1">
+                Try selecting a different date or check the full JSON response below.
+              </p>
+            </div>
           )}
         </div>
       );
@@ -517,7 +558,7 @@ export default function PCOAPITester() {
                     </Button>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Default: Next Sunday. Will fetch all event instances for the selected date.
+                    Default: Next Sunday. Will fetch all future event instances and filter client-side.
                   </p>
                 </div>
 
