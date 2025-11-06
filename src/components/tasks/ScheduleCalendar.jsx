@@ -1,12 +1,12 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { Clock, Key, MapPin } from 'lucide-react';
 
 export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
-  const startDate = startOfWeek(today, { weekStartsOn: 0 }); // Start on Sunday
+  const startDate = today; // Start from today instead of Sunday
 
   const weeks = [];
   for (let w = 0; w < weekCount; w++) {
@@ -30,7 +30,7 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
       {weeks.map((week, weekIndex) => (
         <div key={weekIndex}>
           <p className="text-sm font-semibold text-slate-600 mb-3">
-            Week {weekIndex + 1} • {format(week[0], 'MMM d')} - {format(week[6], 'MMM d')}
+            {weekIndex === 0 ? 'This Week' : `Week ${weekIndex + 1}`} • {format(week[0], 'MMM d')} - {format(week[6], 'MMM d')}
           </p>
           <div className="grid grid-cols-7 gap-2">
             {week.map((day, dayIndex) => {
