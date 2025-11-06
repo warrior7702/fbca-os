@@ -83,12 +83,56 @@ export default function PCOAPITester() {
       
       const data = await response.json();
       
+      // If we're fetching events, also fetch resources for each event
+      if (endpoint === '/event_instances' && response.ok && data.data) {
+        console.log('📦 Fetching resources for', data.data.length, 'events...');
+        
+        // Get unique event IDs
+        const eventIds = [...new Set(data.data.map(instance => 
+          instance.relationships?.event?.data?.id
+        ).filter(Boolean))];
+        
+        console.log('📋 Unique event IDs:', eventIds.length);
+        
+        // Fetch resources for each event (limit to first 20 events to avoid too many requests)
+        const eventsWithResources = await Promise.all(
+          eventIds.slice(0, 20).map(async (eventId) => {
+            try {
+              const resourcesUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`;
+              const resourcesResponse = await fetch(resourcesUrl, {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                return {
+                  eventId,
+                  resources: resourcesData.data || [],
+                  included: resourcesData.included || []
+                };
+              }
+              return { eventId, resources: [], included: [] };
+            } catch (error) {
+              console.error('Error fetching resources for event', eventId, error);
+              return { eventId, resources: [], included: [] };
+            }
+          })
+        );
+        
+        // Store resources data alongside the main data
+        data._resourcesData = eventsWithResources;
+        console.log('✅ Fetched resources for', eventsWithResources.length, 'events');
+      }
+      
       setResult({
         ok: response.ok,
         status: response.status,
         url: url.toString(),
         data: data,
-        endpoint: endpoint // Store endpoint for translation
+        endpoint: endpoint
       });
       
       if (response.ok) {
@@ -183,6 +227,7 @@ export default function PCOAPITester() {
     // Event instances
     if (result.endpoint?.includes('/event_instances')) {
       let events = data.data || [];
+      const resourcesData = data._resourcesData || [];
       
       // CLIENT-SIDE DATE FILTERING (if _client_filter_date was passed)
       const urlParams = new URLSearchParams(result.url.split('?')[1]);
@@ -191,24 +236,20 @@ export default function PCOAPITester() {
       if (filterDate) {
         console.log('🔍 Client-side filtering for date:', filterDate);
         
-        // Parse the selected date (YYYY-MM-DD)
         const [year, month, day] = filterDate.split('-').map(Number);
         const targetDate = new Date(year, month - 1, day);
-        targetDate.setHours(0, 0, 0, 0); // Set to start of day in local time
+        targetDate.setHours(0, 0, 0, 0);
         
         const nextDay = new Date(targetDate);
         nextDay.setDate(nextDay.getDate() + 1);
         
         console.log('📅 Filtering between:', targetDate, 'and', nextDay);
         
-        // Filter events that START on the selected date
         events = events.filter(event => {
           const startsAt = event.attributes?.starts_at;
           if (!startsAt) return false;
           
           const eventDate = new Date(startsAt);
-          // Create a new date object for comparison, setting time to 00:00:00
-          // This ensures we're comparing just the date part.
           const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
           
           const matches = eventDateOnly >= targetDate && eventDateOnly < nextDay;
@@ -233,39 +274,90 @@ export default function PCOAPITester() {
           )}
           {events.length > 0 ? (
             <div className="space-y-2">
-              {events.slice(0, 5).map((event, idx) => (
-                <Card key={idx} className="bg-slate-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-900">{event.attributes?.name || 'Untitled Event'}</h4>
-                        <div className="mt-2 space-y-1 text-sm text-slate-600">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            <span>
-                              {event.attributes?.starts_at ? new Date(event.attributes.starts_at).toLocaleString() : 'No start time'}
-                              {event.attributes?.ends_at && ` - ${new Date(event.attributes.ends_at).toLocaleTimeString()}`}
-                            </span>
+              {events.slice(0, 10).map((event, idx) => {
+                const eventId = event.relationships?.event?.data?.id;
+                const eventResources = resourcesData.find(r => r.eventId === eventId);
+                const resources = eventResources?.resources || [];
+                const included = eventResources?.included || [];
+                
+                return (
+                  <Card key={idx} className="bg-slate-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900">{event.attributes?.name || 'Untitled Event'}</h4>
+                          <div className="mt-2 space-y-1 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              <span>
+                                {event.attributes?.starts_at ? new Date(event.attributes.starts_at).toLocaleString() : 'No start time'}
+                                {event.attributes?.ends_at && ` - ${new Date(event.attributes.ends_at).toLocaleTimeString()}`}
+                              </span>
+                            </div>
+                            {event.attributes?.all_day_event && (
+                              <Badge variant="outline" className="text-xs">All Day Event</Badge>
+                            )}
+                            {event.attributes?.recurrence && event.attributes.recurrence !== 'None' && (
+                              <Badge variant="outline" className="text-xs">{event.attributes.recurrence}</Badge>
+                            )}
+                            
+                            {/* Resources/Rooms Section */}
+                            {resources.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-200">
+                                <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                                  Resources/Rooms ({resources.length})
+                                </p>
+                                <div className="space-y-1">
+                                  {resources.slice(0, 5).map((resource, ridx) => {
+                                    const resourceId = resource.relationships?.resource?.data?.id;
+                                    const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
+                                    const approvalStatus = resource.attributes?.approval_status;
+                                    
+                                    return (
+                                      <div key={ridx} className="flex items-center gap-2">
+                                        <Package className="w-3 h-3 text-blue-600" />
+                                        <span className="text-xs font-medium">
+                                          {resourceDetails?.attributes?.name || 'Unknown Resource'}
+                                        </span>
+                                        {approvalStatus === 'A' && (
+                                          <CheckCircle className="w-3 h-3 text-green-600" />
+                                        )}
+                                        {approvalStatus === 'P' && (
+                                          <AlertCircle className="w-3 h-3 text-yellow-600" />
+                                        )}
+                                        {approvalStatus === 'R' && (
+                                          <XCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        {resource.attributes?.quantity && (
+                                          <span className="text-xs text-slate-500">
+                                            (qty: {resource.attributes.quantity})
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {resources.length > 5 && (
+                                    <p className="text-xs text-slate-500 italic">
+                                      + {resources.length - 5} more resources
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          {event.attributes?.all_day_event && (
-                            <Badge variant="outline" className="text-xs">All Day Event</Badge>
-                          )}
-                          {event.attributes?.recurrence && event.attributes.recurrence !== 'None' && (
-                            <Badge variant="outline" className="text-xs">{event.attributes.recurrence}</Badge>
-                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">Event ID</p>
+                          <p className="text-sm font-mono text-blue-600">{eventId}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-slate-500">Event ID</p>
-                        <p className="text-sm font-mono text-blue-600">{event.relationships?.event?.data?.id}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {events.length > 5 && (
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {events.length > 10 && (
                 <p className="text-sm text-slate-500 text-center">
-                  + {events.length - 5} more events (see full JSON below)
+                  + {events.length - 10} more events (see full JSON below)
                 </p>
               )}
             </div>
