@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -44,7 +45,7 @@ async function fetchWithRetry(url, headers, retries = 3, delayMs = 1000) {
         if (response.status === 429) {
             // Rate limited - wait and retry
             const waitTime = delayMs * Math.pow(2, i); // Exponential backoff
-            console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${i + 1}/${retries}`);
+            console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${i + 1}/${retries} for ${url}`);
             await delay(waitTime);
             continue;
         }
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
 
         const myGroups = [];
         for (const group of allGroups) {
-            await delay(150); // Delay between group member checks
+            await delay(200); // Increased delay
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -147,7 +148,7 @@ Deno.serve(async (req) => {
         const myResources = [];
         
         for (const group of myGroups) {
-            await delay(150); // Delay between resource fetches
+            await delay(200); // Increased delay
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
@@ -220,200 +221,206 @@ Deno.serve(async (req) => {
 
         debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: Process events in SMALL BATCHES with delays
+        // Step 5: Process events SEQUENTIALLY (one at a time) with delays
         const eventsWithMyResources = [];
         const skippedEvents = [];
         
         const eventIdArray = Array.from(eventIds);
         debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
-        const BATCH_SIZE = 5; // Process 5 events at a time
-        const BATCH_DELAY = 500; // 500ms between batches
+        console.log(`🐌 Processing ${eventIdArray.length} events SEQUENTIALLY to avoid rate limits...`);
         
-        for (let i = 0; i < eventIdArray.length; i += BATCH_SIZE) {
-            const batch = eventIdArray.slice(i, i + BATCH_SIZE);
-            console.log(`📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(eventIdArray.length / BATCH_SIZE)}`);
+        for (let i = 0; i < eventIdArray.length; i++) {
+            const eventId = eventIdArray[i];
             
-            // Process batch in parallel
-            const batchResults = await Promise.all(
-                batch.map(async (eventId) => {
-                    try {
-                        // Fetch event and requests with retry
-                        const [eventResponse, requestsResponse] = await Promise.all([
-                            fetchWithRetry(
-                                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-                                headers
-                            ),
-                            fetchWithRetry(
-                                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                                headers
-                            )
-                        ]);
+            // Log progress every 10 events
+            if (i % 10 === 0) {
+                console.log(`📊 Progress: ${i}/${eventIdArray.length} events processed`);
+            }
+            
+            try {
+                // Delay before EACH event (250ms), skip for the first one
+                if (i > 0) {
+                    await delay(250);
+                }
+                
+                // Fetch event details
+                const eventResponse = await fetchWithRetry(
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+                    headers,
+                    3,
+                    2000 // Longer initial delay for retries
+                );
 
-                        if (!eventResponse.ok || !requestsResponse.ok) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    reason: 'fetch_failed',
-                                    eventStatus: eventResponse.status,
-                                    requestsStatus: requestsResponse.status
-                                }
-                            };
-                        }
+                if (!eventResponse.ok) {
+                    skippedEvents.push({
+                        eventId,
+                        reason: 'fetch_failed',
+                        eventStatus: eventResponse.status,
+                        step: 'event_details'
+                    });
+                    continue;
+                }
 
-                        const eventData = await eventResponse.json();
-                        const requestsData = await requestsResponse.json();
-                        const event = eventData.data;
+                const eventData = await eventResponse.json();
+                const event = eventData.data;
 
-                        // Check resources
-                        const myRequestedResources = [];
-                        const allRequestedResources = [];
-                        let accessTime = null;
-                        
-                        for (const request of (requestsData.data || [])) {
-                            const resourceId = request.relationships?.resource?.data?.id;
-                            const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
-                            
-                            allRequestedResources.push({
-                                id: resourceId,
-                                name: resource?.attributes?.name || 'Unknown',
-                                kind: resource?.attributes?.kind || 'Unknown',
-                                isMyResource: myResourceIds.has(resourceId)
-                            });
-                            
-                            if (myResourceIds.has(resourceId)) {
-                                myRequestedResources.push({
-                                    id: resourceId,
-                                    name: resource?.attributes?.name || 'Unknown',
-                                    approval_status: request.attributes?.approval_status
-                                });
+                // Small delay before fetching resources
+                await delay(250);
 
-                                // Get access time from answers
-                                if (!accessTime && request.id) {
-                                    try {
-                                        const answersResponse = await fetchWithRetry(
-                                            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
-                                            headers
-                                        );
+                // Fetch resource requests
+                const requestsResponse = await fetchWithRetry(
+                    `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                    headers,
+                    3,
+                    2000
+                );
 
-                                        if (answersResponse.ok) {
-                                            const answersData = await answersResponse.json();
-                                            
-                                            for (const answer of (answersData.data || [])) {
-                                                const questionAttr = answer.attributes?.question;
-                                                const questionText = typeof questionAttr === 'string' ? questionAttr : 
-                                                                   (questionAttr?.question || questionAttr?.text || '');
-                                                
-                                                const question = String(questionText || '').toLowerCase();
-                                                let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                                                
-                                                if (typeof value === 'object' && value !== null) {
-                                                    value = JSON.stringify(value);
-                                                }
-                                                
-                                                const answerText = String(value || '').toLowerCase();
-                                                
-                                                const isAccessQuestion = question.includes('access') || 
-                                                                       question.includes('time') || 
-                                                                       question.includes('begin') || 
-                                                                       question.includes('end') ||
-                                                                       question.includes('other details');
-                                                
-                                                const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
-                                                                           /\d+:\d+/.test(answerText);
-                                                
-                                                if (isAccessQuestion && looksLikeTimeRange) {
-                                                    accessTime = String(value);
-                                                    break;
-                                                }
-                                            }
+                if (!requestsResponse.ok) {
+                    skippedEvents.push({
+                        eventId,
+                        name: event.attributes?.name,
+                        reason: 'fetch_failed',
+                        requestsStatus: requestsResponse.status,
+                        step: 'resource_requests'
+                    });
+                    continue;
+                }
+
+                const requestsData = await requestsResponse.json();
+
+                // Check resources
+                const myRequestedResources = [];
+                const allRequestedResources = [];
+                let accessTime = null;
+                
+                for (const request of (requestsData.data || [])) {
+                    const resourceId = request.relationships?.resource?.data?.id;
+                    const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+                    
+                    allRequestedResources.push({
+                        id: resourceId,
+                        name: resource?.attributes?.name || 'Unknown',
+                        kind: resource?.attributes?.kind || 'Unknown',
+                        isMyResource: myResourceIds.has(resourceId)
+                    });
+                    
+                    if (myResourceIds.has(resourceId)) {
+                        myRequestedResources.push({
+                            id: resourceId,
+                            name: resource?.attributes?.name || 'Unknown',
+                            approval_status: request.attributes?.approval_status
+                        });
+
+                        // Get access time from answers
+                        if (!accessTime && request.id) {
+                            try {
+                                await delay(250); // Delay before answer fetch
+                                
+                                const answersResponse = await fetchWithRetry(
+                                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
+                                    headers,
+                                    3,
+                                    2000
+                                );
+
+                                if (answersResponse.ok) {
+                                    const answersData = await answersResponse.json();
+                                    
+                                    for (const answer of (answersData.data || [])) {
+                                        const questionAttr = answer.attributes?.question;
+                                        const questionText = typeof questionAttr === 'string' ? questionAttr : 
+                                                           (questionAttr?.question || questionAttr?.text || '');
+                                        
+                                        const question = String(questionText || '').toLowerCase();
+                                        let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                                        
+                                        if (typeof value === 'object' && value !== null) {
+                                            value = JSON.stringify(value);
                                         }
-                                    } catch (error) {
-                                        console.error('Error fetching answers:', error);
+                                        
+                                        const answerText = String(value || '').toLowerCase();
+                                        
+                                        const isAccessQuestion = question.includes('access') || 
+                                                               question.includes('time') || 
+                                                               question.includes('begin') || 
+                                                               question.includes('end') ||
+                                                               question.includes('other details');
+                                        
+                                        const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
+                                                                   /\d+:\d+/.test(answerText);
+                                        
+                                        if (isAccessQuestion && looksLikeTimeRange) {
+                                            accessTime = String(value);
+                                            break;
+                                        }
                                     }
                                 }
+                            } catch (error) {
+                                console.error('Error fetching answers for request', request.id, ':', error);
                             }
                         }
-
-                        if (myRequestedResources.length === 0) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    name: event.attributes?.name,
-                                    reason: 'no_matching_resources',
-                                    total_resources: allRequestedResources.length,
-                                    resources_requested: allRequestedResources
-                                }
-                            };
-                        }
-
-                        // Find instances for this event
-                        const eventInstances = allInstances.filter(i => 
-                            i.relationships?.event?.data?.id === eventId
-                        );
-
-                        if (eventInstances.length === 0) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    name: event.attributes?.name,
-                                    reason: 'no_instances'
-                                }
-                            };
-                        }
-
-                        const events = [];
-                        for (const instance of eventInstances) {
-                            const startsAt = instance.attributes?.starts_at;
-                            const endsAt = instance.attributes?.ends_at;
-                            
-                            if (!startsAt) continue;
-                            
-                            const startDate = new Date(startsAt);
-                            if (startDate > twoWeeksFromNow) {
-                                continue;
-                            }
-
-                            events.push({
-                                id: instance.id,
-                                event_id: eventId,
-                                name: event.attributes?.name || 'Untitled Event',
-                                starts_at: startsAt,
-                                ends_at: endsAt,
-                                summary: event.attributes?.summary,
-                                resources: myRequestedResources,
-                                access_time: accessTime
-                            });
-                        }
-                        
-                        return { events };
-                    } catch (error) {
-                        console.error('❌ Error processing event', eventId, ':', error);
-                        return {
-                            skipped: {
-                                eventId,
-                                reason: 'error',
-                                error: error.message
-                            }
-                        };
                     }
-                })
-            );
-            
-            // Collect results
-            for (const result of batchResults) {
-                if (result.events) {
-                    eventsWithMyResources.push(...result.events);
-                } else if (result.skipped) {
-                    skippedEvents.push(result.skipped);
                 }
-            }
-            
-            // Delay between batches (except for last batch)
-            if (i + BATCH_SIZE < eventIdArray.length) {
-                await delay(BATCH_DELAY);
+
+                if (myRequestedResources.length === 0) {
+                    skippedEvents.push({
+                        eventId,
+                        name: event.attributes?.name,
+                        reason: 'no_matching_resources',
+                        total_resources: allRequestedResources.length,
+                        resources_requested: allRequestedResources
+                    });
+                    continue;
+                }
+
+                // Find instances for this event
+                const eventInstances = allInstances.filter(i => 
+                    i.relationships?.event?.data?.id === eventId
+                );
+
+                if (eventInstances.length === 0) {
+                    skippedEvents.push({
+                        eventId,
+                        name: event.attributes?.name,
+                        reason: 'no_instances'
+                    });
+                    continue;
+                }
+
+                for (const instance of eventInstances) {
+                    const startsAt = instance.attributes?.starts_at;
+                    const endsAt = instance.attributes?.ends_at;
+                    
+                    if (!startsAt) continue;
+                    
+                    const startDate = new Date(startsAt);
+                    if (startDate > twoWeeksFromNow) {
+                        continue;
+                    }
+
+                    eventsWithMyResources.push({
+                        id: instance.id,
+                        event_id: eventId,
+                        name: event.attributes?.name || 'Untitled Event',
+                        starts_at: startsAt,
+                        ends_at: endsAt,
+                        summary: event.attributes?.summary,
+                        resources: myRequestedResources,
+                        access_time: accessTime
+                    });
+                }
+            } catch (error) {
+                console.error('❌ Error processing event', eventId, ':', error);
+                skippedEvents.push({
+                    eventId,
+                    reason: 'error',
+                    error: error.message
+                });
             }
         }
+
+        console.log(`✅ Finished processing all ${eventIdArray.length} events`);
 
         // Sort by start date
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
