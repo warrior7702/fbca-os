@@ -2,11 +2,11 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock } from 'lucide-react';
+import { Clock, Key, MapPin } from 'lucide-react';
 
 export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
-  const startDate = today;
+  const startDate = today; // Start from today instead of Sunday
 
   const weeks = [];
   for (let w = 0; w < weekCount; w++) {
@@ -70,15 +70,6 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                               <Clock className="w-3 h-3 text-green-600" />
                               <span>{format(parseISO(event.starts_at), 'h:mm a')}</span>
                             </div>
-
-                            {event.access_time && (
-                              <div className="flex items-center gap-1 text-[10px] text-green-700">
-                                <Lock className="w-3 h-3 text-green-600" />
-                                <span className="line-clamp-1 font-medium">
-                                  {event.access_time}
-                                </span>
-                              </div>
-                            )}
 
                             {event.resources && event.resources.length > 0 && (
                               <div className="flex items-center gap-1 text-[10px] text-slate-600">
