@@ -554,16 +554,31 @@ export default function PCOAPITester() {
                               </Badge>
                             )}
                           </div>
-                          <div className="mt-1 text-sm text-slate-600">
-                            <Badge variant="outline" className="text-xs">{resource?.attributes?.kind || 'Unknown Type'}</Badge>
-                            {request.attributes?.quantity && (
-                              <span className="ml-2 text-xs">Quantity: {request.attributes.quantity}</span>
-                            )}
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">{resource?.attributes?.kind || 'Unknown Type'}</Badge>
+                              {request.attributes?.quantity && (
+                                <span className="text-xs text-slate-600">Quantity: {request.attributes.quantity}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                              <span className="text-xs font-semibold text-blue-900">Request ID:</span>
+                              <code className="text-sm font-mono text-blue-700 bg-white px-2 py-1 rounded border border-blue-300 select-all">
+                                {request.id}
+                              </code>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-xs"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(request.id);
+                                  toast.success('Request ID copied!');
+                                }}
+                              >
+                                Copy
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-500">Request ID</p>
-                          <p className="text-sm font-mono text-blue-600">{request.id}</p>
                         </div>
                       </div>
                     </CardContent>
