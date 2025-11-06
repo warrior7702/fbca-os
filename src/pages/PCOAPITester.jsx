@@ -755,7 +755,21 @@ export default function PCOAPITester() {
 
 // NEW: Collapsible Event Card Component
 function EventCard({ event, resources, included, eventId }) {
+  const [showRooms, setShowRooms] = useState(false);
   const [showResources, setShowResources] = useState(false);
+  
+  // Split resources into rooms and other resources
+  const rooms = resources.filter(r => {
+    const resourceId = r.relationships?.resource?.data?.id;
+    const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
+    return resourceDetails?.attributes?.kind === 'Room';
+  });
+  
+  const otherResources = resources.filter(r => {
+    const resourceId = r.relationships?.resource?.data?.id;
+    const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
+    return resourceDetails?.attributes?.kind !== 'Room';
+  });
   
   return (
     <Card className="bg-slate-50">
@@ -787,8 +801,90 @@ function EventCard({ event, resources, included, eventId }) {
             </div>
           </div>
 
-          {/* Resources Toggle Button */}
-          {resources.length > 0 && (
+          {/* Rooms Section */}
+          {rooms.length > 0 && (
+            <>
+              <div className="border-t border-slate-200 pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRooms(!showRooms)}
+                  className="w-full justify-between hover:bg-slate-100"
+                >
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-green-600" />
+                    <span className="font-medium">
+                      Rooms ({rooms.length})
+                    </span>
+                  </span>
+                  {showRooms ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+
+              {showRooms && (
+                <div className="bg-white rounded-lg p-3 border border-slate-200 max-h-64 overflow-y-auto">
+                  <div className="space-y-2">
+                    {rooms.map((resource, ridx) => {
+                      const resourceId = resource.relationships?.resource?.data?.id;
+                      const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
+                      const approvalStatus = resource.attributes?.approval_status;
+                      
+                      return (
+                        <div key={ridx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                          <div className="flex items-center gap-2 flex-1">
+                            <MapPin className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {resourceDetails?.attributes?.name || 'Unknown Room'}
+                              </p>
+                              {resourceDetails?.attributes?.room_type && (
+                                <p className="text-xs text-slate-500">
+                                  {resourceDetails.attributes.room_type}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {resource.attributes?.quantity && (
+                              <span className="text-xs text-slate-500">
+                                qty: {resource.attributes.quantity}
+                              </span>
+                            )}
+                            {approvalStatus === 'A' && (
+                              <Badge className="bg-green-100 text-green-700 text-xs">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Approved
+                              </Badge>
+                            )}
+                            {approvalStatus === 'P' && (
+                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                            {approvalStatus === 'R' && (
+                              <Badge className="bg-red-100 text-red-700 text-xs">
+                                <XCircle className="w-3 h-3 mr-1" />
+                                Rejected
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Other Resources Section */}
+          {otherResources.length > 0 && (
             <>
               <div className="border-t border-slate-200 pt-3">
                 <Button
@@ -800,7 +896,7 @@ function EventCard({ event, resources, included, eventId }) {
                   <span className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-blue-600" />
                     <span className="font-medium">
-                      Resources/Rooms ({resources.length})
+                      Resources ({otherResources.length})
                     </span>
                   </span>
                   {showResources ? (
@@ -811,11 +907,10 @@ function EventCard({ event, resources, included, eventId }) {
                 </Button>
               </div>
 
-              {/* Collapsible Resources List */}
               {showResources && (
                 <div className="bg-white rounded-lg p-3 border border-slate-200 max-h-64 overflow-y-auto">
                   <div className="space-y-2">
-                    {resources.map((resource, ridx) => {
+                    {otherResources.map((resource, ridx) => {
                       const resourceId = resource.relationships?.resource?.data?.id;
                       const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
                       const approvalStatus = resource.attributes?.approval_status;
