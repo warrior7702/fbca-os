@@ -21,6 +21,9 @@ export default function PCOAPITester() {
   const [selectedDate, setSelectedDate] = useState('');
   const [groupId, setGroupId] = useState('');
   const [eventId, setEventId] = useState('');
+  
+  // NEW: Store the filter date separately (not sent to PCO)
+  const [clientFilterDate, setClientFilterDate] = useState(null);
 
   useEffect(() => {
     loadUser();
@@ -49,9 +52,10 @@ export default function PCOAPITester() {
     }
   };
 
-  const makeAPICall = async (endpoint, params = {}) => {
+  const makeAPICall = async (endpoint, params = {}, filterDate = null) => {
     setTestLoading(true);
     setResult(null);
+    setClientFilterDate(filterDate); // Store filter date for client-side filtering
     
     try {
       console.log('🔧 Making API call:', endpoint, params);
@@ -64,7 +68,7 @@ export default function PCOAPITester() {
       
       const token = tokenResponse.data.access_token;
       
-      // Build URL with params
+      // Build URL with params (filterDate NOT included in URL)
       const url = new URL(`https://api.planningcenteronline.com/calendar/v2${endpoint}`);
       Object.keys(params).forEach(key => {
         if (params[key]) {
@@ -161,13 +165,12 @@ export default function PCOAPITester() {
     console.log('📅 Fetching all future events to filter by date:', selectedDate);
     
     // PCO doesn't support date range filters well, so fetch all future events
-    // and we'll filter them client-side in the translation
+    // Pass the date separately for client-side filtering (NOT in URL params)
     await makeAPICall('/event_instances', {
       'filter': 'future',
       'per_page': '100',
-      'order': 'starts_at',
-      '_client_filter_date': selectedDate // Store for client-side filtering
-    });
+      'order': 'starts_at'
+    }, selectedDate); // Pass filter date as separate parameter
   };
 
   const testAllApprovalGroups = async () => {
@@ -229,14 +232,11 @@ export default function PCOAPITester() {
       let events = data.data || [];
       const resourcesData = data._resourcesData || [];
       
-      // CLIENT-SIDE DATE FILTERING (if _client_filter_date was passed)
-      const urlParams = new URLSearchParams(result.url.split('?')[1]);
-      const filterDate = urlParams.get('_client_filter_date');
-      
-      if (filterDate) {
-        console.log('🔍 Client-side filtering for date:', filterDate);
+      // CLIENT-SIDE DATE FILTERING (using stored clientFilterDate)
+      if (clientFilterDate) {
+        console.log('🔍 Client-side filtering for date:', clientFilterDate);
         
-        const [year, month, day] = filterDate.split('-').map(Number);
+        const [year, month, day] = clientFilterDate.split('-').map(Number);
         const targetDate = new Date(year, month - 1, day);
         targetDate.setHours(0, 0, 0, 0);
         
@@ -261,15 +261,15 @@ export default function PCOAPITester() {
           return matches;
         });
         
-        console.log('🎯 Filtered to', events.length, 'events on', filterDate);
+        console.log('🎯 Filtered to', events.length, 'events on', clientFilterDate);
       }
       
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">📅 Event Instances Found: {events.length}</h3>
-          {filterDate && (
+          {clientFilterDate && (
             <p className="text-sm text-slate-600">
-              Showing events on <strong>{new Date(filterDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+              Showing events on <strong>{new Date(clientFilterDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
             </p>
           )}
           {events.length > 0 ? (
