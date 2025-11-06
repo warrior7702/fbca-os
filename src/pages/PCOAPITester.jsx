@@ -325,6 +325,38 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Diagnose PCO Token function
+  const testDiagnosePCOToken = async () => {
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔬 Running PCO token diagnostic...');
+      const response = await base44.functions.invoke('diagnosePCOToken');
+      
+      setResult({
+        ok: response.data.ok !== false,
+        status: 200,
+        data: response.data,
+        endpoint: 'diagnosePCOToken'
+      });
+      
+      if (response.data.ok !== false) {
+        toast.success('Diagnostic complete!');
+      } else {
+        toast.error('Diagnostic failed');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to run diagnostic: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
@@ -693,6 +725,109 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Token Diagnostic Results
+    if (result.endpoint === 'diagnosePCOToken') {
+      const diagnostics = data.diagnostics;
+      const summary = diagnostics?.summary;
+      const identities = diagnostics?.all_identities;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔬 PCO Token Diagnostic Results</h3>
+          
+          {/* Summary Box */}
+          {summary && (
+            <Card className={`border-2 ${summary.ids_match ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {summary.ids_match ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    )}
+                    <h4 className="font-semibold text-lg">
+                      {summary.ids_match ? 'Configuration Correct ✅' : 'Configuration Mismatch ❌'}
+                    </h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="p-3 bg-white rounded-lg border">
+                      <p className="text-xs text-slate-500 mb-1">Calendar /me</p>
+                      <p className="font-mono text-sm font-semibold">{summary.calendar_user_id || 'N/A'}</p>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border">
+                      <p className="text-xs text-slate-500 mb-1">People /me</p>
+                      <p className="font-mono text-sm font-semibold">{summary.people_person_id || 'N/A'}</p>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border border-red-300 col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">Token Performs Writes As</p>
+                      <p className="font-mono text-lg font-bold text-red-700">{summary.token_performs_writes_as || 'Unknown'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Identities */}
+          {identities && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">All PCO User IDs Found</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">Email:</span>
+                    <p className="font-medium">{identities.email}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">Stored ID:</span>
+                    <p className="font-mono">{identities.stored_id || 'Not stored'}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">Calendar User:</span>
+                    <p className="font-mono">{identities.calendar_me_id || 'N/A'}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">People Person:</span>
+                    <p className="font-mono">{identities.people_me_id || 'N/A'}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">OAuth User:</span>
+                    <p className="font-mono">{identities.oauth_user_id || 'N/A'}</p>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded">
+                    <span className="text-slate-500">Email Search:</span>
+                    <p className="font-mono">{identities.calendar_user_from_email || 'N/A'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Diagnostic Steps */}
+          {diagnostics?.steps && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Diagnostic Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 font-mono text-xs max-h-64 overflow-y-auto">
+                  {diagnostics.steps.map((step, idx) => (
+                    <div key={idx} className={`${step.includes('❌') ? 'text-red-600' : step.includes('✅') ? 'text-green-600' : 'text-slate-600'}`}>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -920,6 +1055,28 @@ export default function PCOAPITester() {
                   <p className="text-xs text-slate-500">
                     Deny a specific resource request (you must be in the approval group)
                   </p>
+                </div>
+
+                {/* NEW: Token Diagnostic Section */}
+                <div className="border-t pt-4 space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-purple-600" />
+                    Diagnose PCO Token
+                  </Label>
+                  <Button 
+                    onClick={testDiagnosePCOToken} 
+                    disabled={testLoading} 
+                    variant="outline"
+                    className="w-full border-purple-300 hover:bg-purple-50"
+                  >
+                    {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <AlertCircle className="w-4 h-4 mr-2" />}
+                    Run Token Diagnostic
+                  </Button>
+                  <Alert className="bg-purple-50 border-purple-200">
+                    <AlertDescription className="text-sm">
+                      <strong>What this does:</strong> Checks all PCO user IDs, identifies which ID the OAuth token belongs to, and shows if there's a mismatch causing the "User with id 3566727" error.
+                    </AlertDescription>
+                  </Alert>
                 </div>
               </CardContent>
             </Card>
