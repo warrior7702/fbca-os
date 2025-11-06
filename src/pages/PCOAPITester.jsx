@@ -312,7 +312,7 @@ export default function PCOAPITester() {
           )}
           {events.length > 0 ? (
             <div className="space-y-2">
-              {events.map((event, idx) => {
+              {events.slice(0, 10).map((event, idx) => {
                 const eventId = event.relationships?.event?.data?.id;
                 const eventResources = resourcesData.find(r => r.eventId === eventId);
                 const resources = eventResources?.resources || [];
@@ -320,6 +320,11 @@ export default function PCOAPITester() {
                 
                 return <EventCard key={idx} event={event} resources={resources} included={included} eventId={eventId} />;
               })}
+              {events.length > 10 && (
+                <p className="text-sm text-slate-500 text-center">
+                  + {events.length - 10} more events (see full JSON below)
+                </p>
+              )}
             </div>
           ) : (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
