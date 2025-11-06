@@ -722,10 +722,16 @@ export default function Settings() {
                         }
                       </CardDescription>
                     </div>
-                    <Button onClick={() => navigate(createPageUrl('TestCardholders'))} variant="outline">
-                      <Database className="w-4 h-4 mr-2" />
-                      Database Test Page
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button onClick={() => navigate(createPageUrl('PCOAPITester'))} variant="outline">
+                        <Bug className="w-4 h-4 mr-2" />
+                        API Tester
+                      </Button>
+                      <Button onClick={() => navigate(createPageUrl('TestCardholders'))} variant="outline">
+                        <Database className="w-4 h-4 mr-2" />
+                        Database Test
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
               </Card>

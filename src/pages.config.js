@@ -26,6 +26,7 @@ import AdminSetup from './pages/AdminSetup';
 import Calendar from './pages/Calendar';
 import SupportTickets from './pages/SupportTickets';
 import CreateTicket from './pages/CreateTicket';
+import PCOAPITester from './pages/PCOAPITester';
 import Layout from './Layout.jsx';
 
 
@@ -58,6 +59,7 @@ export const PAGES = {
     "Calendar": Calendar,
     "SupportTickets": SupportTickets,
     "CreateTicket": CreateTicket,
+    "PCOAPITester": PCOAPITester,
 }
 
 export const pagesConfig = {
