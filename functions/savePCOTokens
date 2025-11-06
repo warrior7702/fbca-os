@@ -66,35 +66,36 @@ Deno.serve(async (req) => {
             console.log('⚠️ Using default 1 hour expiration:', expiresAt);
         }
 
-        // Get PCO Person ID
-        let pcoUserId = null;
+        // CRITICAL: Get PCO CALENDAR User ID (not People person ID!)
+        let pcoCalendarUserId = null;
         try {
-            console.log('🔍 Fetching PCO Person ID...');
-            const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+            console.log('🔍 Fetching PCO Calendar User ID...');
+            const calendarMeResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
                 headers: { 'Authorization': `Bearer ${access_token}` }
             });
             
-            if (meResponse.ok) {
-                const meData = await meResponse.json();
-                pcoUserId = meData?.data?.id;
-                console.log('✅ Got PCO Person ID:', pcoUserId);
+            if (calendarMeResponse.ok) {
+                const calendarMeData = await calendarMeResponse.json();
+                pcoCalendarUserId = calendarMeData?.data?.id;
+                console.log('✅ Got PCO CALENDAR User ID:', pcoCalendarUserId);
             } else {
-                const errorText = await meResponse.text();
-                console.log('⚠️ Failed to get PCO Person ID:', meResponse.status, errorText);
+                const errorText = await calendarMeResponse.text();
+                console.log('⚠️ Failed to get PCO Calendar User ID:', calendarMeResponse.status, errorText);
             }
         } catch (error) {
-            console.error('⚠️ Error getting PCO Person ID (non-fatal):', error.message);
+            console.error('⚠️ Error getting PCO Calendar User ID (non-fatal):', error.message);
         }
 
-        // Update user with tokens and Person ID
+        // Update user with tokens and Calendar User ID
         const updateData = {
             pco_access_token: access_token,
             pco_refresh_token: refresh_token,
             pco_token_expires_at: expiresAt
         };
 
-        if (pcoUserId) {
-            updateData.pco_user_id = pcoUserId;
+        if (pcoCalendarUserId) {
+            updateData.pco_user_id = pcoCalendarUserId;  // Store CALENDAR user ID!
+            console.log('📝 Storing Calendar User ID:', pcoCalendarUserId);
         }
 
         console.log('💾 Updating user:', user_id);
@@ -103,14 +104,14 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.User.update(user_id, updateData);
 
         console.log('✅ Successfully saved PCO tokens for user:', user_id);
-        if (pcoUserId) {
-            console.log('✅ Saved PCO Person ID:', pcoUserId);
+        if (pcoCalendarUserId) {
+            console.log('✅ Saved PCO Calendar User ID:', pcoCalendarUserId);
         }
         console.log('🔵 ========== savePCOTokens END (SUCCESS) ==========');
 
         return Response.json({ 
             success: true,
-            pco_user_id: pcoUserId
+            pco_user_id: pcoCalendarUserId
         });
 
     } catch (error) {

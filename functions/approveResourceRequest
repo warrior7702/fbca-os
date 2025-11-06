@@ -1,3 +1,4 @@
+
 // approveResourceRequest.js  (Base44 Deno runtime)
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
@@ -58,21 +59,21 @@ Deno.serve(async (req) => {
 
     // ---- 1) require a user token; don't use the service token for writes ----
     const userToken = me?.pco_access_token;
-    const personId = me?.pco_user_id; // e.g. "149670080"
+    const calendarUserId = me?.pco_user_id; // THIS SHOULD BE CALENDAR USER ID NOW!
     
     debugInfo.user_email = me?.email;
-    debugInfo.person_id = personId;
+    debugInfo.calendar_user_id = calendarUserId;
     
-    if (!userToken || !personId) {
+    if (!userToken || !calendarUserId) {
       return Response.json(
-        { ok: false, error: 'No user PCO token; user must connect PCO first.', debug: debugInfo },
+        { ok: false, error: 'No PCO token or Calendar user ID. Please reconnect PCO in Settings.', debug: debugInfo },
         { status: 401 }
       );
     }
 
-    console.log('🔍 DEBUG: Approving as person ID:', personId, 'Email:', me.email);
+    console.log('🔍 DEBUG: Approving as PCO Calendar User ID:', calendarUserId, 'Email:', me.email);
 
-    // ---- 2) OPTIMIZED: Get request details first (1 API call) ----
+    // ---- 2) Get request details first (1 API call) ----
     console.log('📦 Step 1: Fetching request details for request ID:', request_id);
     
     const requestResponse = await pcoGet(
@@ -89,7 +90,7 @@ Deno.serve(async (req) => {
     
     console.log('📦 Request is for resource:', resourceName, '(ID:', resourceId, ')');
 
-    // ---- 3) OPTIMIZED: Get approval groups for THIS resource only (1 API call) ----
+    // ---- 3) Get approval groups for THIS resource only (1 API call) ----
     console.log('👥 Step 2: Finding approval groups for this resource...');
     
     const resourceGroupsResponse = await pcoGet(
@@ -111,8 +112,8 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    // ---- 4) OPTIMIZED: Check membership in ONLY these groups (2-5 API calls instead of 15+) ----
-    console.log('🔐 Step 3: Checking membership in these approval groups...');
+    // ---- 4) Check membership in ONLY these groups using CALENDAR USER ID ----
+    console.log('🔐 Step 3: Checking membership using Calendar User ID:', calendarUserId);
     
     let hasPermission = false;
     let matchingGroupName = null;
@@ -121,6 +122,7 @@ Deno.serve(async (req) => {
     for (const group of approvalGroups) {
       console.log('👥 Checking membership in group:', group.attributes?.name, '(ID:', group.id, ')');
       
+      // Use CALENDAR API people endpoint for this group
       const membersResponse = await pcoGet(
         `${PCO.base}/resource_approval_groups/${group.id}/people?per_page=100`,
         userToken
@@ -129,11 +131,11 @@ Deno.serve(async (req) => {
       const members = membersResponse.data || [];
       console.log('   └─ Group has', members.length, 'members');
       
-      // Check if I'm in this group
+      // Check if I'm in this group using CALENDAR USER ID
       const isMember = members.some(person => {
-        const match = person.id === personId;
+        const match = person.id === calendarUserId;
         if (match) {
-          console.log('   └─ ✅ FOUND ME! Person ID matches:', person.id);
+          console.log('   └─ ✅ FOUND ME! Calendar User ID matches:', person.id);
         }
         return match;
       });
@@ -164,7 +166,7 @@ Deno.serve(async (req) => {
     if (!hasPermission) {
       console.log('❌ PERMISSION DENIED - Not a member of any approval group that manages this resource');
       console.log('📊 Debug Summary:');
-      console.log('   - Person ID:', personId);
+      console.log('   - Calendar User ID:', calendarUserId);
       console.log('   - Resource ID:', resourceId);
       console.log('   - Resource Name:', resourceName);
       console.log('   - Approval Groups Checked:', checkedGroups.length);
@@ -173,7 +175,7 @@ Deno.serve(async (req) => {
         ok: false,
         error: 'You are not authorized to approve this resource',
         debug: debugInfo,
-        diagnostic_message: `You are not a member of any approval group that manages "${resourceName}" (ID: ${resourceId}). Checked ${checkedGroups.length} group(s).`
+        diagnostic_message: `You are not a member of any approval group that manages "${resourceName}" (ID: ${resourceId}). Checked ${checkedGroups.length} group(s). Your Calendar User ID: ${calendarUserId}. Please reconnect PCO in Settings if this seems wrong.`
       }, { status: 403 });
     }
 
