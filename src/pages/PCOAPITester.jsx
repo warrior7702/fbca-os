@@ -264,9 +264,47 @@ export default function PCOAPITester() {
         console.log('🎯 Filtered to', events.length, 'events on', clientFilterDate);
       }
       
+      // Calculate resource counts
+      let eventsWithResources = 0;
+      let eventsWithBuildingAccess = 0;
+      
+      events.forEach(event => {
+        const eventId = event.relationships?.event?.data?.id;
+        const eventResources = resourcesData.find(r => r.eventId === eventId);
+        const resources = eventResources?.resources || [];
+        
+        if (resources.length > 0) {
+          eventsWithResources++;
+        }
+        
+        const hasBuildingAccess = resources.some(r => {
+          const resourceId = r.relationships?.resource?.data?.id;
+          const resourceDetails = eventResources?.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+          return resourceDetails?.attributes?.name?.toLowerCase().includes('building access');
+        });
+        
+        if (hasBuildingAccess) {
+          eventsWithBuildingAccess++;
+        }
+      });
+      
       return (
         <div className="space-y-3">
-          <h3 className="font-semibold text-slate-900">📅 Event Instances Found: {events.length}</h3>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-semibold text-slate-900">📅 Event Instances Found: {events.length}</h3>
+            {eventsWithResources > 0 && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                <Package className="w-3 h-3 mr-1" />
+                {eventsWithResources} with resources
+              </Badge>
+            )}
+            {eventsWithBuildingAccess > 0 && (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+                <MapPin className="w-3 h-3 mr-1" />
+                {eventsWithBuildingAccess} with building access
+              </Badge>
+            )}
+          </div>
           {clientFilterDate && (
             <p className="text-sm text-slate-600">
               Showing events on <strong>{new Date(clientFilterDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
