@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
@@ -38,7 +37,6 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedDayEvents, setSelectedDayEvents] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [currentDayIndex, setCurrentDayIndex] = useState(0); // For mobile carousel
 
   useEffect(() => {
     loadData();
@@ -172,83 +170,6 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
 
-  // Mobile carousel navigation
-  const nextDay = () => {
-    if (currentDayIndex < calendarDays.length - 1) {
-      setCurrentDayIndex(currentDayIndex + 1);
-    }
-  };
-
-  const prevDay = () => {
-    if (currentDayIndex > 0) {
-      setCurrentDayIndex(currentDayIndex - 1);
-    }
-  };
-
-  const renderMobileDayCard = (day, dayIndex) => {
-    const dayEvents = getEventsForDay(day);
-    const isCurrentMonth = isSameMonth(day, currentMonth);
-    const isToday = isSameDay(day, new Date());
-
-    return (
-      <div
-        key={dayIndex}
-        className={`rounded-lg border-2 p-4 h-full min-h-[400px] ${
-          isToday ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-        } ${!isCurrentMonth ? 'opacity-60' : ''}`}
-      >
-        <div className="text-center mb-4">
-          <p className="text-sm font-medium text-slate-600">
-            {format(day, 'EEEE')}
-          </p>
-          <p className={`text-3xl font-bold ${isToday ? 'text-blue-700' : 'text-slate-900'}`}>
-            {format(day, 'd')}
-          </p>
-          <p className="text-sm text-slate-500">{format(day, 'MMMM yyyy')}</p>
-        </div>
-
-        <div className="space-y-3 overflow-y-auto max-h-[300px]">
-          {dayEvents.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-slate-400 text-sm">No events</p>
-            </div>
-          ) : (
-            dayEvents.map((event) => (
-              <Card
-                key={event.id}
-                className="border border-blue-200 bg-blue-50 hover:shadow-md transition-all cursor-pointer hover:bg-blue-100"
-                onClick={() => setSelectedEvent(event)}
-              >
-                <CardContent className="p-3 space-y-2">
-                  <p className="font-semibold text-slate-900 text-sm">
-                    {event.name}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    {format(parseISO(event.starts_at), 'h:mm a')} - {format(parseISO(event.ends_at), 'h:mm a')}
-                  </p>
-                  {event.resources && event.resources.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {event.resources.slice(0, 2).map(resource => (
-                        <Badge key={resource.id} variant="secondary" className="text-xs">
-                          {resource.name}
-                        </Badge>
-                      ))}
-                      {event.resources.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{event.resources.length - 2}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // Helper function to strip HTML tags from text
   const stripHtml = (html) => {
     if (!html) return '';
@@ -350,197 +271,99 @@ export default function Calendar() {
             </p>
           </div>
         ) : (
-          <>
-            {/* Mobile Carousel View */}
-            <div className="block md:hidden bg-white rounded-xl shadow-lg p-4">
-              <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            {/* Calendar Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={prevDay}
-                  disabled={currentDayIndex === 0}
-                  className="h-10 w-10"
+                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
-
-                <div className="text-center">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {format(currentMonth, 'MMMM yyyy')}
-                  </h2>
-                  <p className="text-xs text-slate-600">
-                    Day {currentDayIndex + 1} of {calendarDays.length}
-                  </p>
-                </div>
-
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {format(currentMonth, 'MMMM yyyy')}
+                </h2>
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={nextDay}
-                  disabled={currentDayIndex === calendarDays.length - 1}
-                  className="h-10 w-10"
+                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
-
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentDayIndex}
-                  initial={{ opacity: 0, x: 100 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {renderMobileDayCard(calendarDays[currentDayIndex], currentDayIndex)}
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Day Dots Indicator */}
-              <div className="flex justify-center gap-1 mt-4 overflow-x-auto py-2">
-                {calendarDays.map((day, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentDayIndex(idx)}
-                    className={`h-2 rounded-full transition-all flex-shrink-0 ${
-                      idx === currentDayIndex
-                        ? 'bg-blue-600 w-6'
-                        : 'bg-slate-300 w-2'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {/* Month Navigation */}
-              <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMonth(subMonths(currentMonth, 1));
-                    setCurrentDayIndex(0);
-                  }}
-                >
-                  Previous Month
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMonth(new Date());
-                    setCurrentDayIndex(0);
-                  }}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMonth(addMonths(currentMonth, 1));
-                    setCurrentDayIndex(0);
-                  }}
-                >
-                  Next Month
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentMonth(new Date())}
+              >
+                Today
+              </Button>
             </div>
 
-            {/* Desktop Calendar Grid View */}
-            <div className="hidden md:block bg-white rounded-xl shadow-lg p-6">
-              {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <h2 className="text-2xl font-bold text-slate-900">
-                    {format(currentMonth, 'MMMM yyyy')}
-                  </h2>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {/* Day headers */}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
+                  {day}
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentMonth(new Date())}
-                >
-                  Today
-                </Button>
-              </div>
+              ))}
 
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {/* Day headers */}
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
-                    {day}
-                  </div>
-                ))}
+              {/* Calendar days */}
+              {calendarDays.map((day, index) => {
+                const dayEvents = getEventsForDay(day);
+                const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isToday = isSameDay(day, new Date());
 
-                {/* Calendar days */}
-                {calendarDays.map((day, index) => {
-                  const dayEvents = getEventsForDay(day);
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const isToday = isSameDay(day, new Date());
-
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.005 }}
-                      className={`min-h-32 border border-slate-200 p-2 ${
-                        !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
-                      } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
-                    >
-                      <div className={`text-sm font-semibold mb-1 ${
-                        isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
-                      }`}>
-                        {format(day, 'd')}
-                      </div>
-                      <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event, idx) => (
-                          <motion.div
-                            key={event.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: idx * 0.05 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(event);
-                            }}
-                            className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
-                          >
-                            {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
-                          </motion.div>
-                        ))}
-                        {dayEvents.length > 3 && (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleShowAllDayEvents(day, dayEvents);
-                            }}
-                            className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
-                          >
-                            +{dayEvents.length - 3} more
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.005 }}
+                    className={`min-h-32 border border-slate-200 p-2 ${
+                      !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
+                    } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
+                  >
+                    <div className={`text-sm font-semibold mb-1 ${
+                      isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
+                    }`}>
+                      {format(day, 'd')}
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 3).map((event, idx) => (
+                        <motion.div
+                          key={event.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEvent(event);
+                          }}
+                          className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
+                        >
+                          {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
+                        </motion.div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowAllDayEvents(day, dayEvents);
+                          }}
+                          className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
+                        >
+                          +{dayEvents.length - 3} more
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          </>
+          </div>
         )}
       </div>
 
