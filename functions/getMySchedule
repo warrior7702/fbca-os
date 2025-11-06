@@ -100,7 +100,7 @@ async function getAccessTimeForEvent(eventId, accessToken) {
     }
 }
 
-async function fetchAllPages(url, accessToken, maxPages = 3) {
+async function fetchAllPages(url, accessToken, maxPages = 5) {
     let allData = [];
     let currentUrl = url;
     let pageCount = 0;
@@ -243,19 +243,19 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Step 4: Get event instances for the next week only
-        console.log('📞 Step 4: Fetching event instances for the next week...');
+        // Step 4: Get event instances - INCREASED to 2 weeks for buffer
+        console.log('📞 Step 4: Fetching event instances...');
         
         const now = new Date();
-        const oneWeekFromNow = new Date(now);
-        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+        const twoWeeksFromNow = new Date(now);
+        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14); // Back to 2 weeks
         
-        console.log(`📅 Date range: ${now.toISOString()} to ${oneWeekFromNow.toISOString()}`);
+        console.log(`📅 Date range: ${now.toISOString()} to ${twoWeeksFromNow.toISOString()}`);
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
-        // Fetch up to 3 pages (300 instances) - reduced from 5
-        const allInstances = await fetchAllPages(instancesUrl, accessToken, 3);
+        // INCREASED back to 5 pages (500 instances)
+        const allInstances = await fetchAllPages(instancesUrl, accessToken, 5);
         
         console.log('📅 Found', allInstances.length, 'total future event instances');
 
@@ -282,11 +282,13 @@ Deno.serve(async (req) => {
         
         const eventsWithMyResources = [];
         let processedCount = 0;
+        let skippedPast = 0;
+        let skippedNoResources = 0;
         
         for (const eventId of Array.from(eventIds)) {
             try {
                 processedCount++;
-                if (processedCount % 10 === 0) {
+                if (processedCount % 20 === 0) {
                     console.log(`  Processing event ${processedCount}/${eventIds.size}...`);
                 }
 
@@ -325,35 +327,48 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // Only process if this event uses my resources
-                if (myRequestedResources.length > 0) {
-                    const accessTime = await getAccessTimeForEvent(eventId, accessToken);
+                if (myRequestedResources.length === 0) {
+                    skippedNoResources++;
+                    continue;
+                }
+
+                // Get access time
+                const accessTime = await getAccessTimeForEvent(eventId, accessToken);
+                
+                // Find ALL instances for this event (not just within 2 weeks)
+                const eventInstances = allInstances.filter(i => {
+                    return i.relationships?.event?.data?.id === eventId;
+                });
+
+                // Filter instances to 2-week window and add them
+                for (const instance of eventInstances) {
+                    const startsAt = instance.attributes?.starts_at;
+                    if (!startsAt) continue;
                     
-                    // Find instances for this event that are within our 1-week window
-                    const eventInstances = allInstances.filter(i => {
-                        if (i.relationships?.event?.data?.id !== eventId) return false;
-                        
-                        const startsAt = i.attributes?.starts_at;
-                        if (!startsAt) return false;
-                        
-                        const startDate = new Date(startsAt);
-                        return startDate >= now && startDate <= oneWeekFromNow;
-                    });
-
-                    console.log(`  ✅ Event "${event.attributes?.name}" has ${myRequestedResources.length} my resources, ${eventInstances.length} instances in range`);
-
-                    for (const instance of eventInstances) {
-                        eventsWithMyResources.push({
-                            id: instance.id,
-                            event_id: eventId,
-                            name: event.attributes?.name || 'Untitled Event',
-                            starts_at: instance.attributes?.starts_at,
-                            ends_at: instance.attributes?.ends_at,
-                            summary: event.attributes?.summary,
-                            resources: myRequestedResources,
-                            access_time: accessTime
-                        });
+                    const startDate = new Date(startsAt);
+                    
+                    // Skip if too far in future
+                    if (startDate > twoWeeksFromNow) {
+                        continue;
                     }
+                    
+                    // Skip if in the past (more than 1 day ago to account for ongoing events)
+                    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    if (startDate < oneDayAgo) {
+                        skippedPast++;
+                        continue;
+                    }
+
+                    eventsWithMyResources.push({
+                        id: instance.id,
+                        event_id: eventId,
+                        name: event.attributes?.name || 'Untitled Event',
+                        starts_at: startsAt,
+                        ends_at: instance.attributes?.ends_at,
+                        summary: event.attributes?.summary,
+                        resources: myRequestedResources,
+                        access_time: accessTime
+                    });
                 }
             } catch (error) {
                 console.error('❌ Error processing event', eventId, ':', error);
@@ -364,6 +379,8 @@ Deno.serve(async (req) => {
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
         console.log('🎯 Returning', eventsWithMyResources.length, 'event instances');
+        console.log('📊 Skipped', skippedPast, 'past events');
+        console.log('📊 Skipped', skippedNoResources, 'events without my resources');
         
         // Group by date for summary
         const byDate = {};
@@ -379,10 +396,12 @@ Deno.serve(async (req) => {
             my_groups_count: myGroups.length,
             my_resources_count: myResourceIds.size,
             total_events_checked: processedCount,
+            skipped_past_events_count: skippedPast,
+            skipped_no_resources_events_count: skippedNoResources,
             by_date: byDate,
             date_range: {
                 start: now.toISOString(),
-                end: oneWeekFromNow.toISOString()
+                end: twoWeeksFromNow.toISOString()
             }
         });
 
