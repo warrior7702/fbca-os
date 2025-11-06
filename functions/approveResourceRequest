@@ -12,9 +12,9 @@ async function pcoGet(url, token) {
   return j;
 }
 
-async function pcoPost(url, token, body = {}) {
+async function pcoPatch(url, token, body = {}) {
   const r = await fetch(url, {
-    method: 'POST',
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -22,11 +22,13 @@ async function pcoPost(url, token, body = {}) {
     body: JSON.stringify(body)
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`POST ${url} :: ${r.status} :: ${text}`);
-  return text ? JSON.parse(text).catch(() => ({})) : { ok: true };
+  if (!r.ok) throw new Error(`PATCH ${url} :: ${r.status} :: ${text}`);
+  return text ? JSON.parse(text) : { ok: true };
 }
 
 Deno.serve(async (req) => {
+  const debugInfo = {}; // Collect debug info throughout the process
+  
   try {
     const base44 = createClientFromRequest(req);
     const me = await base44.auth.me();
@@ -44,9 +46,12 @@ Deno.serve(async (req) => {
     const action = String(body.action || '').trim().toLowerCase(); // 'approve' | 'deny'
     const note = body.note ? String(body.note) : undefined;
 
+    debugInfo.request_id = request_id;
+    debugInfo.action = action;
+
     if (!request_id || !['approve', 'deny'].includes(action)) {
       return Response.json(
-        { ok: false, error: 'request_id and action=approve|deny required' },
+        { ok: false, error: 'request_id and action=approve|deny required', debug: debugInfo },
         { status: 400 }
       );
     }
@@ -54,58 +59,190 @@ Deno.serve(async (req) => {
     // ---- 1) require a user token; don't use the service token for writes ----
     const userToken = me?.pco_access_token;
     const personId = me?.pco_user_id; // e.g. "149670080"
+    
+    debugInfo.user_email = me?.email;
+    debugInfo.person_id = personId;
+    
     if (!userToken || !personId) {
       return Response.json(
-        { ok: false, error: 'No user PCO token; user must connect PCO first.' },
+        { ok: false, error: 'No user PCO token; user must connect PCO first.', debug: debugInfo },
         { status: 401 }
       );
     }
 
-    // ---- 2) get user's approval-group memberships ----
-    const mems = await pcoGet(
-      `${PCO.base}/resource_approval_group_memberships?where[person_id]=${personId}&per_page=200&include=resource_approval_group`,
-      userToken
-    );
-    const myGroupIds = (mems.data || [])
-      .map(m => m?.relationships?.resource_approval_group?.data?.id)
-      .filter(Boolean);
+    console.log('🔍 DEBUG: Approving as person ID:', personId, 'Email:', me.email);
 
-    // ---- 3) pull bookings for this request; approval group lives here ----
-    const bookings = await pcoGet(
-      `${PCO.base}/event_resource_requests/${request_id}/resource_bookings?per_page=100&include=approval_group,resource`,
+    // ---- 2) Get all approval groups and check membership ----
+    console.log('📋 Step 1: Fetching all approval groups...');
+    const groupsResponse = await pcoGet(
+      `${PCO.base}/resource_approval_groups?per_page=100`,
       userToken
     );
 
-    const bookingGroupIds = new Set();
-    for (const b of (bookings.data || [])) {
-      const rel = b?.relationships?.approval_group?.data;
-      if (rel?.id) bookingGroupIds.add(rel.id);
+    const allGroups = groupsResponse.data || [];
+    console.log('📋 Found', allGroups.length, 'total approval groups');
+    debugInfo.total_groups = allGroups.length;
+
+    const myGroupIds = [];
+    const groupResourceMap = {}; // Map group ID to list of resource IDs
+    const myGroupDetails = []; // Store details for debugging
+    
+    for (const group of allGroups) {
+      // Get members of this group
+      console.log('👥 Checking membership in group:', group.attributes?.name, '(ID:', group.id, ')');
+      
+      const membersResponse = await pcoGet(
+        `${PCO.base}/resource_approval_groups/${group.id}/people?per_page=100`,
+        userToken
+      );
+      
+      const members = membersResponse.data || [];
+      console.log('   └─ Group has', members.length, 'members');
+      
+      // Check if I'm in this group
+      const isMember = members.some(person => {
+        const match = person.id === personId;
+        if (match) {
+          console.log('   └─ ✅ FOUND ME! Person ID matches:', person.id);
+        }
+        return match;
+      });
+      
+      if (isMember) {
+        myGroupIds.push(group.id);
+        console.log('✅ I AM a member of group:', group.attributes?.name);
+        
+        // Get resources for this group
+        const resourcesResponse = await pcoGet(
+          `${PCO.base}/resource_approval_groups/${group.id}/resources?per_page=100`,
+          userToken
+        );
+        
+        const resources = resourcesResponse.data || [];
+        groupResourceMap[group.id] = resources.map(r => r.id);
+        
+        myGroupDetails.push({
+          group_id: group.id,
+          group_name: group.attributes?.name,
+          resource_count: resources.length,
+          resource_ids: groupResourceMap[group.id]
+        });
+        
+        console.log('   └─ This group manages', resources.length, 'resources');
+        console.log('   └─ Resource IDs:', groupResourceMap[group.id].slice(0, 5).join(', '), '...');
+      } else {
+        console.log('❌ I am NOT a member of group:', group.attributes?.name);
+      }
     }
 
-    // ---- 4) check eligibility (overlap between my groups and bookings' groups) ----
-    let eligible = false;
-    let overlap = [];
-    if (bookingGroupIds.size) {
-      overlap = [...bookingGroupIds].filter(id => myGroupIds.includes(id));
-      eligible = overlap.length > 0;
+    debugInfo.my_groups = myGroupDetails;
+    debugInfo.my_group_ids = myGroupIds;
+    
+    console.log('📋 SUMMARY: I am in', myGroupIds.length, 'approval groups');
+
+    // ---- 3) Get the request details to find the resource ----
+    console.log('📦 Step 2: Fetching request details for request ID:', request_id);
+    
+    const requestResponse = await pcoGet(
+      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
+      userToken
+    );
+
+    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
+    const resourceName = requestResponse.included?.find(i => i.type === 'Resource' && i.id === resourceId)?.attributes?.name;
+    
+    debugInfo.resource_id = resourceId;
+    debugInfo.resource_name = resourceName;
+    
+    console.log('📦 Request is for resource:', resourceName, '(ID:', resourceId, ')');
+
+    // ---- 4) Check if I have permission to approve this resource ----
+    console.log('🔐 Step 3: Checking permissions...');
+    
+    let hasPermission = false;
+    let matchingGroupId = null;
+    let matchingGroupName = null;
+    
+    // Check if any of my groups manage this resource
+    for (const groupId of myGroupIds) {
+      const groupResources = groupResourceMap[groupId] || [];
+      console.log('🔍 Checking if group', groupId, 'manages resource', resourceId);
+      console.log('   └─ Group manages resources:', groupResources.slice(0, 10).join(', '), groupResources.length > 10 ? '...' : '');
+      
+      if (groupResources.includes(resourceId)) {
+        hasPermission = true;
+        matchingGroupId = groupId;
+        matchingGroupName = myGroupDetails.find(g => g.group_id === groupId)?.group_name;
+        console.log('✅ PERMISSION GRANTED! Group', matchingGroupName, 'manages this resource');
+        break;
+      } else {
+        console.log('❌ Group does NOT manage this resource');
+      }
     }
 
-    if (!eligible) {
+    debugInfo.has_permission = hasPermission;
+    debugInfo.matching_group_id = matchingGroupId;
+    debugInfo.matching_group_name = matchingGroupName;
+
+    console.log('🔐 FINAL PERMISSION CHECK:', hasPermission ? '✅ GRANTED' : '❌ DENIED');
+
+    if (!hasPermission) {
+      console.log('❌ PERMISSION DENIED - None of my groups manage this resource');
+      console.log('📊 Debug Summary:');
+      console.log('   - Person ID:', personId);
+      console.log('   - My Groups:', myGroupIds.length);
+      console.log('   - Resource ID:', resourceId);
+      console.log('   - Resource Name:', resourceName);
+      
       return Response.json({
         ok: false,
-        error: 'Forbidden (not in booking approval group)',
-        diag: {
-          personId, myGroupIds, bookingGroupIds: [...bookingGroupIds], overlap
-        }
+        error: 'You are not authorized to approve this resource',
+        debug: debugInfo,
+        diagnostic_message: `You belong to ${myGroupIds.length} approval group(s), but none of them manage the resource "${resourceName}" (ID: ${resourceId})`
       }, { status: 403 });
     }
 
-    // ---- 5) call PCO approve/deny as the user ----
-    const url = `${PCO.base}/event_resource_requests/${request_id}/${action}`;
-    const result = await pcoPost(url, userToken, note ? { note } : {});
+    // ---- 5) PATCH the request to approve/deny ----
+    const statusCode = action === 'approve' ? 'A' : 'R'; // A=Approved, R=Rejected
+    const url = `${PCO.base}/event_resource_requests/${request_id}`;
+    
+    console.log('🚀 Step 4: Patching PCO request:', url);
+    console.log('  Status:', statusCode);
+    
+    const patchBody = {
+      data: {
+        type: 'EventResourceRequest',
+        id: request_id,
+        attributes: {
+          approval_status: statusCode
+        }
+      }
+    };
 
-    return Response.json({ ok: true, action, request_id, result });
+    // Add note if provided
+    if (note) {
+      patchBody.data.attributes.notes = note;
+    }
+
+    const result = await pcoPatch(url, userToken, patchBody);
+
+    console.log('✅ PCO request', action === 'approve' ? 'approved' : 'denied', 'successfully');
+
+    return Response.json({ 
+      ok: true, 
+      action, 
+      request_id, 
+      result,
+      debug: debugInfo
+    });
   } catch (e) {
-    return Response.json({ ok: false, error: String(e) }, { status: 500 });
+    console.error('❌ Approve error:', e);
+    debugInfo.error = e.message;
+    debugInfo.stack = e.stack;
+    return Response.json({ 
+      ok: false, 
+      error: String(e),
+      debug: debugInfo
+    }, { status: 500 });
   }
 });
