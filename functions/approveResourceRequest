@@ -72,23 +72,53 @@ Deno.serve(async (req) => {
 
     console.log('🔍 DEBUG: Approving as person ID:', personId, 'Email:', me.email);
 
-    // ---- 2) Get all approval groups and check membership ----
-    console.log('📋 Step 1: Fetching all approval groups...');
-    const groupsResponse = await pcoGet(
-      `${PCO.base}/resource_approval_groups?per_page=100`,
+    // ---- 2) OPTIMIZED: Get request details first (1 API call) ----
+    console.log('📦 Step 1: Fetching request details for request ID:', request_id);
+    
+    const requestResponse = await pcoGet(
+      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
       userToken
     );
 
-    const allGroups = groupsResponse.data || [];
-    console.log('📋 Found', allGroups.length, 'total approval groups');
-    debugInfo.total_groups = allGroups.length;
-
-    const myGroupIds = [];
-    const groupResourceMap = {}; // Map group ID to list of resource IDs
-    const myGroupDetails = []; // Store details for debugging
+    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
+    const resourceData = requestResponse.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+    const resourceName = resourceData?.attributes?.name;
     
-    for (const group of allGroups) {
-      // Get members of this group
+    debugInfo.resource_id = resourceId;
+    debugInfo.resource_name = resourceName;
+    
+    console.log('📦 Request is for resource:', resourceName, '(ID:', resourceId, ')');
+
+    // ---- 3) OPTIMIZED: Get approval groups for THIS resource only (1 API call) ----
+    console.log('👥 Step 2: Finding approval groups for this resource...');
+    
+    const resourceGroupsResponse = await pcoGet(
+      `${PCO.base}/resources/${resourceId}/resource_approval_groups?per_page=100`,
+      userToken
+    );
+
+    const approvalGroups = resourceGroupsResponse.data || [];
+    debugInfo.total_approval_groups_for_resource = approvalGroups.length;
+    
+    console.log('📋 Found', approvalGroups.length, 'approval groups that manage this resource');
+
+    if (approvalGroups.length === 0) {
+      console.log('❌ No approval groups manage this resource');
+      return Response.json({
+        ok: false,
+        error: 'No approval groups manage this resource',
+        debug: debugInfo
+      }, { status: 403 });
+    }
+
+    // ---- 4) OPTIMIZED: Check membership in ONLY these groups (2-5 API calls instead of 15+) ----
+    console.log('🔐 Step 3: Checking membership in these approval groups...');
+    
+    let hasPermission = false;
+    let matchingGroupName = null;
+    const checkedGroups = [];
+    
+    for (const group of approvalGroups) {
       console.log('👥 Checking membership in group:', group.attributes?.name, '(ID:', group.id, ')');
       
       const membersResponse = await pcoGet(
@@ -108,97 +138,42 @@ Deno.serve(async (req) => {
         return match;
       });
       
+      checkedGroups.push({
+        group_id: group.id,
+        group_name: group.attributes?.name,
+        is_member: isMember,
+        member_count: members.length
+      });
+      
       if (isMember) {
-        myGroupIds.push(group.id);
-        console.log('✅ I AM a member of group:', group.attributes?.name);
-        
-        // Get resources for this group
-        const resourcesResponse = await pcoGet(
-          `${PCO.base}/resource_approval_groups/${group.id}/resources?per_page=100`,
-          userToken
-        );
-        
-        const resources = resourcesResponse.data || [];
-        groupResourceMap[group.id] = resources.map(r => r.id);
-        
-        myGroupDetails.push({
-          group_id: group.id,
-          group_name: group.attributes?.name,
-          resource_count: resources.length,
-          resource_ids: groupResourceMap[group.id]
-        });
-        
-        console.log('   └─ This group manages', resources.length, 'resources');
-        console.log('   └─ Resource IDs:', groupResourceMap[group.id].slice(0, 5).join(', '), '...');
+        hasPermission = true;
+        matchingGroupName = group.attributes?.name;
+        console.log('✅ PERMISSION GRANTED! I am a member of:', matchingGroupName);
+        break; // Found permission, no need to check other groups
       } else {
         console.log('❌ I am NOT a member of group:', group.attributes?.name);
       }
     }
 
-    debugInfo.my_groups = myGroupDetails;
-    debugInfo.my_group_ids = myGroupIds;
-    
-    console.log('📋 SUMMARY: I am in', myGroupIds.length, 'approval groups');
-
-    // ---- 3) Get the request details to find the resource ----
-    console.log('📦 Step 2: Fetching request details for request ID:', request_id);
-    
-    const requestResponse = await pcoGet(
-      `${PCO.base}/event_resource_requests/${request_id}?include=resource`,
-      userToken
-    );
-
-    const resourceId = requestResponse.data?.relationships?.resource?.data?.id;
-    const resourceName = requestResponse.included?.find(i => i.type === 'Resource' && i.id === resourceId)?.attributes?.name;
-    
-    debugInfo.resource_id = resourceId;
-    debugInfo.resource_name = resourceName;
-    
-    console.log('📦 Request is for resource:', resourceName, '(ID:', resourceId, ')');
-
-    // ---- 4) Check if I have permission to approve this resource ----
-    console.log('🔐 Step 3: Checking permissions...');
-    
-    let hasPermission = false;
-    let matchingGroupId = null;
-    let matchingGroupName = null;
-    
-    // Check if any of my groups manage this resource
-    for (const groupId of myGroupIds) {
-      const groupResources = groupResourceMap[groupId] || [];
-      console.log('🔍 Checking if group', groupId, 'manages resource', resourceId);
-      console.log('   └─ Group manages resources:', groupResources.slice(0, 10).join(', '), groupResources.length > 10 ? '...' : '');
-      
-      if (groupResources.includes(resourceId)) {
-        hasPermission = true;
-        matchingGroupId = groupId;
-        matchingGroupName = myGroupDetails.find(g => g.group_id === groupId)?.group_name;
-        console.log('✅ PERMISSION GRANTED! Group', matchingGroupName, 'manages this resource');
-        break;
-      } else {
-        console.log('❌ Group does NOT manage this resource');
-      }
-    }
-
+    debugInfo.checked_groups = checkedGroups;
     debugInfo.has_permission = hasPermission;
-    debugInfo.matching_group_id = matchingGroupId;
     debugInfo.matching_group_name = matchingGroupName;
 
     console.log('🔐 FINAL PERMISSION CHECK:', hasPermission ? '✅ GRANTED' : '❌ DENIED');
 
     if (!hasPermission) {
-      console.log('❌ PERMISSION DENIED - None of my groups manage this resource');
+      console.log('❌ PERMISSION DENIED - Not a member of any approval group that manages this resource');
       console.log('📊 Debug Summary:');
       console.log('   - Person ID:', personId);
-      console.log('   - My Groups:', myGroupIds.length);
       console.log('   - Resource ID:', resourceId);
       console.log('   - Resource Name:', resourceName);
+      console.log('   - Approval Groups Checked:', checkedGroups.length);
       
       return Response.json({
         ok: false,
         error: 'You are not authorized to approve this resource',
         debug: debugInfo,
-        diagnostic_message: `You belong to ${myGroupIds.length} approval group(s), but none of them manage the resource "${resourceName}" (ID: ${resourceId})`
+        diagnostic_message: `You are not a member of any approval group that manages "${resourceName}" (ID: ${resourceId}). Checked ${checkedGroups.length} group(s).`
       }, { status: 403 });
     }
 
