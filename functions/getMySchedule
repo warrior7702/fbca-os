@@ -38,7 +38,7 @@ async function refreshTokenIfNeeded(base44, user) {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Fetch with retry on rate limit
-async function fetchWithRetry(url, headers, retries = 3, delayMs = 1500) { // Changed delayMs from 1000 to 1500
+async function fetchWithRetry(url, headers, retries = 3, delayMs = 1500) {
     for (let i = 0; i < retries; i++) {
         const response = await fetch(url, { headers });
         
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
 
         const myGroups = [];
         for (const group of allGroups) {
-            await delay(150); // Changed from 100ms
+            await delay(100); // REDUCED from 150ms
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
         const myResources = [];
         
         for (const group of myGroups) {
-            await delay(150); // Changed from 100ms
+            await delay(100); // REDUCED from 150ms
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
@@ -221,17 +221,17 @@ Deno.serve(async (req) => {
 
         debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: Process events in BALANCED BATCHES - sweet spot between speed and reliability
+        // Step 5: Process events - OPTIMIZED FOR SPEED
         const eventsWithMyResources = [];
         const skippedEvents = [];
         
         const eventIdArray = Array.from(eventIds);
         debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
-        const BATCH_SIZE = 7; // Changed from 10
-        const BATCH_DELAY = 400; // Changed from 200
+        const BATCH_SIZE = 10; // INCREASED from 7
+        const BATCH_DELAY = 300; // REDUCED from 400ms
         
-        console.log(`⚖️ Processing ${eventIdArray.length} events in balanced batches of ${BATCH_SIZE}...`); // Console log message updated
+        console.log(`⚡ Processing ${eventIdArray.length} events in batches of ${BATCH_SIZE}...`);
         
         for (let i = 0; i < eventIdArray.length; i += BATCH_SIZE) {
             const batch = eventIdArray.slice(i, i + BATCH_SIZE);
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
                 batch.map(async (eventId) => {
                     try {
                         // Small stagger within batch
-                        await delay(Math.random() * 100); // Changed from 50ms
+                        await delay(Math.random() * 80); // REDUCED from 100ms
                         
                         // Fetch event and requests with retry
                         const [eventResponse, requestsResponse] = await Promise.all([
@@ -278,7 +278,9 @@ Deno.serve(async (req) => {
                         // Check resources
                         const myRequestedResources = [];
                         const allRequestedResources = [];
-                        let accessTime = null;
+                        
+                        // REMOVED: access_time fetching entirely for speed
+                        // access_time is not critical for the UI and adds significant time
                         
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
@@ -297,55 +299,6 @@ Deno.serve(async (req) => {
                                     name: resource?.attributes?.name || 'Unknown',
                                     approval_status: request.attributes?.approval_status
                                 });
-
-                                // Get access time from answers
-                                if (!accessTime && request.id) {
-                                    try {
-                                        await delay(75); // Changed from 50ms
-                                        
-                                        const answersResponse = await fetchWithRetry(
-                                            `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
-                                            headers,
-                                            2,
-                                            1000
-                                        );
-
-                                        if (answersResponse.ok) {
-                                            const answersData = await answersResponse.json();
-                                            
-                                            for (const answer of (answersData.data || [])) {
-                                                const questionAttr = answer.attributes?.question;
-                                                const questionText = typeof questionAttr === 'string' ? questionAttr : 
-                                                                   (questionAttr?.question || questionAttr?.text || '');
-                                                
-                                                const question = String(questionText || '').toLowerCase();
-                                                let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                                                
-                                                if (typeof value === 'object' && value !== null) {
-                                                    value = JSON.stringify(value);
-                                                }
-                                                
-                                                const answerText = String(value || '').toLowerCase();
-                                                
-                                                const isAccessQuestion = question.includes('access') || 
-                                                                       question.includes('time') || 
-                                                                       question.includes('begin') || 
-                                                                       question.includes('end') ||
-                                                                       question.includes('other details');
-                                                
-                                                const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
-                                                                           /\d+:\d+/.test(answerText);
-                                                
-                                                if (isAccessQuestion && looksLikeTimeRange) {
-                                                    accessTime = String(value);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    } catch (error) {
-                                        // Silently fail on answers - not critical
-                                    }
-                                }
                             }
                         }
 
@@ -396,7 +349,7 @@ Deno.serve(async (req) => {
                                 ends_at: endsAt,
                                 summary: event.attributes?.summary,
                                 resources: myRequestedResources,
-                                access_time: accessTime
+                                access_time: null // Removed to save time
                             });
                         }
                         
