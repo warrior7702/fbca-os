@@ -405,7 +405,7 @@ export default function MyTasks() {
             ) : (
               <ScheduleCalendar 
                 events={myScheduleEvents} 
-                weekCount={2}
+                weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
             )}

@@ -36,6 +36,7 @@ async function refreshTokenIfNeeded(base44, user) {
 
 async function getAccessTimeForEvent(eventId, accessToken) {
     try {
+        // Fetch resource requests for this event
         const requestsResponse = await fetch(
             `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?per_page=100`,
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -45,6 +46,7 @@ async function getAccessTimeForEvent(eventId, accessToken) {
 
         const requestsData = await requestsResponse.json();
         
+        // For each request, check answers
         for (const request of (requestsData.data || [])) {
             try {
                 const answersResponse = await fetch(
@@ -55,6 +57,7 @@ async function getAccessTimeForEvent(eventId, accessToken) {
                 if (answersResponse.ok) {
                     const answersData = await answersResponse.json();
                     
+                    // Find access time answer
                     for (const answer of (answersData.data || [])) {
                         const questionAttr = answer.attributes?.question;
                         let questionText = '';
@@ -74,6 +77,7 @@ async function getAccessTimeForEvent(eventId, accessToken) {
                         
                         const answerText = String(value || '').toLowerCase();
                         
+                        // Check if this is an access time answer
                         const isAccessQuestion = question.includes('access') || 
                                                question.includes('time') || 
                                                question.includes('begin') || 
@@ -98,34 +102,6 @@ async function getAccessTimeForEvent(eventId, accessToken) {
         console.error('Error getting access time for event:', eventId, error);
         return null;
     }
-}
-
-async function fetchAllPages(url, accessToken, maxPages = 5) {
-    let allData = [];
-    let currentUrl = url;
-    let pageCount = 0;
-    
-    while (currentUrl && pageCount < maxPages) {
-        pageCount++;
-        console.log(`  📄 Fetching page ${pageCount}...`);
-        
-        const response = await fetch(currentUrl, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        if (!response.ok) break;
-        
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-            allData = allData.concat(data.data);
-            console.log(`    Got ${data.data.length} items (total: ${allData.length})`);
-        }
-        
-        currentUrl = data.links?.next;
-    }
-    
-    console.log(`  ✅ Fetched ${pageCount} pages, ${allData.length} total items`);
-    return allData;
 }
 
 Deno.serve(async (req) => {
@@ -181,6 +157,7 @@ Deno.serve(async (req) => {
         const allGroups = groupsData.data || [];
         console.log('📋 Found', allGroups.length, 'total approval groups');
 
+        // Check which groups I'm in
         const myGroups = [];
         for (const group of allGroups) {
             const membersResponse = await fetch(
@@ -243,19 +220,29 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Step 4: Get event instances - INCREASED to 2 weeks for buffer
-        console.log('📞 Step 4: Fetching event instances...');
+        // Step 4: Get ALL future event instances
+        console.log('📞 Step 4: Fetching ALL future event instances...');
         
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14); // Back to 2 weeks
-        
-        console.log(`📅 Date range: ${now.toISOString()} to ${twoWeeksFromNow.toISOString()}`);
+        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
-        // INCREASED back to 5 pages (500 instances)
-        const allInstances = await fetchAllPages(instancesUrl, accessToken, 5);
+        console.log('🔗 Fetching:', instancesUrl);
+        
+        const instancesResponse = await fetch(instancesUrl, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!instancesResponse.ok) {
+            const errorText = await instancesResponse.text();
+            console.error('❌ Failed to fetch event instances:', instancesResponse.status, errorText);
+            throw new Error('Failed to fetch event instances');
+        }
+
+        const instancesData = await instancesResponse.json();
+        const allInstances = instancesData.data || [];
         
         console.log('📅 Found', allInstances.length, 'total future event instances');
 
@@ -277,21 +264,13 @@ Deno.serve(async (req) => {
 
         console.log('📊 Found', eventIds.size, 'unique events');
 
-        // Step 5: Process each unique event
-        console.log('📞 Step 5: Checking events for my resources...');
+        // Step 5: For each event, check if it uses any of my resources
+        console.log('📞 Step 5: Checking which events use my resources...');
         
         const eventsWithMyResources = [];
-        let processedCount = 0;
-        let skippedPast = 0;
-        let skippedNoResources = 0;
         
-        for (const eventId of Array.from(eventIds)) {
+        for (const eventId of Array.from(eventIds).slice(0, 50)) {
             try {
-                processedCount++;
-                if (processedCount % 20 === 0) {
-                    console.log(`  Processing event ${processedCount}/${eventIds.size}...`);
-                }
-
                 // Get event details
                 const eventResponse = await fetch(
                     `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
@@ -327,48 +306,35 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                if (myRequestedResources.length === 0) {
-                    skippedNoResources++;
-                    continue;
-                }
-
-                // Get access time
-                const accessTime = await getAccessTimeForEvent(eventId, accessToken);
-                
-                // Find ALL instances for this event (not just within 2 weeks)
-                const eventInstances = allInstances.filter(i => {
-                    return i.relationships?.event?.data?.id === eventId;
-                });
-
-                // Filter instances to 2-week window and add them
-                for (const instance of eventInstances) {
-                    const startsAt = instance.attributes?.starts_at;
-                    if (!startsAt) continue;
+                if (myRequestedResources.length > 0) {
+                    // Get access time for this event
+                    const accessTime = await getAccessTimeForEvent(eventId, accessToken);
                     
-                    const startDate = new Date(startsAt);
-                    
-                    // Skip if too far in future
-                    if (startDate > twoWeeksFromNow) {
-                        continue;
+                    // Find instances for this event
+                    const eventInstances = allInstances.filter(i => 
+                        i.relationships?.event?.data?.id === eventId
+                    );
+
+                    for (const instance of eventInstances) {
+                        const startsAt = instance.attributes?.starts_at;
+                        const endsAt = instance.attributes?.ends_at;
+                        
+                        if (!startsAt) continue;
+                        
+                        const startDate = new Date(startsAt);
+                        if (startDate > twoWeeksFromNow) continue;
+
+                        eventsWithMyResources.push({
+                            id: instance.id,
+                            event_id: eventId,
+                            name: event.attributes?.name || 'Untitled Event',
+                            starts_at: startsAt,
+                            ends_at: endsAt,
+                            summary: event.attributes?.summary,
+                            resources: myRequestedResources,
+                            access_time: accessTime
+                        });
                     }
-                    
-                    // Skip if in the past (more than 1 day ago to account for ongoing events)
-                    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                    if (startDate < oneDayAgo) {
-                        skippedPast++;
-                        continue;
-                    }
-
-                    eventsWithMyResources.push({
-                        id: instance.id,
-                        event_id: eventId,
-                        name: event.attributes?.name || 'Untitled Event',
-                        starts_at: startsAt,
-                        ends_at: instance.attributes?.ends_at,
-                        summary: event.attributes?.summary,
-                        resources: myRequestedResources,
-                        access_time: accessTime
-                    });
                 }
             } catch (error) {
                 console.error('❌ Error processing event', eventId, ':', error);
@@ -378,31 +344,22 @@ Deno.serve(async (req) => {
         // Sort by start date
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        console.log('🎯 Returning', eventsWithMyResources.length, 'event instances');
-        console.log('📊 Skipped', skippedPast, 'past events');
-        console.log('📊 Skipped', skippedNoResources, 'events without my resources');
+        console.log('🎯 Returning', eventsWithMyResources.length, 'events');
         
-        // Group by date for summary
-        const byDate = {};
-        eventsWithMyResources.forEach(e => {
-            const date = new Date(e.starts_at).toLocaleDateString();
-            byDate[date] = (byDate[date] || 0) + 1;
-        });
-        console.log('📅 Events by date:', byDate);
+        if (eventsWithMyResources.length > 0) {
+            console.log('📋 First few:', eventsWithMyResources.slice(0, 3).map(e => ({
+                name: e.name,
+                date: new Date(e.starts_at).toLocaleDateString(),
+                resources: e.resources.length,
+                access_time: e.access_time
+            })));
+        }
 
         return Response.json({
             events: eventsWithMyResources,
             count: eventsWithMyResources.length,
             my_groups_count: myGroups.length,
-            my_resources_count: myResourceIds.size,
-            total_events_checked: processedCount,
-            skipped_past_events_count: skippedPast,
-            skipped_no_resources_events_count: skippedNoResources,
-            by_date: byDate,
-            date_range: {
-                start: now.toISOString(),
-                end: twoWeeksFromNow.toISOString()
-            }
+            my_resources_count: myResourceIds.size
         });
 
     } catch (error) {
