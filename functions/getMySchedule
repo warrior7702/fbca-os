@@ -37,14 +37,48 @@ async function refreshTokenIfNeeded(base44, user) {
 // Helper to add delay between API calls
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Rate limiter that adapts to 429 errors
+class AdaptiveRateLimiter {
+    constructor() {
+        this.batchSize = 12; // Start aggressive
+        this.batchDelay = 200; // Start fast
+        this.requestDelay = 50; // Delay within batch
+        this.retryDelay = 1500;
+        this.hitRateLimit = false;
+    }
+
+    // Call this when you hit a 429
+    slowDown() {
+        if (!this.hitRateLimit) {
+            console.log('⚠️ Rate limit hit! Slowing down...');
+            this.hitRateLimit = true;
+            this.batchSize = Math.max(4, Math.floor(this.batchSize / 2));
+            this.batchDelay = Math.min(800, this.batchDelay * 2);
+            this.requestDelay = Math.min(150, this.requestDelay * 2);
+            console.log(`📊 New settings: batchSize=${this.batchSize}, batchDelay=${this.batchDelay}ms, requestDelay=${this.requestDelay}ms`);
+        }
+    }
+
+    getSettings() {
+        return {
+            batchSize: this.batchSize,
+            batchDelay: this.batchDelay,
+            requestDelay: this.requestDelay,
+            retryDelay: this.retryDelay
+        };
+    }
+}
+
 // Fetch with retry on rate limit
-async function fetchWithRetry(url, headers, retries = 3, delayMs = 1500) {
+async function fetchWithRetry(url, headers, rateLimiter, retries = 3) {
+    const settings = rateLimiter.getSettings();
+    
     for (let i = 0; i < retries; i++) {
         const response = await fetch(url, { headers });
         
         if (response.status === 429) {
-            // Rate limited - wait and retry
-            const waitTime = delayMs * Math.pow(2, i); // Exponential backoff
+            rateLimiter.slowDown(); // Adjust settings for future requests
+            const waitTime = settings.retryDelay * Math.pow(2, i);
             console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${i + 1}/${retries} for ${url}`);
             await delay(waitTime);
             continue;
@@ -59,6 +93,7 @@ async function fetchWithRetry(url, headers, retries = 3, delayMs = 1500) {
 
 Deno.serve(async (req) => {
     const debugLog = [];
+    const rateLimiter = new AdaptiveRateLimiter();
     
     try {
         const base44 = createClientFromRequest(req);
@@ -85,7 +120,8 @@ Deno.serve(async (req) => {
         // Step 1: Get my PCO person ID
         const meResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/me',
-            headers
+            headers,
+            rateLimiter
         );
 
         if (!meResponse.ok) {
@@ -99,7 +135,8 @@ Deno.serve(async (req) => {
         // Step 2: Get approval groups I'm in
         const groupsResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            headers
+            headers,
+            rateLimiter
         );
 
         if (!groupsResponse.ok) {
@@ -116,7 +153,8 @@ Deno.serve(async (req) => {
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                headers
+                headers,
+                rateLimiter
             );
 
             if (membersResponse.ok) {
@@ -152,7 +190,8 @@ Deno.serve(async (req) => {
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                headers
+                headers,
+                rateLimiter
             );
 
             if (resourcesResponse.ok) {
@@ -191,7 +230,7 @@ Deno.serve(async (req) => {
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
-        const instancesResponse = await fetchWithRetry(instancesUrl, headers);
+        const instancesResponse = await fetchWithRetry(instancesUrl, headers, rateLimiter);
 
         if (!instancesResponse.ok) {
             const errorText = await instancesResponse.text();
@@ -221,41 +260,42 @@ Deno.serve(async (req) => {
 
         debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: Process events in batches
+        // Step 5: Process events with ADAPTIVE RATE LIMITING
         const eventsWithMyResources = [];
         const skippedEvents = [];
         
         const eventIdArray = Array.from(eventIds);
         debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
-        const BATCH_SIZE = 8; // Optimized batch size
-        const BATCH_DELAY = 350; // Balance between speed and reliability
+        console.log(`🚀 Processing ${eventIdArray.length} events with adaptive rate limiting...`);
         
-        console.log(`⚡ Processing ${eventIdArray.length} events in batches of ${BATCH_SIZE}...`);
-        
-        for (let i = 0; i < eventIdArray.length; i += BATCH_SIZE) {
-            const batch = eventIdArray.slice(i, i + BATCH_SIZE);
-            console.log(`📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(eventIdArray.length / BATCH_SIZE)}`);
+        for (let i = 0; i < eventIdArray.length;) {
+            const settings = rateLimiter.getSettings();
+            const batch = eventIdArray.slice(i, i + settings.batchSize);
+            const batchNum = Math.floor(i / settings.batchSize) + 1;
+            const totalBatches = Math.ceil(eventIdArray.length / settings.batchSize);
+            
+            console.log(`📦 Batch ${batchNum}/${totalBatches} (size: ${batch.length}, delay: ${settings.batchDelay}ms, reqDelay: ${settings.requestDelay}ms)`);
             
             // Process batch in parallel
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        await delay(Math.random() * 80);
+                        await delay(Math.random() * settings.requestDelay);
                         
                         // Fetch event and requests
                         const [eventResponse, requestsResponse] = await Promise.all([
                             fetchWithRetry(
                                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
                                 headers,
-                                3,
-                                1500
+                                rateLimiter,
+                                3
                             ),
                             fetchWithRetry(
                                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
                                 headers,
-                                3,
-                                1500
+                                rateLimiter,
+                                3
                             )
                         ]);
 
@@ -277,7 +317,7 @@ Deno.serve(async (req) => {
                         // Check resources
                         const myRequestedResources = [];
                         const allRequestedResources = [];
-                        const buildingAccessRequests = []; // Track building access requests for answer fetching
+                        const buildingAccessRequests = [];
                         
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
@@ -298,7 +338,6 @@ Deno.serve(async (req) => {
                                     approval_status: request.attributes?.approval_status
                                 });
                                 
-                                // OPTIMIZED: Only queue answer fetching for Building Access resources
                                 const isBuildingAccess = resourceName.toLowerCase().includes('building access') || 
                                                        resourceName.toLowerCase().includes('door code') ||
                                                        resourceName.toLowerCase().includes('access code');
@@ -321,28 +360,26 @@ Deno.serve(async (req) => {
                             };
                         }
 
-                        // OPTIMIZED: Fetch answers ONLY for building access, and do it in parallel
+                        // Fetch answers ONLY for building access
                         let accessTime = null;
                         
                         if (buildingAccessRequests.length > 0) {
                             try {
-                                // Fetch all building access answers in parallel
                                 const answerResults = await Promise.all(
                                     buildingAccessRequests.map(async (requestId) => {
                                         try {
-                                            await delay(30); // Small stagger
+                                            await delay(30);
                                             
                                             const answersResponse = await fetchWithRetry(
                                                 `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`,
                                                 headers,
-                                                2,
-                                                1000
+                                                rateLimiter,
+                                                2
                                             );
 
                                             if (answersResponse.ok) {
                                                 const answersData = await answersResponse.json();
                                                 
-                                                // Find access time answer
                                                 for (const answer of (answersData.data || [])) {
                                                     const questionAttr = answer.attributes?.question;
                                                     const questionText = typeof questionAttr === 'string' ? questionAttr : 
@@ -379,7 +416,6 @@ Deno.serve(async (req) => {
                                     })
                                 );
                                 
-                                // Use the first valid access time found
                                 accessTime = answerResults.find(result => result !== null) || null;
                             } catch (error) {
                                 console.error('Error fetching answers:', error);
@@ -448,9 +484,12 @@ Deno.serve(async (req) => {
                 }
             }
             
+            // Move to next batch
+            i += settings.batchSize;
+            
             // Delay between batches (except for last batch)
-            if (i + BATCH_SIZE < eventIdArray.length) {
-                await delay(BATCH_DELAY);
+            if (i < eventIdArray.length) {
+                await delay(settings.batchDelay);
             }
         }
 
@@ -463,6 +502,8 @@ Deno.serve(async (req) => {
             step: 'final', 
             included: eventsWithMyResources.length,
             skipped: skippedEvents.length,
+            rate_limit_hit: rateLimiter.hitRateLimit,
+            final_settings: rateLimiter.getSettings(),
             skipped_details: skippedEvents
         });
 
