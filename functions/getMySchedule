@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -31,6 +32,52 @@ async function refreshTokenIfNeeded(base44, user) {
     });
 
     return tokens.access_token;
+}
+
+async function extractAccessTime(accessToken, eventId, requestId) {
+    try {
+        const answersUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`;
+        
+        const answersResponse = await fetch(answersUrl, {
+            headers: { 
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!answersResponse.ok) return null;
+
+        const answersData = await answersResponse.json();
+        
+        // Look for access time answer
+        for (const answer of (answersData.data || [])) {
+            const question = String(answer.attributes?.question || '').toLowerCase();
+            const answerValue = String(answer.attributes?.value || 
+                                      answer.attributes?.answer ||
+                                      answer.attributes?.text || '').toLowerCase();
+            
+            const isAccessQuestion = question.includes('access') || 
+                                   question.includes('time') || 
+                                   question.includes('begin') || 
+                                   question.includes('end') ||
+                                   question.includes('other details');
+            
+            const looksLikeTimeRange = answerValue.includes('am') || 
+                                      answerValue.includes('pm') || 
+                                      /\d+:\d+/.test(answerValue);
+            
+            if (isAccessQuestion && looksLikeTimeRange) {
+                return answer.attributes?.value || 
+                       answer.attributes?.answer ||
+                       answer.attributes?.text;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error fetching access time:', error);
+        return null;
+    }
 }
 
 Deno.serve(async (req) => {
@@ -149,14 +196,13 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Step 4: Get ALL future event instances (no filtering yet)
+        // Step 4: Get ALL future event instances
         console.log('📞 Step 4: Fetching ALL future event instances...');
         
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
         
-        // Try with simple filter first
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
         console.log('🔗 Fetching:', instancesUrl);
@@ -199,7 +245,7 @@ Deno.serve(async (req) => {
         
         const eventsWithMyResources = [];
         
-        for (const eventId of Array.from(eventIds).slice(0, 50)) { // Limit to first 50 events for speed
+        for (const eventId of Array.from(eventIds).slice(0, 50)) {
             try {
                 // Get event details
                 const eventResponse = await fetch(
@@ -224,16 +270,22 @@ Deno.serve(async (req) => {
                 
                 // Check if any requested resources are mine
                 const myRequestedResources = [];
+                let accessTimeForEvent = null; // Initialize accessTimeForEvent here
+                
                 for (const request of (requestsData.data || [])) {
                     const resourceId = request.relationships?.resource?.data?.id;
                     if (myResourceIds.has(resourceId)) {
-                        // Find resource details from included
                         const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
                         myRequestedResources.push({
                             id: resourceId,
                             name: resource?.attributes?.name || 'Unknown',
                             approval_status: request.attributes?.approval_status
                         });
+                        
+                        // Extract access time from first matching resource (if not found yet)
+                        if (accessTimeForEvent === null) { // Only try to set if not already found
+                            accessTimeForEvent = await extractAccessTime(accessToken, eventId, request.id);
+                        }
                     }
                 }
 
@@ -250,7 +302,7 @@ Deno.serve(async (req) => {
                         if (!startsAt) continue;
                         
                         const startDate = new Date(startsAt);
-                        if (startDate > twoWeeksFromNow) continue; // Only next 2 weeks
+                        if (startDate > twoWeeksFromNow) continue;
 
                         eventsWithMyResources.push({
                             id: instance.id,
@@ -259,7 +311,8 @@ Deno.serve(async (req) => {
                             starts_at: startsAt,
                             ends_at: endsAt,
                             summary: event.attributes?.summary,
-                            resources: myRequestedResources
+                            resources: myRequestedResources,
+                            access_time: accessTimeForEvent // Add access time to event
                         });
                     }
                 }
@@ -277,7 +330,8 @@ Deno.serve(async (req) => {
             console.log('📋 First few:', eventsWithMyResources.slice(0, 3).map(e => ({
                 name: e.name,
                 date: new Date(e.starts_at).toLocaleDateString(),
-                resources: e.resources.length
+                resources: e.resources.length,
+                access_time: e.access_time
             })));
         }
 
