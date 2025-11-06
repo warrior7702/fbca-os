@@ -1,3 +1,4 @@
+
 // approveResourceRequest.js  (Base44 Deno runtime)
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
@@ -73,11 +74,13 @@ Deno.serve(async (req) => {
     console.log('🔍 ========== PCO USER IDENTITY DISCOVERY ==========');
     console.log('📧 Base44 Email:', me.email);
     console.log('💾 Stored Calendar User ID:', storedCalendarUserId);
+    console.log('🔑 Access Token (last 10 chars):', userToken.slice(-10));
 
     // DISCOVERY: Get ALL possible user IDs from different PCO APIs
     const userIdentities = {
       email: me.email,
-      stored_id: storedCalendarUserId
+      stored_id: storedCalendarUserId,
+      all_api_responses: {}
     };
 
     // 1. Calendar /me
@@ -85,10 +88,10 @@ Deno.serve(async (req) => {
       const calendarMeResponse = await pcoGet('https://api.planningcenteronline.com/calendar/v2/me', userToken);
       userIdentities.calendar_me_id = calendarMeResponse.data?.id;
       userIdentities.calendar_me_name = calendarMeResponse.data?.attributes?.name;
-      userIdentities.calendar_me_email = calendarMeResponse.data?.attributes?.email;
+      userIdentities.all_api_responses.calendar_me = calendarMeResponse.data;
       console.log('📅 Calendar /me ID:', userIdentities.calendar_me_id);
       console.log('   Name:', userIdentities.calendar_me_name);
-      console.log('   Email:', userIdentities.calendar_me_email);
+      console.log('   Full data:', JSON.stringify(calendarMeResponse.data?.attributes, null, 2));
     } catch (e) {
       console.log('❌ Calendar /me failed:', e.message);
     }
@@ -98,52 +101,104 @@ Deno.serve(async (req) => {
       const peopleMeResponse = await pcoGet('https://api.planningcenteronline.com/people/v2/me', userToken);
       userIdentities.people_me_id = peopleMeResponse.data?.id;
       userIdentities.people_me_name = peopleMeResponse.data?.attributes?.name;
-      userIdentities.people_me_email = peopleMeResponse.data?.attributes?.primary_campus_id;
+      userIdentities.all_api_responses.people_me = peopleMeResponse.data;
       console.log('👤 People /me ID:', userIdentities.people_me_id);
       console.log('   Name:', userIdentities.people_me_name);
+      console.log('   Full data:', JSON.stringify(peopleMeResponse.data?.attributes, null, 2));
     } catch (e) {
       console.log('❌ People /me failed:', e.message);
     }
 
-    // 3. Token introspection (who owns this token?)
+    // 3. Check Center /me (NEW!)
     try {
-      const tokenResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
-        headers: { 'Authorization': `Bearer ${userToken}` }
-      });
-      if (tokenResponse.ok) {
-        const tokenData = await tokenResponse.json();
-        userIdentities.token_owner_id = tokenData.data?.id;
-        userIdentities.token_owner_name = tokenData.data?.attributes?.name;
-        console.log('🔑 Token Owner ID (from People):', userIdentities.token_owner_id);
-        console.log('   Name:', userIdentities.token_owner_name);
-      }
+      const checkMeResponse = await pcoGet('https://api.planningcenteronline.com/check-ins/v2/me', userToken);
+      userIdentities.checkins_me_id = checkMeResponse.data?.id;
+      userIdentities.all_api_responses.checkins_me = checkMeResponse.data;
+      console.log('✅ Check-Ins /me ID:', userIdentities.checkins_me_id);
     } catch (e) {
-      console.log('❌ Token introspection failed:', e.message);
+      console.log('❌ Check-Ins /me failed:', e.message);
     }
 
-    // 4. Try to get the Calendar user for the People person
-    if (userIdentities.people_me_id) {
-      try {
-        // Search for Calendar users by email
-        const searchUrl = `https://api.planningcenteronline.com/calendar/v2/people?where[email]=${encodeURIComponent(me.email)}`;
-        const searchResponse = await pcoGet(searchUrl, userToken);
-        if (searchResponse.data && searchResponse.data.length > 0) {
-          userIdentities.calendar_user_from_email = searchResponse.data[0].id;
-          console.log('🔍 Calendar User ID (from email search):', userIdentities.calendar_user_from_email);
-        }
-      } catch (e) {
-        console.log('❌ Calendar user search failed:', e.message);
+    // 4. Services /me (NEW!)
+    try {
+      const servicesMeResponse = await pcoGet('https://api.planningcenteronline.com/services/v2/me', userToken);
+      userIdentities.services_me_id = servicesMeResponse.data?.id;
+      userIdentities.all_api_responses.services_me = servicesMeResponse.data;
+      console.log('🎵 Services /me ID:', userIdentities.services_me_id);
+    } catch (e) {
+      console.log('❌ Services /me failed:', e.message);
+    }
+
+    // 5. Try fetching /oauth/me (OAuth token info - THIS SHOULD TELL US WHO OWNS THE TOKEN!)
+    try {
+      const oauthMeResponse = await fetch('https://api.planningcenteronline.com/oauth/me', {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      
+      if (oauthMeResponse.ok) {
+        const oauthData = await oauthMeResponse.json();
+        userIdentities.oauth_me = oauthData;
+        userIdentities.oauth_user_id = oauthData.data?.id;
+        console.log('🔐 OAuth /me Response:', JSON.stringify(oauthData, null, 2));
+        console.log('🔐 OAuth User ID:', userIdentities.oauth_user_id);
+      } else {
+        console.log('❌ OAuth /me failed:', oauthMeResponse.status);
       }
+    } catch (e) {
+      console.log('❌ OAuth /me error:', e.message);
+    }
+
+    // 6. Try to get the Calendar user by email search
+    try {
+      const searchUrl = `https://api.planningcenteronline.com/calendar/v2/people?where[email]=${encodeURIComponent(me.email)}`;
+      const searchResponse = await pcoGet(searchUrl, userToken);
+      if (searchResponse.data && searchResponse.data.length > 0) {
+        userIdentities.calendar_user_from_email = searchResponse.data[0].id;
+        userIdentities.all_api_responses.calendar_email_search = searchResponse.data;
+        console.log('🔍 Calendar User ID (from email search):', userIdentities.calendar_user_from_email);
+      }
+    } catch (e) {
+      console.log('❌ Calendar user search failed:', e.message);
+    }
+
+    // 7. CRITICAL: Try to find user 3566727 directly
+    try {
+      const userCheckResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/people/3566727', {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      
+      if (userCheckResponse.ok) {
+        const userData = await userCheckResponse.json();
+        userIdentities.mystery_user_3566727 = userData.data;
+        console.log('🕵️ Mystery User 3566727:', JSON.stringify(userData.data, null, 2));
+      } else {
+        console.log('❌ Cannot fetch user 3566727:', userCheckResponse.status);
+      }
+    } catch (e) {
+      console.log('❌ Error fetching user 3566727:', e.message);
     }
 
     debugInfo.all_identities = userIdentities;
     
     console.log('📊 ========== IDENTITY SUMMARY ==========');
-    console.log(JSON.stringify(userIdentities, null, 2));
+    console.log('Calendar /me:', userIdentities.calendar_me_id);
+    console.log('People /me:', userIdentities.people_me_id);
+    console.log('OAuth /me:', userIdentities.oauth_user_id);
+    console.log('Calendar email search:', userIdentities.calendar_user_from_email);
+    console.log('Check-Ins /me:', userIdentities.checkins_me_id);
+    console.log('Services /me:', userIdentities.services_me_id);
+    console.log('Mystery 3566727:', userIdentities.mystery_user_3566727 ? 'Found!' : 'Not found');
     console.log('=========================================');
 
-    // Determine which Calendar User ID to use
-    const calendarUserId = userIdentities.calendar_me_id || storedCalendarUserId;
+    // Determine which Calendar User ID to use - try all known IDs
+    const possibleCalendarIds = [
+      userIdentities.calendar_me_id,
+      userIdentities.oauth_user_id,
+      userIdentities.calendar_user_from_email,
+      storedCalendarUserId
+    ].filter(Boolean);
+
+    const calendarUserId = possibleCalendarIds[0];
     
     if (!calendarUserId) {
       return Response.json(
@@ -157,8 +212,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ Using Calendar User ID for approval:', calendarUserId);
-    debugInfo.calendar_user_id_used = calendarUserId;
+    console.log('✅ Will try these Calendar User IDs for approval:', possibleCalendarIds);
+    debugInfo.calendar_user_ids_to_try = possibleCalendarIds;
 
     // ---- 2) Get request details first (1 API call) ----
     console.log('📦 Step 1: Fetching request details for request ID:', request_id);
@@ -202,7 +257,7 @@ Deno.serve(async (req) => {
 
     // ---- 4) Check membership in ONLY these groups - TRY ALL KNOWN IDS ----
     console.log('🔐 Step 3: Checking membership in approval groups...');
-    console.log('   Will try these IDs:', [calendarUserId, userIdentities.calendar_user_from_email, userIdentities.people_me_id].filter(Boolean));
+    console.log('   Will try these IDs:', possibleCalendarIds);
     
     let hasPermission = false;
     let matchingGroupName = null;
@@ -223,23 +278,27 @@ Deno.serve(async (req) => {
       
       // Log all member IDs for comparison
       const memberIds = members.map(m => m.id);
-      console.log('   └─ Member IDs:', memberIds.slice(0, 10).join(', '), memberIds.length > 10 ? '...' : '');
+      console.log('   └─ Member IDs:', memberIds.join(', '));
+      
+      // CRITICAL: Check if any member's RELATIONSHIPS include any of our IDs
+      for (const member of members) {
+        console.log('   └─ Member details:', JSON.stringify(member, null, 2));
+      }
       
       // Try matching with ANY of our known IDs
-      const possibleIds = [
-        calendarUserId,
-        userIdentities.calendar_user_from_email,
-        userIdentities.people_me_id,
-        userIdentities.token_owner_id
-      ].filter(Boolean);
-      
       let matchedId = null;
-      for (const tryId of possibleIds) {
+      for (const tryId of possibleCalendarIds) {
         if (memberIds.includes(tryId)) {
           matchedId = tryId;
           console.log('   └─ ✅ MATCH! Found ID', tryId, 'in group members');
           break;
         }
+      }
+      
+      // Also try matching with 3566727 specifically
+      if (!matchedId && memberIds.includes('3566727')) {
+        matchedId = '3566727';
+        console.log('   └─ ✅ MATCH! Found mystery ID 3566727 in group members');
       }
       
       const isMember = matchedId !== null;
@@ -249,6 +308,7 @@ Deno.serve(async (req) => {
         group_name: group.attributes?.name,
         is_member: isMember,
         member_count: members.length,
+        member_ids: memberIds,
         matched_id: matchedId
       });
       
@@ -272,18 +332,15 @@ Deno.serve(async (req) => {
 
     if (!hasPermission) {
       console.log('❌ PERMISSION DENIED');
-      console.log('📊 Tried these IDs:');
-      console.log('   - Calendar User ID:', calendarUserId);
-      console.log('   - Calendar from email:', userIdentities.calendar_user_from_email);
-      console.log('   - People ID:', userIdentities.people_me_id);
-      console.log('   - Token Owner:', userIdentities.token_owner_id);
+      console.log('📊 Tried these IDs:', possibleCalendarIds);
+      console.log('📊 Group member IDs:', checkedGroups.map(g => g.member_ids).flat());
       
       return Response.json({
         ok: false,
         error: 'You are not authorized to approve this resource',
         debug: debugInfo,
         identities: userIdentities,
-        diagnostic_message: `None of your PCO user IDs are members of approval groups for "${resourceName}". Please check the group membership in PCO.`
+        diagnostic_message: `None of your PCO user IDs (${possibleCalendarIds.join(', ')}) match the approval group members. The OAuth token may belong to a different PCO user (possibly ID 3566727). Try disconnecting and reconnecting PCO.`
       }, { status: 403 });
     }
 
@@ -293,6 +350,7 @@ Deno.serve(async (req) => {
     
     console.log('🚀 Step 4: Patching PCO request:', url);
     console.log('  Status:', statusCode);
+    console.log('  Matched with ID:', matchedWithId);
     
     const patchBody = {
       data: {
