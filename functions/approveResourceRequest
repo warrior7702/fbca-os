@@ -1,4 +1,3 @@
-
 // approveResourceRequest.js  (Base44 Deno runtime)
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
@@ -59,19 +58,107 @@ Deno.serve(async (req) => {
 
     // ---- 1) require a user token; don't use the service token for writes ----
     const userToken = me?.pco_access_token;
-    const calendarUserId = me?.pco_user_id; // THIS SHOULD BE CALENDAR USER ID NOW!
+    const storedCalendarUserId = me?.pco_user_id;
     
     debugInfo.user_email = me?.email;
-    debugInfo.calendar_user_id = calendarUserId;
+    debugInfo.stored_calendar_user_id = storedCalendarUserId;
     
-    if (!userToken || !calendarUserId) {
+    if (!userToken) {
       return Response.json(
-        { ok: false, error: 'No PCO token or Calendar user ID. Please reconnect PCO in Settings.', debug: debugInfo },
+        { ok: false, error: 'No PCO token. Please reconnect PCO in Settings.', debug: debugInfo },
         { status: 401 }
       );
     }
 
-    console.log('🔍 DEBUG: Approving as PCO Calendar User ID:', calendarUserId, 'Email:', me.email);
+    console.log('🔍 ========== PCO USER IDENTITY DISCOVERY ==========');
+    console.log('📧 Base44 Email:', me.email);
+    console.log('💾 Stored Calendar User ID:', storedCalendarUserId);
+
+    // DISCOVERY: Get ALL possible user IDs from different PCO APIs
+    const userIdentities = {
+      email: me.email,
+      stored_id: storedCalendarUserId
+    };
+
+    // 1. Calendar /me
+    try {
+      const calendarMeResponse = await pcoGet('https://api.planningcenteronline.com/calendar/v2/me', userToken);
+      userIdentities.calendar_me_id = calendarMeResponse.data?.id;
+      userIdentities.calendar_me_name = calendarMeResponse.data?.attributes?.name;
+      userIdentities.calendar_me_email = calendarMeResponse.data?.attributes?.email;
+      console.log('📅 Calendar /me ID:', userIdentities.calendar_me_id);
+      console.log('   Name:', userIdentities.calendar_me_name);
+      console.log('   Email:', userIdentities.calendar_me_email);
+    } catch (e) {
+      console.log('❌ Calendar /me failed:', e.message);
+    }
+
+    // 2. People /me
+    try {
+      const peopleMeResponse = await pcoGet('https://api.planningcenteronline.com/people/v2/me', userToken);
+      userIdentities.people_me_id = peopleMeResponse.data?.id;
+      userIdentities.people_me_name = peopleMeResponse.data?.attributes?.name;
+      userIdentities.people_me_email = peopleMeResponse.data?.attributes?.primary_campus_id;
+      console.log('👤 People /me ID:', userIdentities.people_me_id);
+      console.log('   Name:', userIdentities.people_me_name);
+    } catch (e) {
+      console.log('❌ People /me failed:', e.message);
+    }
+
+    // 3. Token introspection (who owns this token?)
+    try {
+      const tokenResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
+        headers: { 'Authorization': `Bearer ${userToken}` }
+      });
+      if (tokenResponse.ok) {
+        const tokenData = await tokenResponse.json();
+        userIdentities.token_owner_id = tokenData.data?.id;
+        userIdentities.token_owner_name = tokenData.data?.attributes?.name;
+        console.log('🔑 Token Owner ID (from People):', userIdentities.token_owner_id);
+        console.log('   Name:', userIdentities.token_owner_name);
+      }
+    } catch (e) {
+      console.log('❌ Token introspection failed:', e.message);
+    }
+
+    // 4. Try to get the Calendar user for the People person
+    if (userIdentities.people_me_id) {
+      try {
+        // Search for Calendar users by email
+        const searchUrl = `https://api.planningcenteronline.com/calendar/v2/people?where[email]=${encodeURIComponent(me.email)}`;
+        const searchResponse = await pcoGet(searchUrl, userToken);
+        if (searchResponse.data && searchResponse.data.length > 0) {
+          userIdentities.calendar_user_from_email = searchResponse.data[0].id;
+          console.log('🔍 Calendar User ID (from email search):', userIdentities.calendar_user_from_email);
+        }
+      } catch (e) {
+        console.log('❌ Calendar user search failed:', e.message);
+      }
+    }
+
+    debugInfo.all_identities = userIdentities;
+    
+    console.log('📊 ========== IDENTITY SUMMARY ==========');
+    console.log(JSON.stringify(userIdentities, null, 2));
+    console.log('=========================================');
+
+    // Determine which Calendar User ID to use
+    const calendarUserId = userIdentities.calendar_me_id || storedCalendarUserId;
+    
+    if (!calendarUserId) {
+      return Response.json(
+        { 
+          ok: false, 
+          error: 'Could not determine Calendar User ID. Please reconnect PCO in Settings.',
+          debug: debugInfo,
+          identities: userIdentities
+        },
+        { status: 401 }
+      );
+    }
+
+    console.log('✅ Using Calendar User ID for approval:', calendarUserId);
+    debugInfo.calendar_user_id_used = calendarUserId;
 
     // ---- 2) Get request details first (1 API call) ----
     console.log('📦 Step 1: Fetching request details for request ID:', request_id);
@@ -108,15 +195,18 @@ Deno.serve(async (req) => {
       return Response.json({
         ok: false,
         error: 'No approval groups manage this resource',
-        debug: debugInfo
+        debug: debugInfo,
+        identities: userIdentities
       }, { status: 403 });
     }
 
-    // ---- 4) Check membership in ONLY these groups using CALENDAR USER ID ----
-    console.log('🔐 Step 3: Checking membership using Calendar User ID:', calendarUserId);
+    // ---- 4) Check membership in ONLY these groups - TRY ALL KNOWN IDS ----
+    console.log('🔐 Step 3: Checking membership in approval groups...');
+    console.log('   Will try these IDs:', [calendarUserId, userIdentities.calendar_user_from_email, userIdentities.people_me_id].filter(Boolean));
     
     let hasPermission = false;
     let matchingGroupName = null;
+    let matchedWithId = null;
     const checkedGroups = [];
     
     for (const group of approvalGroups) {
@@ -131,51 +221,69 @@ Deno.serve(async (req) => {
       const members = membersResponse.data || [];
       console.log('   └─ Group has', members.length, 'members');
       
-      // Check if I'm in this group using CALENDAR USER ID
-      const isMember = members.some(person => {
-        const match = person.id === calendarUserId;
-        if (match) {
-          console.log('   └─ ✅ FOUND ME! Calendar User ID matches:', person.id);
+      // Log all member IDs for comparison
+      const memberIds = members.map(m => m.id);
+      console.log('   └─ Member IDs:', memberIds.slice(0, 10).join(', '), memberIds.length > 10 ? '...' : '');
+      
+      // Try matching with ANY of our known IDs
+      const possibleIds = [
+        calendarUserId,
+        userIdentities.calendar_user_from_email,
+        userIdentities.people_me_id,
+        userIdentities.token_owner_id
+      ].filter(Boolean);
+      
+      let matchedId = null;
+      for (const tryId of possibleIds) {
+        if (memberIds.includes(tryId)) {
+          matchedId = tryId;
+          console.log('   └─ ✅ MATCH! Found ID', tryId, 'in group members');
+          break;
         }
-        return match;
-      });
+      }
+      
+      const isMember = matchedId !== null;
       
       checkedGroups.push({
         group_id: group.id,
         group_name: group.attributes?.name,
         is_member: isMember,
-        member_count: members.length
+        member_count: members.length,
+        matched_id: matchedId
       });
       
       if (isMember) {
         hasPermission = true;
         matchingGroupName = group.attributes?.name;
-        console.log('✅ PERMISSION GRANTED! I am a member of:', matchingGroupName);
-        break; // Found permission, no need to check other groups
+        matchedWithId = matchedId;
+        console.log('✅ PERMISSION GRANTED! Matched with ID:', matchedId, 'in group:', matchingGroupName);
+        break;
       } else {
-        console.log('❌ I am NOT a member of group:', group.attributes?.name);
+        console.log('❌ None of our IDs found in this group');
       }
     }
 
     debugInfo.checked_groups = checkedGroups;
     debugInfo.has_permission = hasPermission;
     debugInfo.matching_group_name = matchingGroupName;
+    debugInfo.matched_with_id = matchedWithId;
 
     console.log('🔐 FINAL PERMISSION CHECK:', hasPermission ? '✅ GRANTED' : '❌ DENIED');
 
     if (!hasPermission) {
-      console.log('❌ PERMISSION DENIED - Not a member of any approval group that manages this resource');
-      console.log('📊 Debug Summary:');
+      console.log('❌ PERMISSION DENIED');
+      console.log('📊 Tried these IDs:');
       console.log('   - Calendar User ID:', calendarUserId);
-      console.log('   - Resource ID:', resourceId);
-      console.log('   - Resource Name:', resourceName);
-      console.log('   - Approval Groups Checked:', checkedGroups.length);
+      console.log('   - Calendar from email:', userIdentities.calendar_user_from_email);
+      console.log('   - People ID:', userIdentities.people_me_id);
+      console.log('   - Token Owner:', userIdentities.token_owner_id);
       
       return Response.json({
         ok: false,
         error: 'You are not authorized to approve this resource',
         debug: debugInfo,
-        diagnostic_message: `You are not a member of any approval group that manages "${resourceName}" (ID: ${resourceId}). Checked ${checkedGroups.length} group(s). Your Calendar User ID: ${calendarUserId}. Please reconnect PCO in Settings if this seems wrong.`
+        identities: userIdentities,
+        diagnostic_message: `None of your PCO user IDs are members of approval groups for "${resourceName}". Please check the group membership in PCO.`
       }, { status: 403 });
     }
 
@@ -210,7 +318,9 @@ Deno.serve(async (req) => {
       action, 
       request_id, 
       result,
-      debug: debugInfo
+      matched_with_id: matchedWithId,
+      debug: debugInfo,
+      identities: userIdentities
     });
   } catch (e) {
     console.error('❌ Approve error:', e);
