@@ -221,6 +221,110 @@ export default function PCOAPITester() {
     });
   };
 
+  const testGetMyApprovals = async () => {
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('📋 Fetching my pending approvals...');
+      const response = await base44.functions.invoke('getMyPendingApprovals');
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'getMyPendingApprovals'
+      });
+      
+      toast.success('Approvals fetched');
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to fetch approvals');
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const testApproveRequest = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('✅ Approving request:', eventId);
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: eventId,
+        action: 'approve'
+      });
+      
+      setResult({
+        ok: response.data.ok !== false,
+        status: 200,
+        data: response.data,
+        endpoint: 'approveResourceRequest'
+      });
+      
+      if (response.data.ok !== false) {
+        toast.success('Request approved!');
+      } else {
+        toast.error(response.data.error || 'Approval failed');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to approve: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const testDenyRequest = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('❌ Denying request:', eventId);
+      const response = await base44.functions.invoke('denyResourceRequest', {
+        request_id: eventId
+      });
+      
+      setResult({
+        ok: response.data.success || response.data.ok,
+        status: 200,
+        data: response.data,
+        endpoint: 'denyResourceRequest'
+      });
+      
+      if (response.data.success || response.data.ok) {
+        toast.success('Request denied');
+      } else {
+        toast.error(response.data.error || 'Denial failed');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to deny: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
@@ -312,7 +416,7 @@ export default function PCOAPITester() {
           )}
           {events.length > 0 ? (
             <div className="space-y-2">
-              {events.slice(0, 10).map((event, idx) => {
+              {events.map((event, idx) => {
                 const eventId = event.relationships?.event?.data?.id;
                 const eventResources = resourcesData.find(r => r.eventId === eventId);
                 const resources = eventResources?.resources || [];
@@ -320,11 +424,6 @@ export default function PCOAPITester() {
                 
                 return <EventCard key={idx} event={event} resources={resources} included={included} eventId={eventId} />;
               })}
-              {events.length > 10 && (
-                <p className="text-sm text-slate-500 text-center">
-                  + {events.length - 10} more events (see full JSON below)
-                </p>
-              )}
             </div>
           ) : (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -533,6 +632,52 @@ export default function PCOAPITester() {
       );
     }
 
+    // Approvals tab results
+    if (result.endpoint === 'getMyPendingApprovals' || result.endpoint === 'approveResourceRequest' || result.endpoint === 'denyResourceRequest') {
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">
+            {result.endpoint === 'getMyPendingApprovals' ? `My Pending Approvals: ${data.approvals?.length || 0}` : ''}
+            {result.endpoint === 'approveResourceRequest' ? 'Approval Request Result' : ''}
+            {result.endpoint === 'denyResourceRequest' ? 'Denial Request Result' : ''}
+          </h3>
+          {data.approvals && data.approvals.length > 0 ? (
+            <div className="space-y-2">
+              {data.approvals.map((approval, idx) => (
+                <Card key={idx} className="bg-slate-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-slate-900">{approval.event_name || 'Unnamed Event'}</h4>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Resource: {approval.resource_name || 'Unknown'} (x{approval.quantity || 1})
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Starts: {approval.starts_at ? new Date(approval.starts_at).toLocaleString() : 'Unknown'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Request ID</p>
+                        <p className="text-sm font-mono text-blue-600">{approval.id}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            (result.endpoint === 'getMyPendingApprovals' && <p className="text-slate-500">No pending approvals found.</p>)
+          )}
+          {result.endpoint !== 'getMyPendingApprovals' && data.message && (
+             <p className="text-slate-700">{data.message}</p>
+          )}
+          {result.endpoint !== 'getMyPendingApprovals' && data.error && (
+             <p className="text-red-700">Error: {data.error}</p>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -585,10 +730,11 @@ export default function PCOAPITester() {
         </div>
 
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="groups">Approval Groups</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
             <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
 
@@ -706,6 +852,64 @@ export default function PCOAPITester() {
             </Card>
           </TabsContent>
 
+          {/* NEW: Approvals Tab */}
+          <TabsContent value="approvals" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  Test Approval Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Get My Pending Approvals</Label>
+                  <Button onClick={testGetMyApprovals} disabled={testLoading} className="w-full">
+                    {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Fetch My Approvals
+                  </Button>
+                  <p className="text-xs text-slate-500">
+                    Gets all pending approvals assigned to you from the database
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-2">
+                  <Label>Approve Request</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Request ID"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                    />
+                    <Button onClick={testApproveRequest} disabled={testLoading} className="bg-green-600 hover:bg-green-700">
+                      {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Approve a specific resource request (you must be in the approval group)
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-2">
+                  <Label>Deny Request</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Request ID"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                    />
+                    <Button onClick={testDenyRequest} disabled={testLoading} variant="destructive">
+                      {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Deny a specific resource request (you must be in the approval group)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Custom Tab */}
           <TabsContent value="custom" className="space-y-4">
             <Card>
@@ -761,7 +965,7 @@ export default function PCOAPITester() {
                   {/* Summary Stats */}
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-semibold text-blue-900 mb-2">
-                      Found {result.data?.data?.length || 0} items
+                      Found {result.data?.data?.length || result.data?.approvals?.length || 0} items
                     </p>
                     {result.data?.meta && (
                       <p className="text-xs text-blue-700">
