@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -99,7 +100,7 @@ async function getAccessTimeForEvent(eventId, accessToken) {
     }
 }
 
-async function fetchAllPages(url, accessToken, maxPages = 5) {
+async function fetchAllPages(url, accessToken, maxPages = 3) {
     let allData = [];
     let currentUrl = url;
     let pageCount = 0;
@@ -242,17 +243,19 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Step 4: Get ALL future event instances (increased pagination)
-        console.log('📞 Step 4: Fetching ALL future event instances...');
+        // Step 4: Get event instances for the next week only
+        console.log('📞 Step 4: Fetching event instances for the next week...');
         
         const now = new Date();
-        const threeWeeksFromNow = new Date(now);
-        threeWeeksFromNow.setDate(threeWeeksFromNow.getDate() + 21);
+        const oneWeekFromNow = new Date(now);
+        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+        
+        console.log(`📅 Date range: ${now.toISOString()} to ${oneWeekFromNow.toISOString()}`);
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         
-        // Fetch up to 5 pages (500 instances) instead of 3
-        const allInstances = await fetchAllPages(instancesUrl, accessToken, 5);
+        // Fetch up to 3 pages (300 instances) - reduced from 5
+        const allInstances = await fetchAllPages(instancesUrl, accessToken, 3);
         
         console.log('📅 Found', allInstances.length, 'total future event instances');
 
@@ -264,12 +267,6 @@ Deno.serve(async (req) => {
                 message: 'No future events found in PCO Calendar'
             });
         }
-
-        // Build a map of instance_id -> instance for quick lookup
-        const instanceMap = new Map();
-        allInstances.forEach(instance => {
-            instanceMap.set(instance.id, instance);
-        });
 
         // Get unique event IDs
         const eventIds = new Set();
@@ -332,7 +329,7 @@ Deno.serve(async (req) => {
                 if (myRequestedResources.length > 0) {
                     const accessTime = await getAccessTimeForEvent(eventId, accessToken);
                     
-                    // Find instances for this event that are within our time window
+                    // Find instances for this event that are within our 1-week window
                     const eventInstances = allInstances.filter(i => {
                         if (i.relationships?.event?.data?.id !== eventId) return false;
                         
@@ -340,7 +337,7 @@ Deno.serve(async (req) => {
                         if (!startsAt) return false;
                         
                         const startDate = new Date(startsAt);
-                        return startDate >= now && startDate <= threeWeeksFromNow;
+                        return startDate >= now && startDate <= oneWeekFromNow;
                     });
 
                     console.log(`  ✅ Event "${event.attributes?.name}" has ${myRequestedResources.length} my resources, ${eventInstances.length} instances in range`);
@@ -382,7 +379,11 @@ Deno.serve(async (req) => {
             my_groups_count: myGroups.length,
             my_resources_count: myResourceIds.size,
             total_events_checked: processedCount,
-            by_date: byDate
+            by_date: byDate,
+            date_range: {
+                start: now.toISOString(),
+                end: oneWeekFromNow.toISOString()
+            }
         });
 
     } catch (error) {
