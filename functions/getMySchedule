@@ -34,6 +34,8 @@ async function refreshTokenIfNeeded(base44, user) {
 }
 
 Deno.serve(async (req) => {
+    const debugLog = []; // For detailed debugging
+    
     try {
         const base44 = createClientFromRequest(req);
         const currentUser = await base44.auth.me();
@@ -43,48 +45,44 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
 
-        console.log('✅ Getting schedule for:', currentUser.email);
+        debugLog.push({ step: 'user', email: currentUser.email });
 
         const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
         const user = users[0];
 
         if (!user || !user.pco_access_token) {
-            console.log('❌ No PCO token');
-            return Response.json({ events: [], message: 'PCO not connected' });
+            debugLog.push({ step: 'error', message: 'No PCO token' });
+            return Response.json({ events: [], message: 'PCO not connected', debug: debugLog });
         }
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
 
         // Step 1: Get my PCO person ID
-        console.log('📞 Step 1: Getting my PCO person ID...');
         const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
         if (!meResponse.ok) {
-            console.error('❌ Failed to get PCO person ID');
             throw new Error('Failed to get PCO person ID');
         }
 
         const meData = await meResponse.json();
         const myPersonId = meData.data?.id;
-        console.log('👤 My PCO Person ID:', myPersonId);
+        debugLog.push({ step: 'person_id', id: myPersonId });
 
         // Step 2: Get approval groups I'm in
-        console.log('📞 Step 2: Getting approval groups...');
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
         if (!groupsResponse.ok) {
-            console.error('❌ Failed to get approval groups');
             throw new Error('Failed to get approval groups');
         }
 
         const groupsData = await groupsResponse.json();
         const allGroups = groupsData.data || [];
-        console.log('📋 Found', allGroups.length, 'total approval groups');
+        debugLog.push({ step: 'total_groups', count: allGroups.length });
 
         // Check which groups I'm in
         const myGroups = [];
@@ -99,7 +97,6 @@ Deno.serve(async (req) => {
                 const isMember = membersData.data?.some(m => m.id === myPersonId);
                 
                 if (isMember) {
-                    console.log('✅ Member of group:', group.attributes?.name);
                     myGroups.push({
                         id: group.id,
                         name: group.attributes?.name
@@ -108,20 +105,20 @@ Deno.serve(async (req) => {
             }
         }
 
-        console.log('📋 I am in', myGroups.length, 'approval groups');
+        debugLog.push({ step: 'my_groups', count: myGroups.length, groups: myGroups.map(g => g.name) });
 
         if (myGroups.length === 0) {
-            console.log('⚠️ Not in any approval groups - returning empty');
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'You are not in any approval groups'
+                message: 'You are not in any approval groups',
+                debug: debugLog
             });
         }
 
         // Step 3: Get resources for my groups
-        console.log('📞 Step 3: Getting resources for my groups...');
         const myResourceIds = new Set();
+        const myResources = []; // For debugging
         
         for (const group of myGroups) {
             const resourcesResponse = await fetch(
@@ -133,32 +130,36 @@ Deno.serve(async (req) => {
                 const resourcesData = await resourcesResponse.json();
                 for (const resource of (resourcesData.data || [])) {
                     myResourceIds.add(resource.id);
-                    console.log('🔑 Managing resource:', resource.attributes?.name);
+                    myResources.push({
+                        id: resource.id,
+                        name: resource.attributes?.name,
+                        group: group.name
+                    });
                 }
             }
         }
 
-        console.log('📊 Managing', myResourceIds.size, 'resources total');
+        debugLog.push({ 
+            step: 'my_resources', 
+            count: myResourceIds.size, 
+            resources: myResources 
+        });
 
         if (myResourceIds.size === 0) {
-            console.log('⚠️ No resources to manage - returning empty');
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'No resources assigned to your approval groups'
+                message: 'No resources assigned to your approval groups',
+                debug: debugLog
             });
         }
 
-        // Step 4: Get ALL future event instances
-        console.log('📞 Step 4: Fetching future event instances...');
-        
+        // Step 4: Get ALL future event instances (REMOVED 30 LIMIT)
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
         
         const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
-        
-        console.log('🔗 Fetching:', instancesUrl);
         
         const instancesResponse = await fetch(instancesUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -166,21 +167,20 @@ Deno.serve(async (req) => {
 
         if (!instancesResponse.ok) {
             const errorText = await instancesResponse.text();
-            console.error('❌ Failed to fetch event instances:', instancesResponse.status, errorText);
-            throw new Error('Failed to fetch event instances');
+            throw new Error('Failed to fetch event instances: ' + errorText);
         }
 
         const instancesData = await instancesResponse.json();
         const allInstances = instancesData.data || [];
         
-        console.log('📅 Found', allInstances.length, 'total future event instances');
+        debugLog.push({ step: 'instances', count: allInstances.length });
 
         if (allInstances.length === 0) {
-            console.log('⚠️ No future events found in PCO Calendar');
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'No future events found in PCO Calendar'
+                message: 'No future events found in PCO Calendar',
+                debug: debugLog
             });
         }
 
@@ -191,15 +191,14 @@ Deno.serve(async (req) => {
             if (eventId) eventIds.add(eventId);
         });
 
-        console.log('📊 Found', eventIds.size, 'unique events');
+        debugLog.push({ step: 'unique_events', count: eventIds.size });
 
-        // Step 5: For each event, check if it uses any of my resources
-        console.log('📞 Step 5: Checking which events use my resources...');
-        
+        // Step 5: Process ALL events (removed limit)
         const eventsWithMyResources = [];
+        const skippedEvents = []; // Track why events were skipped
         
-        // OPTIMIZED: Process in smaller batches and limit total events
-        const eventIdArray = Array.from(eventIds).slice(0, 30); // Only process first 30 events
+        const eventIdArray = Array.from(eventIds); // REMOVED .slice(0, 30)
+        debugLog.push({ step: 'processing_events', count: eventIdArray.length });
         
         for (const eventId of eventIdArray) {
             try {
@@ -215,7 +214,10 @@ Deno.serve(async (req) => {
                     )
                 ]);
 
-                if (!eventResponse.ok || !requestsResponse.ok) continue;
+                if (!eventResponse.ok || !requestsResponse.ok) {
+                    skippedEvents.push({ eventId, reason: 'fetch_failed' });
+                    continue;
+                }
 
                 const eventData = await eventResponse.json();
                 const requestsData = await requestsResponse.json();
@@ -223,19 +225,27 @@ Deno.serve(async (req) => {
 
                 // Check if any requested resources are mine
                 const myRequestedResources = [];
+                const allRequestedResources = []; // For debugging
                 let accessTime = null;
                 
                 for (const request of (requestsData.data || [])) {
                     const resourceId = request.relationships?.resource?.data?.id;
+                    const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
+                    
+                    allRequestedResources.push({
+                        id: resourceId,
+                        name: resource?.attributes?.name || 'Unknown',
+                        isMyResource: myResourceIds.has(resourceId)
+                    });
+                    
                     if (myResourceIds.has(resourceId)) {
-                        const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
                         myRequestedResources.push({
                             id: resourceId,
                             name: resource?.attributes?.name || 'Unknown',
                             approval_status: request.attributes?.approval_status
                         });
 
-                        // OPTIMIZED: Get access time from answers if available (in one call)
+                        // Get access time from answers if available
                         if (!accessTime && request.id) {
                             try {
                                 const answersResponse = await fetch(
@@ -282,66 +292,88 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                if (myRequestedResources.length > 0) {
-                    // Find instances for this event
-                    const eventInstances = allInstances.filter(i => 
-                        i.relationships?.event?.data?.id === eventId
-                    );
+                if (myRequestedResources.length === 0) {
+                    skippedEvents.push({ 
+                        eventId, 
+                        name: event.attributes?.name,
+                        reason: 'no_matching_resources',
+                        requested: allRequestedResources
+                    });
+                    continue;
+                }
 
-                    for (const instance of eventInstances) {
-                        const startsAt = instance.attributes?.starts_at;
-                        const endsAt = instance.attributes?.ends_at;
-                        
-                        if (!startsAt) continue;
-                        
-                        const startDate = new Date(startsAt);
-                        if (startDate > twoWeeksFromNow) continue;
+                // Find instances for this event
+                const eventInstances = allInstances.filter(i => 
+                    i.relationships?.event?.data?.id === eventId
+                );
 
-                        eventsWithMyResources.push({
-                            id: instance.id,
-                            event_id: eventId,
-                            name: event.attributes?.name || 'Untitled Event',
-                            starts_at: startsAt,
-                            ends_at: endsAt,
-                            summary: event.attributes?.summary,
-                            resources: myRequestedResources,
-                            access_time: accessTime
-                        });
+                if (eventInstances.length === 0) {
+                    skippedEvents.push({ eventId, reason: 'no_instances' });
+                    continue;
+                }
+
+                for (const instance of eventInstances) {
+                    const startsAt = instance.attributes?.starts_at;
+                    const endsAt = instance.attributes?.ends_at;
+                    
+                    if (!startsAt) {
+                        skippedEvents.push({ eventId, reason: 'no_start_date' });
+                        continue;
                     }
+                    
+                    const startDate = new Date(startsAt);
+                    if (startDate > twoWeeksFromNow) {
+                        skippedEvents.push({ 
+                            eventId, 
+                            name: event.attributes?.name,
+                            reason: 'beyond_2_weeks',
+                            date: startsAt 
+                        });
+                        continue;
+                    }
+
+                    eventsWithMyResources.push({
+                        id: instance.id,
+                        event_id: eventId,
+                        name: event.attributes?.name || 'Untitled Event',
+                        starts_at: startsAt,
+                        ends_at: endsAt,
+                        summary: event.attributes?.summary,
+                        resources: myRequestedResources,
+                        access_time: accessTime
+                    });
                 }
             } catch (error) {
                 console.error('❌ Error processing event', eventId, ':', error);
+                skippedEvents.push({ eventId, reason: 'error', error: error.message });
             }
         }
 
         // Sort by start date
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        console.log('🎯 Returning', eventsWithMyResources.length, 'events');
-        
-        if (eventsWithMyResources.length > 0) {
-            console.log('📋 First few:', eventsWithMyResources.slice(0, 3).map(e => ({
-                name: e.name,
-                date: new Date(e.starts_at).toLocaleDateString(),
-                resources: e.resources.length,
-                access_time: e.access_time
-            })));
-        }
+        debugLog.push({ 
+            step: 'final', 
+            included: eventsWithMyResources.length,
+            skipped: skippedEvents.length,
+            skipped_details: skippedEvents.slice(0, 10) // Show first 10 skipped
+        });
 
         return Response.json({
             events: eventsWithMyResources,
             count: eventsWithMyResources.length,
             my_groups_count: myGroups.length,
-            my_resources_count: myResourceIds.size
+            my_resources_count: myResourceIds.size,
+            debug: debugLog
         });
 
     } catch (error) {
         console.error('❌ Get my schedule error:', error);
-        console.error('❌ Error stack:', error.stack);
+        debugLog.push({ step: 'error', error: error.message, stack: error.stack });
         return Response.json({
             error: error.message,
             events: [],
-            details: error.stack
+            debug: debugLog
         }, { status: 500 });
     }
 });
