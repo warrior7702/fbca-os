@@ -358,6 +358,38 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Diagnose PCO Connection
+  const testDiagnosePCOConnection = async () => {
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔬 Running PCO connection diagnostic...');
+      const response = await base44.functions.invoke('diagnosePCOConnection');
+      
+      setResult({
+        ok: response.data.ok !== false,
+        status: 200,
+        data: response.data,
+        endpoint: 'diagnosePCOConnection'
+      });
+      
+      if (response.data.ok !== false) {
+        toast.success('Connection diagnostic complete!');
+      } else {
+        toast.error('Connection diagnostic failed');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to run diagnostic: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // NEW: Lookup specific PCO user by ID
   const testLookupUser = async () => {
     if (!lookupUserId) {
@@ -915,6 +947,106 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Connection Diagnostic Results
+    if (result.endpoint === 'diagnosePCOConnection') {
+      const diag = data.diagnostics;
+      const verdict = diag?.verdict;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔬 PCO Connection Diagnostic</h3>
+          
+          {/* OAuth Credentials Check */}
+          {diag?.oauth_credentials && (
+            <Card className="border-2 border-blue-300 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-base">OAuth App Credentials</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="font-semibold">PCO_CLIENT_ID:</div>
+                    <div className="font-mono text-xs">{diag.oauth_credentials.PCO_CLIENT_ID}</div>
+                    <div className="font-semibold">PCO_APP_ID2:</div>
+                    <div className="font-mono text-xs">{diag.oauth_credentials.PCO_APP_ID2}</div>
+                  </div>
+                  <div className="mt-3 p-2 bg-white rounded border">
+                    <p className="font-semibold mb-1">Which credentials are set:</p>
+                    {Object.entries(diag.oauth_credentials.which_is_set).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        {value ? <CheckCircle className="w-3 h-3 text-green-600" /> : <XCircle className="w-3 h-3 text-red-600" />}
+                        <span className="font-mono text-xs">{key}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Test Results */}
+          {verdict && (
+            <Card className={`border-2 ${verdict.ids_match ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {verdict.ids_match ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
+                  Token Test Results
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-2 bg-white rounded border">
+                      <p className="text-xs text-slate-500">Calendar /me</p>
+                      <p className="font-mono font-semibold">{verdict.calendar_me_id || 'N/A'}</p>
+                    </div>
+                    <div className="p-2 bg-white rounded border">
+                      <p className="text-xs text-slate-500">Token writes as</p>
+                      <p className="font-mono font-semibold text-red-700">{verdict.token_writes_as || 'N/A'}</p>
+                    </div>
+                  </div>
+                  
+                  <Alert className={verdict.problem.includes('3566727') ? 'border-red-300 bg-red-50' : 'bg-blue-50 border-blue-200'}>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Problem:</strong> {verdict.problem}
+                    </AlertDescription>
+                  </Alert>
+
+                  {diag.token_introspection && (
+                    <div className="mt-3 p-3 bg-white rounded border">
+                      <p className="text-sm font-semibold mb-2">Token Introspection:</p>
+                      <pre className="text-xs overflow-auto">
+                        {JSON.stringify(diag.token_introspection, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Diagnostic Steps Log */}
+          {diag?.steps && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Diagnostic Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 font-mono text-xs max-h-64 overflow-y-auto">
+                  {diag.steps.map((step, idx) => (
+                    <div key={idx} className={`${step.includes('❌') ? 'text-red-600' : step.includes('✅') ? 'text-green-600' : 'text-slate-600'}`}>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    }
+
     // NEW: User Lookup Results
     if (result.endpoint === 'lookupUser') {
       const userId = data.user_id;
@@ -1240,6 +1372,25 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* NEW: Connection Diagnostic Section - AT THE TOP */}
+                <div className="border-2 border-orange-300 bg-orange-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-orange-900">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                    <strong>🔥 Diagnose Connection Issue</strong>
+                  </Label>
+                  <p className="text-sm text-orange-800">
+                    This will show EXACTLY which OAuth app your token is from and which user ID it writes as.
+                  </p>
+                  <Button 
+                    onClick={testDiagnosePCOConnection} 
+                    disabled={testLoading} 
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <AlertCircle className="w-4 h-4 mr-2" />}
+                    Run Connection Diagnostic
+                  </Button>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Get My Pending Approvals</Label>
                   <Button onClick={testGetMyApprovals} disabled={testLoading} className="w-full">
