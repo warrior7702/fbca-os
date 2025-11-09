@@ -27,6 +27,7 @@ import Calendar from './pages/Calendar';
 import SupportTickets from './pages/SupportTickets';
 import CreateTicket from './pages/CreateTicket';
 import PCOAPITester from './pages/PCOAPITester';
+import PhantomUserHunter from './pages/PhantomUserHunter';
 import Layout from './Layout.jsx';
 
 
@@ -60,6 +61,7 @@ export const PAGES = {
     "SupportTickets": SupportTickets,
     "CreateTicket": CreateTicket,
     "PCOAPITester": PCOAPITester,
+    "PhantomUserHunter": PhantomUserHunter,
 }
 
 export const pagesConfig = {
