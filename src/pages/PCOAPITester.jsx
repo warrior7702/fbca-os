@@ -326,6 +326,46 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Force approve with user 149670080
+  const testForceApproveAs149670080 = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🧪 Force approving as user 149670080:', eventId);
+      const response = await base44.functions.invoke('forceApproveAs149670080', {
+        request_id: eventId,
+        action: 'approve'
+      });
+      
+      setResult({
+        ok: response.data.ok !== false,
+        status: 200,
+        data: response.data,
+        endpoint: 'forceApproveAs149670080'
+      });
+      
+      if (response.data.ok !== false) {
+        toast.success('🎉 Force approval SUCCESS!');
+      } else {
+        toast.error(response.data.error || 'Force approval failed');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // NEW: Diagnose PCO Token function
   const testDiagnosePCOToken = async () => {
     setTestLoading(true);
@@ -827,13 +867,14 @@ export default function PCOAPITester() {
     }
 
     // Approvals tab results
-    if (result.endpoint === 'getMyPendingApprovals' || result.endpoint === 'approveResourceRequest' || result.endpoint === 'denyResourceRequest') {
+    if (result.endpoint === 'getMyPendingApprovals' || result.endpoint === 'approveResourceRequest' || result.endpoint === 'denyResourceRequest' || result.endpoint === 'forceApproveAs149670080') {
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">
             {result.endpoint === 'getMyPendingApprovals' ? `My Pending Approvals: ${data.approvals?.length || 0}` : ''}
             {result.endpoint === 'approveResourceRequest' ? 'Approval Request Result' : ''}
             {result.endpoint === 'denyResourceRequest' ? 'Denial Request Result' : ''}
+            {result.endpoint === 'forceApproveAs149670080' ? 'Force Approval Request Result' : ''}
           </h3>
           {data.approvals && data.approvals.length > 0 ? (
             <div className="space-y-2">
@@ -1566,7 +1607,41 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* NEW: Deep Diagnostic - AT THE VERY TOP */}
+                {/* NEW: 🧪 FORCE APPROVE TEST - AT THE VERY TOP */}
+                <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-purple-900">
+                    <AlertCircle className="w-6 h-6 text-purple-600" />
+                    <strong className="text-lg">🧪 FORCE APPROVE TEST - Use User ID 149670080</strong>
+                  </Label>
+                  <p className="text-sm text-purple-800">
+                    This will FORCE the approval to use user ID 149670080 (your actual Calendar user ID).
+                    If this works but normal approval doesn't, we know the issue is PCO defaulting to wrong user.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Input
+                      placeholder="Request ID"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testForceApproveAs149670080} 
+                      disabled={testLoading} 
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-12 px-6 text-base font-semibold"
+                    >
+                      {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                      Force Approve as 149670080
+                    </Button>
+                  </div>
+                  <Alert className="bg-purple-100 border-purple-300 mt-3">
+                    <AlertDescription className="text-sm">
+                      <strong>What this tests:</strong> If this succeeds, it proves PCO is accepting approvals from 149670080, 
+                      but your normal token is somehow defaulting to 3566727 for write operations.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                {/* Deep Diagnostic - AT THE VERY TOP */}
                 <div className="border-4 border-red-300 bg-red-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-red-900">
                     <AlertCircle className="w-6 h-6 text-red-600" />
