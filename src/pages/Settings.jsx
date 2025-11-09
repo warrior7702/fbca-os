@@ -285,25 +285,23 @@ export default function Settings() {
     }
   };
 
-  const handleConnectPCO = () => {
-    const vercelUrl = "https://pco-webhook.vercel.app";
-    const appUrl = window.location.origin;
-    const settingsUrl = `${appUrl}/Settings`;
-    const state = user.id;
-    
-    console.log('🔗 Starting PCO connection...');
-    console.log('  - User ID:', state);
-    console.log('  - Redirect back to:', settingsUrl);
-    
-    if (!state) {
-      toast.error('User ID not available. Please refresh and try again.');
-      return;
+  const handleConnectPCO = async () => {
+    try {
+      console.log('🔗 Starting direct PCO connection...');
+      
+      // Call backend to get authorization URL (ensures we use PCO_CLIENT_ID)
+      const response = await base44.functions.invoke('initPCOAuthDirect');
+      
+      if (response.data.ok && response.data.auth_url) {
+        console.log('✅ Redirecting to PCO authorization...');
+        window.location.href = response.data.auth_url;
+      } else {
+        throw new Error(response.data.error || 'Failed to initiate PCO auth');
+      }
+    } catch (error) {
+      console.error('❌ PCO connection error:', error);
+      toast.error('Failed to connect: ' + error.message);
     }
-    
-    const authUrl = `${vercelUrl}/api/pco-auth?state=${encodeURIComponent(state)}&redirect_url=${encodeURIComponent(settingsUrl)}`;
-    
-    console.log('🔗 Redirecting to:', authUrl);
-    window.location.href = authUrl;
   };
 
   const handleDisconnectPCO = async () => {
