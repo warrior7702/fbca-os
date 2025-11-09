@@ -74,6 +74,7 @@ export default function MyApprovals() {
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
   const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
+  const [approvingRequest, setApprovingRequest] = useState(null); // NEW: Track which request is being approved/denied
 
   // New state variables for inline cardholder search
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
@@ -325,17 +326,17 @@ export default function MyApprovals() {
 
   const handleSendCode = async (approval) => {
     const doorCode = doorCodes[approval.request_id];
-    
+
     if (!doorCode || doorCode.trim() === '') {
       toast.error('Please enter a door code');
       return;
     }
 
     setSendingCode(approval.request_id);
-    
+
     try {
       console.log('🚪 Posting door code to PCO event...');
-      
+
       const response = await base44.functions.invoke('writePCONote', {
         event_id: approval.event_id,
         badge_code: doorCode.trim()
@@ -343,13 +344,13 @@ export default function MyApprovals() {
 
       if (response.data.ok) {
         toast.success('Door code posted to event activity in PCO!');
-        
+
         // Update posted door codes state to show the code was posted
         setPostedDoorCodes(prev => ({
           ...prev,
           [approval.request_id]: doorCode.trim()
         }));
-        
+
         setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
         setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
       } else {
@@ -360,6 +361,61 @@ export default function MyApprovals() {
       toast.error('Failed to post door code to PCO');
     } finally {
       setSendingCode(null);
+    }
+  };
+
+  const handleApprove = async (approval) => {
+    setApprovingRequest(approval.request_id);
+    try {
+      console.log('✅ Approving request:', approval.request_id);
+
+      const response = await base44.functions.invoke('approveResourceRequest', {
+        request_id: approval.request_id,
+        action: 'approve'
+      });
+
+      if (response.data.ok !== false) {
+        toast.success(`Approved: ${approval.resource_name}`);
+
+        // Remove from approvals list
+        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      } else {
+        toast.error(response.data.error || 'Failed to approve');
+      }
+    } catch (error) {
+      console.error('❌ Approval error:', error);
+      toast.error('Failed to approve: ' + error.message);
+    } finally {
+      setApprovingRequest(null);
+    }
+  };
+
+  const handleDeny = async (approval) => {
+    if (!confirm(`Are you sure you want to deny the request for "${approval.resource_name}"?`)) {
+      return;
+    }
+
+    setApprovingRequest(approval.request_id);
+    try {
+      console.log('❌ Denying request:', approval.request_id);
+
+      const response = await base44.functions.invoke('denyResourceRequest', {
+        request_id: approval.request_id
+      });
+
+      if (response.data.success || response.data.ok) {
+        toast.success(`Denied: ${approval.resource_name}`);
+
+        // Remove from approvals list
+        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
+      } else {
+        toast.error(response.data.error || 'Failed to deny');
+      }
+    } catch (error) {
+      console.error('❌ Denial error:', error);
+      toast.error('Failed to deny: ' + error.message);
+    } finally {
+      setApprovingRequest(null);
     }
   };
 
@@ -443,7 +499,8 @@ export default function MyApprovals() {
               approvals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
-                const postedCode = postedDoorCodes[approval.request_id]; // Get posted code
+                const postedCode = postedDoorCodes[approval.request_id];
+                const isProcessing = approvingRequest === approval.request_id;
 
                 return (
                   <motion.div
@@ -516,78 +573,112 @@ export default function MyApprovals() {
                           </div>
                         )}
 
-                        <div className="space-y-2 pt-4">
-                          {/* Door Code Input with Inline Search */}
-                          <div className="relative">
-                            <Input
-                              type="text"
-                              placeholder="Type name or door code to search..."
-                              value={cardholderSearchQuery[approval.request_id] || ''}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
-                                handleCardholderSearchChange(approval.request_id, value);
-                              }}
-                              className="w-full"
-                              maxLength={50}
-                              disabled={!!postedCode} // Disable if code already posted
-                            />
-                            {searchingCardholder[approval.request_id] && (
-                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
-                            )}
-                            
-                            {/* Inline Search Results */}
-                            {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                                {cardholderSearchResults[approval.request_id].map((cardholder) => (
-                                  <button
-                                    key={cardholder.id}
-                                    onClick={() => handleSelectCardholder(approval.request_id, cardholder)}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
-                                  >
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-                                      <User className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-semibold text-slate-900">{cardholder.name}</p>
-                                      <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
-                                          <Key className="w-3 h-3" />
-                                          {cardholder.pin}#
-                                        </span>
-                                        {cardholder.member_id && (
-                                          <span className="text-xs text-slate-500">
-                                            • ID: {cardholder.member_id}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                          {/* Door Code Section - Only show for Building Access approvals */}
+                          {approval.resource_name?.toLowerCase().includes('building access') && (
+                            <div className="space-y-2">
+                              <p className="text-sm font-semibold text-slate-700">Door Code (Optional):</p>
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  placeholder="Type name or door code to search..."
+                                  value={cardholderSearchQuery[approval.request_id] || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
+                                    handleCardholderSearchChange(approval.request_id, value);
+                                  }}
+                                  className="w-full"
+                                  maxLength={50}
+                                  disabled={!!postedCode || isProcessing}
+                                />
+                                {searchingCardholder[approval.request_id] && (
+                                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                                )}
 
-                          {/* Action Buttons */}
-                          <div className="flex gap-2">
+                                {/* Inline Search Results */}
+                                {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                                    {cardholderSearchResults[approval.request_id].map((cardholder) => (
+                                      <button
+                                        key={cardholder.id}
+                                        onClick={() => handleSelectCardholder(approval.request_id, cardholder)}
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                                      >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                          <User className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-slate-900">{cardholder.name}</p>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
+                                              <Key className="w-3 h-3" />
+                                              {cardholder.pin}#
+                                            </span>
+                                            {cardholder.member_id && (
+                                              <span className="text-xs text-slate-500">
+                                                • ID: {cardholder.member_id}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <Button
+                                onClick={() => handleSendCode(approval)}
+                                disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode || isProcessing}
+                                variant="outline"
+                                className="w-full"
+                              >
+                                {sendingCode === approval.request_id ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Key className="w-4 h-4 mr-2" />
+                                )}
+                                {postedCode ? 'Code Already Posted' : 'Send Code to PCO'}
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Approval Action Buttons */}
+                          <div className="flex gap-3 pt-2">
                             <Button
-                              onClick={() => handleSendCode(approval)}
-                              disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
+                              onClick={() => handleApprove(approval)}
+                              disabled={isProcessing}
                               className="bg-green-600 hover:bg-green-700 text-white flex-1"
                             >
-                              {sendingCode === approval.request_id ? (
+                              {isProcessing ? (
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                               ) : (
-                                <Key className="w-4 h-4 mr-2" />
+                                <CheckCircle className="w-4 h-4 mr-2" />
                               )}
-                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
+                              Approve
                             </Button>
+
+                            <Button
+                              onClick={() => handleDeny(approval)}
+                              disabled={isProcessing}
+                              variant="destructive"
+                              className="flex-1"
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 mr-2" />
+                              )}
+                              Deny
+                            </Button>
+
                             <Button
                               onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
                               variant="outline"
+                              className="shrink-0"
                             >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              View in PCO
+                              <ExternalLink className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
