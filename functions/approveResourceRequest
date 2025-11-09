@@ -32,17 +32,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user's PCO token
-    const userToken = me?.pco_access_token;
+    // CRITICAL FIX: Get user's PCO token from DATABASE, not from session!
+    // Session object might have stale/cached token
+    console.log('🔍 Fetching fresh token from database...');
+    const users = await base44.asServiceRole.entities.User.filter({ email: me.email });
+    const user = users[0];
     
-    if (!userToken) {
+    if (!user?.pco_access_token) {
       return Response.json(
         { ok: false, error: 'No PCO token. Please reconnect PCO in Settings.' },
         { status: 401 }
       );
     }
 
-    console.log('✅ Using user token for:', me.email);
+    const userToken = user.pco_access_token;
+    console.log('✅ Using FRESH token from database for:', me.email);
+    console.log('📊 Token last 10 chars:', userToken.slice(-10));
 
     // Determine status code
     const statusCode = action === 'approve' ? 'A' : 'R';
