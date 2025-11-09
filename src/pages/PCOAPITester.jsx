@@ -476,6 +476,34 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Deep diagnostic
+  const testDeepDiagnostic = async () => {
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔬 Running DEEP PCO diagnostic...');
+      const response = await base44.functions.invoke('deepPCODiagnostic');
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'deepPCODiagnostic'
+      });
+      
+      toast.success('Deep diagnostic complete!');
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to run diagnostic: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
@@ -1188,6 +1216,172 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Deep diagnostic results
+    if (result.endpoint === 'deepPCODiagnostic') {
+      const report = data.report;
+      const verdict = report?.verdict;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔬 Deep PCO Diagnostic Report</h3>
+          
+          {/* User Info */}
+          {report?.user && (
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <p className="text-sm"><strong>User:</strong> {report.user.email}</p>
+                <p className="text-sm"><strong>ID:</strong> {report.user.id}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Info */}
+          {report?.token_info && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Token Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-slate-500">Token (last 10):</span>
+                    <p className="font-mono">{report.token_info.last_10_chars}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Stored PCO User ID:</span>
+                    <p className="font-mono">{report.token_info.stored_pco_user_id || 'null'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Expires:</span>
+                    <p>{report.token_info.expires_at ? new Date(report.token_info.expires_at).toLocaleString() : 'unknown'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Length:</span>
+                    <p>{report.token_info.token_length} chars</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Environment */}
+          {report?.environment && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Environment Credentials</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm font-mono">
+                <div className="flex justify-between">
+                  <span>PCO_CLIENT_ID:</span>
+                  <span>{report.environment.PCO_CLIENT_ID}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>PCO_CLIENT_SECRET:</span>
+                  <span>{report.environment.PCO_CLIENT_SECRET}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>PCO_APP_ID2:</span>
+                  <span className={report.environment.PCO_APP_ID2 !== 'NOT SET' ? 'text-orange-600' : ''}>
+                    {report.environment.PCO_APP_ID2}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>PCO_SECRET2:</span>
+                  <span className={report.environment.PCO_SECRET2 !== 'NOT SET' ? 'text-orange-600' : ''}>
+                    {report.environment.PCO_SECRET2}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Verdict */}
+          {verdict && (
+            <Card className={`border-2 ${verdict.problem_identified ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {verdict.problem_identified ? (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  )}
+                  {verdict.problem_identified ? 'Problem Identified' : 'Configuration OK'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {verdict.problem && (
+                  <Alert className="border-red-300 bg-red-100">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>{verdict.problem}</strong>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 bg-white rounded">
+                    <span className="text-slate-500">From New App:</span>
+                    <p className={verdict.token_is_from_new_app ? 'text-green-600 font-semibold' : 'text-red-600'}>
+                      {verdict.token_is_from_new_app ? '✅ YES' : '❌ NO'}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-white rounded">
+                    <span className="text-slate-500">From Old App:</span>
+                    <p className={verdict.token_is_from_old_app ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                      {verdict.token_is_from_old_app ? '⚠️ YES' : '✅ NO'}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-white rounded">
+                    <span className="text-slate-500">Writes as User:</span>
+                    <p className="font-mono font-semibold">{verdict.writes_as_user || 'unknown'}</p>
+                  </div>
+                  <div className="p-2 bg-white rounded">
+                    <span className="text-slate-500">Calendar User:</span>
+                    <p className="font-mono">{verdict.calendar_user_id || 'unknown'}</p>
+                  </div>
+                </div>
+
+                {verdict.solution && verdict.solution.length > 0 && (
+                  <div className="mt-3 p-3 bg-white rounded border-l-4 border-orange-500">
+                    <p className="font-semibold text-sm mb-2">🔧 Solution Steps:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-sm">
+                      {verdict.solution.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Diagnostic Log */}
+          {report?.steps && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Diagnostic Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 font-mono text-xs max-h-96 overflow-y-auto bg-slate-900 text-slate-100 p-4 rounded">
+                  {report.steps.map((step, idx) => (
+                    <div key={idx} className={`${
+                      step.includes('❌') ? 'text-red-400' : 
+                      step.includes('✅') ? 'text-green-400' : 
+                      step.includes('⚠️') ? 'text-yellow-400' :
+                      step.includes('🔧') ? 'text-orange-400' :
+                      'text-slate-300'
+                    }`}>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1372,7 +1566,27 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* NEW: Connection Diagnostic Section - AT THE TOP */}
+                {/* NEW: Deep Diagnostic - AT THE VERY TOP */}
+                <div className="border-4 border-red-300 bg-red-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-red-900">
+                    <AlertCircle className="w-6 h-6 text-red-600" />
+                    <strong className="text-lg">🔥 DEEP DIAGNOSTIC - RUN THIS FIRST!</strong>
+                  </Label>
+                  <p className="text-sm text-red-800">
+                    This will show EXACTLY which OAuth app issued your token, which user it writes as,
+                    and give you step-by-step instructions to fix the problem.
+                  </p>
+                  <Button 
+                    onClick={testDeepDiagnostic} 
+                    disabled={testLoading} 
+                    className="w-full bg-red-600 hover:bg-red-700 text-white h-12 text-base font-semibold"
+                  >
+                    {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                    Run Deep Diagnostic
+                  </Button>
+                </div>
+
+                {/* Connection Diagnostic Section */}
                 <div className="border-2 border-orange-300 bg-orange-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-orange-900">
                     <AlertCircle className="w-5 h-5 text-orange-600" />
@@ -1436,7 +1650,7 @@ export default function PCOAPITester() {
                   </p>
                 </div>
 
-                {/* NEW: Token Diagnostic Section */}
+                {/* Token Diagnostic Section */}
                 <div className="border-t pt-4 space-y-2">
                   <Label className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-purple-600" />
@@ -1458,7 +1672,7 @@ export default function PCOAPITester() {
                   </Alert>
                 </div>
 
-                {/* NEW: User ID Lookup Section */}
+                {/* User ID Lookup Section */}
                 <div className="border-t pt-4 space-y-2">
                   <Label className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-blue-600" />
