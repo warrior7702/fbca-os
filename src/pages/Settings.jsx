@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -304,6 +304,35 @@ export default function Settings() {
     }
   };
 
+  // NEW: Force reconnect PCO (wipes token and starts fresh)
+  const handleForceReconnectPCO = async () => {
+    if (!confirm('⚠️ This will completely disconnect and reconnect PCO with a fresh token. Continue?')) {
+      return;
+    }
+
+    try {
+      console.log('🔄 Force reconnecting PCO...');
+      toast.loading('Wiping old tokens and reconnecting...', { id: 'reconnect' });
+      
+      const response = await base44.functions.invoke('forceReconnectPCO');
+      
+      if (response.data.ok && response.data.auth_url) {
+        console.log('✅ Tokens wiped! Redirecting to fresh OAuth...');
+        toast.success('Tokens wiped! Reconnecting...', { id: 'reconnect' });
+        
+        // Small delay then redirect
+        setTimeout(() => {
+          window.location.href = response.data.auth_url;
+        }, 500);
+      } else {
+        throw new Error(response.data.error || 'Failed to initiate PCO force reconnect');
+      }
+    } catch (error) {
+      console.error('❌ Force reconnect error:', error);
+      toast.error('Failed to force reconnect: ' + (error.message || 'Unknown error'), { id: 'reconnect' });
+    }
+  };
+
   const handleDisconnectPCO = async () => {
     try {
       await base44.auth.updateMe({
@@ -489,6 +518,35 @@ export default function Settings() {
                       }}
                     >
                       Reconnect Microsoft 365
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* NEW: PCO Token Issue Warning */}
+            {user?.pco_access_token && (
+              <div className="mb-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-red-900 mb-1">🚨 PCO Token Issue Detected</h3>
+                    <p className="text-sm text-red-800 mb-2">
+                      Your PCO token is reading as user <strong>149670080</strong> but writing as <strong>3566727</strong>.
+                      This causes approvals to fail with "User with id 3566727" errors.
+                    </p>
+                    <p className="text-sm text-red-800 mb-3">
+                      <strong>Solution:</strong> Force a complete reconnection to get a fresh token.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleForceReconnectPCO}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      Force Reconnect PCO (Fix Token Issue)
                     </Button>
                   </div>
                 </div>
