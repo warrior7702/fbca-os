@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=pco_auth_failed`
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Dashboard?error=pco_auth_failed`
                 }
             });
         }
@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=missing_params`
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Dashboard?error=missing_params`
                 }
             });
         }
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=token_exchange_failed`
+                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Dashboard?error=token_exchange_failed`
                 }
             });
         }
@@ -110,11 +110,11 @@ Deno.serve(async (req) => {
 
         console.log('✅ User updated with tokens');
 
-        // Redirect back to Settings page with success message
+        // Redirect back to Dashboard with success message
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?connected=pco`
+                'Location': `${Deno.env.get('BASE44_APP_URL')}/Dashboard?connected=pco`
             }
         });
 
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=callback_failed`
+                'Location': `${Deno.env.get('BASE44_APP_URL')}/Dashboard?error=callback_failed`
             }
         });
     }
