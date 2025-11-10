@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +16,14 @@ import {
   MapPin,
   Users,
   Key,
-  User // Added User icon for cardholder search results
+  User,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-// Removed CardholderLookup import as it's no longer used
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -63,6 +62,61 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
   );
 };
 
+// Smart code extraction from event data
+const extractSmartSuggestion = (approval, answers) => {
+  const eventName = (approval.event_name || '').toLowerCase();
+  const resourceName = (approval.resource_name || '').toLowerCase();
+  
+  // Combine all text sources
+  const allText = [
+    eventName,
+    resourceName,
+    ...(answers || []).map(a => `${a.question} ${a.answer}`.toLowerCase())
+  ].join(' ');
+  
+  console.log('🧠 Smart analyzing:', allText);
+  
+  // 1. Look for explicit 6-digit codes
+  const codeMatch = allText.match(/\b(\d{6})\b/);
+  if (codeMatch) {
+    console.log('✅ Found explicit code:', codeMatch[1]);
+    return { code: codeMatch[1], reason: 'found in event details' };
+  }
+  
+  // 2. Look for "unlock" keyword
+  if (allText.includes('unlock')) {
+    console.log('✅ Found "unlock" keyword');
+    return { search: 'unlock', reason: 'unlock keyword detected' };
+  }
+  
+  // 3. Look for building keywords
+  const buildingKeywords = {
+    'pcb': 'PCB',
+    'preschool': 'PCB',
+    'pre-school': 'PCB',
+    'fbc': 'FBC',
+    'main building': 'FBC',
+    'first baptist': 'FBC',
+    'wade': 'WADE',
+    'wade center': 'WADE',
+    'sb': 'SB',
+    'sc': 'SB',
+    'student building': 'SB',
+    'student center': 'SB'
+  };
+  
+  for (const [keyword, building] of Object.entries(buildingKeywords)) {
+    if (allText.includes(keyword)) {
+      console.log('✅ Found building keyword:', keyword, '→', building);
+      return { search: building, reason: `${building} building detected` };
+    }
+  }
+  
+  // 4. Default to "building access" search
+  console.log('📍 Defaulting to building access search');
+  return { search: 'unlock', reason: 'building access request' };
+};
+
 export default function MyApprovals() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,14 +127,11 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
-
-  // New state variables for inline cardholder search
+  const [postedDoorCodes, setPostedDoorCodes] = useState({});
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
   const [cardholderSearchResults, setCardholderSearchResults] = useState({});
   const [searchingCardholder, setSearchingCardholder] = useState({});
-
-  // Removed: showCardholderLookup and currentApprovalForLookup states as they are replaced by inline search
+  const [smartSuggestions, setSmartSuggestions] = useState({});
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -146,9 +197,16 @@ export default function MyApprovals() {
   useEffect(() => {
     if (approvals.length > 0) {
       loadAllAnswerPreviews();
-      loadPostedDoorCodes(); // NEW: Load door codes that were already posted
+      loadPostedDoorCodes();
     }
   }, [approvals]);
+
+  // NEW: Auto-suggest codes when answers are loaded
+  useEffect(() => {
+    if (Object.keys(answerPreviews).length > 0) {
+      autoSuggestCodes();
+    }
+  }, [answerPreviews]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -220,7 +278,6 @@ export default function MyApprovals() {
     }
   };
 
-  // NEW: Load posted door codes for all approvals
   const loadPostedDoorCodes = async () => {
     for (const approval of approvals) {
       try {
@@ -249,6 +306,39 @@ export default function MyApprovals() {
     }
   };
 
+  // NEW: Auto-suggest codes intelligently
+  const autoSuggestCodes = async () => {
+    console.log('🧠 Starting smart auto-suggest...');
+    
+    for (const approval of approvals) {
+      // Skip if already posted or already has a code
+      if (postedDoorCodes[approval.request_id] || doorCodes[approval.request_id]) {
+        continue;
+      }
+      
+      const answers = answerPreviews[approval.request_id];
+      const suggestion = extractSmartSuggestion(approval, answers);
+      
+      setSmartSuggestions(prev => ({
+        ...prev,
+        [approval.request_id]: suggestion
+      }));
+      
+      // If we found an explicit code, pre-fill it
+      if (suggestion.code) {
+        console.log('✨ Pre-filling code:', suggestion.code);
+        setDoorCodes(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
+        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
+        toast.success(`Smart-filled code: ${suggestion.code}`, { duration: 2000 });
+      }
+      // If we have a search term, auto-search for it
+      else if (suggestion.search) {
+        console.log('🔍 Auto-searching for:', suggestion.search);
+        searchCardholders(approval.request_id, suggestion.search);
+      }
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -258,7 +348,8 @@ export default function MyApprovals() {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
-        setPostedDoorCodes({}); // Clear posted codes cache
+        setPostedDoorCodes({});
+        setSmartSuggestions({});
         setLastSync(new Date());
       }
     } catch (error) {
@@ -269,9 +360,8 @@ export default function MyApprovals() {
     }
   };
 
-  // New searchCardholders function
   const searchCardholders = async (requestId, query) => {
-    if (!query || query.length < 2) { // Only search if query is at least 2 characters long
+    if (!query || query.length < 2) {
       setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
       return;
     }
@@ -281,7 +371,7 @@ export default function MyApprovals() {
     try {
       const response = await base44.functions.invoke('cardholdersSearch', {
         q: query,
-        limit: 5 // Limiting results to 5 for better UX
+        limit: 5
       });
 
       if (response.data.ok) {
@@ -302,25 +392,22 @@ export default function MyApprovals() {
     }
   };
 
-  // New handleCardholderSearchChange function with debouncing
   const handleCardholderSearchChange = (requestId, value) => {
     setCardholderSearchQuery(prev => ({ ...prev, [requestId]: value }));
 
-    // Debounce search to avoid too many API calls
     if (window.cardholderSearchTimeout) {
       clearTimeout(window.cardholderSearchTimeout);
     }
 
     window.cardholderSearchTimeout = setTimeout(() => {
       searchCardholders(requestId, value);
-    }, 300); // 300ms debounce
+    }, 300);
   };
 
-  // New handleSelectCardholder for inline results
   const handleSelectCardholder = (requestId, cardholder) => {
-    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin })); // Set the actual door code
-    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin })); // Update input field with selected PIN
-    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] })); // Clear search results
+    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin }));
+    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin }));
+    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
   };
 
   const handleSendCode = async (approval) => {
@@ -344,14 +431,13 @@ export default function MyApprovals() {
       if (response.data.ok) {
         toast.success('Door code posted to event activity in PCO!');
         
-        // Update posted door codes state to show the code was posted
         setPostedDoorCodes(prev => ({
           ...prev,
           [approval.request_id]: doorCode.trim()
         }));
         
-        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
-        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
+        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' }));
+        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' }));
       } else {
         toast.error(response.data.error || 'Failed to post door code');
       }
@@ -443,7 +529,8 @@ export default function MyApprovals() {
               approvals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
-                const postedCode = postedDoorCodes[approval.request_id]; // Get posted code
+                const postedCode = postedDoorCodes[approval.request_id];
+                const smartSuggestion = smartSuggestions[approval.request_id];
 
                 return (
                   <motion.div
@@ -506,7 +593,16 @@ export default function MyApprovals() {
                           </div>
                         )}
 
-                        {/* Show posted door code if available */}
+                        {/* Smart Suggestion Badge */}
+                        {smartSuggestion && !postedCode && (
+                          <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                            <Sparkles className="w-4 h-4 text-purple-600" />
+                            <span className="text-xs text-purple-700 font-medium">
+                              Smart suggestion: {smartSuggestion.reason}
+                            </span>
+                          </div>
+                        )}
+
                         {postedCode && (
                           <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                             <Key className="w-4 h-4 text-green-600" />
@@ -517,11 +613,10 @@ export default function MyApprovals() {
                         )}
 
                         <div className="space-y-2 pt-4">
-                          {/* Door Code Input with Inline Search */}
                           <div className="relative">
                             <Input
                               type="text"
-                              placeholder="Type name or door code to search..."
+                              placeholder="Type name, code, or building (PCB/FBC/WADE/SB)..."
                               value={cardholderSearchQuery[approval.request_id] || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
@@ -530,13 +625,12 @@ export default function MyApprovals() {
                               }}
                               className="w-full"
                               maxLength={50}
-                              disabled={!!postedCode} // Disable if code already posted
+                              disabled={!!postedCode}
                             />
                             {searchingCardholder[approval.request_id] && (
                               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
                             )}
                             
-                            {/* Inline Search Results */}
                             {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
                               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                                 {cardholderSearchResults[approval.request_id].map((cardholder) => (
@@ -568,7 +662,6 @@ export default function MyApprovals() {
                             )}
                           </div>
 
-                          {/* Action Buttons */}
                           <div className="flex gap-2">
                             <Button
                               onClick={() => handleSendCode(approval)}
@@ -606,7 +699,6 @@ export default function MyApprovals() {
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
-      {/* Removed CardholderLookup modal entirely as its functionality is now inline */}
     </div>
   );
 }
