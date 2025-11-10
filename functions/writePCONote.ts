@@ -27,19 +27,32 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
-    // Format badge code to ensure format is xxxxxx# (6 digits + #)
-    let formattedCode = String(badge_code).replace(/#/g, '').trim(); // Remove any existing #
+    // Clean and format the badge code
+    let formattedCode = String(badge_code).trim();
     console.log('🔢 Original code:', badge_code);
-    console.log('🔢 Cleaned code:', formattedCode);
-
-    if (!/^\d{6}$/.test(formattedCode)) {
-      console.error('❌ Invalid code format:', formattedCode);
-      return Response.json({ 
-        error: 'Invalid door code format. Must be 6 digits.' 
-      }, { status: 400 });
+    
+    // Check if it's "unlock" keyword (case-insensitive)
+    const isUnlock = formattedCode.toLowerCase() === 'unlock';
+    
+    if (isUnlock) {
+      // Keep "unlock" as-is without the #
+      formattedCode = 'unlock';
+      console.log('🔓 Detected unlock keyword - no # needed');
+    } else {
+      // It's a numeric code - validate and add #
+      formattedCode = formattedCode.replace(/#/g, ''); // Remove any existing #
+      console.log('🔢 Cleaned code:', formattedCode);
+      
+      if (!/^\d{6}$/.test(formattedCode)) {
+        console.error('❌ Invalid code format:', formattedCode);
+        return Response.json({ 
+          error: 'Invalid door code format. Must be 6 digits or "unlock".' 
+        }, { status: 400 });
+      }
+      
+      formattedCode = formattedCode + '#'; // Add # at the end for numeric codes
+      console.log('✅ Formatted numeric code:', formattedCode);
     }
-    formattedCode = formattedCode + '#'; // Add # at the end
-    console.log('✅ Formatted code:', formattedCode);
 
     // Get user's PCO OAuth token from database
     console.log('🔍 Fetching user token from database...');
