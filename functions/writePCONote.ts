@@ -36,14 +36,14 @@ Deno.serve(async (req) => {
       formattedCode = formattedCode + '#'; // Add # at the end
     }
 
-    // Get PCO Admin credentials (Personal Access Token)
-    const appId = Deno.env.get('PCO_APP_ID2');
-    const secret = Deno.env.get('PCO_SECRET2');
+    // Get PCO credentials (using main OAuth app)
+    const clientId = Deno.env.get('PCO_CLIENT_ID');
+    const clientSecret = Deno.env.get('PCO_CLIENT_SECRET');
 
-    if (!appId || !secret) {
+    if (!clientId || !clientSecret) {
       return Response.json({
         ok: false,
-        error: 'PCO admin credentials not configured. Please set PCO_APP_ID2 and PCO_SECRET2 in environment variables.'
+        error: 'PCO credentials not configured. Please set PCO_CLIENT_ID and PCO_CLIENT_SECRET in environment variables.'
       }, { status: 500 });
     }
 
@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
     // Create comment text for activity thread - PCO shows who posted it
     const commentText = `🚪 Building Access Approved\n\nDoor Code: ${formattedCode}`;
 
-    // Use Basic Auth with admin credentials - POST a comment to event activity
-    const auth = btoa(`${appId}:${secret}`);
+    // Use Basic Auth with PCO credentials - POST a comment to event activity
+    const auth = btoa(`${clientId}:${clientSecret}`);
 
     const response = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_comments`,
