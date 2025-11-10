@@ -74,7 +74,7 @@ export default function MyApprovals() {
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
   const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
-  const [approvingRequest, setApprovingRequest] = useState(null); // NEW: Track which request is being approved/denied
+  // Removed: approvingRequest state as it's no longer needed
 
   // New state variables for inline cardholder search
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
@@ -364,60 +364,7 @@ export default function MyApprovals() {
     }
   };
 
-  const handleApprove = async (approval) => {
-    setApprovingRequest(approval.request_id);
-    try {
-      console.log('✅ Approving request:', approval.request_id);
-
-      const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.request_id,
-        action: 'approve'
-      });
-
-      if (response.data.ok !== false) {
-        toast.success(`Approved: ${approval.resource_name}`);
-
-        // Remove from approvals list
-        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
-      } else {
-        toast.error(response.data.error || 'Failed to approve');
-      }
-    } catch (error) {
-      console.error('❌ Approval error:', error);
-      toast.error('Failed to approve: ' + error.message);
-    } finally {
-      setApprovingRequest(null);
-    }
-  };
-
-  const handleDeny = async (approval) => {
-    if (!confirm(`Are you sure you want to deny the request for "${approval.resource_name}"?`)) {
-      return;
-    }
-
-    setApprovingRequest(approval.request_id);
-    try {
-      console.log('❌ Denying request:', approval.request_id);
-
-      const response = await base44.functions.invoke('denyResourceRequest', {
-        request_id: approval.request_id
-      });
-
-      if (response.data.success || response.data.ok) {
-        toast.success(`Denied: ${approval.resource_name}`);
-
-        // Remove from approvals list
-        setApprovals(prev => prev.filter(a => a.request_id !== approval.request_id));
-      } else {
-        toast.error(response.data.error || 'Failed to deny');
-      }
-    } catch (error) {
-      console.error('❌ Denial error:', error);
-      toast.error('Failed to deny: ' + error.message);
-    } finally {
-      setApprovingRequest(null);
-    }
-  };
+  // Removed: handleApprove and handleDeny functions
 
   if (loading) {
     return (
@@ -500,7 +447,6 @@ export default function MyApprovals() {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
                 const postedCode = postedDoorCodes[approval.request_id];
-                const isProcessing = approvingRequest === approval.request_id;
 
                 return (
                   <motion.div
@@ -590,7 +536,7 @@ export default function MyApprovals() {
                                   }}
                                   className="w-full"
                                   maxLength={50}
-                                  disabled={!!postedCode || isProcessing}
+                                  disabled={!!postedCode}
                                 />
                                 {searchingCardholder[approval.request_id] && (
                                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
@@ -630,7 +576,7 @@ export default function MyApprovals() {
 
                               <Button
                                 onClick={() => handleSendCode(approval)}
-                                disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode || isProcessing}
+                                disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
                                 variant="outline"
                                 className="w-full"
                               >
@@ -644,43 +590,14 @@ export default function MyApprovals() {
                             </div>
                           )}
 
-                          {/* Approval Action Buttons */}
-                          <div className="flex gap-3 pt-2">
-                            <Button
-                              onClick={() => handleApprove(approval)}
-                              disabled={isProcessing}
-                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                            >
-                              {isProcessing ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                              )}
-                              Approve
-                            </Button>
-
-                            <Button
-                              onClick={() => handleDeny(approval)}
-                              disabled={isProcessing}
-                              variant="destructive"
-                              className="flex-1"
-                            >
-                              {isProcessing ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 mr-2" />
-                              )}
-                              Deny
-                            </Button>
-
-                            <Button
-                              onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
-                              variant="outline"
-                              className="shrink-0"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          {/* Single "Approve in PCO" Button */}
+                          <Button
+                            onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
+                            className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Approve in PCO
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
