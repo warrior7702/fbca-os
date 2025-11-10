@@ -656,11 +656,298 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Investigate specific request
+  const testInvestigateRequest = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    setDetailedTestResult(null);
+    try {
+      console.log('🔍 Investigating request:', eventId);
+      const response = await base44.functions.invoke('investigateSpecificRequest', {
+        request_id: eventId
+      });
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'investigateSpecificRequest'
+      });
+      
+      toast.success('Investigation complete!');
+    } catch (error) {
+      console.error('❌ Investigation error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Investigation failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
 
     const data = result.data;
+
+    // NEW: Specific request investigation results
+    if (result.endpoint === 'investigateSpecificRequest') {
+      const report = data.report;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔍 Request Investigation Results</h3>
+          
+          {/* Verdict */}
+          {report.verdict && (
+            <Card className={`border-2 ${report.verdict.phantom_found ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {report.verdict.phantom_found ? (
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  )}
+                  Verdict
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm mb-2"><strong>{report.verdict.conclusion}</strong></p>
+                {report.verdict.locations?.length > 0 && (
+                  <div className="mt-3 p-3 bg-white rounded border">
+                    <p className="text-sm font-semibold mb-2">Phantom found as:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {report.verdict.locations.map((loc, idx) => (
+                        <li key={idx} className="text-red-700">{loc}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {report.verdict.solution && (
+                  <div className="mt-3 p-3 bg-orange-50 rounded border border-orange-200">
+                    <p className="text-sm font-semibold mb-2">Solution:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {report.verdict.solution.map((sol, idx) => (
+                        <li key={idx}>{sol}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Request Details */}
+          {report.request && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Request Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-slate-500">Request ID:</span>
+                  <p className="font-mono">{report.request.id}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Status:</span>
+                  <p>{report.request.approval_status}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Event ID:</span>
+                  <p className="font-mono">{report.request.event_id}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Resource ID:</span>
+                  <p className="font-mono">{report.request.resource_id}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Created By:</span>
+                  <p className="font-mono">{report.request.created_by_id || 'N/A'}</p>
+                  {report.request.created_by_id === '3566727' && (
+                    <Badge className="bg-red-500 text-white mt-1">PHANTOM!</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Event Details */}
+          {report.event && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Event Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div>
+                  <span className="text-slate-500">Name:</span>
+                  <p className="font-semibold">{report.event.name}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-slate-500">Event ID:</span>
+                    <p className="font-mono">{report.event.id}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Owner ID:</span>
+                    <p className="font-mono">{report.event.owner_id || 'N/A'}</p>
+                    {report.event.owner_id === '3566727' && (
+                      <Badge className="bg-red-500 text-white mt-1">PHANTOM!</Badge>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Created By:</span>
+                    <p className="font-mono">{report.event.created_by_id || 'N/A'}</p>
+                    {report.event.created_by_id === '3566727' && (
+                      <Badge className="bg-red-500 text-white mt-1">PHANTOM!</Badge>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Resource Details */}
+          {report.resource && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Resource Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-slate-500">Name:</span>
+                  <p className="font-semibold">{report.resource.name}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Kind:</span>
+                  <p>{report.resource.kind}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Resource ID:</span>
+                  <p className="font-mono">{report.resource.id}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Created By:</span>
+                  <p className="font-mono">{report.resource.created_by_id || 'N/A'}</p>
+                  {report.resource.created_by_id === '3566727' && (
+                    <Badge className="bg-red-500 text-white mt-1">PHANTOM!</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Phantom User Lookup */}
+          {report.phantom_user && (
+            <Card className={`border-2 ${report.phantom_user.exists ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {report.phantom_user.exists ? (
+                    <CheckCircle className="w-5 h-5 text-orange-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-gray-600" />
+                  )}
+                  User 3566727 Lookup
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {report.phantom_user.exists ? (
+                  <div className="space-y-2 text-sm">
+                    <p className="font-semibold text-orange-900">✅ User 3566727 EXISTS in PCO Calendar!</p>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <div>
+                        <span className="text-slate-500">Name:</span>
+                        <p className="font-medium">{report.phantom_user.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Email:</span>
+                        <p className="font-medium">{report.phantom_user.email}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Status:</span>
+                        <p className="font-medium">{report.phantom_user.status}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Permissions:</span>
+                        <p className="font-medium">{report.phantom_user.permissions || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">❌ User 3566727 does NOT exist in PCO Calendar</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Approval Attempt */}
+          {report.approval_attempt && (
+            <Card className={`border-2 ${report.approval_attempt.ok ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {report.approval_attempt.ok ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  Approval Test Result
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className={report.approval_attempt.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                      HTTP {report.approval_attempt.status}
+                    </Badge>
+                    <span className="text-sm font-semibold">
+                      {report.approval_attempt.ok ? '✅ Approval Succeeded!' : '❌ Approval Failed'}
+                    </span>
+                  </div>
+                  {!report.approval_attempt.ok && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <p className="text-xs font-semibold text-red-700 mb-1">Error Response:</p>
+                      <pre className="text-xs text-red-600 whitespace-pre-wrap font-mono">
+                        {report.approval_attempt.response}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Findings */}
+          {report.findings?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">All Findings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1">
+                  {report.findings.map((finding, idx) => (
+                    <li key={idx} className={`text-sm ${
+                      finding.includes('🚨') ? 'text-red-700 font-semibold' :
+                      finding.includes('✅') ? 'text-green-700' :
+                      finding.includes('❌') ? 'text-red-600' :
+                      'text-slate-700'
+                    }`}>
+                      {finding}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    }
 
     // NEW: Detailed approval test results
     if (result.endpoint === 'testApprovalWithDetails' && detailedTestResult) {
@@ -1717,7 +2004,7 @@ export default function PCOAPITester() {
                       <span className="text-slate-500">Token's Application ID:</span>
                       <p className="font-mono font-semibold">{inv.application_id}</p>
                       {inv.application_id === '3566727' && (
-                        <Badge className="bg-red-100 text-red-700 mt-1">🚨 This is 3566727!</Badge>
+                        <Badge className="bg-red-100 text-white mt-1">🚨 This is 3566727!</Badge>
                       )}
                     </div>
                   )}
@@ -2055,6 +2342,39 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* NEW: INVESTIGATE SPECIFIC REQUEST - AT THE VERY TOP */}
+                <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-purple-900">
+                    <AlertCircle className="w-6 h-6 text-purple-600" />
+                    <strong className="text-lg">🎯 INVESTIGATE SPECIFIC REQUEST - Find the Phantom!</strong>
+                  </Label>
+                  <p className="text-sm text-purple-800">
+                    This will investigate ONE specific request and tell you:<br/>
+                    • Who owns the event (is it 3566727?)<br/>
+                    • Who created the request (is it 3566727?)<br/>
+                    • Who created the resource (is it 3566727?)<br/>
+                    • Whether user 3566727 exists in PCO<br/>
+                    • The EXACT approval error message<br/>
+                    <strong>Use Request ID: 31642685 from Building Access!</strong>
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Input
+                      placeholder="Request ID (e.g., 31642685)"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testInvestigateRequest} 
+                      disabled={testLoading} 
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-12 px-6 text-base font-semibold"
+                    >
+                      {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                      Investigate Request
+                    </Button>
+                  </div>
+                </div>
+
                  {/* NEW: HUNT FOR PHANTOM - AT THE VERY TOP */}
                 <div className="border-4 border-red-300 bg-red-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-red-900">
