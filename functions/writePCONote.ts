@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
     const isUnlock = formattedCode.toLowerCase() === 'unlock';
     
     if (isUnlock) {
-      // Keep "unlock" as-is without the #
-      formattedCode = 'unlock';
-      console.log('🔓 Detected unlock keyword - no # needed');
+      // Keep "Unlock" with capital U, no # needed
+      formattedCode = 'Unlock';
+      console.log('🔓 Detected unlock keyword - formatting as "Unlock"');
     } else {
       // It's a numeric code - validate and add #
       formattedCode = formattedCode.replace(/#/g, ''); // Remove any existing #
