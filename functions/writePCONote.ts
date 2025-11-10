@@ -41,30 +41,31 @@ Deno.serve(async (req) => {
     formattedCode = formattedCode + '#'; // Add # at the end
     console.log('✅ Formatted code:', formattedCode);
 
-    // Get PCO Admin credentials (Personal Access Token)
-    const appId = Deno.env.get('PCO_APP_ID2');
-    const secret = Deno.env.get('PCO_SECRET2');
+    // Get user's PCO OAuth token from database
+    console.log('🔍 Fetching user token from database...');
+    const users = await base44.asServiceRole.entities.User.filter({ email: user.email });
+    const userRecord = users[0];
 
-    console.log('🔑 PCO_APP_ID2 exists:', !!appId);
-    console.log('🔑 PCO_SECRET2 exists:', !!secret);
-
-    if (!appId || !secret) {
-      console.error('❌ Missing PCO admin credentials');
+    if (!userRecord?.pco_access_token) {
+      console.error('❌ No PCO token found for user');
       return Response.json({
         ok: false,
-        error: 'PCO admin credentials not configured. Please set PCO_APP_ID2 and PCO_SECRET2 in environment variables.'
-      }, { status: 500 });
+        error: 'No PCO token. Please reconnect PCO in Settings.'
+      }, { status: 401 });
     }
+
+    const token = userRecord.pco_access_token;
+    console.log('✅ Using user OAuth token');
+    console.log('📊 Token last 10 chars:', token.slice(-10));
 
     console.log('💬 Posting door code to event activity thread');
     console.log('📅 Event ID:', event_id);
     console.log('🚪 Door Code:', formattedCode);
 
-    // Create comment text for activity thread - PCO shows who posted it
+    // Create comment text for activity thread
     const commentText = `🚪 Building Access Approved\n\nDoor Code: ${formattedCode}`;
 
-    // Use Basic Auth with admin credentials - POST a comment to event activity
-    const auth = btoa(`${appId}:${secret}`);
+    // Use Bearer token (user's OAuth token)
     const url = `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_comments`;
     
     console.log('🔗 POST URL:', url);
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
