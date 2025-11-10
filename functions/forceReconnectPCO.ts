@@ -21,18 +21,24 @@ Deno.serve(async (req) => {
 
     console.log('✅ All PCO tokens wiped clean!');
 
-    // Generate fresh OAuth URL
+    // Get environment variables
     const clientId = Deno.env.get('PCO_CLIENT_ID');
-    const appUrl = Deno.env.get('BASE44_APP_URL');
+    const appUrl = Deno.env.get('BASE44_APP_URL') || 'https://fbca-os.base44.app';
     
-    if (!clientId || !appUrl) {
+    if (!clientId) {
       return Response.json({ 
         ok: false, 
-        error: 'Missing PCO_CLIENT_ID or BASE44_APP_URL' 
+        error: 'Missing PCO_CLIENT_ID' 
       }, { status: 500 });
     }
 
+    // Build redirect URI - MUST match what's configured in PCO OAuth app
     const redirectUri = `${appUrl}/api/function/pcoCallback`;
+    
+    console.log('📋 Using PCO_CLIENT_ID:', clientId);
+    console.log('🔗 Redirect URI:', redirectUri);
+
+    // Build OAuth URL
     const authUrl = `https://api.planningcenteronline.com/oauth/authorize?` +
       `client_id=${encodeURIComponent(clientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -40,13 +46,17 @@ Deno.serve(async (req) => {
       `&scope=calendar people` +
       `&state=${encodeURIComponent(me.id)}`;
 
-    console.log('🔗 Generated fresh OAuth URL');
-    console.log('📋 Using PCO_CLIENT_ID:', clientId);
+    console.log('✅ Generated fresh OAuth URL');
 
     return Response.json({
       ok: true,
       message: 'All PCO tokens wiped. Redirect to fresh OAuth flow.',
-      auth_url: authUrl
+      auth_url: authUrl,
+      debug: {
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        app_url: appUrl
+      }
     });
 
   } catch (error) {
