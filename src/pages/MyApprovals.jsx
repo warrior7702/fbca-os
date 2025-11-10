@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,6 +151,25 @@ export default function MyApprovals() {
       return { query: 'wade event', reason: '💡 Detected WADE building' };
     }
     
+    // Check for PCB (Praise & Celebration Building)
+    if (allAnswersText.includes('pcb') || allAnswersText.includes('praise') || 
+        allAnswersText.includes('celebration') || eventName.includes('pcb')) {
+      return { query: 'pcb', reason: '💡 Detected PCB building' };
+    }
+    
+    // Check for FBC (First Baptist Church)
+    if (allAnswersText.includes('fbc') || allAnswersText.includes('first baptist') || 
+        eventName.includes('fbc')) {
+      return { query: 'fbc', reason: '💡 Detected FBC building' };
+    }
+    
+    // Check for SC/SB (Student Center/Student Building)
+    if (allAnswersText.includes(' sc ') || allAnswersText.includes(' sb ') || 
+        allAnswersText.includes('student center') || allAnswersText.includes('student building') ||
+        eventName.includes(' sc ') || eventName.includes(' sb ')) {
+      return { query: 'student', reason: '💡 Detected Student Center/Building' };
+    }
+    
     // Look for specific names or numbers in the answers
     const nameMatch = allAnswersText.match(/\b([A-Z][a-z]+\s[A-Z][a-z]+)\b/);
     if (nameMatch) {
@@ -293,10 +313,14 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
+      console.log('🔄 Syncing approvals from PCO...');
       const response = await base44.functions.invoke('syncMyApprovals');
 
       if (response.data.success) {
-        toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
+        const count = response.data.count || 0;
+        toast.success(`Synced ${count} pending approval${count !== 1 ? 's' : ''}`, {
+          description: count === 0 ? 'All approvals are complete!' : undefined
+        });
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
         setPostedDoorCodes({});
@@ -386,7 +410,7 @@ export default function MyApprovals() {
         }));
 
         setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' }));
-        setCardholderSearchQuery(prev => ({ ...prev, [requestId]: '' }));
+        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Fix: use approval.request_id
       } else {
         toast.error(response.data.error || 'Failed to post door code');
       }
