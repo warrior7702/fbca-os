@@ -12,33 +12,23 @@ Deno.serve(async (req) => {
         console.log('📝 State (user_id):', state);
         console.log('❌ Error:', error);
 
-        // Get base URL from environment or infer from request
-        const baseUrl = Deno.env.get('BASE44_APP_URL') || `${url.protocol}//${url.host}`;
+        // Always use the BASE44_APP_URL from environment (it's set as a secret)
+        const baseUrl = Deno.env.get('BASE44_APP_URL');
         console.log('🌐 Base URL:', baseUrl);
 
         if (error) {
             console.error('PCO OAuth error:', error);
-            return new Response(null, {
-                status: 302,
-                headers: {
-                    'Location': `${baseUrl}/Settings?error=pco_auth_failed`
-                }
-            });
+            return Response.redirect(`${baseUrl}/Settings?error=pco_auth_failed`, 302);
         }
 
         if (!code || !state) {
             console.error('Missing code or state');
-            return new Response(null, {
-                status: 302,
-                headers: {
-                    'Location': `${baseUrl}/Settings?error=missing_params`
-                }
-            });
+            return Response.redirect(`${baseUrl}/Settings?error=missing_params`, 302);
         }
 
         const base44 = createClientFromRequest(req);
         
-        // Use dynamic callback URL based on current host
+        // Use the BASE44_APP_URL for redirect URI
         const redirectUri = `${baseUrl}/functions/pcoCallback`;
         
         console.log('🔑 Using redirect URI:', redirectUri);
@@ -63,12 +53,7 @@ Deno.serve(async (req) => {
         if (!tokenResponse.ok) {
             const errorText = await tokenResponse.text();
             console.error('❌ PCO token exchange failed:', errorText);
-            return new Response(null, {
-                status: 302,
-                headers: {
-                    'Location': `${baseUrl}/Settings?error=token_exchange_failed`
-                }
-            });
+            return Response.redirect(`${baseUrl}/Settings?error=token_exchange_failed`, 302);
         }
 
         const tokens = await tokenResponse.json();
@@ -115,26 +100,13 @@ Deno.serve(async (req) => {
         console.log('✅ User updated with tokens');
 
         // Redirect back to Settings page with success message
-        return new Response(null, {
-            status: 302,
-            headers: {
-                'Location': `${baseUrl}/Settings?connected=pco`
-            }
-        });
+        return Response.redirect(`${baseUrl}/Settings?connected=pco`, 302);
 
     } catch (error) {
         console.error('❌ PCO callback error:', error);
         console.error('Stack:', error.stack);
         
-        // Try to get base URL for error redirect
-        const url = new URL(req.url);
-        const baseUrl = Deno.env.get('BASE44_APP_URL') || `${url.protocol}//${url.host}`;
-        
-        return new Response(null, {
-            status: 302,
-            headers: {
-                'Location': `${baseUrl}/Settings?error=callback_failed`
-            }
-        });
+        const baseUrl = Deno.env.get('BASE44_APP_URL');
+        return Response.redirect(`${baseUrl}/Settings?error=callback_failed`, 302);
     }
 });
