@@ -26,6 +26,9 @@ export default function PCOAPITester() {
   // NEW: Store the filter date separately (not sent to PCO)
   const [clientFilterDate, setClientFilterDate] = useState(null);
 
+  // NEW: Add state for detailed test result
+  const [detailedTestResult, setDetailedTestResult] = useState(null);
+
   useEffect(() => {
     loadUser();
     
@@ -56,6 +59,7 @@ export default function PCOAPITester() {
   const makeAPICall = async (endpoint, params = {}, filterDate = null) => {
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null); // Clear detailed results on new API call
     setClientFilterDate(filterDate); // Store filter date for client-side filtering
     
     try {
@@ -124,6 +128,8 @@ export default function PCOAPITester() {
               console.error('Error fetching resources for event', eventId, error);
               return { eventId, resources: [], included: [] };
             }
+            // Add a small delay to avoid hitting rate limits too hard if there are many events
+            // await new Promise(resolve => setTimeout(resolve, 100)); 
           })
         );
         
@@ -225,6 +231,7 @@ export default function PCOAPITester() {
   const testGetMyApprovals = async () => {
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('📋 Fetching my pending approvals...');
       const response = await base44.functions.invoke('getMyPendingApprovals');
@@ -257,6 +264,7 @@ export default function PCOAPITester() {
     
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('✅ Approving request:', eventId);
       const response = await base44.functions.invoke('approveResourceRequest', {
@@ -296,6 +304,7 @@ export default function PCOAPITester() {
     
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('❌ Denying request:', eventId);
       const response = await base44.functions.invoke('denyResourceRequest', {
@@ -335,6 +344,7 @@ export default function PCOAPITester() {
     
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('🧪 Force approving as user 149670080:', eventId);
       const response = await base44.functions.invoke('forceApproveAs149670080', {
@@ -370,6 +380,7 @@ export default function PCOAPITester() {
   const testDiagnosePCOToken = async () => {
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('🔬 Running PCO token diagnostic...');
       const response = await base44.functions.invoke('diagnosePCOToken');
@@ -402,6 +413,7 @@ export default function PCOAPITester() {
   const testDiagnosePCOConnection = async () => {
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('🔬 Running PCO connection diagnostic...');
       const response = await base44.functions.invoke('diagnosePCOConnection');
@@ -439,6 +451,7 @@ export default function PCOAPITester() {
     
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('🔍 Looking up PCO user ID:', lookupUserId);
       
@@ -520,6 +533,7 @@ export default function PCOAPITester() {
   const testDeepDiagnostic = async () => {
     setTestLoading(true);
     setResult(null);
+    setDetailedTestResult(null);
     try {
       console.log('🔬 Running DEEP PCO diagnostic...');
       const response = await base44.functions.invoke('deepPCODiagnostic');
@@ -544,11 +558,157 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Test approval with full details
+  const testApprovalWithDetails = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setDetailedTestResult(null);
+    setResult(null); // Clear main result when detailed test is run
+    try {
+      console.log('🧪 Testing approval with FULL details for request:', eventId);
+      const response = await base44.functions.invoke('testApprovalWithDetails', {
+        request_id: eventId
+      });
+      
+      console.log('📊 Full Test Result:', response.data);
+      
+      setDetailedTestResult(response.data.report);
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'testApprovalWithDetails'
+      });
+      
+      toast.success('Test complete! Check results below.');
+    } catch (error) {
+      console.error('❌ Test error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Test failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
 
     const data = result.data;
+
+    // NEW: Detailed approval test results
+    if (result.endpoint === 'testApprovalWithDetails' && detailedTestResult) {
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🧪 Detailed Approval Test Results</h3>
+          
+          {/* Test Steps */}
+          {detailedTestResult.steps?.map((step, idx) => (
+            <Card key={idx} className={`border-2 ${
+              step.success ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
+            }`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {step.success ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  {step.step}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {step.user_id && (
+                    <div>
+                      <span className="text-slate-500">User ID:</span>
+                      <span className="ml-2 font-mono font-semibold">{step.user_id}</span>
+                    </div>
+                  )}
+                  {step.user_name && (
+                    <div>
+                      <span className="text-slate-500">Name:</span>
+                      <span className="ml-2">{step.user_name}</span>
+                    </div>
+                  )}
+                  {step.status && (
+                    <div>
+                      <span className="text-slate-500">HTTP Status:</span>
+                      <Badge className={step.status === 200 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                        {step.status}
+                      </Badge>
+                    </div>
+                  )}
+                  {step.error && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <p className="text-xs font-semibold text-red-700 mb-1">Error Details:</p>
+                      <pre className="text-xs text-red-600 whitespace-pre-wrap font-mono">
+                        {typeof step.error === 'string' ? step.error : JSON.stringify(step.error, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {step.parsed_error && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <p className="text-xs font-semibold text-red-700 mb-1">Parsed Error:</p>
+                      <pre className="text-xs text-red-600 whitespace-pre-wrap">
+                        {typeof step.parsed_error === 'string' ? step.parsed_error : JSON.stringify(step.parsed_error, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {step.response && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <p className="text-xs font-semibold text-green-700 mb-1">Success Response:</p>
+                      <pre className="text-xs text-green-600 whitespace-pre-wrap">
+                        {step.response}
+                      </pre>
+                    </div>
+                  )}
+                  {step.request_data && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <p className="text-xs font-semibold text-slate-700 mb-1">Request Data:</p>
+                      <pre className="text-xs whitespace-pre-wrap">
+                        {JSON.stringify(step.request_data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Phantom User Detection */}
+          {detailedTestResult.phantom_user_detected && (
+            <Alert className="border-red-300 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription>
+                <strong className="text-red-900">🚨 PHANTOM USER DETECTED!</strong>
+                <p className="mt-1">The token is writing as user ID: <strong>{detailedTestResult.phantom_user_detected}</strong></p>
+                <p className="mt-1 text-sm">This is NOT your Calendar user ID ({detailedTestResult.correct_user_id || 'unknown'}). Your token has the wrong OAuth app association.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Permission Issue */}
+          {detailedTestResult.permission_issue && (
+            <Alert className="bg-orange-50 border-orange-200">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription>
+                <strong className="text-orange-900">🔒 Permission Issue Detected</strong>
+                <p className="mt-1 text-sm">You may not be in the correct approval group for this resource.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      );
+    }
 
     // Event instances
     if (result.endpoint?.includes('/event_instances')) {
@@ -1607,6 +1767,40 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* NEW: Detailed Approval Test - AT THE VERY TOP */}
+                <div className="border-4 border-blue-300 bg-blue-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-blue-900">
+                    <AlertCircle className="w-6 h-6 text-blue-600" />
+                    <strong className="text-lg">🔍 DETAILED APPROVAL TEST - Shows EXACT Error Message</strong>
+                  </Label>
+                  <p className="text-sm text-blue-800">
+                    This will attempt the approval and show you the EXACT error message from PCO,
+                    including which user ID it's trying to use for the write operation.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Input
+                      placeholder="Request ID (e.g., 31445396)"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testApprovalWithDetails} 
+                      disabled={testLoading} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-12 px-6 text-base font-semibold"
+                    >
+                      {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                      Test Approval (Detailed)
+                    </Button>
+                  </div>
+                  <Alert className="bg-blue-100 border-blue-300 mt-3">
+                    <AlertDescription className="text-sm">
+                      <strong>What this does:</strong> Attempts the actual approval and captures the complete
+                      error message from PCO, including any references to user IDs.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
                 {/* NEW: 🧪 FORCE APPROVE TEST - AT THE VERY TOP */}
                 <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-purple-900">
