@@ -16,13 +16,13 @@ export default function PCOAPITester() {
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
   const [result, setResult] = useState(null);
-  
+
   // Test inputs
   const [selectedDate, setSelectedDate] = useState('');
   const [groupId, setGroupId] = useState('');
   const [eventId, setEventId] = useState('');
   const [lookupUserId, setLookupUserId] = useState('3566727'); // Pre-fill with mystery ID
-  
+
   // NEW: Store the filter date separately (not sent to PCO)
   const [clientFilterDate, setClientFilterDate] = useState(null);
 
@@ -31,7 +31,7 @@ export default function PCOAPITester() {
 
   useEffect(() => {
     loadUser();
-    
+
     // Set default date to next Sunday
     const today = new Date();
     const daysUntilSunday = (7 - today.getDay()) % 7 || 7;
@@ -44,7 +44,7 @@ export default function PCOAPITester() {
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
-      
+
       if (currentUser.role !== 'admin' && currentUser.role !== 'super_user') {
         toast.error('Access denied - Admin only');
       }
@@ -61,18 +61,18 @@ export default function PCOAPITester() {
     setResult(null);
     setDetailedTestResult(null); // Clear detailed results on new API call
     setClientFilterDate(filterDate); // Store filter date for client-side filtering
-    
+
     try {
       console.log('🔧 Making API call:', endpoint, params);
-      
+
       // Get PCO token
       const tokenResponse = await base44.functions.invoke('getPCOToken');
       if (!tokenResponse.data.ok) {
         throw new Error('Failed to get PCO token');
       }
-      
+
       const token = tokenResponse.data.access_token;
-      
+
       // Build URL with params (filterDate NOT included in URL)
       const url = new URL(`https://api.planningcenteronline.com/calendar/v2${endpoint}`);
       Object.keys(params).forEach(key => {
@@ -80,29 +80,29 @@ export default function PCOAPITester() {
           url.searchParams.append(key, params[key]);
         }
       });
-      
+
       console.log('📞 Calling:', url.toString());
-      
+
       const response = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       const data = await response.json();
-      
+
       // If we're fetching events, also fetch resources for each event
       if (endpoint === '/event_instances' && response.ok && data.data) {
         console.log('📦 Fetching resources for', data.data.length, 'events...');
-        
+
         // Get unique event IDs
-        const eventIds = [...new Set(data.data.map(instance => 
+        const eventIds = [...new Set(data.data.map(instance =>
           instance.relationships?.event?.data?.id
         ).filter(Boolean))];
-        
+
         console.log('📋 Unique event IDs:', eventIds.length);
-        
+
         // Fetch resources for each event (limit to first 20 events to avoid too many requests)
         const eventsWithResources = await Promise.all(
           eventIds.slice(0, 20).map(async (eventId) => {
@@ -114,7 +114,7 @@ export default function PCOAPITester() {
                   'Content-Type': 'application/json'
                 }
               });
-              
+
               if (resourcesResponse.ok) {
                 const resourcesData = await resourcesResponse.json();
                 return {
@@ -129,15 +129,15 @@ export default function PCOAPITester() {
               return { eventId, resources: [], included: [] };
             }
             // Add a small delay to avoid hitting rate limits too hard if there are many events
-            // await new Promise(resolve => setTimeout(resolve, 100)); 
+            // await new Promise(resolve => setTimeout(resolve, 100));
           })
         );
-        
+
         // Store resources data alongside the main data
         data._resourcesData = eventsWithResources;
         console.log('✅ Fetched resources for', eventsWithResources.length, 'events');
       }
-      
+
       setResult({
         ok: response.ok,
         status: response.status,
@@ -145,7 +145,7 @@ export default function PCOAPITester() {
         data: data,
         endpoint: endpoint
       });
-      
+
       if (response.ok) {
         toast.success('API call successful');
       } else {
@@ -168,9 +168,9 @@ export default function PCOAPITester() {
       toast.error('Please select a date');
       return;
     }
-    
+
     console.log('📅 Fetching all future events to filter by date:', selectedDate);
-    
+
     // PCO doesn't support date range filters well, so fetch all future events
     // Pass the date separately for client-side filtering (NOT in URL params)
     await makeAPICall('/event_instances', {
@@ -191,7 +191,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a group ID');
       return;
     }
-    
+
     await makeAPICall(`/resource_approval_groups/${groupId}/resources`, {
       'per_page': '100'
     });
@@ -202,7 +202,7 @@ export default function PCOAPITester() {
       toast.error('Please enter an event ID');
       return;
     }
-    
+
     await makeAPICall(`/events/${eventId}`, {
       'include': 'tags'
     });
@@ -213,7 +213,7 @@ export default function PCOAPITester() {
       toast.error('Please enter an event ID');
       return;
     }
-    
+
     await makeAPICall(`/events/${eventId}/event_resource_requests`, {
       'include': 'resource',
       'per_page': '100'
@@ -235,14 +235,14 @@ export default function PCOAPITester() {
     try {
       console.log('📋 Fetching my pending approvals...');
       const response = await base44.functions.invoke('getMyPendingApprovals');
-      
+
       setResult({
         ok: true,
         status: 200,
         data: response.data,
         endpoint: 'getMyPendingApprovals'
       });
-      
+
       toast.success('Approvals fetched');
     } catch (error) {
       console.error('❌ Error:', error);
@@ -261,7 +261,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a request ID');
       return;
     }
-    
+
     setTestLoading(true);
     setResult(null);
     setDetailedTestResult(null);
@@ -271,14 +271,14 @@ export default function PCOAPITester() {
         request_id: eventId,
         action: 'approve'
       });
-      
+
       setResult({
         ok: response.data.ok !== false,
         status: 200,
         data: response.data,
         endpoint: 'approveResourceRequest'
       });
-      
+
       if (response.data.ok !== false) {
         toast.success('Request approved!');
       } else {
@@ -301,7 +301,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a request ID');
       return;
     }
-    
+
     setTestLoading(true);
     setResult(null);
     setDetailedTestResult(null);
@@ -310,14 +310,14 @@ export default function PCOAPITester() {
       const response = await base44.functions.invoke('denyResourceRequest', {
         request_id: eventId
       });
-      
+
       setResult({
         ok: response.data.success || response.data.ok,
         status: 200,
         data: response.data,
         endpoint: 'denyResourceRequest'
       });
-      
+
       if (response.data.success || response.data.ok) {
         toast.success('Request denied');
       } else {
@@ -341,7 +341,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a request ID');
       return;
     }
-    
+
     setTestLoading(true);
     setResult(null);
     setDetailedTestResult(null);
@@ -351,14 +351,14 @@ export default function PCOAPITester() {
         request_id: eventId,
         action: 'approve'
       });
-      
+
       setResult({
         ok: response.data.ok !== false,
         status: 200,
         data: response.data,
         endpoint: 'forceApproveAs149670080'
       });
-      
+
       if (response.data.ok !== false) {
         toast.success('🎉 Force approval SUCCESS!');
       } else {
@@ -384,14 +384,14 @@ export default function PCOAPITester() {
     try {
       console.log('🔬 Running PCO token diagnostic...');
       const response = await base44.functions.invoke('diagnosePCOToken');
-      
+
       setResult({
         ok: response.data.ok !== false,
         status: 200,
         data: response.data,
         endpoint: 'diagnosePCOToken'
       });
-      
+
       if (response.data.ok !== false) {
         toast.success('Diagnostic complete!');
       } else {
@@ -417,14 +417,14 @@ export default function PCOAPITester() {
     try {
       console.log('🔬 Running PCO connection diagnostic...');
       const response = await base44.functions.invoke('diagnosePCOConnection');
-      
+
       setResult({
         ok: response.data.ok !== false,
         status: 200,
         data: response.data,
         endpoint: 'diagnosePCOConnection'
       });
-      
+
       if (response.data.ok !== false) {
         toast.success('Connection diagnostic complete!');
       } else {
@@ -448,59 +448,59 @@ export default function PCOAPITester() {
       toast.error('Please enter a user ID');
       return;
     }
-    
+
     setTestLoading(true);
     setResult(null);
     setDetailedTestResult(null);
     try {
       console.log('🔍 Looking up PCO user ID:', lookupUserId);
-      
+
       // Get token
       const tokenResponse = await base44.functions.invoke('getPCOToken');
       if (!tokenResponse.data.ok) {
         throw new Error('Failed to get PCO token');
       }
-      
+
       const token = tokenResponse.data.access_token;
-      
+
       // Try Calendar API
       console.log('📞 Trying Calendar API: /calendar/v2/people/' + lookupUserId);
       const calendarResponse = await fetch(`https://api.planningcenteronline.com/calendar/v2/people/${lookupUserId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const calendarResult = {
         status: calendarResponse.status,
         ok: calendarResponse.ok,
         data: null,
         error: null
       };
-      
+
       if (calendarResponse.ok) {
         calendarResult.data = await calendarResponse.json();
       } else {
         calendarResult.error = await calendarResponse.text();
       }
-      
+
       // Try People API
       console.log('📞 Trying People API: /people/v2/people/' + lookupUserId);
       const peopleResponse = await fetch(`https://api.planningcenteronline.com/people/v2/people/${lookupUserId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const peopleResult = {
         status: peopleResponse.status,
         ok: peopleResponse.ok,
         data: null,
         error: null
       };
-      
+
       if (peopleResponse.ok) {
         peopleResult.data = await peopleResponse.json();
       } else {
         peopleResult.error = await peopleResponse.text();
       }
-      
+
       setResult({
         ok: true,
         status: 200,
@@ -511,7 +511,7 @@ export default function PCOAPITester() {
         },
         endpoint: 'lookupUser'
       });
-      
+
       if (!calendarResult.ok && !peopleResult.ok) {
         toast.error(`User ${lookupUserId} not found in any PCO API`);
       } else {
@@ -537,14 +537,14 @@ export default function PCOAPITester() {
     try {
       console.log('🔬 Running DEEP PCO diagnostic...');
       const response = await base44.functions.invoke('deepPCODiagnostic');
-      
+
       setResult({
         ok: true,
         status: 200,
         data: response.data,
         endpoint: 'deepPCODiagnostic'
       });
-      
+
       toast.success('Deep diagnostic complete!');
     } catch (error) {
       console.error('❌ Error:', error);
@@ -564,7 +564,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a request ID');
       return;
     }
-    
+
     setTestLoading(true);
     setDetailedTestResult(null);
     setResult(null); // Clear main result when detailed test is run
@@ -573,18 +573,18 @@ export default function PCOAPITester() {
       const response = await base44.functions.invoke('testApprovalWithDetails', {
         request_id: eventId
       });
-      
+
       console.log('📊 Full Test Result:', response.data);
-      
+
       setDetailedTestResult(response.data.report);
-      
+
       setResult({
         ok: true,
         status: 200,
         data: response.data,
         endpoint: 'testApprovalWithDetails'
       });
-      
+
       toast.success('Test complete! Check results below.');
     } catch (error) {
       console.error('❌ Test error:', error);
@@ -606,14 +606,14 @@ export default function PCOAPITester() {
     try {
       console.log('🔍 Investigating what 3566727 actually is...');
       const response = await base44.functions.invoke('investigateWhat3566727Is');
-      
+
       setResult({
         ok: true,
         status: 200,
         data: response.data,
         endpoint: 'investigateWhat3566727Is'
       });
-      
+
       toast.success('Investigation complete!');
     } catch (error) {
       console.error('❌ Investigation error:', error);
@@ -622,6 +622,35 @@ export default function PCOAPITester() {
         error: error.message
       });
       toast.error('Investigation failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // NEW: Hunt for phantom in approval groups
+  const testFindPhantomInGroups = async () => {
+    setTestLoading(true);
+    setResult(null);
+    setDetailedTestResult(null);
+    try {
+      console.log('🔍 Hunting for phantom user in approval groups...');
+      const response = await base44.functions.invoke('findPhantomInApprovalGroups');
+
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'findPhantomInApprovalGroups'
+      });
+
+      toast.success('Hunt complete!');
+    } catch (error) {
+      console.error('❌ Hunt error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Hunt failed: ' + error.message);
     } finally {
       setTestLoading(false);
     }
@@ -638,7 +667,7 @@ export default function PCOAPITester() {
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🧪 Detailed Approval Test Results</h3>
-          
+
           {/* Test Steps */}
           {detailedTestResult.steps?.map((step, idx) => (
             <Card key={idx} className={`border-2 ${
@@ -743,63 +772,63 @@ export default function PCOAPITester() {
     if (result.endpoint?.includes('/event_instances')) {
       let events = data.data || [];
       const resourcesData = data._resourcesData || [];
-      
+
       // CLIENT-SIDE DATE FILTERING (using stored clientFilterDate)
       if (clientFilterDate) {
         console.log('🔍 Client-side filtering for date:', clientFilterDate);
-        
+
         const [year, month, day] = clientFilterDate.split('-').map(Number);
         const targetDate = new Date(year, month - 1, day);
         targetDate.setHours(0, 0, 0, 0);
-        
+
         const nextDay = new Date(targetDate);
         nextDay.setDate(nextDay.getDate() + 1);
-        
+
         console.log('📅 Filtering between:', targetDate, 'and', nextDay);
-        
+
         events = events.filter(event => {
           const startsAt = event.attributes?.starts_at;
           if (!startsAt) return false;
-          
+
           const eventDate = new Date(startsAt);
           const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-          
+
           const matches = eventDateOnly >= targetDate && eventDateOnly < nextDay;
-          
+
           if (matches) {
             console.log('✅ Match:', event.attributes?.name, 'starts:', startsAt);
           }
-          
+
           return matches;
         });
-        
+
         console.log('🎯 Filtered to', events.length, 'events on', clientFilterDate);
       }
-      
+
       // Calculate resource counts
       let eventsWithResources = 0;
       let eventsWithBuildingAccess = 0;
-      
+
       events.forEach(event => {
         const eventId = event.relationships?.event?.data?.id;
         const eventResources = resourcesData.find(r => r.eventId === eventId);
         const resources = eventResources?.resources || [];
-        
+
         if (resources.length > 0) {
           eventsWithResources++;
         }
-        
+
         const hasBuildingAccess = resources.some(r => {
           const resourceId = r.relationships?.resource?.data?.id;
           const resourceDetails = eventResources?.included?.find(i => i.type === 'Resource' && i.id === resourceId);
           return resourceDetails?.attributes?.name?.toLowerCase().includes('building access');
         });
-        
+
         if (hasBuildingAccess) {
           eventsWithBuildingAccess++;
         }
       });
-      
+
       return (
         <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
@@ -829,7 +858,7 @@ export default function PCOAPITester() {
                 const eventResources = resourcesData.find(r => r.eventId === eventId);
                 const resources = eventResources?.resources || [];
                 const included = eventResources?.included || [];
-                
+
                 return <EventCard key={idx} event={event} resources={resources} included={included} eventId={eventId} />;
               })}
             </div>
@@ -923,7 +952,7 @@ export default function PCOAPITester() {
     if (result.endpoint?.includes('/event_resource_requests')) {
       const requests = data.data || [];
       const included = data.included || [];
-      
+
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">📋 Resource Requests Found: {requests.length}</h3>
@@ -933,7 +962,7 @@ export default function PCOAPITester() {
                 const resourceId = request.relationships?.resource?.data?.id;
                 const resource = included.find(i => i.type === 'Resource' && i.id === resourceId);
                 const approvalStatus = request.attributes?.approval_status;
-                
+
                 return (
                   <Card key={idx} className="bg-slate-50">
                     <CardContent className="p-4">
@@ -1006,7 +1035,7 @@ export default function PCOAPITester() {
       const event = data.data;
       const included = data.included || [];
       const tags = included.filter(i => i.type === 'Tag');
-      
+
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">📅 Event Details</h3>
@@ -1016,14 +1045,14 @@ export default function PCOAPITester() {
                 <h4 className="font-semibold text-lg text-slate-900">{event?.attributes?.name || 'Untitled Event'}</h4>
                 <p className="text-sm text-slate-600 mt-1">{event?.attributes?.summary || 'No summary'}</p>
               </div>
-              
+
               {event?.attributes?.description && (
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase">Description</p>
                   <p className="text-sm text-slate-700 mt-1">{event.attributes.description}</p>
                 </div>
               )}
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase">Approval Status</p>
@@ -1034,7 +1063,7 @@ export default function PCOAPITester() {
                   <p className="text-sm text-slate-700 mt-1">{event?.attributes?.percent_approved || 0}%</p>
                 </div>
               </div>
-              
+
               {tags.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Tags</p>
@@ -1045,7 +1074,7 @@ export default function PCOAPITester() {
                   </div>
                 </div>
               )}
-              
+
               <div>
                 <p className="text-xs text-slate-500">Event ID: <span className="font-mono text-blue-600">{event?.id}</span></p>
               </div>
@@ -1055,7 +1084,7 @@ export default function PCOAPITester() {
       );
     }
 
-    // Approvals tab results
+    // Approval's tab results
     if (result.endpoint === 'getMyPendingApprovals' || result.endpoint === 'approveResourceRequest' || result.endpoint === 'denyResourceRequest' || result.endpoint === 'forceApproveAs149670080') {
       return (
         <div className="space-y-3">
@@ -1107,11 +1136,11 @@ export default function PCOAPITester() {
       const diagnostics = data.diagnostics;
       const summary = diagnostics?.summary;
       const identities = diagnostics?.all_identities;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔬 PCO Token Diagnostic Results</h3>
-          
+
           {/* Summary Box */}
           {summary && (
             <Card className={`border-2 ${summary.ids_match ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
@@ -1127,7 +1156,7 @@ export default function PCOAPITester() {
                       {summary.ids_match ? 'Configuration Correct ✅' : 'Configuration Mismatch ❌'}
                     </h4>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div className="p-3 bg-white rounded-lg border">
                       <p className="text-xs text-slate-500 mb-1">Calendar /me</p>
@@ -1209,11 +1238,11 @@ export default function PCOAPITester() {
     if (result.endpoint === 'diagnosePCOConnection') {
       const diag = data.diagnostics;
       const verdict = diag?.verdict;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔬 PCO Connection Diagnostic</h3>
-          
+
           {/* OAuth Credentials Check */}
           {diag?.oauth_credentials && (
             <Card className="border-2 border-blue-300 bg-blue-50">
@@ -1263,7 +1292,7 @@ export default function PCOAPITester() {
                       <p className="font-mono font-semibold text-red-700">{verdict.token_writes_as || 'N/A'}</p>
                     </div>
                   </div>
-                  
+
                   <Alert className={verdict.problem.includes('3566727') ? 'border-red-300 bg-red-50' : 'bg-blue-50 border-blue-200'}>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
@@ -1310,11 +1339,11 @@ export default function PCOAPITester() {
       const userId = data.user_id;
       const calendar = data.calendar_api;
       const people = data.people_api;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔍 User ID Lookup: {userId}</h3>
-          
+
           {/* Calendar API Result */}
           <Card className={`border-2 ${calendar.ok ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
             <CardHeader>
@@ -1333,7 +1362,7 @@ export default function PCOAPITester() {
                     {calendar.ok ? '✅ User EXISTS in Calendar' : '❌ User NOT FOUND in Calendar'}
                   </span>
                 </div>
-                
+
                 {calendar.ok && calendar.data?.data && (
                   <div className="mt-3 p-3 bg-white rounded border">
                     <p className="text-sm font-semibold text-slate-700 mb-2">User Details:</p>
@@ -1357,7 +1386,7 @@ export default function PCOAPITester() {
                     </div>
                   </div>
                 )}
-                
+
                 {!calendar.ok && (
                   <div className="mt-2 p-2 bg-white rounded border text-xs font-mono text-red-600">
                     {calendar.error}
@@ -1385,7 +1414,7 @@ export default function PCOAPITester() {
                     {people.ok ? '✅ Person EXISTS in People' : '❌ Person NOT FOUND in People'}
                   </span>
                 </div>
-                
+
                 {people.ok && people.data?.data && (
                   <div className="mt-3 p-3 bg-white rounded border">
                     <p className="text-sm font-semibold text-slate-700 mb-2">Person Details:</p>
@@ -1405,15 +1434,15 @@ export default function PCOAPITester() {
                       <div>
                         <span className="text-slate-500">Created:</span>
                         <p className="font-medium">
-                          {people.data.data.attributes?.created_at 
-                            ? new Date(people.data.data.attributes.created_at).toLocaleDateString() 
+                          {people.data.data.attributes?.created_at
+                            ? new Date(people.data.data.attributes.created_at).toLocaleDateString()
                             : 'N/A'}
                         </p>
                       </div>
                     </div>
                   </div>
                 )}
-                
+
                 {!people.ok && (
                   <div className="mt-2 p-2 bg-white rounded border text-xs font-mono text-red-600">
                     {people.error}
@@ -1450,11 +1479,11 @@ export default function PCOAPITester() {
     if (result.endpoint === 'deepPCODiagnostic') {
       const report = data.report;
       const verdict = report?.verdict;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔬 Deep PCO Diagnostic Report</h3>
-          
+
           {/* User Info */}
           {report?.user && (
             <Card className="bg-blue-50 border-blue-200">
@@ -1547,7 +1576,7 @@ export default function PCOAPITester() {
                     </AlertDescription>
                   </Alert>
                 )}
-                
+
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="p-2 bg-white rounded">
                     <span className="text-slate-500">From New App:</span>
@@ -1595,8 +1624,8 @@ export default function PCOAPITester() {
                 <div className="space-y-1 font-mono text-xs max-h-96 overflow-y-auto bg-slate-900 text-slate-100 p-4 rounded">
                   {report.steps.map((step, idx) => (
                     <div key={idx} className={`${
-                      step.includes('❌') ? 'text-red-400' : 
-                      step.includes('✅') ? 'text-green-400' : 
+                      step.includes('❌') ? 'text-red-400' :
+                      step.includes('✅') ? 'text-green-400' :
                       step.includes('⚠️') ? 'text-yellow-400' :
                       step.includes('🔧') ? 'text-orange-400' :
                       'text-slate-300'
@@ -1615,11 +1644,11 @@ export default function PCOAPITester() {
     // NEW: Investigation results
     if (result.endpoint === 'investigateWhat3566727Is') {
       const report = data.report;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔍 What IS 3566727?</h3>
-          
+
           {/* Conclusion */}
           {report.conclusion && (
             <Card className="border-2 border-purple-300 bg-purple-50">
@@ -1656,7 +1685,7 @@ export default function PCOAPITester() {
                       </Badge>
                     </div>
                   )}
-                  
+
                   {inv.conclusion && (
                     <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
                       <strong>💡 {inv.conclusion}</strong>
@@ -1722,6 +1751,122 @@ export default function PCOAPITester() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      );
+    }
+
+    // NEW: Phantom hunt results
+    if (result.endpoint === 'findPhantomInApprovalGroups') {
+      const report = data.report;
+
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔍 Phantom User Hunt Results</h3>
+
+          {/* Verdict */}
+          {report.verdict && (
+            <Card className={`border-2 ${report.verdict.found ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {report.verdict.found ? (
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  )}
+                  {report.verdict.found ? 'Phantom User FOUND!' : 'Phantom User NOT Found'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm mb-2"><strong>{report.verdict.message}</strong></p>
+                <p className="text-sm"><strong>Action:</strong> {report.verdict.action}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Groups with phantom only */}
+          {report.groups_with_phantom?.length > 0 && (
+            <Card className="border-red-300 bg-red-50">
+              <CardHeader>
+                <CardTitle className="text-base">⚠️ Groups with PHANTOM ONLY</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-red-800 mb-3">
+                  These groups have user 3566727 but NOT you! Remove 3566727 from these groups in PCO.
+                </p>
+                {report.groups_with_phantom.map((group, idx) => (
+                  <Card key={idx} className="mb-3 bg-white">
+                    <CardContent className="p-3">
+                      <h4 className="font-semibold">{group.name}</h4>
+                      <p className="text-xs text-slate-500">ID: {group.id}</p>
+                      <div className="mt-2 space-y-1">
+                        {group.people.map((person, pidx) => (
+                          <div key={pidx} className="text-sm flex items-center gap-2">
+                            <Users className="w-3 h-3" />
+                            {person.name} ({person.id})
+                            {person.id === '3566727' && <Badge className="bg-red-500 text-white text-xs">PHANTOM</Badge>}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Groups with both */}
+          {report.groups_with_both?.length > 0 && (
+            <Card className="border-orange-300 bg-orange-50">
+              <CardHeader>
+                <CardTitle className="text-base">🚨 Groups with BOTH You AND Phantom</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-orange-800 mb-3">
+                  These groups have BOTH you (149670080) AND the phantom (3566727). Remove 3566727.
+                </p>
+                {report.groups_with_both.map((group, idx) => (
+                  <Card key={idx} className="mb-3 bg-white">
+                    <CardContent className="p-3">
+                      <h4 className="font-semibold">{group.name}</h4>
+                      <p className="text-xs text-slate-500">ID: {group.id}</p>
+                      <div className="mt-2 space-y-1">
+                        {group.people.map((person, pidx) => (
+                          <div key={pidx} className="text-sm flex items-center gap-2">
+                            <Users className="w-3 h-3" />
+                            {person.name} ({person.id})
+                            {person.id === '3566727' && <Badge className="bg-red-500 text-white text-xs">PHANTOM</Badge>}
+                            {person.id === '149670080' && <Badge className="bg-blue-500 text-white text-xs">YOU</Badge>}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Groups with you only */}
+          {report.groups_with_you?.length > 0 && (
+            <Card className="border-green-300 bg-green-50">
+              <CardHeader>
+                <CardTitle className="text-base">✅ Groups with YOU Only (No Phantom)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-green-800 mb-3">
+                  These groups are clean - only you, no phantom user.
+                </p>
+                {report.groups_with_you.map((group, idx) => (
+                  <Card key={idx} className="mb-3 bg-white">
+                    <CardContent className="p-3">
+                      <h4 className="font-semibold">{group.name}</h4>
+                      <p className="text-xs text-slate-500">ID: {group.id}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       );
     }
@@ -1910,6 +2055,26 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                 {/* NEW: HUNT FOR PHANTOM - AT THE VERY TOP */}
+                <div className="border-4 border-red-300 bg-red-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-red-900">
+                    <AlertCircle className="w-6 h-6 text-red-600" />
+                    <strong className="text-lg">🔍 HUNT FOR PHANTOM IN APPROVAL GROUPS</strong>
+                  </Label>
+                  <p className="text-sm text-red-800">
+                    Since your token is PERFECT, the phantom (3566727) must be hiding in your approval groups!<br/>
+                    <strong>This will scan EVERY approval group to find where 3566727 is lurking.</strong>
+                  </p>
+                  <Button
+                    onClick={testFindPhantomInGroups}
+                    disabled={testLoading}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white h-12 text-base font-semibold mt-3"
+                  >
+                    {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                    Hunt for Phantom User 3566727
+                  </Button>
+                </div>
+
                  {/* NEW: INVESTIGATE 3566727 - AT THE VERY TOP */}
                 <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-purple-900">
@@ -1923,9 +2088,9 @@ export default function PCOAPITester() {
                     • Something else in PCO's system<br/>
                     <strong>This will finally tell us what the mystery ID actually is!</strong>
                   </p>
-                  <Button 
-                    onClick={testInvestigate3566727} 
-                    disabled={testLoading} 
+                  <Button
+                    onClick={testInvestigate3566727}
+                    disabled={testLoading}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 text-base font-semibold mt-3"
                   >
                     {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
@@ -1950,9 +2115,9 @@ export default function PCOAPITester() {
                       onChange={(e) => setEventId(e.target.value)}
                       className="flex-1"
                     />
-                    <Button 
-                      onClick={testApprovalWithDetails} 
-                      disabled={testLoading} 
+                    <Button
+                      onClick={testApprovalWithDetails}
+                      disabled={testLoading}
                       className="bg-blue-600 hover:bg-blue-700 text-white h-12 px-6 text-base font-semibold"
                     >
                       {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
@@ -1984,9 +2149,9 @@ export default function PCOAPITester() {
                       onChange={(e) => setEventId(e.target.value)}
                       className="flex-1"
                     />
-                    <Button 
-                      onClick={testForceApproveAs149670080} 
-                      disabled={testLoading} 
+                    <Button
+                      onClick={testForceApproveAs149670080}
+                      disabled={testLoading}
                       className="bg-purple-600 hover:bg-purple-700 text-white h-12 px-6 text-base font-semibold"
                     >
                       {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
@@ -1995,7 +2160,7 @@ export default function PCOAPITester() {
                   </div>
                   <Alert className="bg-purple-100 border-purple-300 mt-3">
                     <AlertDescription className="text-sm">
-                      <strong>What this tests:</strong> If this succeeds, it proves PCO is accepting approvals from 149670080, 
+                      <strong>What this tests:</strong> If this succeeds, it proves PCO is accepting approvals from 149670080,
                       but your normal token is somehow defaulting to 3566727 for write operations.
                     </AlertDescription>
                   </Alert>
@@ -2011,9 +2176,9 @@ export default function PCOAPITester() {
                     This will show EXACTLY which OAuth app issued your token, which user it writes as,
                     and give you step-by-step instructions to fix the problem.
                   </p>
-                  <Button 
-                    onClick={testDeepDiagnostic} 
-                    disabled={testLoading} 
+                  <Button
+                    onClick={testDeepDiagnostic}
+                    disabled={testLoading}
                     className="w-full bg-red-600 hover:bg-red-700 text-white h-12 text-base font-semibold"
                   >
                     {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
@@ -2030,9 +2195,9 @@ export default function PCOAPITester() {
                   <p className="text-sm text-orange-800">
                     This will show EXACTLY which OAuth app your token is from and which user ID it writes as.
                   </p>
-                  <Button 
-                    onClick={testDiagnosePCOConnection} 
-                    disabled={testLoading} 
+                  <Button
+                    onClick={testDiagnosePCOConnection}
+                    disabled={testLoading}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                   >
                     {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <AlertCircle className="w-4 h-4 mr-2" />}
@@ -2091,9 +2256,9 @@ export default function PCOAPITester() {
                     <AlertCircle className="w-4 h-4 text-purple-600" />
                     Diagnose PCO Token
                   </Label>
-                  <Button 
-                    onClick={testDiagnosePCOToken} 
-                    disabled={testLoading} 
+                  <Button
+                    onClick={testDiagnosePCOToken}
+                    disabled={testLoading}
                     variant="outline"
                     className="w-full border-purple-300 hover:bg-purple-50"
                   >
@@ -2120,8 +2285,8 @@ export default function PCOAPITester() {
                       onChange={(e) => setLookupUserId(e.target.value)}
                       className="flex-1"
                     />
-                    <Button 
-                      onClick={testLookupUser} 
+                    <Button
+                      onClick={testLookupUser}
                       disabled={testLoading}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
@@ -2171,7 +2336,7 @@ export default function PCOAPITester() {
                   <p className="text-xs font-mono break-all">{result.url}</p>
                 </div>
               )}
-              
+
               {result.error ? (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-900 font-semibold mb-2">Error:</p>
@@ -2201,7 +2366,7 @@ export default function PCOAPITester() {
                       </p>
                     )}
                   </div>
-                  
+
                   {/* Raw JSON */}
                   <details className="border rounded-lg bg-slate-50">
                     <summary className="p-4 cursor-pointer font-semibold text-slate-700 hover:bg-slate-100">
@@ -2227,20 +2392,20 @@ export default function PCOAPITester() {
 function EventCard({ event, resources, included, eventId }) {
   const [showRooms, setShowRooms] = useState(false);
   const [showResources, setShowResources] = useState(false);
-  
+
   // Split resources into rooms and other resources
   const rooms = resources.filter(r => {
     const resourceId = r.relationships?.resource?.data?.id;
     const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
     return resourceDetails?.attributes?.kind === 'Room';
   });
-  
+
   const otherResources = resources.filter(r => {
     const resourceId = r.relationships?.resource?.data?.id;
     const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
     return resourceDetails?.attributes?.kind !== 'Room';
   });
-  
+
   return (
     <Card className="bg-slate-50">
       <CardContent className="p-4">
@@ -2302,7 +2467,7 @@ function EventCard({ event, resources, included, eventId }) {
                       const resourceId = resource.relationships?.resource?.data?.id;
                       const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
                       const approvalStatus = resource.attributes?.approval_status;
-                      
+
                       return (
                         <div key={ridx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
                           <div className="flex items-center gap-2 flex-1">
@@ -2318,7 +2483,7 @@ function EventCard({ event, resources, included, eventId }) {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {resource.attributes?.quantity && (
                               <span className="text-xs text-slate-500">
@@ -2384,7 +2549,7 @@ function EventCard({ event, resources, included, eventId }) {
                       const resourceId = resource.relationships?.resource?.data?.id;
                       const resourceDetails = included.find(i => i.type === 'Resource' && i.id === resourceId);
                       const approvalStatus = resource.attributes?.approval_status;
-                      
+
                       return (
                         <div key={ridx} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
                           <div className="flex items-center gap-2 flex-1">
@@ -2400,7 +2565,7 @@ function EventCard({ event, resources, included, eventId }) {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {resource.attributes?.quantity && (
                               <span className="text-xs text-slate-500">
