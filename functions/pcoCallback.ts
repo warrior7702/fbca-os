@@ -12,12 +12,16 @@ Deno.serve(async (req) => {
         console.log('📝 State (user_id):', state);
         console.log('❌ Error:', error);
 
+        // Get base URL from environment or infer from request
+        const baseUrl = Deno.env.get('BASE44_APP_URL') || `${url.protocol}//${url.host}`;
+        console.log('🌐 Base URL:', baseUrl);
+
         if (error) {
             console.error('PCO OAuth error:', error);
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=pco_auth_failed`
+                    'Location': `${baseUrl}/Settings?error=pco_auth_failed`
                 }
             });
         }
@@ -27,15 +31,15 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=missing_params`
+                    'Location': `${baseUrl}/Settings?error=missing_params`
                 }
             });
         }
 
         const base44 = createClientFromRequest(req);
         
-        // Use direct callback (FBCA app registered with this callback URL)
-        const redirectUri = 'https://fbca-unified-hub-37662cca.base44.app/functions/pcoCallback';
+        // Use dynamic callback URL based on current host
+        const redirectUri = `${baseUrl}/functions/pcoCallback`;
         
         console.log('🔑 Using redirect URI:', redirectUri);
         console.log('🔑 Client ID exists:', !!Deno.env.get('PCO_CLIENT_ID'));
@@ -62,7 +66,7 @@ Deno.serve(async (req) => {
             return new Response(null, {
                 status: 302,
                 headers: {
-                    'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=token_exchange_failed`
+                    'Location': `${baseUrl}/Settings?error=token_exchange_failed`
                 }
             });
         }
@@ -99,7 +103,7 @@ Deno.serve(async (req) => {
         };
 
         if (pcoCalendarUserId) {
-            updateData.pco_user_id = pcoCalendarUserId;  // Store CALENDAR user ID, not People person ID!
+            updateData.pco_user_id = pcoCalendarUserId;
             console.log('📝 Storing Calendar User ID:', pcoCalendarUserId);
         }
 
@@ -114,17 +118,22 @@ Deno.serve(async (req) => {
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?connected=pco`
+                'Location': `${baseUrl}/Settings?connected=pco`
             }
         });
 
     } catch (error) {
         console.error('❌ PCO callback error:', error);
         console.error('Stack:', error.stack);
+        
+        // Try to get base URL for error redirect
+        const url = new URL(req.url);
+        const baseUrl = Deno.env.get('BASE44_APP_URL') || `${url.protocol}//${url.host}`;
+        
         return new Response(null, {
             status: 302,
             headers: {
-                'Location': `${Deno.env.get('BASE44_APP_URL')}/Settings?error=callback_failed`
+                'Location': `${baseUrl}/Settings?error=callback_failed`
             }
         });
     }

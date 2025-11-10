@@ -11,11 +11,15 @@ Deno.serve(async (req) => {
 
         // Direct PCO OAuth flow using PCO_CLIENT_ID
         const clientId = Deno.env.get('PCO_CLIENT_ID');
-        const appUrl = Deno.env.get('BASE44_APP_URL');
-        const redirectUri = `${appUrl}/functions/pcoCallback`;
+        
+        // Get base URL from environment or infer from request
+        const url = new URL(req.url);
+        const baseUrl = Deno.env.get('BASE44_APP_URL') || `${url.protocol}//${url.host}`;
+        const redirectUri = `${baseUrl}/functions/pcoCallback`;
         
         console.log('🔗 Initiating PCO OAuth with:');
         console.log('  - Client ID:', clientId?.slice(0, 20) + '...');
+        console.log('  - Base URL:', baseUrl);
         console.log('  - Redirect URI:', redirectUri);
         console.log('  - User ID (state):', user.id);
 
