@@ -598,6 +598,35 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Investigate what 3566727 actually is
+  const testInvestigate3566727 = async () => {
+    setTestLoading(true);
+    setResult(null);
+    setDetailedTestResult(null);
+    try {
+      console.log('🔍 Investigating what 3566727 actually is...');
+      const response = await base44.functions.invoke('investigateWhat3566727Is');
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'investigateWhat3566727Is'
+      });
+      
+      toast.success('Investigation complete!');
+    } catch (error) {
+      console.error('❌ Investigation error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Investigation failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
@@ -1583,6 +1612,120 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Investigation results
+    if (result.endpoint === 'investigateWhat3566727Is') {
+      const report = data.report;
+      
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🔍 What IS 3566727?</h3>
+          
+          {/* Conclusion */}
+          {report.conclusion && (
+            <Card className="border-2 border-purple-300 bg-purple-50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-purple-600" />
+                  Conclusion
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm mb-2"><strong>Likely Cause:</strong> {report.conclusion.likely_cause}</p>
+                <p className="text-sm"><strong>Action Needed:</strong> {report.conclusion.action_needed}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Investigations */}
+          {report.investigations?.map((inv, idx) => (
+            <Card key={idx}>
+              <CardHeader>
+                <CardTitle className="text-base">{inv.test}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {inv.result && (
+                    <div>
+                      <span className="text-slate-500">Result:</span>
+                      <Badge className={
+                        inv.result === 'FOUND' ? 'bg-green-100 text-green-700 ml-2' :
+                        inv.result === 'NOT FOUND' ? 'bg-red-100 text-red-700 ml-2' :
+                        'bg-slate-100 text-slate-700 ml-2'
+                      }>
+                        {typeof inv.result === 'string' ? inv.result : 'See below'}
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {inv.conclusion && (
+                    <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
+                      <strong>💡 {inv.conclusion}</strong>
+                    </div>
+                  )}
+
+                  {inv.PCO_CLIENT_ID && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-slate-500">PCO_CLIENT_ID:</span>
+                        <p className="font-mono text-xs">{inv.PCO_CLIENT_ID}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">PCO_APP_ID2:</span>
+                        <p className="font-mono text-xs">{inv.PCO_APP_ID2 || 'NOT SET'}</p>
+                      </div>
+                      {inv.matches_mystery_id !== undefined && (
+                        <div className="col-span-2">
+                          <Badge className={inv.matches_mystery_id ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}>
+                            {inv.matches_mystery_id ? '⚠️ One matches 3566727!' : '✅ Neither matches 3566727'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {inv.application_id && (
+                    <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                      <span className="text-slate-500">Token's Application ID:</span>
+                      <p className="font-mono font-semibold">{inv.application_id}</p>
+                      {inv.application_id === '3566727' && (
+                        <Badge className="bg-red-100 text-red-700 mt-1">🚨 This is 3566727!</Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {inv.resource_owner_id && (
+                    <div>
+                      <span className="text-slate-500">Resource Owner ID:</span>
+                      <span className="ml-2 font-mono">{inv.resource_owner_id}</span>
+                    </div>
+                  )}
+
+                  {inv.stored_id !== undefined && (
+                    <div>
+                      <span className="text-slate-500">Stored in Database:</span>
+                      <span className="ml-2 font-mono">{inv.stored_id || 'null'}</span>
+                      {inv.matches_3566727 && (
+                        <Badge className="bg-red-100 text-red-700 ml-2">Matches 3566727!</Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {inv.data && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-blue-600">View Raw Data</summary>
+                      <pre className="mt-2 text-xs bg-slate-100 p-2 rounded overflow-auto max-h-48">
+                        {JSON.stringify(inv.data, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1767,6 +1910,29 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                 {/* NEW: INVESTIGATE 3566727 - AT THE VERY TOP */}
+                <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-purple-900">
+                    <AlertCircle className="w-6 h-6 text-purple-600" />
+                    <strong className="text-lg">🔍 WHAT IS 3566727? - Run This Investigation</strong>
+                  </Label>
+                  <p className="text-sm text-purple-800">
+                    This will investigate whether 3566727 is:<br/>
+                    • An OAuth application ID<br/>
+                    • A user ID<br/>
+                    • Something else in PCO's system<br/>
+                    <strong>This will finally tell us what the mystery ID actually is!</strong>
+                  </p>
+                  <Button 
+                    onClick={testInvestigate3566727} 
+                    disabled={testLoading} 
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 text-base font-semibold mt-3"
+                  >
+                    {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+                    Investigate What 3566727 Actually Is
+                  </Button>
+                </div>
+
                 {/* NEW: Detailed Approval Test - AT THE VERY TOP */}
                 <div className="border-4 border-blue-300 bg-blue-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-blue-900">
