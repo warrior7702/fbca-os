@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,61 +61,6 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
       </div>
     </div>
   );
-};
-
-// Smart code extraction from event data
-const extractSmartSuggestion = (approval, answers) => {
-  const eventName = (approval.event_name || '').toLowerCase();
-  const resourceName = (approval.resource_name || '').toLowerCase();
-  
-  // Combine all text sources
-  const allText = [
-    eventName,
-    resourceName,
-    ...(answers || []).map(a => `${a.question} ${a.answer}`.toLowerCase())
-  ].join(' ');
-  
-  console.log('🧠 Smart analyzing:', allText);
-  
-  // 1. Look for explicit 6-digit codes
-  const codeMatch = allText.match(/\b(\d{6})\b/);
-  if (codeMatch) {
-    console.log('✅ Found explicit code:', codeMatch[1]);
-    return { code: codeMatch[1], reason: 'found in event details' };
-  }
-  
-  // 2. Look for "unlock" keyword
-  if (allText.includes('unlock')) {
-    console.log('✅ Found "unlock" keyword');
-    return { search: 'unlock', reason: 'unlock keyword detected' };
-  }
-  
-  // 3. Look for building keywords
-  const buildingKeywords = {
-    'pcb': 'PCB',
-    'preschool': 'PCB',
-    'pre-school': 'PCB',
-    'fbc': 'FBC',
-    'main building': 'FBC',
-    'first baptist': 'FBC',
-    'wade': 'WADE',
-    'wade center': 'WADE',
-    'sb': 'SB',
-    'sc': 'SB',
-    'student building': 'SB',
-    'student center': 'SB'
-  };
-  
-  for (const [keyword, building] of Object.entries(buildingKeywords)) {
-    if (allText.includes(keyword)) {
-      console.log('✅ Found building keyword:', keyword, '→', building);
-      return { search: building, reason: `${building} building detected` };
-    }
-  }
-  
-  // 4. Default to "building access" search
-  console.log('📍 Defaulting to building access search');
-  return { search: 'unlock', reason: 'building access request' };
 };
 
 export default function MyApprovals() {
@@ -201,7 +147,7 @@ export default function MyApprovals() {
     }
   }, [approvals]);
 
-  // NEW: Auto-suggest codes when answers are loaded
+  // NEW: Use API for smart suggestions when answers are loaded
   useEffect(() => {
     if (Object.keys(answerPreviews).length > 0) {
       autoSuggestCodes();
@@ -306,35 +252,58 @@ export default function MyApprovals() {
     }
   };
 
-  // NEW: Auto-suggest codes intelligently
+  // NEW: Use learning API for smart suggestions
   const autoSuggestCodes = async () => {
-    console.log('🧠 Starting smart auto-suggest...');
+    console.log('🧠 Getting smart suggestions from learning API...');
     
     for (const approval of approvals) {
-      // Skip if already posted or already has a code
       if (postedDoorCodes[approval.request_id] || doorCodes[approval.request_id]) {
         continue;
       }
       
-      const answers = answerPreviews[approval.request_id];
-      const suggestion = extractSmartSuggestion(approval, answers);
-      
-      setSmartSuggestions(prev => ({
-        ...prev,
-        [approval.request_id]: suggestion
-      }));
-      
-      // If we found an explicit code, pre-fill it
-      if (suggestion.code) {
-        console.log('✨ Pre-filling code:', suggestion.code);
-        setDoorCodes(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
-        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
-        toast.success(`Smart-filled code: ${suggestion.code}`, { duration: 2000 });
-      }
-      // If we have a search term, auto-search for it
-      else if (suggestion.search) {
-        console.log('🔍 Auto-searching for:', suggestion.search);
-        searchCardholders(approval.request_id, suggestion.search);
+      try {
+        const answers = answerPreviews[approval.request_id];
+        const response = await base44.functions.invoke('getSmartSuggestion', {
+          event_name: approval.event_name,
+          resource_name: approval.resource_name,
+          answers: answers
+        });
+        
+        if (response.data.ok && response.data.suggestion) {
+          const suggestion = response.data.suggestion;
+          const isLearned = response.data.learned;
+          
+          setSmartSuggestions(prev => ({
+            ...prev,
+            [approval.request_id]: {
+              ...suggestion,
+              learned: isLearned,
+              confidence: response.data.confidence // Assuming confidence comes from API
+            }
+          }));
+          
+          // If we have a learned cardholder, pre-fill it
+          if (isLearned && suggestion.cardholder) {
+            console.log('✨ Pre-filling learned code:', suggestion.cardholder.pin);
+            setDoorCodes(prev => ({ ...prev, [approval.request_id]: suggestion.cardholder.pin }));
+            setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: suggestion.cardholder.pin }));
+            toast.success(`🎓 Smart learned: ${suggestion.cardholder.name} (${suggestion.reason})`, { duration: 3000 });
+          }
+          // If we found an explicit code
+          else if (suggestion.code) {
+            console.log('✨ Pre-filling code:', suggestion.code);
+            setDoorCodes(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
+            setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: suggestion.code }));
+            toast.success(`Smart-filled code: ${suggestion.code}`, { duration: 2000 });
+          }
+          // If we have a search term
+          else if (suggestion.search) {
+            console.log('🔍 Auto-searching for:', suggestion.search);
+            searchCardholders(approval.request_id, suggestion.search);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting smart suggestion:', error);
       }
     }
   };
@@ -404,10 +373,24 @@ export default function MyApprovals() {
     }, 300);
   };
 
-  const handleSelectCardholder = (requestId, cardholder) => {
+  const handleSelectCardholder = async (requestId, cardholder, approval) => {
     setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin }));
     setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin }));
     setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
+    
+    // Learn from this selection
+    try {
+      const searchTerm = cardholderSearchQuery[requestId];
+      await base44.functions.invoke('learnFromSelection', {
+        event_name: approval.event_name,
+        resource_name: approval.resource_name,
+        selected_cardholder: cardholder,
+        search_term: searchTerm
+      });
+      console.log('📚 Learned from selection:', cardholder.name);
+    } catch (error) {
+      console.error('Error learning from selection:', error);
+    }
   };
 
   const handleSendCode = async (approval) => {
@@ -593,13 +576,22 @@ export default function MyApprovals() {
                           </div>
                         )}
 
-                        {/* Smart Suggestion Badge */}
+                        {/* Smart Suggestion Badge - NOW SHOWS IF LEARNED */}
                         {smartSuggestion && !postedCode && (
-                          <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                            <Sparkles className="w-4 h-4 text-purple-600" />
-                            <span className="text-xs text-purple-700 font-medium">
-                              Smart suggestion: {smartSuggestion.reason}
+                          <div className={`flex items-center gap-2 p-2 rounded-lg border ${
+                            smartSuggestion.learned 
+                              ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300' 
+                              : 'bg-purple-50 border-purple-200'
+                          }`}>
+                            <Sparkles className={`w-4 h-4 ${smartSuggestion.learned ? 'text-pink-600' : 'text-purple-600'}`} />
+                            <span className={`text-xs font-medium ${smartSuggestion.learned ? 'text-pink-700' : 'text-purple-700'}`}>
+                              {smartSuggestion.learned ? '🎓 Learned: ' : 'Smart: '}{smartSuggestion.reason}
                             </span>
+                            {smartSuggestion.learned && smartSuggestion.confidence && (
+                              <Badge variant="outline" className="text-xs bg-white/50">
+                                {Math.round(smartSuggestion.confidence * 100)}% confident
+                              </Badge>
+                            )}
                           </div>
                         )}
 
@@ -636,7 +628,7 @@ export default function MyApprovals() {
                                 {cardholderSearchResults[approval.request_id].map((cardholder) => (
                                   <button
                                     key={cardholder.id}
-                                    onClick={() => handleSelectCardholder(approval.request_id, cardholder)}
+                                    onClick={() => handleSelectCardholder(approval.request_id, cardholder, approval)}
                                     className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
                                   >
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
