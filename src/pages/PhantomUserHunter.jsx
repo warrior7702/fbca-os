@@ -26,15 +26,18 @@ export default function PhantomUserHunter() {
     try {
       console.log('🔍 Starting Phantom User Hunt for:', myEmail);
 
-      // Get token directly
-      const tokenResponse = await base44.functions.invoke('getPCOToken');
-      if (!tokenResponse.data.ok) {
-        throw new Error('Failed to get PCO token');
-      }
-      
-      const token = tokenResponse.data.access_token;
-      console.log('✅ Got token');
+      // Get fresh token from database
+      const me = await base44.auth.me();
+      const users = await base44.asServiceRole.entities.User.filter({ email: me.email });
+      const user = users[0];
 
+      if (!user?.pco_access_token) {
+        toast.error('No PCO token found. Please connect PCO in Settings.');
+        setSearching(false);
+        return;
+      }
+
+      const token = user.pco_access_token;
       const report = {
         timestamp: new Date().toISOString(),
         search_email: myEmail,
@@ -120,6 +123,7 @@ export default function PhantomUserHunter() {
           const groups = groupsData.data || [];
           
           for (const group of groups) {
+            // Get people in this group
             const peopleRes = await fetch(`https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -162,7 +166,7 @@ export default function PhantomUserHunter() {
         });
       }
 
-      // SEARCH 4: Test write operation
+      // SEARCH 4: Test write operation to see who it writes as
       console.log('📍 Testing write operation...');
       try {
         const testWriteRes = await fetch('https://api.planningcenteronline.com/calendar/v2/event_resource_requests/99999999', {
@@ -206,7 +210,7 @@ export default function PhantomUserHunter() {
         });
       }
 
-      // SEARCH 5: Search for email in Calendar users
+      // SEARCH 5: Search for your email in Calendar users
       console.log('📍 Searching Calendar users by email...');
       try {
         const searchRes = await fetch(`https://api.planningcenteronline.com/calendar/v2/people?where[search]=${encodeURIComponent(myEmail)}&per_page=100`, {
@@ -237,6 +241,46 @@ export default function PhantomUserHunter() {
       } catch (error) {
         report.locations.push({
           endpoint: 'Calendar User Search',
+          status: 'error',
+          error: error.message
+        });
+      }
+
+      // SEARCH 6: Check OAuth token introspection
+      console.log('📍 Checking OAuth token ownership...');
+      try {
+        const clientId = Deno.env.get('PCO_CLIENT_ID') || 'not-set';
+        const clientSecret = Deno.env.get('PCO_CLIENT_SECRET') || 'not-set';
+        
+        if (clientId !== 'not-set' && clientSecret !== 'not-set') {
+          const introspectRes = await fetch('https://api.planningcenteronline.com/oauth/introspect', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`
+            },
+            body: `token=${token}`
+          });
+          
+          if (introspectRes.ok) {
+            const introspectData = await introspectRes.json();
+            
+            report.locations.push({
+              endpoint: 'OAuth Introspection',
+              status: 'success',
+              client_id: introspectData.client_id,
+              username: introspectData.username,
+              active: introspectData.active
+            });
+            
+            if (introspectData.username === '3566727') {
+              report.findings.push('🚨 CRITICAL: OAuth token belongs to user 3566727!');
+            }
+          }
+        }
+      } catch (error) {
+        report.locations.push({
+          endpoint: 'OAuth Introspection',
           status: 'error',
           error: error.message
         });

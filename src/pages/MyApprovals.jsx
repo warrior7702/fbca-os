@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,14 +17,14 @@ import {
   MapPin,
   Users,
   Key,
-  User,
-  Sparkles
+  User // Added User icon for cardholder search results
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+// Removed CardholderLookup import as it's no longer used
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -72,11 +73,14 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [doorCodes, setDoorCodes] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [postedDoorCodes, setPostedDoorCodes] = useState({});
+  const [postedDoorCodes, setPostedDoorCodes] = useState({}); // NEW: Track posted door codes
+
+  // New state variables for inline cardholder search
   const [cardholderSearchQuery, setCardholderSearchQuery] = useState({});
   const [cardholderSearchResults, setCardholderSearchResults] = useState({});
   const [searchingCardholder, setSearchingCardholder] = useState({});
-  const [smartSuggestions, setSmartSuggestions] = useState({});
+
+  // Removed: showCardholderLookup and currentApprovalForLookup states as they are replaced by inline search
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -134,37 +138,6 @@ export default function MyApprovals() {
     };
   };
 
-  // NEW: Smart suggestion logic
-  const generateSmartSuggestion = (approval, answers) => {
-    const allAnswersText = answers.map(qa => qa.answer.toLowerCase()).join(' ');
-    const eventName = approval.event_name?.toLowerCase() || '';
-    
-    // Check for "unlock" or "no code" keywords
-    if (allAnswersText.includes('unlock') || allAnswersText.includes('no code') || 
-        allAnswersText.includes('no access code') || allAnswersText.includes('not needed')) {
-      return { query: 'unlock', reason: '💡 Detected "no code needed"' };
-    }
-    
-    // Check for building names and suggest building-specific codes
-    if (allAnswersText.includes('wade') || eventName.includes('wade')) {
-      return { query: 'wade event', reason: '💡 Detected WADE building' };
-    }
-    
-    // Look for specific names or numbers in the answers
-    const nameMatch = allAnswersText.match(/\b([A-Z][a-z]+\s[A-Z][a-z]+)\b/);
-    if (nameMatch) {
-      return { query: nameMatch[1], reason: `💡 Detected name: ${nameMatch[1]}` };
-    }
-    
-    // Look for 6-digit codes
-    const codeMatch = allAnswersText.match(/\b(\d{6})\b/);
-    if (codeMatch) {
-      return { query: codeMatch[1], reason: `💡 Detected code: ${codeMatch[1]}` };
-    }
-    
-    return null;
-  };
-
   useEffect(() => {
     loadUser();
     loadApprovals();
@@ -173,24 +146,9 @@ export default function MyApprovals() {
   useEffect(() => {
     if (approvals.length > 0) {
       loadAllAnswerPreviews();
-      loadPostedDoorCodes();
+      loadPostedDoorCodes(); // NEW: Load door codes that were already posted
     }
   }, [approvals]);
-
-  // NEW: Auto-suggest based on answers
-  useEffect(() => {
-    Object.keys(answerPreviews).forEach(requestId => {
-      const approval = approvals.find(a => a.request_id === requestId);
-      if (approval && approval.resource_name?.toLowerCase().includes('building access')) {
-        const suggestion = generateSmartSuggestion(approval, answerPreviews[requestId]);
-        if (suggestion && !smartSuggestions[requestId]) {
-          setSmartSuggestions(prev => ({ ...prev, [requestId]: suggestion }));
-          // Auto-search with the suggestion
-          searchCardholders(requestId, suggestion.query);
-        }
-      }
-    });
-  }, [answerPreviews]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -262,6 +220,7 @@ export default function MyApprovals() {
     }
   };
 
+  // NEW: Load posted door codes for all approvals
   const loadPostedDoorCodes = async () => {
     for (const approval of approvals) {
       try {
@@ -275,7 +234,7 @@ export default function MyApprovals() {
           );
 
           if (doorCodeComment) {
-            const match = doorCodeComment.body.match(/Door Code:\s*(\w+)/);
+            const match = doorCodeComment.body.match(/Door Code:\s*(\d+)/);
             if (match) {
               setPostedDoorCodes(prev => ({
                 ...prev,
@@ -299,8 +258,7 @@ export default function MyApprovals() {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
         setApprovals(response.data.pending_approvals || []);
         setAnswerPreviews({});
-        setPostedDoorCodes({});
-        setSmartSuggestions({});
+        setPostedDoorCodes({}); // Clear posted codes cache
         setLastSync(new Date());
       }
     } catch (error) {
@@ -311,8 +269,9 @@ export default function MyApprovals() {
     }
   };
 
+  // New searchCardholders function
   const searchCardholders = async (requestId, query) => {
-    if (!query || query.length < 2) {
+    if (!query || query.length < 2) { // Only search if query is at least 2 characters long
       setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
       return;
     }
@@ -322,7 +281,7 @@ export default function MyApprovals() {
     try {
       const response = await base44.functions.invoke('cardholdersSearch', {
         q: query,
-        limit: 5
+        limit: 5 // Limiting results to 5 for better UX
       });
 
       if (response.data.ok) {
@@ -331,47 +290,52 @@ export default function MyApprovals() {
           [requestId]: response.data.results || []
         }));
       } else {
+        toast.error(response.data.error || 'Failed to search cardholders');
         setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
       }
     } catch (error) {
       console.error('Cardholder search error:', error);
+      toast.error('Error during cardholder search');
       setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
     } finally {
       setSearchingCardholder(prev => ({ ...prev, [requestId]: false }));
     }
   };
 
+  // New handleCardholderSearchChange function with debouncing
   const handleCardholderSearchChange = (requestId, value) => {
     setCardholderSearchQuery(prev => ({ ...prev, [requestId]: value }));
 
+    // Debounce search to avoid too many API calls
     if (window.cardholderSearchTimeout) {
       clearTimeout(window.cardholderSearchTimeout);
     }
 
     window.cardholderSearchTimeout = setTimeout(() => {
       searchCardholders(requestId, value);
-    }, 300);
+    }, 300); // 300ms debounce
   };
 
+  // New handleSelectCardholder for inline results
   const handleSelectCardholder = (requestId, cardholder) => {
-    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin }));
-    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin }));
-    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] }));
+    setDoorCodes(prev => ({ ...prev, [requestId]: cardholder.pin })); // Set the actual door code
+    setCardholderSearchQuery(prev => ({ ...prev, [requestId]: cardholder.pin })); // Update input field with selected PIN
+    setCardholderSearchResults(prev => ({ ...prev, [requestId]: [] })); // Clear search results
   };
 
   const handleSendCode = async (approval) => {
     const doorCode = doorCodes[approval.request_id];
-
+    
     if (!doorCode || doorCode.trim() === '') {
       toast.error('Please enter a door code');
       return;
     }
 
     setSendingCode(approval.request_id);
-
+    
     try {
       console.log('🚪 Posting door code to PCO event...');
-
+      
       const response = await base44.functions.invoke('writePCONote', {
         event_id: approval.event_id,
         badge_code: doorCode.trim()
@@ -379,14 +343,15 @@ export default function MyApprovals() {
 
       if (response.data.ok) {
         toast.success('Door code posted to event activity in PCO!');
-
+        
+        // Update posted door codes state to show the code was posted
         setPostedDoorCodes(prev => ({
           ...prev,
           [approval.request_id]: doorCode.trim()
         }));
-
-        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' }));
-        setCardholderSearchQuery(prev => ({ ...prev, [requestId]: '' }));
+        
+        setDoorCodes(prev => ({ ...prev, [approval.request_id]: '' })); // Clear input after sending
+        setCardholderSearchQuery(prev => ({ ...prev, [approval.request_id]: '' })); // Also clear the search query input
       } else {
         toast.error(response.data.error || 'Failed to post door code');
       }
@@ -478,8 +443,7 @@ export default function MyApprovals() {
               approvals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
-                const postedCode = postedDoorCodes[approval.request_id];
-                const suggestion = smartSuggestions[approval.request_id];
+                const postedCode = postedDoorCodes[approval.request_id]; // Get posted code
 
                 return (
                   <motion.div
@@ -542,6 +506,7 @@ export default function MyApprovals() {
                           </div>
                         )}
 
+                        {/* Show posted door code if available */}
                         {postedCode && (
                           <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                             <Key className="w-4 h-4 text-green-600" />
@@ -551,90 +516,80 @@ export default function MyApprovals() {
                           </div>
                         )}
 
-                        <div className="space-y-3 pt-4 border-t border-slate-200">
-                          {approval.resource_name?.toLowerCase().includes('building access') && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-700">Door Code (Optional):</p>
-                                {suggestion && (
-                                  <Badge variant="outline" className="flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200">
-                                    <Sparkles className="w-3 h-3" />
-                                    {suggestion.reason}
-                                  </Badge>
-                                )}
+                        <div className="space-y-2 pt-4">
+                          {/* Door Code Input with Inline Search */}
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              placeholder="Type name or door code to search..."
+                              value={cardholderSearchQuery[approval.request_id] || ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
+                                handleCardholderSearchChange(approval.request_id, value);
+                              }}
+                              className="w-full"
+                              maxLength={50}
+                              disabled={!!postedCode} // Disable if code already posted
+                            />
+                            {searchingCardholder[approval.request_id] && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                            )}
+                            
+                            {/* Inline Search Results */}
+                            {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                                {cardholderSearchResults[approval.request_id].map((cardholder) => (
+                                  <button
+                                    key={cardholder.id}
+                                    onClick={() => handleSelectCardholder(approval.request_id, cardholder)}
+                                    className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                                  >
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                      <User className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-slate-900">{cardholder.name}</p>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
+                                          <Key className="w-3 h-3" />
+                                          {cardholder.pin}#
+                                        </span>
+                                        {cardholder.member_id && (
+                                          <span className="text-xs text-slate-500">
+                                            • ID: {cardholder.member_id}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
                               </div>
-                              <div className="relative">
-                                <Input
-                                  type="text"
-                                  placeholder="Type name or door code to search..."
-                                  value={cardholderSearchQuery[approval.request_id] || ''}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
-                                    handleCardholderSearchChange(approval.request_id, value);
-                                  }}
-                                  className="w-full"
-                                  maxLength={50}
-                                  disabled={!!postedCode}
-                                />
-                                {searchingCardholder[approval.request_id] && (
-                                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
-                                )}
+                            )}
+                          </div>
 
-                                {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
-                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                                    {cardholderSearchResults[approval.request_id].map((cardholder) => (
-                                      <button
-                                        key={cardholder.id}
-                                        onClick={() => handleSelectCardholder(approval.request_id, cardholder)}
-                                        className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
-                                      >
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-                                          <User className="w-5 h-5 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="font-semibold text-slate-900">{cardholder.name}</p>
-                                          <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
-                                              <Key className="w-3 h-3" />
-                                              {cardholder.pin}#
-                                            </span>
-                                            {cardholder.member_id && (
-                                              <span className="text-xs text-slate-500">
-                                                • ID: {cardholder.member_id}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              <Button
-                                onClick={() => handleSendCode(approval)}
-                                disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
-                                variant="outline"
-                                className="w-full"
-                              >
-                                {sendingCode === approval.request_id ? (
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Key className="w-4 h-4 mr-2" />
-                                )}
-                                {postedCode ? 'Code Already Posted' : 'Send Code to PCO'}
-                              </Button>
-                            </div>
-                          )}
-
-                          <Button
-                            onClick={() => window.open('https://calendar.planningcenteronline.com/approvals', '_blank')}
-                            className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                          >
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Approve in PCO
-                          </Button>
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleSendCode(approval)}
+                              disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
+                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                            >
+                              {sendingCode === approval.request_id ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Key className="w-4 h-4 mr-2" />
+                              )}
+                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
+                            </Button>
+                            <Button
+                              onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
+                              variant="outline"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              View in PCO
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -651,6 +606,7 @@ export default function MyApprovals() {
         onClose={() => setShowCalendar(false)}
         approvals={approvals}
       />
+      {/* Removed CardholderLookup modal entirely as its functionality is now inline */}
     </div>
   );
 }
