@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 Deno.serve(async (req) => {
@@ -20,14 +19,20 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'badge_code required' }, { status: 400 });
     }
 
-    // Format badge code to ensure format is xxxxxx# (6 digits + #)
-    let formattedCode = String(badge_code).replace(/#/g, '').trim(); // Remove any existing #
-    if (!/^\d{6}$/.test(formattedCode)) {
+    // Format badge code - support both numeric codes and special codes like "Unlock"
+    let formattedCode = String(badge_code).trim();
+    
+    // If it's a 6-digit numeric code, format it with #
+    if (/^\d{6}$/.test(formattedCode)) {
+      formattedCode = formattedCode + '#';
+    }
+    // For non-numeric codes (like "Unlock"), keep as-is
+    // Just ensure it's not empty
+    else if (formattedCode.length === 0) {
       return Response.json({ 
-        error: 'Invalid door code format. Must be 6 digits.' 
+        error: 'Invalid door code format. Code cannot be empty.' 
       }, { status: 400 });
     }
-    formattedCode = formattedCode + '#'; // Add # at the end
 
     // Get PCO Admin credentials (Personal Access Token)
     const appId = Deno.env.get('PCO_APP_ID2');
