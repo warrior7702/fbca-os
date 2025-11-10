@@ -592,7 +592,7 @@ export default function MyApprovals() {
 
                           {/* Single "Approve in PCO" Button */}
                           <Button
-                            onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
+                            onClick={() => window.open('https://calendar.planningcenteronline.com/approvals', '_blank')}
                             className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                           >
                             <ExternalLink className="w-4 h-4 mr-2" />
