@@ -662,7 +662,7 @@ export default function PCOAPITester() {
       toast.error('Please enter a request ID');
       return;
     }
-    
+
     setTestLoading(true);
     setResult(null);
     setDetailedTestResult(null);
@@ -671,14 +671,14 @@ export default function PCOAPITester() {
       const response = await base44.functions.invoke('investigateSpecificRequest', {
         request_id: eventId
       });
-      
+
       setResult({
         ok: true,
         status: 200,
         data: response.data,
         endpoint: 'investigateSpecificRequest'
       });
-      
+
       toast.success('Investigation complete!');
     } catch (error) {
       console.error('❌ Investigation error:', error);
@@ -692,20 +692,171 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Test different approval formats
+  const testApprovalFormats = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+
+    setTestLoading(true);
+    setResult(null);
+    setDetailedTestResult(null);
+    try {
+      console.log('🧪 Testing different approval formats for request:', eventId);
+      const response = await base44.functions.invoke('testApprovalFormats', {
+        request_id: eventId
+      });
+
+      setResult({
+        ok: true,
+        status: 200,
+        data: response.data,
+        endpoint: 'testApprovalFormats'
+      });
+
+      toast.success('Format tests complete! Check results below.');
+    } catch (error) {
+      console.error('❌ Test error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Test failed: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
 
     const data = result.data;
 
+    // NEW: Approval format test results
+    if (result.endpoint === 'testApprovalFormats') {
+      const report = data.report;
+
+      return (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-900 text-lg">🧪 Approval Format Test Results</h3>
+
+          {/* Verdict */}
+          {report.verdict && (
+            <Card className={`border-2 ${report.verdict.found_working_format ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {report.verdict.found_working_format ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  Result
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {report.verdict.found_working_format ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-green-900">✅ Found a working format!</p>
+                    <div className="p-3 bg-white rounded border">
+                      <p className="text-sm font-semibold mb-2">Working Formats:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {report.verdict.working_formats.map((format, idx) => (
+                          <li key={idx} className="text-green-700">{format}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="text-sm text-slate-700 mt-3">
+                      <strong>Recommendation:</strong> {report.verdict.recommendation}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-red-900">❌ No working format found</p>
+                    <p className="text-sm text-red-700">{report.verdict.message}</p>
+                    {report.verdict.all_still_use_phantom && (
+                      <Alert className="bg-red-100 border-red-300 mt-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          All formats still reference user 3566727. This is a PCO permission/ownership issue, not a format issue.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Test Results */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">All Format Tests ({report.tests?.length || 0})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {report.tests?.map((test, idx) => (
+                <Card key={idx} className={`border-2 ${test.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-slate-900">{test.test_name}</h4>
+                      <Badge className={test.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                        HTTP {test.status}
+                      </Badge>
+                    </div>
+
+                    {test.success ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-green-700">✅ Success!</p>
+                        {test.response && (
+                          <details>
+                            <summary className="text-xs text-blue-600 cursor-pointer">View Response</summary>
+                            <pre className="text-xs mt-2 p-2 bg-white rounded overflow-auto max-h-32">
+                              {test.response}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-red-700">❌ Failed</p>
+                        {test.still_uses_phantom && (
+                          <Badge className="bg-red-500 text-white text-xs">Still uses 3566727</Badge>
+                        )}
+                        {test.error && (
+                          <details>
+                            <summary className="text-xs text-red-600 cursor-pointer">View Error</summary>
+                            <pre className="text-xs mt-2 p-2 bg-white rounded overflow-auto max-h-32">
+                              {test.error}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    )}
+
+                    <details className="mt-2">
+                      <summary className="text-xs text-slate-600 cursor-pointer">View Request Body</summary>
+                      <pre className="text-xs mt-2 p-2 bg-white rounded overflow-auto max-h-48">
+                        {JSON.stringify(test.request_body, null, 2)}
+                      </pre>
+                    </details>
+                  </CardContent>
+                </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     // NEW: Specific request investigation results
     if (result.endpoint === 'investigateSpecificRequest') {
       const report = data.report;
-      
+
       return (
         <div className="space-y-4">
           <h3 className="font-semibold text-slate-900 text-lg">🔍 Request Investigation Results</h3>
-          
+
           {/* Verdict */}
           {report.verdict && (
             <Card className={`border-2 ${report.verdict.phantom_found ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
@@ -2342,6 +2493,39 @@ export default function PCOAPITester() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* NEW: TEST DIFFERENT APPROVAL FORMATS - AT THE VERY TOP */}
+                <div className="border-4 border-green-300 bg-green-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-green-900">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <strong className="text-lg">🎯 TEST DIFFERENT APPROVAL FORMATS - Find What Works!</strong>
+                  </Label>
+                  <p className="text-sm text-green-800">
+                    This will try 5 DIFFERENT ways to format the approval request:<br/>
+                    • Standard format<br/>
+                    • With approved_by_id in attributes<br/>
+                    • With approved_by in relationships<br/>
+                    • Minimal format<br/>
+                    • With meta user context<br/>
+                    <strong>Use Request ID: 31642685 from Building Access!</strong>
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Input
+                      placeholder="Request ID (e.g., 31642685)"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={testApprovalFormats}
+                      disabled={testLoading}
+                      className="bg-green-600 hover:bg-green-700 text-white h-12 px-6 text-base font-semibold"
+                    >
+                      {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+                      Test All Formats
+                    </Button>
+                  </div>
+                </div>
+
                 {/* NEW: INVESTIGATE SPECIFIC REQUEST - AT THE VERY TOP */}
                 <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
                   <Label className="flex items-center gap-2 text-purple-900">
@@ -2364,9 +2548,9 @@ export default function PCOAPITester() {
                       onChange={(e) => setEventId(e.target.value)}
                       className="flex-1"
                     />
-                    <Button 
-                      onClick={testInvestigateRequest} 
-                      disabled={testLoading} 
+                    <Button
+                      onClick={testInvestigateRequest}
+                      disabled={testLoading}
                       className="bg-purple-600 hover:bg-purple-700 text-white h-12 px-6 text-base font-semibold"
                     >
                       {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <AlertCircle className="w-5 h-5 mr-2" />}
