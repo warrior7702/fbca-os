@@ -184,7 +184,7 @@ export default function MyTasks() {
         window.open(event.meetingLink.url, '_blank');
         toast.success(`Opening ${event.meetingLink.provider || 'meeting'}...`);
       } else {
-        toast.info('No meeting link available for this event.');
+        toast.info('No meeting link available');
       }
     } else { // Existing PCO event click handling
       setSelectedScheduleEvent(event);
@@ -392,7 +392,7 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"> {/* Adjusted grid for 3 columns on md screens */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
               <div className="flex items-center justify-between mb-2">
