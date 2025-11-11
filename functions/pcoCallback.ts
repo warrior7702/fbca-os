@@ -3,14 +3,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 Deno.serve(async (req) => {
     const startTime = Date.now();
     
-    // Get base URL first thing
+    // Get base URL - redirect to root with hash for client-side routing
     const baseUrl = Deno.env.get('BASE44_APP_URL') || '';
-    const settingsUrl = baseUrl ? `${baseUrl}/Settings?tab=integrations` : '/Settings?tab=integrations';
     
     console.log('========================================');
     console.log('🔄 PCO Callback Started');
     console.log('🌐 BASE44_APP_URL:', baseUrl || 'NOT SET');
-    console.log('🔗 Settings URL:', settingsUrl);
     
     try {
         const url = new URL(req.url);
@@ -22,16 +20,23 @@ Deno.serve(async (req) => {
         console.log('📝 State (user_id):', state || 'MISSING');
         console.log('❌ Error param:', error || 'none');
 
+        // Helper to build redirect URL
+        const buildRedirectUrl = (params) => {
+            const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
+            // Use hash-based routing for client-side navigation
+            return `${redirectBase}/#/Settings?${params}`;
+        };
+
         // Handle PCO OAuth error
         if (error) {
             console.error('❌ PCO returned error:', error);
-            return Response.redirect(`${settingsUrl}&error=pco_auth_failed`, 302);
+            return Response.redirect(buildRedirectUrl('tab=integrations&error=pco_auth_failed'), 302);
         }
 
         // Validate required parameters
         if (!code || !state) {
             console.error('❌ Missing required parameters');
-            return Response.redirect(`${settingsUrl}&error=missing_params`, 302);
+            return Response.redirect(buildRedirectUrl('tab=integrations&error=missing_params'), 302);
         }
 
         console.log('✅ Parameters validated');
@@ -40,7 +45,7 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         console.log('✅ Base44 client created');
         
-        // Build redirect URI
+        // Build redirect URI for PCO
         const redirectUri = baseUrl ? `${baseUrl}/functions/pcoCallback` : `${url.protocol}//${url.host}/functions/pcoCallback`;
         console.log('🔑 Redirect URI:', redirectUri);
         
@@ -50,7 +55,7 @@ Deno.serve(async (req) => {
         
         if (!clientId || !clientSecret) {
             console.error('❌ Missing PCO credentials');
-            return Response.redirect(`${settingsUrl}&error=pco_credentials_missing`, 302);
+            return Response.redirect(buildRedirectUrl('tab=integrations&error=pco_credentials_missing'), 302);
         }
 
         console.log('✅ PCO credentials found');
@@ -75,7 +80,7 @@ Deno.serve(async (req) => {
             const errorText = await tokenResponse.text();
             console.error('❌ Token exchange failed:', tokenResponse.status);
             console.error('❌ Response:', errorText);
-            return Response.redirect(`${settingsUrl}&error=token_exchange_failed`, 302);
+            return Response.redirect(buildRedirectUrl('tab=integrations&error=token_exchange_failed'), 302);
         }
 
         const tokens = await tokenResponse.json();
@@ -123,8 +128,8 @@ Deno.serve(async (req) => {
         console.log('✅ User updated successfully');
         console.log('⏱️ Total time:', elapsed, 'ms');
 
-        // Redirect to Settings with success
-        const successUrl = `${settingsUrl}&connected=pco&t=${Date.now()}`;
+        // Redirect to Settings with success using hash routing
+        const successUrl = buildRedirectUrl(`tab=integrations&connected=pco&t=${Date.now()}`);
         console.log('🎉 Success! Redirecting to:', successUrl);
         console.log('========================================');
         
@@ -139,6 +144,8 @@ Deno.serve(async (req) => {
         console.error('📚 Stack:', error.stack);
         console.error('========================================');
         
-        return Response.redirect(`${settingsUrl}&error=callback_failed`, 302);
+        const url = new URL(req.url);
+        const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
+        return Response.redirect(`${redirectBase}/#/Settings?tab=integrations&error=callback_failed`, 302);
     }
 });
