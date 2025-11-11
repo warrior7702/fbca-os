@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-// Building code keywords mapping
 const buildingKeywords = {
   'pcb': ['pcb', 'preschool', 'pre-school', 'preschool building'],
   'fbc': ['fbc', 'main', 'main building', 'first baptist'],
@@ -20,10 +19,8 @@ function matchesBuilding(query, record) {
   const email = normalize(record.email);
   const memberId = normalize(record.member_id);
   
-  // Check if query matches any building keyword
   for (const [building, keywords] of Object.entries(buildingKeywords)) {
     if (keywords.some(k => qn.includes(k) || k.includes(qn))) {
-      // Check if this record is associated with this building
       if (name.includes(building) || email.includes(building) || memberId.includes(building)) {
         return true;
       }
@@ -82,34 +79,39 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     
-    // Check authentication
     const user = await base44.auth.me();
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Read from POST body
-    const body = await req.json().catch(() => ({}));
-    const q = body.q || '';
-    const limit = parseInt(body.limit || '12', 10);
+    // FIXED: Support both POST body and URL params
+    let q = '';
+    let limit = 12;
+    
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      q = body.q || body.query || '';
+      limit = parseInt(body.limit || '12', 10);
+    } else {
+      // GET request - read from URL params
+      const url = new URL(req.url);
+      q = url.searchParams.get('q') || url.searchParams.get('query') || '';
+      limit = parseInt(url.searchParams.get('limit') || '12', 10);
+    }
 
-    console.log(`🔍 Searching for: "${q}"`);
+    console.log(`🔍 Searching for: "${q}" (method: ${req.method})`);
 
     // Get all cardholders
     const cardholders = await base44.asServiceRole.entities.Cardholder.list();
-    console.log(`📊 Total cardholders in database: ${cardholders.length}`);
+    console.log(`📊 Total cardholders: ${cardholders.length}`);
 
-    if (cardholders.length === 0) {
-      console.log('⚠️ No cardholders found in database!');
+    if (!cardholders || cardholders.length === 0) {
       return Response.json({ 
         ok: true, 
         results: [],
         debug: { total: 0, query: q }
       });
     }
-
-    // Log first record structure
-    console.log(`📋 First record structure:`, cardholders[0]);
 
     // Score and filter results
     const results = cardholders
@@ -120,9 +122,6 @@ Deno.serve(async (req) => {
       .map(x => x.r);
 
     console.log(`✅ Found ${results.length} matching results`);
-    if (results.length > 0) {
-      console.log(`📋 Top result:`, results[0]);
-    }
 
     return Response.json({ 
       ok: true, 
@@ -133,7 +132,10 @@ Deno.serve(async (req) => {
         matched: results.length 
       }
     }, {
-      headers: { 'Cache-Control': 'no-store' }
+      headers: { 
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json'
+      }
     });
 
   } catch (error) {
@@ -142,6 +144,9 @@ Deno.serve(async (req) => {
       ok: false, 
       error: error.message,
       results: []
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 });

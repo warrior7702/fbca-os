@@ -1,16 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-// Normalize text for pattern matching
 function normalizePattern(text) {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Remove special chars
-    .replace(/\s+/g, ' ') // Collapse spaces
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-// Extract key words from event name
 function extractKeyWords(text) {
   if (!text) return '';
   
@@ -18,7 +16,7 @@ function extractKeyWords(text) {
   const normalized = normalizePattern(text);
   const words = normalized.split(' ').filter(w => w.length > 2 && !stopWords.includes(w));
   
-  return words.slice(0, 3).join(' '); // Top 3 keywords
+  return words.slice(0, 3).join(' ');
 }
 
 Deno.serve(async (req) => {
@@ -46,35 +44,56 @@ Deno.serve(async (req) => {
 
     console.log('📚 Learning from selection:', {
       event: event_name,
+      resource: resource_name,
       cardholder: selected_cardholder.name,
+      pin: selected_cardholder.pin,
       search: search_term
     });
 
-    // Create patterns
+    // FIXED: Create unique pattern based on event AND resource
     const eventPattern = extractKeyWords(event_name);
     const resourcePattern = normalizePattern(resource_name);
+    
+    // IMPORTANT: Use a composite key to avoid duplicate PINs
+    const patternKey = `${eventPattern}|${resourcePattern}`.substring(0, 100);
 
-    console.log('🔍 Extracted patterns:', { eventPattern, resourcePattern });
+    console.log('🔍 Pattern key:', patternKey);
+    console.log('🔍 Selected PIN:', selected_cardholder.pin);
 
-    // Check if this pattern already exists
+    // FIXED: Check for existing pattern using composite key
     const existingPatterns = await base44.asServiceRole.entities.SmartSearchPattern.filter({
       event_name_pattern: eventPattern,
-      selected_pin: selected_cardholder.pin
+      resource_name_pattern: resourcePattern
     });
 
-    if (existingPatterns.length > 0) {
+    console.log(`📊 Found ${existingPatterns.length} existing patterns for this event+resource`);
+
+    // FIXED: Find pattern that matches BOTH event+resource AND the selected PIN
+    const existingPattern = existingPatterns.find(p => p.selected_pin === selected_cardholder.pin);
+
+    if (existingPattern) {
       // Update existing pattern - increase confidence
-      const pattern = existingPatterns[0];
-      await base44.asServiceRole.entities.SmartSearchPattern.update(pattern.id, {
-        times_selected: (pattern.times_selected || 1) + 1,
-        confidence_score: Math.min(10, (pattern.confidence_score || 1) + 0.5),
+      const newTimesSelected = (existingPattern.times_selected || 1) + 1;
+      const newConfidence = Math.min(10, (existingPattern.confidence_score || 1) + 0.5);
+      
+      await base44.asServiceRole.entities.SmartSearchPattern.update(existingPattern.id, {
+        times_selected: newTimesSelected,
+        confidence_score: newConfidence,
         last_used: new Date().toISOString(),
-        search_term_used: search_term || pattern.search_term_used
+        search_term_used: search_term || existingPattern.search_term_used
       });
       
-      console.log('✅ Updated existing pattern - confidence now:', pattern.confidence_score + 0.5);
+      console.log(`✅ Updated existing pattern - confidence: ${existingPattern.confidence_score} → ${newConfidence}, times: ${existingPattern.times_selected} → ${newTimesSelected}`);
     } else {
-      // Create new pattern
+      // FIXED: Check if there's a different PIN for this event+resource combo
+      if (existingPatterns.length > 0) {
+        console.log('⚠️ Different PIN selected for same event+resource:');
+        console.log('   Previous PIN:', existingPatterns[0].selected_pin);
+        console.log('   New PIN:', selected_cardholder.pin);
+        console.log('   Creating separate pattern...');
+      }
+      
+      // Create new pattern with the NEW PIN
       await base44.asServiceRole.entities.SmartSearchPattern.create({
         event_name_pattern: eventPattern,
         resource_name_pattern: resourcePattern,
@@ -87,7 +106,7 @@ Deno.serve(async (req) => {
         last_used: new Date().toISOString()
       });
       
-      console.log('✅ Created new pattern');
+      console.log('✅ Created new pattern with PIN:', selected_cardholder.pin);
     }
 
     return Response.json({ 
