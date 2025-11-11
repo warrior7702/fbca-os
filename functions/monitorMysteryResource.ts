@@ -132,8 +132,17 @@ Deno.serve(async (req) => {
 
       newRequests.push(commRequest);
 
-      // TODO: Send email notification to requestor
-      // Will be implemented in next step with email testing
+      // Send email notification to event owner
+      try {
+        console.log('📧 Sending email notification for request:', commRequest.id);
+        await base44.asServiceRole.functions.invoke('sendCommunicationRequestEmail', {
+          request_id: commRequest.id
+        });
+        console.log('✅ Email sent successfully');
+      } catch (emailError) {
+        console.error('❌ Failed to send email:', emailError);
+        // Continue even if email fails - don't block the request creation
+      }
     }
 
     return Response.json({

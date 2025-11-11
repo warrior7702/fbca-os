@@ -554,12 +554,11 @@ export default function PCOAPITester() {
     setTestLoading(true);
     setResult(null);
     try {
-      console.log('📧 Testing communication request email:', eventId);
+      console.log('📧 Testing communication request email for request:', eventId);
       
-      // Send email notification
+      // Send email notification - will automatically send to the event owner
       const response = await base44.functions.invoke('sendCommunicationRequestEmail', {
-        request_id: eventId,
-        recipient_email: user.email
+        request_id: eventId
       });
       
       setResult({
@@ -570,7 +569,7 @@ export default function PCOAPITester() {
       });
       
       if (response.data.success) {
-        toast.success('📧 Email sent successfully!');
+        toast.success(`📧 Email sent to ${response.data.recipient}!`);
       } else {
         toast.error('Failed to send email');
       }
@@ -1469,14 +1468,35 @@ export default function PCOAPITester() {
     if (result.endpoint === 'sendCommunicationRequestEmail') {
       return (
         <div className="space-y-3">
-          <h3 className="font-semibold text-slate-900">📧 Communication Request Email Result</h3>
+          <h3 className="font-semibold text-slate-900">📧 Email Notification Result</h3>
           {data.success ? (
-            <p className="text-green-700">Email sent successfully!</p>
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-semibold">Email Sent Successfully!</span>
+                  </div>
+                  <div className="mt-3 space-y-1 text-sm">
+                    <p><strong>Sent to:</strong> {data.recipient}</p>
+                    <p><strong>Request Number:</strong> {data.request_number}</p>
+                    <p><strong>Event:</strong> {data.request_title}</p>
+                  </div>
+                  <Alert className="bg-white border-green-300 mt-3">
+                    <AlertDescription className="text-sm">
+                      ✅ The event owner should receive the test email at <strong>{data.recipient}</strong>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
-            <p className="text-red-700">Failed to send email: {data.error || 'Unknown error'}</p>
-          )}
-          {data.message && (
-            <p className="text-slate-700">{data.message}</p>
+            <Alert className="border-red-300 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-900">
+                {data.error || 'Failed to send email'}
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       );
@@ -1852,7 +1872,7 @@ export default function PCOAPITester() {
                   <AlertDescription className="text-sm">
                     <strong>How it works:</strong> When a "Mystery Resource" is requested in PCO Calendar, 
                     the system automatically creates a Communication Request and sends an email notification 
-                    to the requestor with the workflow details.
+                    to the event owner (requestor).
                   </AlertDescription>
                 </Alert>
 
@@ -1875,43 +1895,27 @@ export default function PCOAPITester() {
                     </Button>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Enter a WorkflowRequest ID to test sending the email notification.
-                    The email will be sent to your email address ({user?.email}).
+                    Enter a WorkflowRequest ID. The email will automatically be sent to the event owner (requestor_email).
                   </p>
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                  <h3 className="font-semibold text-sm">📧 Email Template Preview</h3>
+                  <h3 className="font-semibold text-sm">📧 Current Email Template</h3>
                   <Card className="bg-slate-50">
                     <CardContent className="p-4">
                       <div className="space-y-3 text-sm">
                         <div>
                           <p className="text-xs text-slate-500">Subject:</p>
-                          <p className="font-semibold">Communications Request Created: [Event Name]</p>
+                          <p className="font-semibold">Communications Request: [Event Name]</p>
                         </div>
                         <div className="border-t pt-3">
                           <p className="text-xs text-slate-500 mb-2">Body:</p>
-                          <div className="space-y-2 text-slate-700">
-                            <p>Hello [Requestor Name],</p>
-                            <p>Your communications request has been created automatically from your Planning Center Calendar event.</p>
-                            <div className="bg-white p-3 rounded border my-3">
-                              <p className="font-semibold mb-1">Request Details:</p>
-                              <ul className="text-xs space-y-1">
-                                <li>• Request Number: CR-XXXXXX</li>
-                                <li>• Event: [Event Name]</li>
-                                <li>• Event Date: [Event Date]</li>
-                                <li>• Status: Minister Goal Review</li>
-                              </ul>
-                            </div>
-                            <div>
-                              <p className="font-semibold">Next Steps:</p>
-                              <p className="text-xs">Your request will go through:</p>
-                              <ol className="text-xs list-decimal list-inside mt-1">
-                                <li>Minister Goal Review</li>
-                                <li>Project Review</li>
-                                <li>Campaign Running</li>
-                              </ol>
-                            </div>
+                          <div className="space-y-2 text-slate-700 bg-white p-3 rounded border font-mono text-xs">
+                            <p>Testing from Base44 Communications ticket</p>
+                            <p className="mt-2">Request Number: CR-XXXXXX</p>
+                            <p>Event: [Event Name]</p>
+                            <p>Requestor: [Name]</p>
+                            <p className="mt-2">This is a test email notification from the Communications Request system.</p>
                           </div>
                         </div>
                       </div>
@@ -1925,10 +1929,10 @@ export default function PCOAPITester() {
                     <strong>Testing Steps:</strong>
                     <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
                       <li>Create a test event in PCO Calendar with "Mystery Resource"</li>
-                      <li>Click "Sync PCO" in the Communications Request page</li>
+                      <li>Go to Communications Request page and click "Sync PCO"</li>
                       <li>Find the new request ID in the dashboard</li>
-                      <li>Enter that ID here and click "Send Test Email"</li>
-                      <li>Check your inbox for the notification</li>
+                      <li>Enter that ID above and click "Send Test Email"</li>
+                      <li>Event owner will receive the test email</li>
                     </ol>
                   </AlertDescription>
                 </Alert>

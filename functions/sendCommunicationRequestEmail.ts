@@ -5,92 +5,63 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     
     const body = await req.json();
-    const { request_id, recipient_email } = body;
+    const { request_id } = body;
 
-    if (!request_id || !recipient_email) {
+    if (!request_id) {
       return Response.json({ 
-        error: 'Missing required fields: request_id and recipient_email' 
+        error: 'Missing required field: request_id' 
       }, { status: 400 });
     }
 
     // Fetch the communication request
-    const request = await base44.asServiceRole.entities.WorkflowRequest.filter({ id: request_id });
+    const requests = await base44.asServiceRole.entities.WorkflowRequest.filter({ id: request_id });
     
-    if (!request || request.length === 0) {
+    if (!requests || requests.length === 0) {
       return Response.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    const commRequest = request[0];
+    const commRequest = requests[0];
 
-    // Build email content based on request type
-    let emailSubject = '';
-    let emailBody = '';
-
-    if (commRequest.type === 'mystery_resource') {
-      emailSubject = `Communications Request Created: ${commRequest.title}`;
-      emailBody = `
-Hello ${commRequest.requestor_name},
-
-Your communications request has been created automatically from your Planning Center Calendar event.
-
-Request Details:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Request Number: ${commRequest.request_number}
-Event: ${commRequest.pco_event_name}
-Event Date: ${commRequest.pco_event_date ? new Date(commRequest.pco_event_date).toLocaleDateString() : 'Not specified'}
-Status: Minister Goal Review
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Next Steps:
-Your request will go through the following workflow:
-1. Minister Goal Review - Define your ministry goals and objectives
-2. Project Review - Communications team reviews project scope
-3. Campaign Running - Active execution and delivery
-
-You can view and update your request at any time in the Communications Request portal.
-
-Questions? Reply to this email or contact the communications team.
-
-Best regards,
-Communications Team
-      `.trim();
-    } else {
-      emailSubject = `Communications Request: ${commRequest.title}`;
-      emailBody = `
-Hello ${commRequest.requestor_name},
-
-Your communications request has been received.
-
-Request Number: ${commRequest.request_number}
-Title: ${commRequest.title}
-Status: ${commRequest.status}
-
-You can view and manage your request in the Communications Request portal.
-
-Best regards,
-Communications Team
-      `.trim();
+    // Get the event owner's email from the request
+    const recipientEmail = commRequest.requestor_email;
+    
+    if (!recipientEmail) {
+      return Response.json({ error: 'No requestor email found on request' }, { status: 400 });
     }
+
+    // Simple test email
+    const emailSubject = `Communications Request: ${commRequest.title}`;
+    const emailBody = `Testing from Base44 Communications ticket
+
+Request Number: ${commRequest.request_number}
+Event: ${commRequest.pco_event_name || commRequest.title}
+Requestor: ${commRequest.requestor_name}
+
+This is a test email notification from the Communications Request system.`;
+
+    console.log('📧 Sending email to:', recipientEmail);
+    console.log('📋 Request:', commRequest.request_number);
 
     // Send email using Base44 Core integration
     const emailResult = await base44.asServiceRole.integrations.Core.SendEmail({
       from_name: 'Communications Team',
-      to: recipient_email,
+      to: recipientEmail,
       subject: emailSubject,
       body: emailBody
     });
 
+    console.log('✅ Email sent successfully');
+
     return Response.json({
       success: true,
       email_sent: true,
-      recipient: recipient_email,
-      request_number: commRequest.request_number
+      recipient: recipientEmail,
+      request_number: commRequest.request_number,
+      request_title: commRequest.title
     });
 
   } catch (error) {
-    console.error('Error sending communication request email:', error);
+    console.error('❌ Error sending communication request email:', error);
     return Response.json({ 
       error: error.message,
       details: 'Failed to send email notification'
