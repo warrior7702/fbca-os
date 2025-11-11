@@ -24,7 +24,12 @@ import {
   Target,
   Presentation,
   Megaphone,
-  Edit
+  Edit,
+  LayoutGrid,
+  List,
+  Calendar as CalendarIcon,
+  Building2,
+  Archive
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -45,6 +50,7 @@ export default function WorkflowHub() {
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
   const [view, setView] = useState('requestor');
+  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'list'
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const navigate = useNavigate();
 
@@ -80,7 +86,7 @@ export default function WorkflowHub() {
 
       // If admin/worker, load all requests
       if (isWorker) {
-        const allReqs = await base44.entities.WorkflowRequest.list('-created_date', 50);
+        const allReqs = await base44.entities.WorkflowRequest.list('-created_date', 100);
         setAllRequests(allReqs);
       }
 
@@ -123,7 +129,6 @@ export default function WorkflowHub() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'request': return 'bg-blue-100 text-blue-700 border-blue-300';
       case 'minister_goal_review': return 'bg-purple-100 text-purple-700 border-purple-300';
       case 'project_review': return 'bg-orange-100 text-orange-700 border-orange-300';
       case 'campaign_running': return 'bg-green-100 text-green-700 border-green-300';
@@ -135,7 +140,6 @@ export default function WorkflowHub() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'request': return <FileText className="w-4 h-4" />;
       case 'minister_goal_review': return <Target className="w-4 h-4" />;
       case 'project_review': return <Presentation className="w-4 h-4" />;
       case 'campaign_running': return <Megaphone className="w-4 h-4" />;
@@ -157,7 +161,6 @@ export default function WorkflowHub() {
 
   const formatStatus = (status) => {
     const statusMap = {
-      'request': 'Request',
       'minister_goal_review': 'Minister Goal Review',
       'project_review': 'Project Review',
       'campaign_running': 'Campaign Running',
@@ -165,6 +168,11 @@ export default function WorkflowHub() {
       'cancelled': 'Cancelled'
     };
     return statusMap[status] || status;
+  };
+
+  // Get requests by status
+  const getRequestsByStatus = (requests, status) => {
+    return requests.filter(r => r.status === status);
   };
 
   if (loading) {
@@ -177,6 +185,70 @@ export default function WorkflowHub() {
       </div>
     );
   }
+
+  const KanbanCard = ({ request }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer p-4 mb-3"
+      onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`)}
+    >
+      <div className="space-y-3">
+        <div className="flex items-start justify-between">
+          <h3 className="font-semibold text-slate-900 text-sm leading-tight flex-1">{request.title}</h3>
+          <Badge variant="outline" className={`${getStatusColor(request.status)} text-xs ml-2`}>
+            {formatStatus(request.status).split(' ')[0]}
+          </Badge>
+        </div>
+
+        {request.requestor_name && (
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <User className="w-3 h-3" />
+            <span className="truncate">{request.requestor_name}</span>
+          </div>
+        )}
+
+        {request.ministry_department && (
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <Building2 className="w-3 h-3" />
+            <span className="truncate">{request.ministry_department}</span>
+          </div>
+        )}
+
+        {request.pco_event_date && (
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <CalendarIcon className="w-3 h-3" />
+            <span>{format(new Date(request.pco_event_date), 'MMM d, yyyy')}</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${getPriorityColor(request.priority)}`} />
+            <span className="text-xs text-slate-500">{request.request_number}</span>
+          </div>
+          {request.type === 'mystery_resource' && (
+            <Sparkles className="w-3 h-3 text-purple-500" />
+          )}
+        </div>
+
+        <Button
+          size="sm"
+          variant="ghost"
+          className="w-full text-xs h-7"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
+          }}
+        >
+          {request.status === 'minister_goal_review' ? 'Start Goal Review' : 
+           request.status === 'project_review' ? 'Review Project' : 
+           'View Campaign'}
+          <ArrowRight className="w-3 h-3 ml-1" />
+        </Button>
+      </div>
+    </motion.div>
+  );
 
   const RequestCard = ({ request, showAssignee = false }) => (
     <motion.div
@@ -240,13 +312,110 @@ export default function WorkflowHub() {
     </motion.div>
   );
 
+  const KanbanView = ({ requests }) => {
+    const goalReviewRequests = getRequestsByStatus(requests, 'minister_goal_review');
+    const projectReviewRequests = getRequestsByStatus(requests, 'project_review');
+    const campaignRunningRequests = getRequestsByStatus(requests, 'campaign_running');
+    const completedRequests = getRequestsByStatus(requests, 'completed');
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Minister Goal Review Column */}
+        <div className="bg-purple-50/50 rounded-lg p-4 border-2 border-purple-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-purple-600" />
+              <h3 className="font-semibold text-slate-900">Minister Goal Review</h3>
+            </div>
+            <Badge className="bg-purple-100 text-purple-700">{goalReviewRequests.length}</Badge>
+          </div>
+          <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+            {goalReviewRequests.map(request => (
+              <KanbanCard key={request.id} request={request} />
+            ))}
+            {goalReviewRequests.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                No requests in goal review
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Project Review Column */}
+        <div className="bg-orange-50/50 rounded-lg p-4 border-2 border-orange-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Presentation className="w-5 h-5 text-orange-600" />
+              <h3 className="font-semibold text-slate-900">Project Review</h3>
+            </div>
+            <Badge className="bg-orange-100 text-orange-700">{projectReviewRequests.length}</Badge>
+          </div>
+          <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+            {projectReviewRequests.map(request => (
+              <KanbanCard key={request.id} request={request} />
+            ))}
+            {projectReviewRequests.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                No requests in project review
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Campaign Running Column */}
+        <div className="bg-green-50/50 rounded-lg p-4 border-2 border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-green-600" />
+              <h3 className="font-semibold text-slate-900">Campaign Running</h3>
+            </div>
+            <Badge className="bg-green-100 text-green-700">{campaignRunningRequests.length}</Badge>
+          </div>
+          <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+            {campaignRunningRequests.map(request => (
+              <KanbanCard key={request.id} request={request} />
+            ))}
+            {campaignRunningRequests.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                No active campaigns
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Archived/Completed Column */}
+        <div className="bg-slate-50/50 rounded-lg p-4 border-2 border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-slate-600" />
+              <h3 className="font-semibold text-slate-900">Archived</h3>
+            </div>
+            <Badge className="bg-slate-100 text-slate-700">{completedRequests.length}</Badge>
+          </div>
+          <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+            {completedRequests.map(request => (
+              <KanbanCard key={request.id} request={request} />
+            ))}
+            {completedRequests.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                No archived requests
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const allActiveRequests = view === 'worker' ? allRequests : myRequests;
+
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-[1600px] mx-auto p-6 space-y-6">
         <AppHeader
           icon={MessageSquare}
           title="Communications Request"
-          description="Minister Goal Review → Project Review → Campaign Running"
+          description="Track all your creative projects"
           iconColor="from-purple-500 to-pink-500"
           action={
             <div className="flex gap-2">
@@ -311,152 +480,120 @@ export default function WorkflowHub() {
           }
         />
 
-        {/* Entry Points Info */}
-        <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-purple-600 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-slate-900 mb-1">3 Ways to Create Requests</p>
-                <div className="text-xs text-slate-600 space-y-1">
-                  <p>🔄 <strong>Auto:</strong> PCO Calendar events with "Mystery Resource"</p>
-                  <p>📝 <strong>Manual Form:</strong> Submit directly through our form</p>
-                  <p>💬 <strong>Continue Existing:</strong> Add to your current requests</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
+          <Card className="border-2 border-slate-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <User className="w-5 h-5 text-blue-600" />
-                <Badge className="bg-blue-100 text-blue-700">{myRequests.length}</Badge>
+                <LayoutGrid className="w-5 h-5 text-slate-600" />
+                <Badge className="bg-slate-100 text-slate-700">{allActiveRequests.length}</Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{myRequests.length}</p>
-              <p className="text-sm text-slate-600">My Requests</p>
+              <p className="text-2xl font-bold text-slate-900">{allActiveRequests.length}</p>
+              <p className="text-sm text-slate-600">Total Requests</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-2 border-purple-200 bg-purple-50/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Target className="w-5 h-5 text-purple-600" />
                 <Badge className="bg-purple-100 text-purple-700">
-                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'minister_goal_review').length}
+                  {getRequestsByStatus(allActiveRequests, 'minister_goal_review').length}
                 </Badge>
               </div>
               <p className="text-2xl font-bold text-slate-900">
-                {[...myRequests, ...assignedToMe].filter(r => r.status === 'minister_goal_review').length}
+                {getRequestsByStatus(allActiveRequests, 'minister_goal_review').length}
               </p>
               <p className="text-sm text-slate-600">Goal Review</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <Presentation className="w-5 h-5 text-orange-600" />
-                <Badge className="bg-orange-100 text-orange-700">
-                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'project_review').length}
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">
-                {[...myRequests, ...assignedToMe].filter(r => r.status === 'project_review').length}
-              </p>
-              <p className="text-sm text-slate-600">Project Review</p>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className="border-2 border-green-200 bg-green-50/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Megaphone className="w-5 h-5 text-green-600" />
                 <Badge className="bg-green-100 text-green-700">
-                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'campaign_running').length}
+                  {getRequestsByStatus(allActiveRequests, 'campaign_running').length}
                 </Badge>
               </div>
               <p className="text-2xl font-bold text-slate-900">
-                {[...myRequests, ...assignedToMe].filter(r => r.status === 'campaign_running').length}
+                {getRequestsByStatus(allActiveRequests, 'campaign_running').length}
               </p>
-              <p className="text-sm text-slate-600">Running</p>
+              <p className="text-sm text-slate-600">Campaign Running</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-slate-200 bg-slate-50/50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <CheckCircle2 className="w-5 h-5 text-slate-600" />
+                <Badge className="bg-slate-100 text-slate-700">
+                  {getRequestsByStatus(allActiveRequests, 'completed').length}
+                </Badge>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {getRequestsByStatus(allActiveRequests, 'completed').length}
+              </p>
+              <p className="text-sm text-slate-600">Archived</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs value={view} onValueChange={setView} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="requestor">
-              <User className="w-4 h-4 mr-2" />
-              My Requests
-            </TabsTrigger>
-            <TabsTrigger value="worker">
-              <Users className="w-4 h-4 mr-2" />
-              Team Queue
-            </TabsTrigger>
-          </TabsList>
+        {/* View Toggle */}
+        <div className="flex items-center justify-between">
+          <Tabs value={view} onValueChange={setView} className="w-auto">
+            <TabsList>
+              <TabsTrigger value="requestor">
+                <User className="w-4 h-4 mr-2" />
+                My Requests
+              </TabsTrigger>
+              <TabsTrigger value="worker">
+                <Users className="w-4 h-4 mr-2" />
+                Team View
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-          <TabsContent value="requestor" className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 mb-4">My Requests</h2>
-              {myRequests.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="p-12 text-center">
-                    <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
-                    <p className="text-slate-600 mb-4">Create your first communications request</p>
-                    <Button onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Request
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {myRequests.map(request => (
-                    <RequestCard key={request.id} request={request} showAssignee={true} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
+          <Tabs value={viewMode} onValueChange={setViewMode} className="w-auto">
+            <TabsList>
+              <TabsTrigger value="kanban">
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Kanban View
+              </TabsTrigger>
+              <TabsTrigger value="list">
+                <List className="w-4 h-4 mr-2" />
+                List View
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-          <TabsContent value="worker" className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Assigned to Me</h2>
-              {assignedToMe.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="p-12 text-center">
-                    <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No assigned tasks</h3>
-                    <p className="text-slate-600">Requests assigned to you will appear here</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {assignedToMe.map(request => (
-                    <RequestCard key={request.id} request={request} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {user?.role === 'admin' && allRequests.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-4">All Requests</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {allRequests.map(request => (
-                    <RequestCard key={request.id} request={request} showAssignee={true} />
-                  ))}
-                </div>
+        {/* Main Content */}
+        {viewMode === 'kanban' ? (
+          <KanbanView requests={allActiveRequests} />
+        ) : (
+          <div>
+            {allActiveRequests.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="p-12 text-center">
+                  <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
+                  <p className="text-slate-600 mb-4">Create your first communications request</p>
+                  <Button onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Request
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {allActiveRequests.map(request => (
+                  <RequestCard key={request.id} request={request} showAssignee={view === 'worker'} />
+                ))}
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </div>
   );
