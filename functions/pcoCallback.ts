@@ -1,68 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-// Helper function to create HTML error page
-function createErrorPage(errorMessage, redirectUrl) {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PCO Connection Issue</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .container {
-            background: white;
-            padding: 3rem;
-            border-radius: 1rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            text-align: center;
-        }
-        h1 { color: #e53e3e; margin-bottom: 1rem; }
-        p { color: #4a5568; line-height: 1.6; margin-bottom: 2rem; }
-        button {
-            background: #4299e1;
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background: #3182ce; }
-        .error-code {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            font-family: monospace;
-            font-size: 0.875rem;
-            margin-bottom: 2rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚠️ Connection Issue</h1>
-        <p>${errorMessage}</p>
-        <button onclick="window.location.href='${redirectUrl}'">
-            Return to Settings
-        </button>
-    </div>
-</body>
-</html>`;
-}
-
 Deno.serve(async (req) => {
     const startTime = Date.now();
+    
+    // Get base URL first thing
+    const baseUrl = Deno.env.get('BASE44_APP_URL') || '';
+    const settingsUrl = baseUrl ? `${baseUrl}/Settings?tab=integrations` : '/Settings?tab=integrations';
+    
+    console.log('========================================');
+    console.log('🔄 PCO Callback Started');
+    console.log('🌐 BASE44_APP_URL:', baseUrl || 'NOT SET');
+    console.log('🔗 Settings URL:', settingsUrl);
     
     try {
         const url = new URL(req.url);
@@ -70,46 +18,20 @@ Deno.serve(async (req) => {
         const state = url.searchParams.get('state');
         const error = url.searchParams.get('error');
 
-        console.log('========================================');
-        console.log('🔄 PCO Callback Started');
-        console.log('⏰ Time:', new Date().toISOString());
         console.log('📝 Code:', code ? `${code.slice(0, 20)}...` : 'MISSING');
         console.log('📝 State (user_id):', state || 'MISSING');
         console.log('❌ Error param:', error || 'none');
 
-        // Get base URL
-        const baseUrl = (Deno.env.get('BASE44_APP_URL') || '').replace(/\/$/, '');
-        console.log('🌐 Base URL:', baseUrl);
-
-        if (!baseUrl) {
-            console.error('❌ BASE44_APP_URL not set!');
-            return new Response(
-                createErrorPage(
-                    'Configuration error: BASE44_APP_URL not set. Please contact support.',
-                    '/Settings'
-                ),
-                { status: 500, headers: { 'Content-Type': 'text/html' } }
-            );
-        }
-
-        const settingsUrl = `${baseUrl}/Settings?tab=integrations`;
-        
         // Handle PCO OAuth error
         if (error) {
             console.error('❌ PCO returned error:', error);
-            const redirectUrl = `${settingsUrl}&error=pco_auth_failed`;
-            console.log('🔗 Redirecting to:', redirectUrl);
-            return Response.redirect(redirectUrl, 302);
+            return Response.redirect(`${settingsUrl}&error=pco_auth_failed`, 302);
         }
 
         // Validate required parameters
         if (!code || !state) {
             console.error('❌ Missing required parameters');
-            console.error('  - Code:', !!code);
-            console.error('  - State:', !!state);
-            const redirectUrl = `${settingsUrl}&error=missing_params`;
-            console.log('🔗 Redirecting to:', redirectUrl);
-            return Response.redirect(redirectUrl, 302);
+            return Response.redirect(`${settingsUrl}&error=missing_params`, 302);
         }
 
         console.log('✅ Parameters validated');
@@ -119,7 +41,7 @@ Deno.serve(async (req) => {
         console.log('✅ Base44 client created');
         
         // Build redirect URI
-        const redirectUri = `${baseUrl}/functions/pcoCallback`;
+        const redirectUri = baseUrl ? `${baseUrl}/functions/pcoCallback` : `${url.protocol}//${url.host}/functions/pcoCallback`;
         console.log('🔑 Redirect URI:', redirectUri);
         
         // Check environment variables
@@ -128,15 +50,7 @@ Deno.serve(async (req) => {
         
         if (!clientId || !clientSecret) {
             console.error('❌ Missing PCO credentials');
-            console.error('  - Client ID:', !!clientId);
-            console.error('  - Client Secret:', !!clientSecret);
-            return new Response(
-                createErrorPage(
-                    'Configuration error: PCO credentials not configured. Please contact support.',
-                    settingsUrl
-                ),
-                { status: 500, headers: { 'Content-Type': 'text/html' } }
-            );
+            return Response.redirect(`${settingsUrl}&error=pco_credentials_missing`, 302);
         }
 
         console.log('✅ PCO credentials found');
@@ -161,20 +75,11 @@ Deno.serve(async (req) => {
             const errorText = await tokenResponse.text();
             console.error('❌ Token exchange failed:', tokenResponse.status);
             console.error('❌ Response:', errorText);
-            return new Response(
-                createErrorPage(
-                    `Failed to connect to Planning Center (Error ${tokenResponse.status}). Please try again or contact support if the problem persists.`,
-                    `${settingsUrl}&error=token_exchange_failed`
-                ),
-                { status: 200, headers: { 'Content-Type': 'text/html' } }
-            );
+            return Response.redirect(`${settingsUrl}&error=token_exchange_failed`, 302);
         }
 
         const tokens = await tokenResponse.json();
         console.log('✅ Tokens received');
-        console.log('  - Access token:', tokens.access_token ? 'exists' : 'missing');
-        console.log('  - Refresh token:', tokens.refresh_token ? 'exists' : 'missing');
-        console.log('  - Expires in:', tokens.expires_in, 'seconds');
 
         // Calculate expiration time
         const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
@@ -210,7 +115,6 @@ Deno.serve(async (req) => {
         }
 
         console.log('💾 Updating user:', state);
-        console.log('📊 Update data keys:', Object.keys(updateData));
 
         // Update user with tokens using service role
         await base44.asServiceRole.entities.User.update(state, updateData);
@@ -235,15 +139,6 @@ Deno.serve(async (req) => {
         console.error('📚 Stack:', error.stack);
         console.error('========================================');
         
-        const baseUrl = (Deno.env.get('BASE44_APP_URL') || '').replace(/\/$/, '');
-        const settingsUrl = `${baseUrl}/Settings?tab=integrations`;
-        
-        return new Response(
-            createErrorPage(
-                `An unexpected error occurred: ${error.message}. Please try again or contact support.`,
-                `${settingsUrl}&error=callback_failed`
-            ),
-            { status: 200, headers: { 'Content-Type': 'text/html' } }
-        );
+        return Response.redirect(`${settingsUrl}&error=callback_failed`, 302);
     }
 });
