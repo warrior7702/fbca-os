@@ -773,15 +773,18 @@ export default function PCOAPITester() {
       const event = eventData.data;
       
       console.log('✅ Event fetched:', event.attributes?.name);
+      console.log('📅 Event attributes:', event.attributes);
       
       // Get owner ID from relationships
       const ownerId = event.relationships?.owner?.data?.id;
       
       let ownerDetails = null;
+      let ownerEmail = null;
+      
       if (ownerId) {
         console.log('👤 Fetching owner details for ID:', ownerId);
         
-        // Fetch owner details from Calendar API
+        // Try Calendar API first
         const ownerResponse = await fetch(
           `https://api.planningcenteronline.com/calendar/v2/people/${ownerId}`,
           {
@@ -795,9 +798,47 @@ export default function PCOAPITester() {
         if (ownerResponse.ok) {
           const ownerData = await ownerResponse.json();
           ownerDetails = ownerData.data;
-          console.log('✅ Owner found:', ownerDetails.attributes?.name);
+          console.log('✅ Owner found in Calendar API:', ownerDetails.attributes);
+          
+          // Try to get email from Calendar API
+          ownerEmail = ownerDetails.attributes?.email;
+        }
+        
+        // If no email, try People API
+        if (!ownerEmail) {
+          console.log('🔍 No email in Calendar API, trying People API...');
+          const peopleResponse = await fetch(
+            `https://api.planningcenteronline.com/people/v2/people/${ownerId}?include=emails`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (peopleResponse.ok) {
+            const peopleData = await peopleResponse.json();
+            console.log('✅ People API response:', peopleData);
+            
+            // Look for email in included emails
+            if (peopleData.included && peopleData.included.length > 0) {
+              const primaryEmail = peopleData.included.find(item => 
+                item.type === 'Email' && item.attributes?.primary
+              );
+              if (primaryEmail) {
+                ownerEmail = primaryEmail.attributes?.address;
+                console.log('✅ Found primary email:', ownerEmail);
+              } else if (peopleData.included[0]?.attributes?.address) {
+                ownerEmail = peopleData.included[0].attributes.address;
+                console.log('✅ Found first email:', ownerEmail);
+              }
+            }
+          }
         }
       }
+      
+      console.log('📧 Final owner email:', ownerEmail);
       
       setResult({
         ok: true,
@@ -806,16 +847,17 @@ export default function PCOAPITester() {
           event: event,
           owner: ownerDetails,
           owner_id: ownerId,
-          owner_name: event.attributes?.owner_name,
-          owner_email: ownerDetails?.attributes?.email
+          owner_name: event.attributes?.owner_name || ownerDetails?.attributes?.name,
+          owner_email: ownerEmail,
+          event_date: event.attributes?.starts_at
         },
         endpoint: 'getEventOwner'
       });
       
       if (ownerDetails) {
-        toast.success(`Found event owner: ${ownerDetails.attributes?.name}`);
+        toast.success(`Found event owner: ${ownerDetails.attributes?.name || 'Unknown'}`);
       } else {
-        toast.warning('Event has no owner assigned or owner details not found');
+        toast.warning('Event has no owner assigned');
       }
       
     } catch (error) {
@@ -2432,18 +2474,18 @@ export default function PCOAPITester() {
                             console.log('📦 Sending data:', {
                               event_id: eventId,
                               event_name: result.data.event.attributes?.name,
-                              event_date: result.data.event.attributes?.starts_at,
-                              owner_email: result.data.owner.attributes?.email,
-                              owner_name: result.data.owner.attributes?.name
+                              event_date: result.data.event_date,
+                              owner_email: result.data.owner_email,
+                              owner_name: result.data.owner_name
                             });
                             
                             // Call backend function to create request and send email
                             const response = await base44.functions.invoke('sendTestEmailFromEvent', {
                               event_id: eventId,
                               event_name: result.data.event.attributes?.name,
-                              event_date: result.data.event.attributes?.starts_at,
-                              owner_email: result.data.owner.attributes?.email,
-                              owner_name: result.data.owner.attributes?.name
+                              event_date: result.data.event_date,
+                              owner_email: result.data.owner_email,
+                              owner_name: result.data.owner_name
                             });
                             
                             console.log('✅ Response:', response.data);
