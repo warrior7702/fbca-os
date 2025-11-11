@@ -30,10 +30,8 @@ import {
   User,
   Key,
   Clock,
-  Video, // NEW: Video icon for meetings
-  MapPin, // NEW: MapPin icon for location
 } from "lucide-react";
-import { format, isToday, parseISO, formatDistanceToNow, differenceInMinutes } from "date-fns"; // NEW: differenceInMinutes
+import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import ScheduleCalendar from "../components/tasks/ScheduleCalendar";
@@ -45,7 +43,6 @@ import ScheduleEventDetailModal from "../components/tasks/ScheduleEventDetailMod
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // NEW: Dialog components
 
 const CATEGORY_COLORS = {
   'Action Needed': '#c43e00',
@@ -70,19 +67,10 @@ export default function MyTasks() {
   const [showEmailDetail, setShowEmailDetail] = useState(false);
   const [supportTickets, setSupportTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
-  
-  // Renamed from myScheduleEvents to scheduleEvents to reflect unified nature
-  const [scheduleEvents, setScheduleEvents] = useState([]);
+  const [myScheduleEvents, setMyScheduleEvents] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
-
-  // Replaced showScheduleEventDetail with scheduleEventDetailOpen for clarity
   const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
-  const [scheduleEventDetailOpen, setScheduleEventDetailOpen] = useState(false);
-
-  // NEW: for meeting details
-  const [selectedMeeting, setSelectedMeeting] = useState(null); 
-  // NEW: for tab navigation
-  const [activeTab, setActiveTab] = useState('my-day');
+  const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
 
   const navigate = useNavigate();
 
@@ -93,16 +81,16 @@ export default function MyTasks() {
     }
   };
 
-  // Renamed loadMySchedule to loadSchedule and updated logic for unified schedule
-  const loadSchedule = async () => {
-    console.log('🗓️ ========== LOADING UNIFIED SCHEDULE ==========');
+  const loadMySchedule = async () => {
+    console.log('🗓️ ========== LOADING MY SCHEDULE ==========');
     
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getUnifiedSchedule...');
+      console.log('📞 Calling getMySchedule (which filters getPCOCalendarEvents)...');
       
-      const response = await base44.functions.invoke('getUnifiedSchedule');
+      // Call getMySchedule which will filter the events from getPCOCalendarEvents
+      const response = await base44.functions.invoke('getMySchedule');
       
       console.log('✅ Response:', response.data);
       
@@ -112,33 +100,32 @@ export default function MyTasks() {
       
       const events = response.data.events || [];
       
-      console.log(`✅ Got ${events.length} events for unified schedule`);
-      if (response.data.sources) {
-        console.log('Sources:', response.data.sources);
-      }
+      console.log(`✅ Got ${events.length} events for my schedule`);
+      console.log(`📊 I'm in ${response.data.my_groups_count || 0} approval groups`);
+      console.log(`📊 Managing ${response.data.my_resources_count || 0} resources`);
       
       if (events.length === 0 && response.data.message) {
         console.log('ℹ️', response.data.message);
       }
       
-      setScheduleEvents(events); // Using new scheduleEvents state
-      console.log('✅ SUCCESS! Unified Schedule loaded');
+      setMyScheduleEvents(events);
+      console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
-      console.error('❌ ERROR in loadSchedule:');
+      console.error('❌ ERROR in loadMySchedule:');
       console.error('Error message:', error.message);
       
       toast.error('Failed to load schedule');
-      setScheduleEvents([]);
+      setMyScheduleEvents([]);
     } finally {
       setLoadingSchedule(false);
     }
   };
 
   const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh clicked - refreshing all data');
-    await loadData(); // Reloads all data, including schedule via useEffect
-    toast.success('All data refreshed!');
+    console.log('🔄 Manual refresh clicked - refreshing schedule');
+    await loadMySchedule();
+    toast.success('Schedule refreshed!');
   };
 
   useEffect(() => {
@@ -149,32 +136,14 @@ export default function MyTasks() {
     console.log('📢 User changed:', user?.email);
     if (user) {
       loadSupportTickets();
-      console.log('📢 About to call loadSchedule()');
-      loadSchedule(); // Call the unified schedule loader
+      console.log('📢 About to call loadMySchedule()');
+      loadMySchedule();
     }
   }, [user]);
 
   const handleScheduleEventClick = (event) => {
-    if (event.type === 'meeting') {
-      // Open meeting detail modal for 'meeting' type events
-      setSelectedMeeting(event);
-    } else {
-      // Open PCO event detail modal for other types (e.g., 'pco_event')
-      setSelectedScheduleEvent(event);
-      setScheduleEventDetailOpen(true);
-    }
-  };
-
-  // NEW: Function to handle joining a meeting
-  const handleJoinMeeting = (meeting) => {
-    if (meeting.meetingLink?.url) {
-      window.open(meeting.meetingLink.url, '_blank');
-      toast.success(`Opening ${meeting.meetingLink.provider}...`);
-    } else if (meeting.webLink) {
-      // Fallback for Outlook calendar events that might just have a web link
-      window.open(meeting.webLink, '_blank');
-      toast.success('Opening in Outlook...');
-    }
+    setSelectedScheduleEvent(event);
+    setShowScheduleEventDetail(true);
   };
 
   const loadData = async () => {
@@ -318,8 +287,8 @@ export default function MyTasks() {
     }
   };
 
-  // Calculate events today (using new scheduleEvents state)
-  const eventsToday = scheduleEvents.filter(event => {
+  // Calculate events today
+  const eventsToday = myScheduleEvents.filter(event => {
     const eventDate = new Date(event.starts_at);
     return isToday(eventDate);
   }).length;
@@ -351,10 +320,10 @@ export default function MyTasks() {
             <div className="flex gap-2">
               <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm">
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                Task Calendar
+                Calendar
               </Button>
-              <Button onClick={handleManualRefresh} disabled={loading || loadingSchedule || loadingTickets || loadingEmails} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
-                {(loading || loadingSchedule || loadingTickets || loadingEmails) ? (
+              <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
+                {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Syncing...
@@ -374,7 +343,7 @@ export default function MyTasks() {
           <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <CheckSquare className="w-5 h-5 text-indigo-600" />
+                <CalendarIcon className="w-5 h-5 text-indigo-600" />
                 <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300">Today</Badge>
               </div>
               <p className="text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
@@ -382,7 +351,7 @@ export default function MyTasks() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab('schedule')}>
+          <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <CalendarIcon className="w-5 h-5 text-green-600" />
@@ -392,19 +361,6 @@ export default function MyTasks() {
               </div>
               <p className="text-2xl font-bold text-slate-900">{eventsToday}</p>
               <p className="text-sm text-slate-600">Events Today</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab('emails')}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <Mail className="w-5 h-5 text-blue-600" />
-                <Badge className="bg-blue-100 text-blue-700 border-blue-300">
-                  {loadingEmails ? <Loader2 className="h-3 w-3 animate-spin" /> : Object.values(emails.categorized).flat().length}
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">{Object.values(emails.categorized).flat().length}</p>
-              <p className="text-sm text-slate-600">Categorized Emails</p>
             </CardContent>
           </Card>
 
@@ -422,171 +378,132 @@ export default function MyTasks() {
           </Card>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center justify-between mt-6">
-          <Select value={activeTab} onValueChange={setActiveTab}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select a view" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="my-day">My Day</SelectItem>
-              <SelectItem value="schedule">My Schedule</SelectItem>
-              {user?.microsoft_access_token && <SelectItem value="todo">Microsoft To Do</SelectItem>}
-              {user?.microsoft_access_token && <SelectItem value="emails">Categorized Emails</SelectItem>}
-              <SelectItem value="tickets">Support Tickets</SelectItem>
-              <SelectItem value="all-tasks">All Tasks Calendar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Conditional Rendering based on activeTab */}
-        {activeTab === "schedule" && (
-          <div className="space-y-4">
-            <Card className="border-2 border-green-200 bg-white">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl flex items-center gap-2">
-                      <CalendarIcon className="w-6 h-6 text-green-600" />
-                      My Schedule
-                    </CardTitle>
-                    <p className="text-slate-600 text-sm mt-1">
-                      Upcoming events & meetings • {scheduleEvents.length} event{scheduleEvents.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Source badges */}
-                    {scheduleEvents.filter(e => e.type === 'pco_event').length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {scheduleEvents.filter(e => e.type === 'pco_event').length} PCO Events
-                      </Badge>
-                    )}
-                    {scheduleEvents.filter(e => e.type === 'meeting').length > 0 && (
-                      <Badge variant="outline" className="text-xs bg-purple-50">
-                        {scheduleEvents.filter(e => e.type === 'meeting').length} Meetings
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loadingSchedule ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                    <p className="text-slate-600">Loading your schedule...</p>
-                  </div>
-                ) : scheduleEvents.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-slate-600">No upcoming events or meetings found</p>
-                  </div>
-                ) : (
-                  <ScheduleCalendar 
-                    events={scheduleEvents} 
-                    weekCount={1}
-                    onEventClick={handleScheduleEventClick}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === 'my-day' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <CheckSquare className="w-5 h-5" />
-                  My Day
-                </CardTitle>
-                <Badge variant="secondary">{myDayTasks.length} task{myDayTasks.length !== 1 ? 's' : ''}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {myDayTasks.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">No tasks due today! 🎉</p>
-              ) : (
-                <div className="space-y-3">
-                  {myDayTasks.map((task) => {
-                    const isMicrosoftToDo = task.source === 'microsoft_todo';
-                    const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
-
-                    return (
-                      <div
-                        key={`${task.source}-${task.id}`}
-                        onClick={() => handleTaskClick(task)}
-                        className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-                        style={{ borderLeftColor: listColor }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: listColor }}
-                              />
-                              <h3 className="font-semibold text-slate-900">{task.title}</h3>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className={getStatusColor(task.status)}>
-                                {formatStatus(task.status)}
-                              </Badge>
-                              {isMicrosoftToDo ? (
-                                <span className="text-xs text-slate-500 font-medium">From To Do</span>
-                              ) : task.list_name && (
-                                <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => handleCompleteTask(task, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <CheckSquare className="w-4 h-4 mr-1" />
-                            Complete
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === 'all-tasks' && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="border-2 border-green-200 bg-white">
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5" />
-                  Task Calendar
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  <CalendarIcon className="w-6 h-6 text-green-600" />
+                  My Schedule
                 </CardTitle>
-                <CardDescription>Your upcoming tasks</CardDescription>
+                <p className="text-slate-600 text-sm mt-1">
+                  Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFullCalendar(true)}
-              >
-                <Maximize2 className="w-4 h-4 mr-2" />
-                Full Calendar
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <TaskCalendar
-                tasks={allTasks}
-                onTaskClick={handleTaskClick}
-                weekCount={2}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingSchedule ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <p className="text-slate-600">Loading your schedule...</p>
+              </div>
+            ) : myScheduleEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-600">No upcoming events found</p>
+              </div>
+            ) : (
+              <ScheduleCalendar 
+                events={myScheduleEvents} 
+                weekCount={1}
+                onEventClick={handleScheduleEventClick}
               />
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
-        {activeTab === 'todo' && user?.microsoft_access_token && todoTasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5" />
+                My Day
+              </CardTitle>
+              <Badge variant="secondary">{myDayTasks.length} task{myDayTasks.length !== 1 ? 's' : ''}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {myDayTasks.length === 0 ? (
+              <p className="text-slate-500 text-center py-4">No tasks due today! 🎉</p>
+            ) : (
+              <div className="space-y-3">
+                {myDayTasks.map((task) => {
+                  const isMicrosoftToDo = task.source === 'microsoft_todo';
+                  const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
+
+                  return (
+                    <div
+                      key={`${task.source}-${task.id}`}
+                      onClick={() => handleTaskClick(task)}
+                      className="p-4 bg-white hover:bg-slate-50 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                      style={{ borderLeftColor: listColor }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: listColor }}
+                            />
+                            <h3 className="font-semibold text-slate-900">{task.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={getStatusColor(task.status)}>
+                              {formatStatus(task.status)}
+                            </Badge>
+                            {isMicrosoftToDo ? (
+                              <span className="text-xs text-slate-500 font-medium">From To Do</span>
+                            ) : task.list_name && (
+                              <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => handleCompleteTask(task, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <CheckSquare className="w-4 h-4 mr-1" />
+                          Complete
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5" />
+                Task Calendar
+              </CardTitle>
+              <CardDescription>Your upcoming tasks</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFullCalendar(true)}
+            >
+              <Maximize2 className="w-4 h-4 mr-2" />
+              Full Calendar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <TaskCalendar
+              tasks={allTasks}
+              onTaskClick={handleTaskClick}
+              weekCount={2}
+            />
+          </CardContent>
+        </Card>
+
+        {user?.microsoft_access_token && todoTasks.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -642,7 +559,7 @@ export default function MyTasks() {
           </Card>
         )}
 
-        {activeTab === 'emails' && user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
+        {user?.microsoft_access_token && emails.categorized && Object.keys(emails.categorized).length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -726,7 +643,7 @@ export default function MyTasks() {
           </motion.div>
         )}
 
-        {activeTab === 'tickets' && supportTickets.length > 0 && (
+        {supportTickets.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -797,7 +714,6 @@ export default function MyTasks() {
             </CardContent>
           </Card>
         )}
-
       </div>
 
       <FullCalendarModal
@@ -834,138 +750,10 @@ export default function MyTasks() {
       />
 
       <ScheduleEventDetailModal
-        open={scheduleEventDetailOpen} // Using new state variable
-        onOpenChange={setScheduleEventDetailOpen} // Using new state variable
+        open={showScheduleEventDetail}
+        onOpenChange={setShowScheduleEventDetail}
         event={selectedScheduleEvent}
       />
-
-      {/* NEW: Meeting Detail Modal */}
-      <Dialog open={!!selectedMeeting} onOpenChange={() => setSelectedMeeting(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl pr-8 flex items-center gap-2">
-              <Video className="w-6 h-6 text-purple-600" />
-              {selectedMeeting?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Meeting from Microsoft Calendar
-            </DialogDescription>
-          </DialogHeader>
-          {selectedMeeting && (() => {
-            const start = parseISO(selectedMeeting.starts_at);
-            const end = parseISO(selectedMeeting.ends_at);
-            
-            return (
-              <div className="space-y-6">
-                {/* Time & Location */}
-                <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-lg">
-                  <CalendarIcon className="w-5 h-5 text-purple-600 mt-1" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-900 mb-1">
-                      {format(start, 'EEEE, MMMM d, yyyy')}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
-                      <span className="text-slate-400 ml-2">
-                        ({differenceInMinutes(end, start)} minutes)
-                      </span>
-                    </p>
-                    {selectedMeeting.location && (
-                      <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
-                        <MapPin className="w-4 h-4" />
-                        <span>{selectedMeeting.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Meeting Link */}
-                {selectedMeeting.meetingLink && (
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <p className="text-sm font-semibold text-green-900 mb-2 flex items-center gap-2">
-                      <Video className="w-4 h-4" />
-                      {selectedMeeting.meetingLink.provider} Meeting
-                    </p>
-                    <Button
-                      onClick={() => handleJoinMeeting(selectedMeeting)}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      <Video className="w-4 h-4 mr-2" />
-                      Join {selectedMeeting.meetingLink.provider}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Organizer */}
-                {selectedMeeting.organizer && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-2">Organizer</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-semibold">
-                        {selectedMeeting.organizer.name?.[0]?.toUpperCase() || 'O'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{selectedMeeting.organizer.name}</p>
-                        <p className="text-xs text-slate-500">{selectedMeeting.organizer.email}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Attendees */}
-                {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-3">
-                      Attendees ({selectedMeeting.attendees.length})
-                    </p>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {selectedMeeting.attendees.map((attendee, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                            {attendee.name?.[0]?.toUpperCase() || 'A'}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">{attendee.name}</p>
-                            <p className="text-xs text-slate-500">{attendee.email}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Description */}
-                {selectedMeeting.summary && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
-                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedMeeting.summary}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  {selectedMeeting.webLink && (
-                    <Button
-                      onClick={() => window.open(selectedMeeting.webLink, '_blank')}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open in Outlook
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => setSelectedMeeting(null)}
-                    variant="outline"
-                  >
-                    Close
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
