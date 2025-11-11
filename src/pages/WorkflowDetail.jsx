@@ -175,6 +175,8 @@ Start by asking about the event theme.`;
         `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
       ).join('\n\n');
 
+      const messageCount = newMessages.filter(m => m.role === 'user').length;
+
       const context = {
         event_name: request.title,
         ministry: request.ministry_department,
@@ -182,43 +184,57 @@ Start by asking about the event theme.`;
         is_youth_college: request.ministry_department?.toLowerCase().includes('youth') || 
                           request.ministry_department?.toLowerCase().includes('college'),
         need_type: request.goal_review_data?.need_type,
-        conversation_so_far: conversationHistory
+        conversation_so_far: conversationHistory,
+        message_count: messageCount
       };
 
-      const prompt = `You are a ministry communications consultant gathering event details. Keep responses brief and direct.
+      const prompt = `You are a ministry communications consultant gathering event details. Keep responses brief and move through questions efficiently.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
+Messages exchanged: ${context.message_count}
 
 Conversation:
 ${context.conversation_so_far}
 
-Ask these questions IN ORDER (one at a time):
+RULES:
+1. Ask ONE question at a time
+2. If user gives ANY answer (even vague), acknowledge briefly and move to next question
+3. If user says "skip", "not sure", "don't know" - say "No problem" and move on
+4. Never ask the same topic more than once
+5. Keep responses under 2 sentences
+
+Questions to cover (in order):
 1. Event theme
 2. Expected attendance (how many people)
 3. Materials/items being given to attendees
 4. What makes this program special/unique
 5. What attendees should leave with (spiritually, emotionally, relationally)
 6. Date and time of event
-7. Is childcare provided? ${context.is_youth_college ? '(Skip if youth/college event)' : ''}
+7. Childcare ${context.is_youth_college ? '(Skip for youth/college)' : '(provided/included/alternate)'}
 8. Food/menu details
 9. Event logistics/flow/speakers/topics
 10. Any other specific information
 
-After collecting all info, summarize in this format:
+After collecting answers (even partial), summarize:
 
-EVENT THEME: [theme]
-EXPECTED ATTENDANCE: [number]
-MATERIALS: [items for attendees]
-WHAT MAKES IT SPECIAL: [unique aspects]
-DESIRED IMPACT: [spiritual/emotional/relational outcomes]
-DATE/TIME: [when]
-CHILDCARE: [yes/no/details]
-FOOD: [menu details]
-EVENT FLOW: [logistics/speakers/topics]
-SPECIAL NOTES: [additional info]
+EVENT THEME: [answer or "Not specified"]
+EXPECTED ATTENDANCE: [answer or "TBD"]
+MATERIALS: [answer or "None specified"]
+WHAT MAKES IT SPECIAL: [answer or "To be determined"]
+DESIRED IMPACT: [answer or "To be determined"]
+DATE/TIME: [answer or "TBD"]
+CHILDCARE: [answer or "TBD"]
+FOOD: [answer or "TBD"]
+EVENT FLOW: [answer or "TBD"]
+SPECIAL NOTES: [answer or "None"]
 
-Then say: "Information complete. Ready for project review."`;
+Then say: "Information complete. Ready for project review."
+
+IMPORTANT: 
+- If this is message 10+, provide summary and finish
+- Accept incomplete answers and move forward
+- Never repeat a question`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
@@ -235,12 +251,13 @@ Then say: "Information complete. Ready for project review."`;
       setChatMessages(updatedMessages);
 
       const isDone = response.toLowerCase().includes('ready for project review') || 
-                     response.toLowerCase().includes('information complete');
+                     response.toLowerCase().includes('information complete') ||
+                     messageCount >= 12; // Force completion after 12 user messages
 
       let extractedData = {};
       if (isDone) {
         try {
-          const extractPrompt = `Extract event details from this conversation into JSON:
+          const extractPrompt = `Extract event details from this conversation. Use "Not specified" or null for missing info:
 
 ${conversationHistory}
 
@@ -248,13 +265,13 @@ Return ONLY valid JSON:
 {
   "event_theme": "theme or null",
   "expected_attendance": "number or null",
-  "materials_for_attendees": "items being given or null",
+  "materials_for_attendees": "items or null",
   "what_makes_special": "unique aspects or null",
-  "desired_impact": "spiritual/emotional/relational outcomes or null",
-  "event_date_time": "date and time or null",
-  "childcare_details": "childcare info or null",
-  "food_menu": "food details or null",
-  "event_flow": "logistics/speakers/topics or null",
+  "desired_impact": "outcomes or null",
+  "event_date_time": "date/time or null",
+  "childcare_details": "info or null",
+  "food_menu": "details or null",
+  "event_flow": "logistics or null",
   "special_notes": "additional info or null"
 }`;
 
