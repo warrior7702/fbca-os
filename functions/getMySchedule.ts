@@ -141,23 +141,46 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Get future event instances (first 2 pages only)
+        // Get future event instances - FETCH ALL PAGES (up to 60 days)
         const now = new Date();
-        const twoWeeksFromNow = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+        const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
         
         const instances = [];
         let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at';
         let pageCount = 0;
+        const MAX_PAGES = 10; // Increase to 10 pages to get more events
         
-        while (nextUrl && pageCount < 2) {
+        console.log('📅 Fetching event instances...');
+        
+        while (nextUrl && pageCount < MAX_PAGES) {
             const response = await fetchWithRetry(nextUrl, { headers });
             if (!response.ok) break;
             
             const data = await response.json();
-            instances.push(...(data.data || []));
+            const pageInstances = data.data || [];
+            
+            // Add instances within 60 days
+            for (const instance of pageInstances) {
+                const startsAt = instance.attributes?.starts_at;
+                if (startsAt) {
+                    const startDate = new Date(startsAt);
+                    if (startDate <= sixtyDaysFromNow) {
+                        instances.push(instance);
+                    }
+                }
+            }
+            
             nextUrl = data.links?.next;
             pageCount++;
+            console.log(`✅ Fetched page ${pageCount}, total instances: ${instances.length}`);
+            
+            // Small delay to avoid rate limiting
+            if (nextUrl) {
+                await delay(100);
+            }
         }
+        
+        console.log(`✅ Total instances fetched: ${instances.length}`);
         
         if (instances.length === 0) {
             return Response.json({
@@ -173,6 +196,8 @@ Deno.serve(async (req) => {
             const eventId = instance.relationships?.event?.data?.id;
             if (eventId) eventIds.add(eventId);
         });
+
+        console.log(`📊 Processing ${eventIds.size} unique events...`);
 
         // Process events in OPTIMIZED batches
         const eventsWithMyResources = [];
@@ -231,7 +256,7 @@ Deno.serve(async (req) => {
                             if (!startsAt) continue;
                             
                             const startDate = new Date(startsAt);
-                            if (startDate > twoWeeksFromNow) continue;
+                            if (startDate > sixtyDaysFromNow) continue;
 
                             events.push({
                                 id: instance.id,
@@ -247,6 +272,7 @@ Deno.serve(async (req) => {
                         
                         return { events };
                     } catch (error) {
+                        console.error('Error processing event:', error);
                         return { events: [] };
                     }
                 })
@@ -264,6 +290,8 @@ Deno.serve(async (req) => {
         }
 
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+
+        console.log(`✅ SUCCESS: Returning ${eventsWithMyResources.length} events`);
 
         return Response.json({
             events: eventsWithMyResources,
