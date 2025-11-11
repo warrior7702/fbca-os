@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -47,6 +46,10 @@ export default function WorkflowDetail() {
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [goalReviewComplete, setGoalReviewComplete] = useState(false);
   const [conversationStarted, setConversationStarted] = useState(false);
+  
+  // Auto-scroll ref
+  const chatContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     if (requestId) {
@@ -54,6 +57,13 @@ export default function WorkflowDetail() {
       loadUser();
     }
   }, [requestId]);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isAIThinking]);
 
   const loadUser = async () => {
     try {
@@ -99,7 +109,6 @@ export default function WorkflowDetail() {
     setIsAIThinking(true);
 
     try {
-      // Initial AI greeting
       const context = {
         event_name: request.title,
         ministry: request.ministry_department,
@@ -109,23 +118,14 @@ export default function WorkflowDetail() {
         need_type: request.goal_review_data?.need_type
       };
 
-      const initialPrompt = `You are a ministry communications consultant helping plan effective outreach. 
-      
+      const initialPrompt = `You are a ministry communications consultant. Your goal is to gather information for project planning.
+
 Event: ${context.event_name}
 Ministry: ${context.ministry}
 Date: ${context.event_date ? format(new Date(context.event_date), 'PPP') : 'TBD'}
-${context.is_youth_college ? '(Youth/College Event - typically no childcare needed)' : ''}
 Type: ${context.need_type}
 
-Start the conversation naturally. Your goal is to understand:
-1. WHY they're promoting (emotional/spiritual/relational impact) - ask this FIRST
-2. What attendees should walk away with (feeling, learning, relationship)
-3. Shape, Shepherd, Serving, Sent (4 S's framework for ministry)
-4. Practical logistics (childcare, registration, etc.)
-
-Be direct, concise, and to-the-point. No overly happy language. Get to the heart of ministry impact.
-
-Start with a brief greeting and ask the FIRST key question about what they hope attendees will walk away with emotionally, spiritually, or relationally.`;
+Start by asking ONE clear question about their target audience. Keep it brief and professional.`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: initialPrompt,
@@ -140,7 +140,6 @@ Start with a brief greeting and ask the FIRST key question about what they hope 
 
       setChatMessages([aiMessage]);
 
-      // Save to database
       await base44.entities.WorkflowRequest.update(requestId, {
         goal_review_data: {
           ...request.goal_review_data,
@@ -172,7 +171,6 @@ Start with a brief greeting and ask the FIRST key question about what they hope 
     setIsAIThinking(true);
 
     try {
-      // Build conversation context
       const conversationHistory = newMessages.map(m => 
         `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
       ).join('\n\n');
@@ -187,28 +185,29 @@ Start with a brief greeting and ask the FIRST key question about what they hope 
         conversation_so_far: conversationHistory
       };
 
-      const prompt = `You are a ministry communications consultant. Continue the conversation to understand ministry impact.
+      const prompt = `You are a ministry communications consultant gathering information for project planning.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
-${context.is_youth_college ? '(Youth/College Event)' : ''}
 
-Conversation so far:
+Conversation:
 ${context.conversation_so_far}
 
-Key areas to explore (if not yet covered):
-1. ✅ FIRST: What should attendees walk away with? (emotional/spiritual/relational)
-2. Shape, Shepherd, Serving, Sent framework
-3. Practical logistics (childcare, registration, Church Center link)
+Based on their response, ask ONE follow-up question to gather project details:
+- Target audience details
+- Key message or theme
+- Expected attendance
+- Registration needs
+- Specific deliverables
 
-RULES:
-- Be direct and concise
-- Ask ONE question at a time
-- If you've asked the same thing 2-3 times and got vague answers, move on
-- ${context.is_youth_college ? 'Skip childcare questions for youth/college events' : 'Ask about childcare if relevant'}
-- When you have enough information about ministry impact and goals (usually after 4-6 exchanges), say "I have everything I need. Let me summarize..." and provide a brief summary
+Keep responses brief and professional. After 4-5 exchanges, summarize the collected information in this format:
 
-Respond naturally to their last message and guide toward uncovered areas.`;
+TARGET AUDIENCE: [who this is for]
+KEY MESSAGE: [main theme/message]
+DELIVERABLES: [what they need]
+SPECIAL NOTES: [any additional details]
+
+Then say: "I have the information needed. Ready to move to project review."`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
@@ -224,17 +223,55 @@ Respond naturally to their last message and guide toward uncovered areas.`;
       const updatedMessages = [...newMessages, aiMessage];
       setChatMessages(updatedMessages);
 
-      // Check if AI is done (mentions "summary" or "everything I need")
-      const isDone = response.toLowerCase().includes('everything i need') || 
-                     response.toLowerCase().includes('let me summarize');
+      const isDone = response.toLowerCase().includes('ready to move to project review') || 
+                     response.toLowerCase().includes('i have the information needed');
 
-      // Save to database
+      // Extract structured data from conversation
+      let extractedData = {};
+      if (isDone) {
+        try {
+          const extractPrompt = `Extract project details from this conversation into JSON format:
+
+${conversationHistory}
+
+Return ONLY valid JSON with these fields (use null if not mentioned):
+{
+  "target_audience": "who this is for",
+  "key_message": "main message or theme",
+  "expected_attendance": "estimated number or null",
+  "registration_link": "any registration URL or null",
+  "deliverables": ["list", "of", "items"],
+  "special_notes": "any additional details or null"
+}`;
+
+          const extractedResponse = await base44.integrations.Core.InvokeLLM({
+            prompt: extractPrompt,
+            response_json_schema: {
+              type: "object",
+              properties: {
+                target_audience: { type: "string" },
+                key_message: { type: "string" },
+                expected_attendance: { type: ["string", "null"] },
+                registration_link: { type: ["string", "null"] },
+                deliverables: { type: "array", items: { type: "string" } },
+                special_notes: { type: ["string", "null"] }
+              }
+            }
+          });
+
+          extractedData = extractedResponse;
+        } catch (extractError) {
+          console.error('Failed to extract structured data:', extractError);
+        }
+      }
+
       await base44.entities.WorkflowRequest.update(requestId, {
         goal_review_data: {
           ...request.goal_review_data,
           chat_history: updatedMessages,
           completed: isDone,
-          completed_at: isDone ? new Date().toISOString() : null
+          completed_at: isDone ? new Date().toISOString() : null,
+          ...extractedData
         }
       });
 
@@ -256,8 +293,8 @@ Respond naturally to their last message and guide toward uncovered areas.`;
         status: 'project_review'
       });
 
-      toast.success('Moved to Project Review!');
-      await loadRequest();
+      toast.success('Moved to Project Review');
+      navigate(createPageUrl('ProjectReview') + `?id=${requestId}`);
     } catch (error) {
       console.error('Error moving to project review:', error);
       toast.error('Failed to move to project review');
@@ -296,7 +333,7 @@ Respond naturally to their last message and guide toward uncovered areas.`;
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-slate-50 to-slate-100 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -309,9 +346,9 @@ Respond naturally to their last message and guide toward uncovered areas.`;
               >
                 ← Back
               </Button>
-              <span className="font-mono text-sm text-slate-500">{request.request_number}</span>
+              <span className="font-mono text-xs text-slate-500">{request.request_number}</span>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">{request.title}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 mb-2">{request.title}</h1>
             <div className="flex items-center gap-3 flex-wrap">
               {getStatusBadge(request.status)}
               {request.ministry_department && (
@@ -332,65 +369,63 @@ Respond naturally to their last message and guide toward uncovered areas.`;
 
         {/* Minister Goal Review Section */}
         {request.status === 'minister_goal_review' && (
-          <Card className="border-2 border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-purple-600" />
+          <Card className="border border-slate-200 shadow-sm">
+            <CardHeader className="border-b bg-slate-50">
+              <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                <Target className="w-5 h-5 text-slate-700" />
                 Minister Goal Review
               </CardTitle>
-              <p className="text-sm text-slate-600 mt-2">
-                Let's discuss your ministry goals and the impact you want to make. 
-                Not sure where to begin? <a href="mailto:communications@fbcarlington.org" className="text-purple-600 hover:underline">Email me to schedule a time to meet!</a>
-              </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {!conversationStarted ? (
                 <div className="text-center py-8">
-                  <p className="text-slate-700 mb-6">
-                    I'll ask you a few questions to understand the heart behind your event. This should take about 5 minutes.
+                  <p className="text-slate-600 mb-6">
+                    Quick interview to gather project details (5 minutes)
                   </p>
                   <Button
                     onClick={startGoalReview}
-                    className="bg-purple-600 hover:bg-purple-700"
-                    size="lg"
+                    className="bg-slate-900 hover:bg-slate-800"
                   >
-                    <MessageSquare className="w-5 h-5 mr-2" />
-                    Start Conversation
+                    Start Interview
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Chat Messages */}
-                  <div className="bg-white rounded-lg border border-purple-200 p-4 max-h-96 overflow-y-auto space-y-4">
-                    <AnimatePresence>
-                      {chatMessages.map((message, idx) => (
-                        <motion.div
-                          key={idx}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div className={`max-w-[80%] rounded-lg p-3 ${
-                            message.role === 'user' 
-                              ? 'bg-purple-600 text-white' 
-                              : 'bg-slate-100 text-slate-900'
-                          }`}>
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                            <p className="text-xs mt-1 opacity-70">
-                              {format(new Date(message.timestamp), 'h:mm a')}
-                            </p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+                  <div 
+                    ref={chatContainerRef}
+                    className="bg-white rounded-lg border border-slate-200 p-4 h-[400px] overflow-y-auto"
+                  >
+                    <div className="space-y-4">
+                      <AnimatePresence>
+                        {chatMessages.map((message, idx) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-[75%] rounded-lg px-4 py-2.5 ${
+                              message.role === 'user' 
+                                ? 'bg-slate-900 text-white' 
+                                : 'bg-slate-100 text-slate-900'
+                            }`}>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
 
-                    {isAIThinking && (
-                      <div className="flex justify-start">
-                        <div className="bg-slate-100 rounded-lg p-3">
-                          <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                      {isAIThinking && (
+                        <div className="flex justify-start">
+                          <div className="bg-slate-100 rounded-lg px-4 py-2.5">
+                            <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                      
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
 
                   {/* Input Area */}
@@ -406,13 +441,13 @@ Respond naturally to their last message and guide toward uncovered areas.`;
                           }
                         }}
                         placeholder="Type your response..."
-                        className="resize-none"
+                        className="resize-none border-slate-300 focus:border-slate-400"
                         rows={2}
                       />
                       <Button
                         onClick={sendMessage}
                         disabled={!userInput.trim() || isAIThinking}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        className="bg-slate-900 hover:bg-slate-800"
                       >
                         <Send className="w-4 h-4" />
                       </Button>
@@ -424,21 +459,21 @@ Respond naturally to their last message and guide toward uncovered areas.`;
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="border-t border-purple-200 pt-4"
+                      className="border-t border-slate-200 pt-4"
                     >
                       <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <CheckCircle2 className="w-6 h-6 text-green-600" />
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                           <div>
-                            <p className="font-semibold text-green-900">Goal Review Complete!</p>
-                            <p className="text-sm text-green-700">Ready to move to Project Review</p>
+                            <p className="font-medium text-slate-900">Interview Complete</p>
+                            <p className="text-sm text-slate-600">Ready for project review</p>
                           </div>
                         </div>
                         <Button
                           onClick={moveToProjectReview}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-slate-900 hover:bg-slate-800"
                         >
-                          Move to Project Review
+                          Continue to Project Review
                           <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                       </div>
@@ -452,27 +487,27 @@ Respond naturally to their last message and guide toward uncovered areas.`;
 
         {/* Request Details */}
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Request Information</CardTitle>
+          <Card className="border border-slate-200">
+            <CardHeader className="border-b bg-slate-50">
+              <CardTitle className="text-base font-medium">Request Information</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-4 space-y-3">
               <div>
-                <p className="text-sm text-slate-500">Requestor</p>
-                <p className="font-medium">{request.requestor_name}</p>
-                <p className="text-sm text-slate-600">{request.requestor_email}</p>
+                <p className="text-xs text-slate-500 mb-1">Requestor</p>
+                <p className="font-medium text-sm">{request.requestor_name}</p>
+                <p className="text-xs text-slate-600">{request.requestor_email}</p>
               </div>
 
               {request.description && (
                 <div>
-                  <p className="text-sm text-slate-500">Description</p>
+                  <p className="text-xs text-slate-500 mb-1">Description</p>
                   <p className="text-sm text-slate-700">{request.description}</p>
                 </div>
               )}
 
               {request.goal_review_data?.need_type && (
                 <div>
-                  <p className="text-sm text-slate-500">Type</p>
+                  <p className="text-xs text-slate-500 mb-1">Type</p>
                   <Badge variant="outline" className="capitalize">
                     {request.goal_review_data.need_type}
                   </Badge>
@@ -480,27 +515,27 @@ Respond naturally to their last message and guide toward uncovered areas.`;
               )}
 
               <div>
-                <p className="text-sm text-slate-500">Created</p>
-                <p className="text-sm text-slate-700">
+                <p className="text-xs text-slate-500 mb-1">Created</p>
+                <p className="text-xs text-slate-700">
                   {format(new Date(request.created_date), 'PPP p')}
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Graphics Items - FIXED NULL CHECK */}
+          {/* Graphics Items */}
           {request.goal_review_data?.graphics_items && Object.keys(request.goal_review_data.graphics_items).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Graphics Requested</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="border-b bg-slate-50">
+                <CardTitle className="text-base font-medium">Graphics Requested</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-2">
                   {Object.entries(request.goal_review_data.graphics_items)
                     .filter(([_, value]) => value)
                     .map(([key, _]) => (
                       <div key={key} className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                         <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>
                       </div>
                     ))}
@@ -509,19 +544,19 @@ Respond naturally to their last message and guide toward uncovered areas.`;
             </Card>
           )}
 
-          {/* Marketing Channels - FIXED NULL CHECK */}
+          {/* Marketing Channels */}
           {request.goal_review_data?.marketing_channels && Object.keys(request.goal_review_data.marketing_channels).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Marketing Channels</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="border-b bg-slate-50">
+                <CardTitle className="text-base font-medium">Marketing Channels</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="space-y-2">
                   {Object.entries(request.goal_review_data.marketing_channels)
                     .filter(([_, value]) => value)
                     .map(([key, _]) => (
                       <div key={key} className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
                         <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>
                       </div>
                     ))}
@@ -532,11 +567,11 @@ Respond naturally to their last message and guide toward uncovered areas.`;
 
           {/* Links */}
           {(request.goal_review_data?.graphics_folder_link || request.goal_review_data?.marketing_assets_link) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Links</CardTitle>
+            <Card className="border border-slate-200">
+              <CardHeader className="border-b bg-slate-50">
+                <CardTitle className="text-base font-medium">Links</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="p-4 space-y-2">
                 {request.goal_review_data.graphics_folder_link && (
                   <div>
                     <p className="text-xs text-slate-500 mb-1">Graphics Folder</p>
@@ -544,7 +579,7 @@ Respond naturally to their last message and guide toward uncovered areas.`;
                       href={request.goal_review_data.graphics_folder_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-purple-600 hover:underline break-all"
+                      className="text-xs text-blue-600 hover:underline break-all"
                     >
                       {request.goal_review_data.graphics_folder_link}
                     </a>
@@ -557,7 +592,7 @@ Respond naturally to their last message and guide toward uncovered areas.`;
                       href={request.goal_review_data.marketing_assets_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-purple-600 hover:underline break-all"
+                      className="text-xs text-blue-600 hover:underline break-all"
                     >
                       {request.goal_review_data.marketing_assets_link}
                     </a>
@@ -570,15 +605,15 @@ Respond naturally to their last message and guide toward uncovered areas.`;
 
         {/* Conversation History */}
         {request.conversation_history && request.conversation_history.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Activity Log</CardTitle>
+          <Card className="border border-slate-200">
+            <CardHeader className="border-b bg-slate-50">
+              <CardTitle className="text-base font-medium">Activity Log</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               <div className="space-y-3">
                 {request.conversation_history.map((item, idx) => (
                   <div key={idx} className="flex gap-3 pb-3 border-b last:border-0">
-                    <User className="w-4 h-4 text-slate-400 mt-1" />
+                    <User className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-slate-900">{item.author}</p>
                       <p className="text-sm text-slate-600">{item.message}</p>
