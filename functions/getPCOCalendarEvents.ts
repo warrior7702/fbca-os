@@ -43,7 +43,7 @@ async function fetchAllInstances(accessToken, baseUrl) {
     let allInstances = [];
     let nextUrl = baseUrl;
     let pageCount = 0;
-    const maxPages = 3; // Only fetch 3 pages (300 instances max)
+    const maxPages = 10; // Increased to fetch up to 1000 instances (10 pages * 100)
     
     while (nextUrl && pageCount < maxPages) {
         pageCount++;
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
         // Fetch full event data with resources and tags for each unique event (in parallel batches)
         const eventDataMap = {};
         const eventIdArray = Array.from(eventIds);
-        const batchSize = 10; // Process 10 events at a time
+        const batchSize = 15; // Increased batch size for faster processing
         
         let eventsWithoutNames = 0;
         let eventsWithoutResources = 0;
@@ -161,16 +161,35 @@ Deno.serve(async (req) => {
 
                     if (!eventResponse.ok) {
                         console.error(`❌ Failed to fetch event ${eventId}: ${eventResponse.status}`);
-                        return null;
+                        return {
+                            eventId,
+                            data: {
+                                name: `Event ${eventId}`,
+                                summary: null,
+                                description: null,
+                                visible_in_church_center: false,
+                                approval_status: null,
+                                resource_requests: [],
+                                tags: []
+                            }
+                        };
                     }
 
                     const eventData = await eventResponse.json();
                     const event = eventData.data;
                     
-                    // VALIDATION: Check if event has a name
-                    const eventName = event.attributes?.name;
+                    // Get event name - try multiple sources
+                    let eventName = event.attributes?.name;
+                    
+                    // If name is missing or empty, try summary
                     if (!eventName || eventName.trim() === '') {
-                        console.warn(`⚠️ Event ${eventId} has no name! Using fallback.`);
+                        eventName = event.attributes?.summary;
+                    }
+                    
+                    // If still missing, use ID-based name
+                    if (!eventName || eventName.trim() === '') {
+                        console.warn(`⚠️ Event ${eventId} has no name or summary! Using fallback.`);
+                        eventName = `Unnamed Event (${eventId})`;
                         eventsWithoutNames++;
                     }
                     
@@ -281,7 +300,7 @@ Deno.serve(async (req) => {
                     return {
                         eventId,
                         data: {
-                            name: eventName || 'Untitled Event',
+                            name: eventName,
                             summary: event.attributes?.summary || null,
                             description: event.attributes?.description || null,
                             visible_in_church_center: event.attributes?.visible_in_church_center,
@@ -292,7 +311,18 @@ Deno.serve(async (req) => {
                     };
                 } catch (error) {
                     console.error(`❌ Error fetching event ${eventId}:`, error);
-                    return null;
+                    return {
+                        eventId,
+                        data: {
+                            name: `Event ${eventId} (Error)`,
+                            summary: null,
+                            description: null,
+                            visible_in_church_center: false,
+                            approval_status: null,
+                            resource_requests: [],
+                            tags: []
+                        }
+                    };
                 }
             });
 
@@ -364,7 +394,7 @@ Deno.serve(async (req) => {
             eventsWithResources.push({
                 id: instance.id,
                 event_id: eventId,
-                name: eventData?.name || 'Untitled Event',
+                name: eventData?.name || `Event ${eventId}`,
                 starts_at: starts_at,
                 ends_at: ends_at,
                 summary: eventData?.summary,
@@ -392,11 +422,6 @@ Deno.serve(async (req) => {
             console.log(`📊 Events with resources: ${withResources}`);
             console.log(`📊 Events without resources: ${withoutResources}`);
             console.log(`📊 Events with answers: ${withAnswers}`);
-            console.log(`📋 First few events:`, eventsWithResources.slice(0, 3).map(e => ({ 
-                name: e.name, 
-                date: e.starts_at, 
-                resources: e.resources.length 
-            })));
         }
 
         return Response.json({ 
