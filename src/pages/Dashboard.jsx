@@ -19,7 +19,8 @@ import {
   Inbox,
   Video,
   CalendarIcon,
-  Layers // Added Layers icon
+  Layers, // Added Layers icon
+  MessageSquare // Added MessageSquare icon for Communications Request
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -31,7 +32,7 @@ const defaultApps = [
   { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-purple-500 to-pink-500", path: "MyMeetings" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
   { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" },
-  { id: "workflowhub", name: "Workflow Hub", icon: Layers, color: "from-purple-500 to-pink-500", path: "WorkflowHub" },
+  { id: "communications", name: "Communications Request", icon: MessageSquare, color: "from-purple-500 to-pink-500", path: "WorkflowHub" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
@@ -59,7 +60,7 @@ const getDefaultPositions = () => {
     myapprovals: { row: 0, col: 2 },
     calendar: { row: 0, col: 3 },
     email: { row: 1, col: 0 },
-    workflowhub: { row: 1, col: 1 }, // Updated from marketing to workflowhub
+    communications: { row: 1, col: 1 },
     foodservice: { row: 1, col: 2 },
     staffdir: { row: 1, col: 3 },
     ticketing: { row: 2, col: 0 },

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock, ChevronDown, ChevronUp, MessageSquare, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -539,6 +539,48 @@ export default function PCOAPITester() {
         error: error.message
       });
       toast.error('Failed to run diagnostic: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // NEW: Test sending communication request email
+  const testSendCommRequestEmail = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID (from WorkflowRequest entity)');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('📧 Testing communication request email:', eventId);
+      
+      // Send email notification
+      const response = await base44.functions.invoke('sendCommunicationRequestEmail', {
+        request_id: eventId,
+        recipient_email: user.email
+      });
+      
+      setResult({
+        ok: response.data.success,
+        status: 200,
+        data: response.data,
+        endpoint: 'sendCommunicationRequestEmail'
+      });
+      
+      if (response.data.success) {
+        toast.success('📧 Email sent successfully!');
+      } else {
+        toast.error('Failed to send email');
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to send email: ' + error.message);
     } finally {
       setTestLoading(false);
     }
@@ -1423,6 +1465,23 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Communication Request Email Result
+    if (result.endpoint === 'sendCommunicationRequestEmail') {
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900">📧 Communication Request Email Result</h3>
+          {data.success ? (
+            <p className="text-green-700">Email sent successfully!</p>
+          ) : (
+            <p className="text-red-700">Failed to send email: {data.error || 'Unknown error'}</p>
+          )}
+          {data.message && (
+            <p className="text-slate-700">{data.message}</p>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1475,11 +1534,12 @@ export default function PCOAPITester() {
         </div>
 
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="groups">Approval Groups</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="communications">Comm Requests</TabsTrigger>
             <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
 
@@ -1774,6 +1834,104 @@ export default function PCOAPITester() {
                     </AlertDescription>
                   </Alert>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* NEW: Communications Request Tab */}
+          <TabsContent value="communications" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-purple-600" />
+                  Test Communication Request Email
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-sm">
+                    <strong>How it works:</strong> When a "Mystery Resource" is requested in PCO Calendar, 
+                    the system automatically creates a Communication Request and sends an email notification 
+                    to the requestor with the workflow details.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2">
+                  <Label>Test Email Notification</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Communication Request ID (from WorkflowRequest entity)"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testSendCommRequestEmail} 
+                      disabled={testLoading}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Mail className="w-4 h-4 mr-2" />}
+                      Send Test Email
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Enter a WorkflowRequest ID to test sending the email notification.
+                    The email will be sent to your email address ({user?.email}).
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <h3 className="font-semibold text-sm">📧 Email Template Preview</h3>
+                  <Card className="bg-slate-50">
+                    <CardContent className="p-4">
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <p className="text-xs text-slate-500">Subject:</p>
+                          <p className="font-semibold">Communications Request Created: [Event Name]</p>
+                        </div>
+                        <div className="border-t pt-3">
+                          <p className="text-xs text-slate-500 mb-2">Body:</p>
+                          <div className="space-y-2 text-slate-700">
+                            <p>Hello [Requestor Name],</p>
+                            <p>Your communications request has been created automatically from your Planning Center Calendar event.</p>
+                            <div className="bg-white p-3 rounded border my-3">
+                              <p className="font-semibold mb-1">Request Details:</p>
+                              <ul className="text-xs space-y-1">
+                                <li>• Request Number: CR-XXXXXX</li>
+                                <li>• Event: [Event Name]</li>
+                                <li>• Event Date: [Event Date]</li>
+                                <li>• Status: Minister Goal Review</li>
+                              </ul>
+                            </div>
+                            <div>
+                              <p className="font-semibold">Next Steps:</p>
+                              <p className="text-xs">Your request will go through:</p>
+                              <ol className="text-xs list-decimal list-inside mt-1">
+                                <li>Minister Goal Review</li>
+                                <li>Project Review</li>
+                                <li>Campaign Running</li>
+                              </ol>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Alert className="bg-purple-50 border-purple-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Testing Steps:</strong>
+                    <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
+                      <li>Create a test event in PCO Calendar with "Mystery Resource"</li>
+                      <li>Click "Sync PCO" in the Communications Request page</li>
+                      <li>Find the new request ID in the dashboard</li>
+                      <li>Enter that ID here and click "Send Test Email"</li>
+                      <li>Check your inbox for the notification</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
           </TabsContent>

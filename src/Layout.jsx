@@ -25,7 +25,8 @@ import {
   ClipboardCheck, // NEW: for My Approvals app
   Sparkles,
   Calendar as CalendarIcon, // Added CalendarIcon
-  Building2 // NEW: Added Building2 icon for My Department
+  Building2, // NEW: Added Building2 icon for My Department
+  MessageSquare // NEW: Added MessageSquare icon for Communications Request
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -73,9 +74,9 @@ const apps = [
     color: "text-violet-500"
   },
   {
-    name: "Workflow Hub",
+    name: "Communications Request",
     path: "WorkflowHub",
-    icon: Layers,
+    icon: MessageSquare,
     color: "text-purple-500"
   },
   {
