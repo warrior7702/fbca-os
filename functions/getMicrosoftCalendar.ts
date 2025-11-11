@@ -116,6 +116,19 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Got access token');
 
+        // Get timezone from request body or default to America/Chicago (Central Time)
+        let timezone = 'America/Chicago';
+        try {
+            const body = await req.json().catch(() => ({}));
+            if (body.timezone) {
+                timezone = body.timezone;
+            }
+        } catch {
+            // Use default timezone
+        }
+
+        console.log('🌍 Using timezone:', timezone);
+
         // Get date range - 7 days ago to 60 days ahead
         const now = new Date();
         const startDate = new Date(now);
@@ -128,13 +141,13 @@ Deno.serve(async (req) => {
 
         console.log('📅 Fetching events from', startDateTime, 'to', endDateTime);
 
-        // Fetch calendar events
+        // Fetch calendar events with user's timezone preference
         const calendarResponse = await fetch(
             `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${startDateTime}&endDateTime=${endDateTime}&$orderby=start/dateTime&$top=100`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
-                    'Prefer': 'outlook.timezone="UTC"'
+                    'Prefer': `outlook.timezone="${timezone}"`
                 }
             }
         );
@@ -154,11 +167,19 @@ Deno.serve(async (req) => {
         const processedEvents = events.map(event => {
             const meetingLink = extractMeetingLink(event);
             
+            // Add timezone to the start/end times
+            const startWithTz = event.start?.dateTime;
+            const endWithTz = event.end?.dateTime;
+            
+            console.log(`📅 Event: ${event.subject} - Start: ${startWithTz} (${event.start?.timeZone || timezone})`);
+            
             return {
                 id: event.id,
                 subject: event.subject || 'Untitled Meeting',
-                start: event.start?.dateTime,
-                end: event.end?.dateTime,
+                start: startWithTz,
+                end: endWithTz,
+                startTimeZone: event.start?.timeZone || timezone,
+                endTimeZone: event.end?.timeZone || timezone,
                 location: event.location?.displayName || null,
                 isOnlineMeeting: event.isOnlineMeeting || false,
                 meetingLink: meetingLink,
@@ -187,13 +208,14 @@ Deno.serve(async (req) => {
         // Filter out cancelled events
         const activeEvents = processedEvents.filter(e => !e.isCancelled);
 
-        console.log(`✅ Returning ${activeEvents.length} active events`);
+        console.log(`✅ Returning ${activeEvents.length} active events (timezone: ${timezone})`);
         console.log('========================================');
 
         return Response.json({
             success: true,
             events: activeEvents,
-            count: activeEvents.length
+            count: activeEvents.length,
+            timezone: timezone
         });
 
     } catch (error) {

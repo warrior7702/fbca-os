@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   XCircle,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,9 +39,15 @@ export default function MyMeetings() {
   const [syncing, setSyncing] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userTimezone, setUserTimezone] = useState('America/Chicago');
 
   useEffect(() => {
-    loadData();
+    // Detect user's timezone
+    const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setUserTimezone(detectedTimezone);
+    console.log('🌍 Detected timezone:', detectedTimezone);
+
+    loadData(detectedTimezone);
 
     // Update current time every minute for countdown
     const timer = setInterval(() => {
@@ -50,7 +57,7 @@ export default function MyMeetings() {
     return () => clearInterval(timer);
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (timezone = userTimezone) => {
     setLoading(true);
     try {
       const currentUser = await base44.auth.me();
@@ -62,11 +69,17 @@ export default function MyMeetings() {
         return;
       }
 
-      const response = await base44.functions.invoke('getMicrosoftCalendar');
+      console.log('📅 Fetching calendar with timezone:', timezone);
+
+      const response = await base44.functions.invoke('getMicrosoftCalendar', {
+        timezone: timezone
+      });
       
       if (response.data && response.data.events) {
         setMeetings(response.data.events);
         console.log(`✅ Loaded ${response.data.events.length} meetings`);
+        console.log('🌍 Calendar timezone:', response.data.timezone);
+        
         toast.success(`Loaded ${response.data.events.length} meetings`);
       } else {
         setMeetings([]);
@@ -82,7 +95,7 @@ export default function MyMeetings() {
 
   const handleSync = async () => {
     setSyncing(true);
-    await loadData();
+    await loadData(userTimezone);
     setSyncing(false);
   };
 
@@ -96,31 +109,53 @@ export default function MyMeetings() {
     }
   };
 
+  // Parse dates - they're already in the correct timezone from the API
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    return parseISO(dateStr);
+  };
+
   // Filter meetings
   const now = new Date();
-  const todayMeetings = meetings.filter(m => isToday(parseISO(m.start)));
-  const upcomingMeetings = meetings.filter(m => {
-    const start = parseISO(m.start);
-    return isFuture(start) && !isToday(start);
+  const todayMeetings = meetings.filter(m => {
+    const start = parseDate(m.start);
+    return start && isToday(start);
   });
-  const pastMeetings = meetings.filter(m => isPast(parseISO(m.end)));
+  
+  const upcomingMeetings = meetings.filter(m => {
+    const start = parseDate(m.start);
+    return start && isFuture(start) && !isToday(start);
+  });
+  
+  const pastMeetings = meetings.filter(m => {
+    const end = parseDate(m.end);
+    return end && isPast(end);
+  });
 
   // Find next meeting
   const nextMeeting = meetings
-    .filter(m => isFuture(parseISO(m.start)))
-    .sort((a, b) => parseISO(a.start) - parseISO(b.start))[0];
+    .filter(m => {
+      const start = parseDate(m.start);
+      return start && isFuture(start);
+    })
+    .sort((a, b) => parseDate(a.start) - parseDate(b.start))[0];
 
   // Check if meeting is happening now
   const isMeetingNow = (meeting) => {
-    const start = parseISO(meeting.start);
-    const end = parseISO(meeting.end);
+    const start = parseDate(meeting.start);
+    const end = parseDate(meeting.end);
+    if (!start || !end) return false;
     return now >= start && now <= end;
   };
 
   // Get meeting status
   const getMeetingStatus = (meeting) => {
-    const start = parseISO(meeting.start);
-    const end = parseISO(meeting.end);
+    const start = parseDate(meeting.start);
+    const end = parseDate(meeting.end);
+    
+    if (!start || !end) {
+      return { status: 'unknown', color: 'text-slate-600', bg: 'bg-slate-50', icon: CalendarIcon };
+    }
     
     if (now >= start && now <= end) {
       return { status: 'live', color: 'text-green-600', bg: 'bg-green-50', icon: Video };
@@ -160,6 +195,7 @@ export default function MyMeetings() {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-slate-600">Loading meetings...</p>
+          <p className="text-xs text-slate-400 mt-2">Timezone: {userTimezone}</p>
         </div>
       </div>
     );
@@ -173,7 +209,15 @@ export default function MyMeetings() {
         <AppHeader
           icon={Video}
           title="My Meetings"
-          description={`${meetings.length} meeting${meetings.length !== 1 ? 's' : ''} • ${todayMeetings.length} today`}
+          description={
+            <div className="flex items-center gap-3 flex-wrap">
+              <span>{meetings.length} meeting{meetings.length !== 1 ? 's' : ''} • {todayMeetings.length} today</span>
+              <Badge variant="outline" className="text-xs">
+                <Globe className="w-3 h-3 mr-1" />
+                {userTimezone}
+              </Badge>
+            </div>
+          }
           iconColor="from-purple-500 to-pink-500"
           action={
             <Button
@@ -198,46 +242,52 @@ export default function MyMeetings() {
         />
 
         {/* Next Meeting Countdown */}
-        {nextMeeting && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 text-white"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-purple-100 text-sm mb-1">Next Meeting</p>
-                <h2 className="text-2xl font-bold mb-2">{nextMeeting.subject}</h2>
-                <div className="flex items-center gap-4 text-sm text-purple-100">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {format(parseISO(nextMeeting.start), 'h:mm a')} - {format(parseISO(nextMeeting.end), 'h:mm a')}
-                  </span>
-                  {isMeetingNow(nextMeeting) && (
-                    <Badge className="bg-green-500 text-white animate-pulse">
-                      🔴 Live Now
-                    </Badge>
-                  )}
-                  {!isMeetingNow(nextMeeting) && (
-                    <span>
-                      in {differenceInMinutes(parseISO(nextMeeting.start), currentTime)} minutes
+        {nextMeeting && (() => {
+          const start = parseDate(nextMeeting.start);
+          const end = parseDate(nextMeeting.end);
+          if (!start || !end) return null;
+          
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 text-white"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-purple-100 text-sm mb-1">Next Meeting</p>
+                  <h2 className="text-2xl font-bold mb-2">{nextMeeting.subject}</h2>
+                  <div className="flex items-center gap-4 text-sm text-purple-100 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
                     </span>
-                  )}
+                    {isMeetingNow(nextMeeting) && (
+                      <Badge className="bg-green-500 text-white animate-pulse">
+                        🔴 Live Now
+                      </Badge>
+                    )}
+                    {!isMeetingNow(nextMeeting) && (
+                      <span>
+                        in {differenceInMinutes(start, currentTime)} minutes
+                      </span>
+                    )}
+                  </div>
                 </div>
+                {nextMeeting.meetingLink && (
+                  <Button
+                    onClick={() => handleJoinMeeting(nextMeeting)}
+                    className="bg-white text-purple-600 hover:bg-purple-50"
+                    size="lg"
+                  >
+                    <Video className="w-5 h-5 mr-2" />
+                    Join {nextMeeting.meetingLink.provider}
+                  </Button>
+                )}
               </div>
-              {nextMeeting.meetingLink && (
-                <Button
-                  onClick={() => handleJoinMeeting(nextMeeting)}
-                  className="bg-white text-purple-600 hover:bg-purple-50"
-                  size="lg"
-                >
-                  <Video className="w-5 h-5 mr-2" />
-                  Join {nextMeeting.meetingLink.provider}
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
 
         {/* Today's Meetings */}
         {todayMeetings.length > 0 && (
@@ -247,6 +297,10 @@ export default function MyMeetings() {
               {todayMeetings.map((meeting) => {
                 const status = getMeetingStatus(meeting);
                 const StatusIcon = status.icon;
+                const start = parseDate(meeting.start);
+                const end = parseDate(meeting.end);
+                
+                if (!start || !end) return null;
                 
                 return (
                   <motion.div
@@ -261,10 +315,10 @@ export default function MyMeetings() {
                           {/* Time */}
                           <div className="text-center min-w-20">
                             <p className="text-2xl font-bold text-slate-900">
-                              {format(parseISO(meeting.start), 'h:mm')}
+                              {format(start, 'h:mm')}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {format(parseISO(meeting.start), 'a')}
+                              {format(start, 'a')}
                             </p>
                           </div>
 
@@ -300,9 +354,9 @@ export default function MyMeetings() {
                               <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4" />
                                 <span>
-                                  {format(parseISO(meeting.start), 'h:mm a')} - {format(parseISO(meeting.end), 'h:mm a')}
+                                  {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
                                   <span className="text-slate-400 ml-2">
-                                    ({differenceInMinutes(parseISO(meeting.end), parseISO(meeting.start))} min)
+                                    ({differenceInMinutes(end, start)} min)
                                   </span>
                                 </span>
                               </div>
@@ -359,43 +413,48 @@ export default function MyMeetings() {
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-4">Upcoming</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingMeetings.slice(0, 6).map((meeting) => (
-                <motion.div
-                  key={meeting.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => setSelectedMeeting(meeting)}
-                >
-                  <Card className="border-none h-full">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1">
-                            {isToday(parseISO(meeting.start)) ? 'Today' :
-                             isTomorrow(parseISO(meeting.start)) ? 'Tomorrow' :
-                             format(parseISO(meeting.start), 'EEEE, MMM d')}
-                          </p>
-                          <h3 className="font-semibold text-slate-900 line-clamp-2">
-                            {meeting.subject}
-                          </h3>
-                        </div>
+              {upcomingMeetings.slice(0, 6).map((meeting) => {
+                const start = parseDate(meeting.start);
+                if (!start) return null;
+                
+                return (
+                  <motion.div
+                    key={meeting.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => setSelectedMeeting(meeting)}
+                  >
+                    <Card className="border-none h-full">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">
+                              {isToday(start) ? 'Today' :
+                               isTomorrow(start) ? 'Tomorrow' :
+                               format(start, 'EEEE, MMM d')}
+                            </p>
+                            <h3 className="font-semibold text-slate-900 line-clamp-2">
+                              {meeting.subject}
+                            </h3>
+                          </div>
 
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Clock className="w-4 h-4" />
-                          {format(parseISO(meeting.start), 'h:mm a')}
-                        </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Clock className="w-4 h-4" />
+                            {format(start, 'h:mm a')}
+                          </div>
 
-                        {meeting.meetingLink && (
-                          <Badge variant="outline" className="text-xs">
-                            {meeting.meetingLink.provider}
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                          {meeting.meetingLink && (
+                            <Badge variant="outline" className="text-xs">
+                              {meeting.meetingLink.provider}
+                            </Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -421,129 +480,139 @@ export default function MyMeetings() {
               Meeting details and information
             </DialogDescription>
           </DialogHeader>
-          {selectedMeeting && (
-            <div className="space-y-6">
-              {/* Time & Status */}
-              <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-lg">
-                <CalendarIcon className="w-5 h-5 text-purple-600 mt-1" />
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-900 mb-1">
-                    {format(parseISO(selectedMeeting.start), 'EEEE, MMMM d, yyyy')}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {format(parseISO(selectedMeeting.start), 'h:mm a')} - {format(parseISO(selectedMeeting.end), 'h:mm a')}
-                    <span className="text-slate-400 ml-2">
-                      ({differenceInMinutes(parseISO(selectedMeeting.end), parseISO(selectedMeeting.start))} minutes)
-                    </span>
-                  </p>
-                  <div className="mt-2">
-                    {getResponseBadge(selectedMeeting.responseStatus)}
+          {selectedMeeting && (() => {
+            const start = parseDate(selectedMeeting.start);
+            const end = parseDate(selectedMeeting.end);
+            
+            if (!start || !end) return <p className="text-slate-500">Invalid meeting times</p>;
+            
+            return (
+              <div className="space-y-6">
+                {/* Time & Status */}
+                <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-lg">
+                  <CalendarIcon className="w-5 h-5 text-purple-600 mt-1" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-900 mb-1">
+                      {format(start, 'EEEE, MMMM d, yyyy')}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
+                      <span className="text-slate-400 ml-2">
+                        ({differenceInMinutes(end, start)} minutes)
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {selectedMeeting.startTimeZone || userTimezone}
+                    </p>
+                    <div className="mt-2">
+                      {getResponseBadge(selectedMeeting.responseStatus)}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Location */}
-              {selectedMeeting.location && (
-                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
-                  <MapPin className="w-5 h-5 text-slate-600" />
-                  <span className="text-slate-700">{selectedMeeting.location}</span>
+                {/* Location */}
+                {selectedMeeting.location && (
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
+                    <MapPin className="w-5 h-5 text-slate-600" />
+                    <span className="text-slate-700">{selectedMeeting.location}</span>
+                  </div>
+                )}
+
+                {/* Meeting Link */}
+                {selectedMeeting.meetingLink && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-sm font-semibold text-green-900 mb-2">
+                      {selectedMeeting.meetingLink.provider} Meeting
+                    </p>
+                    <Button
+                      onClick={() => handleJoinMeeting(selectedMeeting)}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <Video className="w-4 h-4 mr-2" />
+                      Join {selectedMeeting.meetingLink.provider}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Organizer */}
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Organizer</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-semibold">
+                      {selectedMeeting.organizer?.name?.[0]?.toUpperCase() || 'O'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{selectedMeeting.organizer?.name}</p>
+                      <p className="text-xs text-slate-500">{selectedMeeting.organizer?.email}</p>
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {/* Meeting Link */}
-              {selectedMeeting.meetingLink && (
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm font-semibold text-green-900 mb-2">
-                    {selectedMeeting.meetingLink.provider} Meeting
-                  </p>
+                {/* Attendees */}
+                {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="text-sm font-semibold text-slate-700 mb-3">
+                      Attendees ({selectedMeeting.attendees.length})
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {selectedMeeting.attendees.map((attendee, idx) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                              {attendee.name?.[0]?.toUpperCase() || 'A'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{attendee.name}</p>
+                              <p className="text-xs text-slate-500">{attendee.email}</p>
+                            </div>
+                          </div>
+                          {attendee.status && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                attendee.status === 'accepted' ? 'bg-green-50 text-green-700' :
+                                attendee.status === 'declined' ? 'bg-red-50 text-red-700' :
+                                attendee.status === 'tentative' ? 'bg-yellow-50 text-yellow-700' :
+                                'bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {attendee.status}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Body Preview */}
+                {selectedMeeting.bodyPreview && (
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedMeeting.bodyPreview}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2">
                   <Button
-                    onClick={() => handleJoinMeeting(selectedMeeting)}
-                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={() => window.open(selectedMeeting.webLink, '_blank')}
+                    variant="outline"
+                    className="flex-1"
                   >
-                    <Video className="w-4 h-4 mr-2" />
-                    Join {selectedMeeting.meetingLink.provider}
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open in Outlook
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedMeeting(null)}
+                    variant="outline"
+                  >
+                    Close
                   </Button>
                 </div>
-              )}
-
-              {/* Organizer */}
-              <div className="p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Organizer</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-semibold">
-                    {selectedMeeting.organizer?.name?.[0]?.toUpperCase() || 'O'}
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900">{selectedMeeting.organizer?.name}</p>
-                    <p className="text-xs text-slate-500">{selectedMeeting.organizer?.email}</p>
-                  </div>
-                </div>
               </div>
-
-              {/* Attendees */}
-              {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm font-semibold text-slate-700 mb-3">
-                    Attendees ({selectedMeeting.attendees.length})
-                  </p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {selectedMeeting.attendees.map((attendee, idx) => (
-                      <div key={idx} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                            {attendee.name?.[0]?.toUpperCase() || 'A'}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">{attendee.name}</p>
-                            <p className="text-xs text-slate-500">{attendee.email}</p>
-                          </div>
-                        </div>
-                        {attendee.status && (
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${
-                              attendee.status === 'accepted' ? 'bg-green-50 text-green-700' :
-                              attendee.status === 'declined' ? 'bg-red-50 text-red-700' :
-                              attendee.status === 'tentative' ? 'bg-yellow-50 text-yellow-700' :
-                              'bg-slate-50 text-slate-700'
-                            }`}
-                          >
-                            {attendee.status}
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Body Preview */}
-              {selectedMeeting.bodyPreview && (
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
-                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedMeeting.bodyPreview}</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => window.open(selectedMeeting.webLink, '_blank')}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open in Outlook
-                </Button>
-                <Button
-                  onClick={() => setSelectedMeeting(null)}
-                  variant="outline"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
