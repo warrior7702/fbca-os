@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -30,7 +29,7 @@ import {
   User,
   Key,
   Clock,
-  Video, // Added Video icon
+  Video,
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -72,9 +71,9 @@ export default function MyTasks() {
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
   const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
-  const [meetings, setMeetings] = useState([]); // New state for meetings
-  const [loadingMeetings, setLoadingMeetings] = useState(true); // New state for loading meetings
-  const [userTimezone, setUserTimezone] = useState('America/Chicago'); // New state for user timezone
+  const [meetings, setMeetings] = useState([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(true);
+  const [userTimezone, setUserTimezone] = useState('America/Chicago');
 
   const navigate = useNavigate();
 
@@ -93,7 +92,6 @@ export default function MyTasks() {
     try {
       console.log('📞 Calling getMySchedule (which filters getPCOCalendarEvents)...');
       
-      // Call getMySchedule which will filter the events from getPCOCalendarEvents
       const response = await base44.functions.invoke('getMySchedule');
       
       console.log('✅ Response:', response.data);
@@ -126,13 +124,12 @@ export default function MyTasks() {
     }
   };
 
-  const loadMeetings = async () => { // New function to load meetings
+  const loadMeetings = async () => {
     console.log('📅 ========== LOADING MEETINGS ==========');
     
     setLoadingMeetings(true);
     
     try {
-      // Detect timezone
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       setUserTimezone(detectedTimezone);
       console.log('🌍 Using timezone:', detectedTimezone);
@@ -151,7 +148,6 @@ export default function MyTasks() {
       
     } catch (error) {
       console.error('❌ ERROR loading meetings:', error.message);
-      // Don't show error toast - user might not have Microsoft connected
       setMeetings([]);
     } finally {
       setLoadingMeetings(false);
@@ -159,8 +155,8 @@ export default function MyTasks() {
   };
 
   const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh clicked - refreshing schedule and meetings'); // Updated message
-    await Promise.all([loadMySchedule(), loadMeetings()]); // Refresh both
+    console.log('🔄 Manual refresh clicked - refreshing schedule and meetings');
+    await Promise.all([loadMySchedule(), loadMeetings()]);
     toast.success('Schedule refreshed!');
   };
 
@@ -172,21 +168,21 @@ export default function MyTasks() {
     console.log('📢 User changed:', user?.email);
     if (user) {
       loadSupportTickets();
-      console.log('📢 About to call loadMySchedule() and loadMeetings()'); // Updated message
+      console.log('📢 About to call loadMySchedule() and loadMeetings()');
       loadMySchedule();
-      loadMeetings(); // Call loadMeetings when user loads
+      loadMeetings();
     }
   }, [user]);
 
   const handleScheduleEventClick = (event) => {
-    if (event.type === 'meeting') { // Handle meeting click
+    if (event.type === 'meeting') {
       if (event.meetingLink?.url) {
         window.open(event.meetingLink.url, '_blank');
-        toast.success(`Opening ${event.meetingLink.provider || 'meeting'}...`);
+        toast.success(`Opening ${event.meetingLink.provider}...`);
       } else {
         toast.info('No meeting link available');
       }
-    } else { // Existing PCO event click handling
+    } else {
       setSelectedScheduleEvent(event);
       setShowScheduleEventDetail(true);
     }
@@ -333,7 +329,6 @@ export default function MyTasks() {
     }
   };
 
-  // Calculate events today - combine PCO and meetings
   const pcoEventsToday = myScheduleEvents.filter(event => {
     const eventDate = new Date(event.starts_at);
     return isToday(eventDate);
@@ -344,7 +339,7 @@ export default function MyTasks() {
     return isToday(meetingDate);
   }).length;
 
-  const eventsToday = pcoEventsToday + meetingsToday; // Combined count
+  const eventsToday = pcoEventsToday + meetingsToday;
 
   if (loading) {
     return (
@@ -361,7 +356,7 @@ export default function MyTasks() {
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6"> {/* Added responsive padding and spacing */}
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
         {(!user?.clickup_access_token && !user?.microsoft_access_token) && <ConnectionWarning />}
 
         <AppHeader
@@ -373,18 +368,18 @@ export default function MyTasks() {
             <div className="flex gap-2">
               <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm">
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Calendar</span> {/* Added sm:inline */}
+                <span className="hidden sm:inline">Calendar</span>
               </Button>
               <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Syncing...</span> {/* Added sm:inline */}
+                    <span className="hidden sm:inline">Syncing...</span>
                   </>
                 ) : (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Sync</span> {/* Added sm:inline */}
+                    <span className="hidden sm:inline">Sync</span>
                   </>
                 )}
               </Button>
@@ -394,52 +389,52 @@ export default function MyTasks() {
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" /> {/* Responsive icon size */}
+                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" />
                 <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 text-xs">Today</Badge>
               </div>
-              <p className="text-xl md:text-2xl font-bold text-slate-900">{myDayTasks.length}</p> {/* Responsive text size */}
-              <p className="text-xs md:text-sm text-slate-600">Tasks Due</p> {/* Responsive text size */}
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
+              <p className="text-xs md:text-sm text-slate-600">Tasks Due</p>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-green-600" /> {/* Responsive icon size */}
+                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
                 <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                  {(loadingSchedule || loadingMeetings) ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday} {/* Updated loading check */}
+                  {(loadingSchedule || loadingMeetings) ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday}
                 </Badge>
               </div>
-              <p className="text-xl md:text-2xl font-bold text-slate-900">{eventsToday}</p> {/* Responsive text size */}
-              <p className="text-xs md:text-sm text-slate-600">Events Today</p> {/* Responsive text size */}
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{eventsToday}</p>
+              <p className="text-xs md:text-sm text-slate-600">Events Today</p>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
-            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between mb-2">
-                <TicketIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> {/* Responsive icon size */}
+                <TicketIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" />
                 <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs">
                   {loadingTickets ? <Loader2 className="h-3 w-3 animate-spin" /> : supportTickets.length}
                 </Badge>
               </div>
-              <p className="text-xl md:text-2xl font-bold text-slate-900">{supportTickets.length}</p> {/* Responsive text size */}
-              <p className="text-xs md:text-sm text-slate-600">Support Tickets</p> {/* Responsive text size */}
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
+              <p className="text-xs md:text-sm text-slate-600">Support Tickets</p>
             </CardContent>
           </Card>
         </div>
 
         <Card className="border-2 border-green-200 bg-white">
           <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-2"> {/* Added flex-wrap and gap */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-xl md:text-2xl flex items-center gap-2"> {/* Responsive text size */}
-                  <CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-green-600" /> {/* Responsive icon size */}
-                  <span>My Schedule</span> {/* Wrapped text in span */}
+                <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+                  <span>My Schedule</span>
                 </CardTitle>
-                <p className="text-slate-600 text-xs md:text-sm mt-1"> {/* Responsive text size */}
+                <p className="text-slate-600 text-xs md:text-sm mt-1">
                   <span className="inline-flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                     {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
@@ -474,16 +469,16 @@ export default function MyTasks() {
             {(loadingSchedule || loadingMeetings) ? (
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                <p className="text-slate-600 text-sm">Loading your schedule...</p> {/* Responsive text size */}
+                <p className="text-slate-600 text-sm">Loading your schedule...</p>
               </div>
             ) : (myScheduleEvents.length === 0 && meetings.length === 0) ? (
               <div className="text-center py-8">
-                <p className="text-slate-600 text-sm">No upcoming events or meetings found</p> {/* Responsive text size */}
+                <p className="text-slate-600 text-sm">No upcoming events or meetings found</p>
               </div>
             ) : (
               <ScheduleCalendar 
-                events={myScheduleEvents} 
-                meetings={meetings} {/* Pass meetings to ScheduleCalendar */}
+                events={myScheduleEvents}
+                meetings={meetings}
                 weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
@@ -570,7 +565,7 @@ export default function MyTasks() {
               onClick={() => setShowFullCalendar(true)}
             >
               <Maximize2 className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Full Calendar</span> {/* Added sm:inline */}
+              <span className="hidden sm:inline">Full Calendar</span>
             </Button>
           </CardHeader>
           <CardContent>
