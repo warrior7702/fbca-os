@@ -49,6 +49,12 @@ const apps = [
     color: "text-indigo-500"
   },
   {
+    name: "My Meetings",
+    path: "MyMeetings",
+    icon: CalendarIcon,
+    color: "text-purple-500"
+  },
+  {
     name: "My Approvals",
     path: "MyApprovals",
     icon: ClipboardCheck,
