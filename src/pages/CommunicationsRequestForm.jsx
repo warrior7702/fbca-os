@@ -19,10 +19,10 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar as CalendarIcon, Search, Image, Megaphone, Clock } from "lucide-react";
+import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar as CalendarIcon, Search, Image, Megaphone, Clock, Upload, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, addDays, addMonths, startOfDay, endOfDay } from "date-fns";
+import { format, addDays, addMonths } from "date-fns";
 
 // Helper function to capitalize names properly
 const capitalizeFullName = (name) => {
@@ -42,9 +42,10 @@ export default function CommunicationsRequestForm() {
   const [searchingEvents, setSearchingEvents] = useState(false);
   const [pcoEvents, setPcoEvents] = useState([]);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState("30"); // "30", "60", "90", "all"
+  const [dateRange, setDateRange] = useState("30");
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState({ hour: "12", minute: "00", period: "PM" });
+  const [photoUploadMethod, setPhotoUploadMethod] = useState("upload"); // "upload" or "link"
   const navigate = useNavigate();
 
   // Form state
@@ -76,6 +77,7 @@ export default function CommunicationsRequestForm() {
       something_else: false
     },
     previous_event_photos: null,
+    previous_event_photos_link: "",
     graphics_folder_link: "",
     
     marketing_channels: {
@@ -87,13 +89,7 @@ export default function CommunicationsRequestForm() {
       press_release: false
     },
     marketing_message: "",
-    marketing_assets_link: "",
-    
-    project_description: "",
-    target_audience: "",
-    success_metrics: "",
-    budget_range: "",
-    timeline: ""
+    marketing_assets_link: ""
   });
 
   const ministries = [
@@ -198,7 +194,6 @@ export default function CommunicationsRequestForm() {
       const response = await base44.functions.invoke('getPCOToken');
       const token = response.data.access_token;
 
-      // Calculate date range
       const now = new Date();
       let endDate;
       switch(range) {
@@ -212,7 +207,7 @@ export default function CommunicationsRequestForm() {
           endDate = addDays(now, 90);
           break;
         case "all":
-          endDate = addMonths(now, 12); // 1 year
+          endDate = addMonths(now, 12);
           break;
         default:
           endDate = addDays(now, 30);
@@ -264,7 +259,6 @@ export default function CommunicationsRequestForm() {
         })
       );
 
-      // Filter by date range and sort
       const validEvents = events
         .filter(e => e !== null && e.date)
         .filter(e => {
@@ -286,7 +280,6 @@ export default function CommunicationsRequestForm() {
   const handlePCOEventSelect = (event) => {
     const eventDate = new Date(event.date);
     
-    // Extract date and time
     setSelectedDate(eventDate);
     
     const hours = eventDate.getHours();
@@ -345,7 +338,9 @@ export default function CommunicationsRequestForm() {
       const finalProjectName = formData.manual_event_name || formData.project_name;
 
       let photoUrls = [];
-      if (formData.previous_event_photos) {
+      
+      // Handle photo uploads
+      if (photoUploadMethod === "upload" && formData.previous_event_photos) {
         for (const file of formData.previous_event_photos) {
           try {
             const uploadResult = await base44.integrations.Core.UploadFile({ file });
@@ -354,6 +349,8 @@ export default function CommunicationsRequestForm() {
             console.error('Error uploading file:', err);
           }
         }
+      } else if (photoUploadMethod === "link" && formData.previous_event_photos_link) {
+        photoUrls = [formData.previous_event_photos_link];
       }
 
       const request = await base44.entities.WorkflowRequest.create({
@@ -362,7 +359,7 @@ export default function CommunicationsRequestForm() {
         status: "request",
         priority: "medium",
         title: finalProjectName,
-        description: formData.project_description || `${formData.need_type} request for ${formData.ministry_department}`,
+        description: `${formData.need_type} request for ${formData.ministry_department}`,
         requestor_email: formData.requester_email,
         requestor_name: formData.requester_name,
         ministry_department: formData.ministry_department,
@@ -379,11 +376,6 @@ export default function CommunicationsRequestForm() {
           marketing_assets_link: formData.marketing_assets_link,
           graphics_folder_link: formData.graphics_folder_link,
           previous_event_photos: photoUrls,
-          ministry_goal: formData.project_description,
-          target_audience: formData.target_audience,
-          success_metrics: formData.success_metrics,
-          budget_range: formData.budget_range,
-          timeline: formData.timeline,
           event_theme: formData.event_theme,
           event_date: formData.event_date,
           manual_event_name: formData.manual_event_name
@@ -598,7 +590,6 @@ FBC Arlington`
                         </div>
                       ) : (
                         <>
-                          {/* Date Range Tabs */}
                           <Tabs value={dateRange} onValueChange={(value) => {
                             setDateRange(value);
                             if (pcoEvents.length > 0) {
@@ -826,7 +817,6 @@ FBC Arlington`
                     </Label>
                     
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Date Picker */}
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -848,7 +838,6 @@ FBC Arlington`
                         </PopoverContent>
                       </Popover>
 
-                      {/* Time Picker */}
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -962,23 +951,57 @@ FBC Arlington`
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="previous_photos" className="text-sm font-medium">
+                        {/* Previous Event Photos - Upload or Link */}
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">
                             Previous Event Photos (Optional)
                           </Label>
-                          <p className="text-xs text-slate-500 mb-2">
-                            If you have any pictures from previous events, you can drop them here. If not, no worries!
+                          <p className="text-xs text-slate-500">
+                            If you have pictures from previous events, you can share them here. If not, no worries!
                           </p>
-                          <Input
-                            id="previous_photos"
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="h-10"
-                          />
+                          
+                          <RadioGroup
+                            value={photoUploadMethod}
+                            onValueChange={setPhotoUploadMethod}
+                            className="flex gap-4"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="upload" id="photo-upload" />
+                              <Label htmlFor="photo-upload" className="cursor-pointer font-normal flex items-center gap-2">
+                                <Upload className="w-4 h-4" />
+                                Upload Files
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="link" id="photo-link" />
+                              <Label htmlFor="photo-link" className="cursor-pointer font-normal flex items-center gap-2">
+                                <LinkIcon className="w-4 h-4" />
+                                Paste Link
+                              </Label>
+                            </div>
+                          </RadioGroup>
+
+                          {photoUploadMethod === "upload" ? (
+                            <Input
+                              id="previous_photos"
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="h-10"
+                            />
+                          ) : (
+                            <Input
+                              id="previous_photos_link"
+                              value={formData.previous_event_photos_link}
+                              onChange={(e) => handleChange("previous_event_photos_link", e.target.value)}
+                              placeholder="Paste link to Google Drive, Dropbox, etc..."
+                              className="h-10"
+                            />
+                          )}
                         </div>
 
+                        {/* Link to Graphics Folder */}
                         <div className="space-y-2">
                           <Label htmlFor="graphics_folder_link" className="text-sm font-medium">
                             Link to Graphics Folder (Optional)
@@ -1037,6 +1060,7 @@ FBC Arlington`
                           </div>
                         </div>
 
+                        {/* Marketing Message */}
                         <div className="space-y-2">
                           <Label htmlFor="marketing_message" className="text-sm font-medium">
                             Key Marketing Message
@@ -1051,6 +1075,7 @@ FBC Arlington`
                           />
                         </div>
 
+                        {/* Link to Marketing Assets */}
                         <div className="space-y-2">
                           <Label htmlFor="marketing_assets_link" className="text-sm font-medium">
                             Link to Marketing Assets (Optional)
@@ -1067,118 +1092,29 @@ FBC Arlington`
                     )}
                   </AnimatePresence>
 
-                  {/* Common Additional Fields */}
+                  {/* Submit Button */}
                   {formData.need_type && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="space-y-4 pt-4 border-t"
+                      className="pt-4"
                     >
-                      <div className="space-y-1.5">
-                        <Label htmlFor="project_description" className="text-sm font-medium">
-                          Project Description
-                        </Label>
-                        <Textarea
-                          id="project_description"
-                          value={formData.project_description}
-                          onChange={(e) => handleChange("project_description", e.target.value)}
-                          placeholder="Tell us about your project, goals, and vision..."
-                          rows={4}
-                          className="resize-none"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="target_audience" className="text-sm font-medium">
-                            Target Audience
-                          </Label>
-                          <Input
-                            id="target_audience"
-                            value={formData.target_audience}
-                            onChange={(e) => handleChange("target_audience", e.target.value)}
-                            placeholder="e.g., Young families"
-                            className="h-10"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="timeline" className="text-sm font-medium">
-                            Timeline
-                          </Label>
-                          <Select
-                            value={formData.timeline}
-                            onValueChange={(value) => handleChange("timeline", value)}
-                          >
-                            <SelectTrigger className="h-10">
-                              <SelectValue placeholder="When?" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ASAP">ASAP (1 week)</SelectItem>
-                              <SelectItem value="2-3 weeks">2-3 weeks</SelectItem>
-                              <SelectItem value="1 month">1 month</SelectItem>
-                              <SelectItem value="2-3 months">2-3 months</SelectItem>
-                              <SelectItem value="Flexible">Flexible</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="budget_range" className="text-sm font-medium">
-                            Budget Range
-                          </Label>
-                          <Select
-                            value={formData.budget_range}
-                            onValueChange={(value) => handleChange("budget_range", value)}
-                          >
-                            <SelectTrigger className="h-10">
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="$0 - $500">$0 - $500</SelectItem>
-                              <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
-                              <SelectItem value="$1,000 - $2,500">$1,000 - $2,500</SelectItem>
-                              <SelectItem value="$2,500+">$2,500+</SelectItem>
-                              <SelectItem value="Not sure">Not sure</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="success_metrics" className="text-sm font-medium">
-                            Success Metric
-                          </Label>
-                          <Input
-                            id="success_metrics"
-                            value={formData.success_metrics}
-                            onChange={(e) => handleChange("success_metrics", e.target.value)}
-                            placeholder="e.g., 100 attendees"
-                            className="h-10"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Submit Button */}
-                      <div className="pt-4">
-                        <Button
-                          type="submit"
-                          disabled={submitting}
-                          className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
-                        >
-                          {submitting ? (
-                            <>
-                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                              Submitting...
-                            </>
-                          ) : (
-                            <>
-                              Submit Request 🚀
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            Submit Request 🚀
+                          </>
+                        )}
+                      </Button>
                     </motion.div>
                   )}
                 </motion.div>
