@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -487,8 +488,8 @@ Respond naturally to their last message and guide toward uncovered areas.`;
             </CardContent>
           </Card>
 
-          {/* Graphics Items */}
-          {request.goal_review_data?.graphics_items && (
+          {/* Graphics Items - FIXED NULL CHECK */}
+          {request.goal_review_data?.graphics_items && Object.keys(request.goal_review_data.graphics_items).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Graphics Requested</CardTitle>
@@ -508,8 +509,8 @@ Respond naturally to their last message and guide toward uncovered areas.`;
             </Card>
           )}
 
-          {/* Marketing Channels */}
-          {request.goal_review_data?.marketing_channels && (
+          {/* Marketing Channels - FIXED NULL CHECK */}
+          {request.goal_review_data?.marketing_channels && Object.keys(request.goal_review_data.marketing_channels).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Marketing Channels</CardTitle>
