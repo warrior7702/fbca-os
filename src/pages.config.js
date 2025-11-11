@@ -31,6 +31,7 @@ import PhantomUserHunter from './pages/PhantomUserHunter';
 import WorkflowHub from './pages/WorkflowHub';
 import TestMysterySync from './pages/TestMysterySync';
 import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
+import WorkflowDetail from './pages/WorkflowDetail';
 import Layout from './Layout.jsx';
 
 
@@ -68,6 +69,7 @@ export const PAGES = {
     "WorkflowHub": WorkflowHub,
     "TestMysterySync": TestMysterySync,
     "CommunicationsRequestForm": CommunicationsRequestForm,
+    "WorkflowDetail": WorkflowDetail,
 }
 
 export const pagesConfig = {
