@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MessageSquare, Loader2, CheckCircle2, Sparkles } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -23,12 +24,19 @@ export default function CommunicationsRequestForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [searchingEvents, setSearchingEvents] = useState(false);
+  const [pcoEvents, setPcoEvents] = useState([]);
   const navigate = useNavigate();
 
   // Form state
   const [formData, setFormData] = useState({
     requester_name: "",
     requester_email: "",
+    is_event_related: "", // "yes" or "no"
+    event_source: "", // "pco" or "email" (for existing events)
+    pco_event_id: "",
+    pco_event_name: "",
+    pco_event_date: "",
     project_name: "",
     ministry_department: "",
     event_theme: "",
@@ -99,6 +107,82 @@ export default function CommunicationsRequestForm() {
     }));
   };
 
+  const searchPCOEvents = async () => {
+    if (!user?.pco_access_token) {
+      toast.error("Please connect Planning Center in Settings");
+      return;
+    }
+
+    setSearchingEvents(true);
+    try {
+      // Get future events
+      const response = await base44.functions.invoke('getPCOToken');
+      const token = response.data.access_token;
+
+      const eventsResponse = await fetch(
+        'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=20&order=starts_at',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const eventsData = await eventsResponse.json();
+      
+      // Get unique events with their details
+      const eventIds = [...new Set(eventsData.data.map(inst => 
+        inst.relationships?.event?.data?.id
+      ).filter(Boolean))];
+
+      const events = await Promise.all(
+        eventIds.slice(0, 10).map(async (eventId) => {
+          const eventResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          const eventData = await eventResponse.json();
+          const instance = eventsData.data.find(inst => 
+            inst.relationships?.event?.data?.id === eventId
+          );
+          
+          return {
+            id: eventId,
+            name: eventData.data?.attributes?.name || 'Untitled',
+            date: instance?.attributes?.starts_at,
+            summary: eventData.data?.attributes?.summary
+          };
+        })
+      );
+
+      setPcoEvents(events);
+    } catch (error) {
+      console.error('Error fetching PCO events:', error);
+      toast.error('Failed to fetch events from PCO');
+    } finally {
+      setSearchingEvents(false);
+    }
+  };
+
+  const handlePCOEventSelect = (eventId) => {
+    const event = pcoEvents.find(e => e.id === eventId);
+    if (event) {
+      setFormData(prev => ({
+        ...prev,
+        pco_event_id: event.id,
+        pco_event_name: event.name,
+        pco_event_date: event.date,
+        project_name: event.name
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -125,8 +209,12 @@ export default function CommunicationsRequestForm() {
         requestor_email: formData.requester_email,
         requestor_name: formData.requester_name,
         ministry_department: formData.ministry_department,
-        pco_event_date: formData.event_date || null,
+        pco_event_id: formData.pco_event_id || null,
+        pco_event_name: formData.pco_event_name || null,
+        pco_event_date: formData.pco_event_date || formData.event_date || null,
         goal_review_data: {
+          is_event_related: formData.is_event_related,
+          event_source: formData.event_source,
           ministry_goal: formData.project_description,
           target_audience: formData.target_audience,
           success_metrics: formData.success_metrics,
@@ -172,13 +260,11 @@ FBC Arlington`
         console.log('✅ Confirmation email sent');
       } catch (emailError) {
         console.error('Email send failed (non-critical):', emailError);
-        // Don't fail the whole submission if email fails
       }
 
       setSubmitted(true);
       toast.success("Request submitted successfully!");
 
-      // Redirect after 3 seconds
       setTimeout(() => {
         navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
       }, 3000);
@@ -236,262 +322,409 @@ FBC Arlington`
 
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
-      <div className="max-w-4xl mx-auto p-6 py-12">
+      <div className="max-w-3xl mx-auto p-6 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-lg mb-6">
-            <MessageSquare className="w-8 h-8 text-white" />
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg mb-4">
+            <MessageSquare className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-3">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Communications Action Plan Request
           </h1>
-          <p className="text-lg text-slate-600">
+          <p className="text-slate-600">
             Let's create something amazing together! ✨
           </p>
         </div>
 
         {/* Form */}
         <Card className="border-2 border-purple-200 shadow-xl">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200">
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200 py-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-purple-600" />
               Project Details
             </CardTitle>
-            <p className="text-sm text-slate-600">Fill out the information below to get started</p>
           </CardHeader>
 
           <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Your Name */}
-              <div className="space-y-2">
-                <Label htmlFor="requester_name" className="text-base font-semibold">
-                  Your Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="requester_name"
-                  value={formData.requester_name}
-                  onChange={(e) => handleChange("requester_name", e.target.value)}
-                  required
-                  className="h-12"
-                />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Name & Email - Compact Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="requester_name" className="text-sm font-medium">
+                    Your Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="requester_name"
+                    value={formData.requester_name}
+                    onChange={(e) => handleChange("requester_name", e.target.value)}
+                    required
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="requester_email" className="text-sm font-medium">
+                    Your Email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="requester_email"
+                    type="email"
+                    value={formData.requester_email}
+                    onChange={(e) => handleChange("requester_email", e.target.value)}
+                    required
+                    className="h-10"
+                  />
+                </div>
               </div>
 
-              {/* Your Email */}
-              <div className="space-y-2">
-                <Label htmlFor="requester_email" className="text-base font-semibold">
-                  Your Email <span className="text-red-500">*</span>
+              {/* Event Related Question */}
+              <div className="space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <Label className="text-sm font-semibold text-blue-900">
+                  Is this related to an event? <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="requester_email"
-                  type="email"
-                  value={formData.requester_email}
-                  onChange={(e) => handleChange("requester_email", e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
-
-              {/* Project Name */}
-              <div className="space-y-2">
-                <Label htmlFor="project_name" className="text-base font-semibold">
-                  Project Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="project_name"
-                  value={formData.project_name}
-                  onChange={(e) => handleChange("project_name", e.target.value)}
-                  placeholder="e.g., Spring Revival 2025"
-                  required
-                  className="h-12"
-                />
-              </div>
-
-              {/* Ministry/Department */}
-              <div className="space-y-2">
-                <Label htmlFor="ministry_department" className="text-base font-semibold">
-                  Ministry/Department <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.ministry_department}
-                  onValueChange={(value) => handleChange("ministry_department", value)}
-                  required
+                <RadioGroup
+                  value={formData.is_event_related}
+                  onValueChange={(value) => {
+                    handleChange("is_event_related", value);
+                    // Reset event-related fields when changing
+                    if (value === "no") {
+                      handleChange("event_source", "");
+                      handleChange("pco_event_id", "");
+                      handleChange("pco_event_name", "");
+                      handleChange("pco_event_date", "");
+                    }
+                  }}
+                  className="flex gap-6"
                 >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select ministry..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ministries.map(ministry => (
-                      <SelectItem key={ministry} value={ministry}>{ministry}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="event-yes" />
+                    <Label htmlFor="event-yes" className="cursor-pointer font-normal">
+                      Yes, existing event
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="event-no" />
+                    <Label htmlFor="event-no" className="cursor-pointer font-normal">
+                      No, new initiative
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
 
-              {/* Event Theme */}
-              <div className="space-y-2">
-                <Label htmlFor="event_theme" className="text-base font-semibold">
-                  Event Theme
-                </Label>
-                <Input
-                  id="event_theme"
-                  value={formData.event_theme}
-                  onChange={(e) => handleChange("event_theme", e.target.value)}
-                  placeholder="e.g., Unity in Christ"
-                  className="h-12"
-                />
-              </div>
+              {/* BRANCH: Existing Event */}
+              <AnimatePresence>
+                {formData.is_event_related === "yes" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 pl-4 border-l-4 border-blue-300"
+                  >
+                    {/* Event Source */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        Where is this event from? <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          type="button"
+                          variant={formData.event_source === "pco" ? "default" : "outline"}
+                          onClick={() => {
+                            handleChange("event_source", "pco");
+                            searchPCOEvents();
+                          }}
+                          className={formData.event_source === "pco" ? "bg-purple-600" : ""}
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          PCO Calendar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={formData.event_source === "email" ? "default" : "outline"}
+                          onClick={() => handleChange("event_source", "email")}
+                          disabled
+                          className="opacity-50"
+                        >
+                          <Search className="w-4 h-4 mr-2" />
+                          Email Request (Coming Soon)
+                        </Button>
+                      </div>
+                    </div>
 
-              {/* What do you need? */}
-              <div className="space-y-2">
-                <Label htmlFor="request_type" className="text-base font-semibold">
-                  What do you need? <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.request_type}
-                  onValueChange={(value) => handleChange("request_type", value)}
-                  required
+                    {/* PCO Event Selection */}
+                    {formData.event_source === "pco" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-2"
+                      >
+                        <Label className="text-sm font-medium">
+                          Select Event <span className="text-red-500">*</span>
+                        </Label>
+                        {searchingEvents ? (
+                          <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
+                            <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                            <span className="text-sm text-slate-600">Loading events...</span>
+                          </div>
+                        ) : pcoEvents.length > 0 ? (
+                          <Select
+                            value={formData.pco_event_id}
+                            onValueChange={handlePCOEventSelect}
+                            required
+                          >
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select an event..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {pcoEvents.map(event => (
+                                <SelectItem key={event.id} value={event.id}>
+                                  {event.name} - {event.date ? new Date(event.date).toLocaleDateString() : 'No date'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={searchPCOEvents}
+                            className="w-full"
+                          >
+                            <Search className="w-4 h-4 mr-2" />
+                            Search PCO Events
+                          </Button>
+                        )}
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* BRANCH: New Initiative */}
+              <AnimatePresence>
+                {formData.is_event_related === "no" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 pl-4 border-l-4 border-green-300"
+                  >
+                    {/* Project Name */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="project_name" className="text-sm font-medium">
+                        Project/Initiative Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="project_name"
+                        value={formData.project_name}
+                        onChange={(e) => handleChange("project_name", e.target.value)}
+                        placeholder="e.g., Fall Outreach Campaign"
+                        required={formData.is_event_related === "no"}
+                        className="h-10"
+                      />
+                    </div>
+
+                    {/* Event Theme */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="event_theme" className="text-sm font-medium">
+                        Theme/Message
+                      </Label>
+                      <Input
+                        id="event_theme"
+                        value={formData.event_theme}
+                        onChange={(e) => handleChange("event_theme", e.target.value)}
+                        placeholder="e.g., Unity in Christ"
+                        className="h-10"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Common Fields (shown after event question is answered) */}
+              {formData.is_event_related && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4 pt-4 border-t"
                 >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select what you need..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {requestTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  {/* Ministry & Request Type Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ministry_department" className="text-sm font-medium">
+                        Ministry <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.ministry_department}
+                        onValueChange={(value) => handleChange("ministry_department", value)}
+                        required
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ministries.map(ministry => (
+                            <SelectItem key={ministry} value={ministry}>{ministry}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              {/* Event Date & Time */}
-              <div className="space-y-2">
-                <Label htmlFor="event_date" className="text-base font-semibold">
-                  Event Date & Time
-                </Label>
-                <Input
-                  id="event_date"
-                  type="datetime-local"
-                  value={formData.event_date}
-                  onChange={(e) => handleChange("event_date", e.target.value)}
-                  className="h-12"
-                />
-              </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="request_type" className="text-sm font-medium">
+                        What do you need? <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.request_type}
+                        onValueChange={(value) => handleChange("request_type", value)}
+                        required
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {requestTypes.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-              {/* Project Description */}
-              <div className="space-y-2">
-                <Label htmlFor="project_description" className="text-base font-semibold">
-                  Project Description
-                </Label>
-                <Textarea
-                  id="project_description"
-                  value={formData.project_description}
-                  onChange={(e) => handleChange("project_description", e.target.value)}
-                  placeholder="Tell us about your project, goals, and vision..."
-                  rows={5}
-                  className="resize-none"
-                />
-              </div>
-
-              {/* Target Audience */}
-              <div className="space-y-2">
-                <Label htmlFor="target_audience" className="text-base font-semibold">
-                  Target Audience
-                </Label>
-                <Input
-                  id="target_audience"
-                  value={formData.target_audience}
-                  onChange={(e) => handleChange("target_audience", e.target.value)}
-                  placeholder="e.g., Young families, College students, Church-wide"
-                  className="h-12"
-                />
-              </div>
-
-              {/* Success Metrics */}
-              <div className="space-y-2">
-                <Label htmlFor="success_metrics" className="text-base font-semibold">
-                  How will you measure success?
-                </Label>
-                <Input
-                  id="success_metrics"
-                  value={formData.success_metrics}
-                  onChange={(e) => handleChange("success_metrics", e.target.value)}
-                  placeholder="e.g., 100 attendees, 50 social media shares"
-                  className="h-12"
-                />
-              </div>
-
-              {/* Budget Range */}
-              <div className="space-y-2">
-                <Label htmlFor="budget_range" className="text-base font-semibold">
-                  Budget Range
-                </Label>
-                <Select
-                  value={formData.budget_range}
-                  onValueChange={(value) => handleChange("budget_range", value)}
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select budget range..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="$0 - $500">$0 - $500</SelectItem>
-                    <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
-                    <SelectItem value="$1,000 - $2,500">$1,000 - $2,500</SelectItem>
-                    <SelectItem value="$2,500 - $5,000">$2,500 - $5,000</SelectItem>
-                    <SelectItem value="$5,000+">$5,000+</SelectItem>
-                    <SelectItem value="Not sure">Not sure</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Timeline */}
-              <div className="space-y-2">
-                <Label htmlFor="timeline" className="text-base font-semibold">
-                  Desired Timeline
-                </Label>
-                <Select
-                  value={formData.timeline}
-                  onValueChange={(value) => handleChange("timeline", value)}
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="When do you need this?" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ASAP (within 1 week)">ASAP (within 1 week)</SelectItem>
-                    <SelectItem value="2-3 weeks">2-3 weeks</SelectItem>
-                    <SelectItem value="1 month">1 month</SelectItem>
-                    <SelectItem value="2-3 months">2-3 months</SelectItem>
-                    <SelectItem value="3+ months">3+ months</SelectItem>
-                    <SelectItem value="Flexible">Flexible</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Submit Button */}
-              <div className="pt-6">
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Submitting Request...
-                    </>
-                  ) : (
-                    <>
-                      Submit Request 🚀
-                    </>
+                  {/* Event Date (for new initiatives only) */}
+                  {formData.is_event_related === "no" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="event_date" className="text-sm font-medium">
+                        Target Date
+                      </Label>
+                      <Input
+                        id="event_date"
+                        type="datetime-local"
+                        value={formData.event_date}
+                        onChange={(e) => handleChange("event_date", e.target.value)}
+                        className="h-10"
+                      />
+                    </div>
                   )}
-                </Button>
-              </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="project_description" className="text-sm font-medium">
+                      Project Description
+                    </Label>
+                    <Textarea
+                      id="project_description"
+                      value={formData.project_description}
+                      onChange={(e) => handleChange("project_description", e.target.value)}
+                      placeholder="Tell us about your project, goals, and vision..."
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </div>
+
+                  {/* Target Audience & Timeline Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="target_audience" className="text-sm font-medium">
+                        Target Audience
+                      </Label>
+                      <Input
+                        id="target_audience"
+                        value={formData.target_audience}
+                        onChange={(e) => handleChange("target_audience", e.target.value)}
+                        placeholder="e.g., Young families"
+                        className="h-10"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="timeline" className="text-sm font-medium">
+                        Timeline
+                      </Label>
+                      <Select
+                        value={formData.timeline}
+                        onValueChange={(value) => handleChange("timeline", value)}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="When?" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ASAP">ASAP (1 week)</SelectItem>
+                          <SelectItem value="2-3 weeks">2-3 weeks</SelectItem>
+                          <SelectItem value="1 month">1 month</SelectItem>
+                          <SelectItem value="2-3 months">2-3 months</SelectItem>
+                          <SelectItem value="Flexible">Flexible</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Budget & Success Metrics Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="budget_range" className="text-sm font-medium">
+                        Budget Range
+                      </Label>
+                      <Select
+                        value={formData.budget_range}
+                        onValueChange={(value) => handleChange("budget_range", value)}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="$0 - $500">$0 - $500</SelectItem>
+                          <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
+                          <SelectItem value="$1,000 - $2,500">$1,000 - $2,500</SelectItem>
+                          <SelectItem value="$2,500+">$2,500+</SelectItem>
+                          <SelectItem value="Not sure">Not sure</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="success_metrics" className="text-sm font-medium">
+                        Success Metric
+                      </Label>
+                      <Input
+                        id="success_metrics"
+                        value={formData.success_metrics}
+                        onChange={(e) => handleChange("success_metrics", e.target.value)}
+                        placeholder="e.g., 100 attendees"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="pt-4">
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          Submit Request 🚀
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
             </form>
           </CardContent>
         </Card>
 
-        {/* Footer Note */}
-        <div className="text-center mt-8">
-          <p className="text-sm text-slate-600">
-            Questions? Contact the Communications Team at{" "}
+        {/* Footer */}
+        <div className="text-center mt-6">
+          <p className="text-xs text-slate-600">
+            Questions? Contact{" "}
             <a href="mailto:communications@fbcarlington.org" className="text-purple-600 hover:underline">
               communications@fbcarlington.org
             </a>
