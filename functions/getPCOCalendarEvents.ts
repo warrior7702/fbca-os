@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -44,7 +43,7 @@ async function fetchAllInstances(accessToken, baseUrl) {
     let allInstances = [];
     let nextUrl = baseUrl;
     let pageCount = 0;
-    const maxPages = 3; // REDUCED: Only fetch 3 pages (300 instances max)
+    const maxPages = 3; // Only fetch 3 pages (300 instances max)
     
     while (nextUrl && pageCount < maxPages) {
         pageCount++;
@@ -105,7 +104,7 @@ Deno.serve(async (req) => {
         const accessToken = await refreshTokenIfNeeded(base44, user);
         console.log('✅ Access token ready');
 
-        // SIMPLIFIED: Just use filter=future, no date filtering (PCO API doesn't like complex filters)
+        // Fetch future event instances
         const baseUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
         
         console.log('🔗 Base URL:', baseUrl);
@@ -140,6 +139,9 @@ Deno.serve(async (req) => {
         const eventIdArray = Array.from(eventIds);
         const batchSize = 10; // Process 10 events at a time
         
+        let eventsWithoutNames = 0;
+        let eventsWithoutResources = 0;
+        
         for (let i = 0; i < eventIdArray.length; i += batchSize) {
             const batch = eventIdArray.slice(i, i + batchSize);
             console.log(`🔄 Processing event batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(eventIdArray.length / batchSize)}`);
@@ -158,12 +160,19 @@ Deno.serve(async (req) => {
                     );
 
                     if (!eventResponse.ok) {
-                        console.error(`Failed to fetch event ${eventId}`);
+                        console.error(`❌ Failed to fetch event ${eventId}: ${eventResponse.status}`);
                         return null;
                     }
 
                     const eventData = await eventResponse.json();
                     const event = eventData.data;
+                    
+                    // VALIDATION: Check if event has a name
+                    const eventName = event.attributes?.name;
+                    if (!eventName || eventName.trim() === '') {
+                        console.warn(`⚠️ Event ${eventId} has no name! Using fallback.`);
+                        eventsWithoutNames++;
+                    }
                     
                     // Extract tags from included
                     const tags = [];
@@ -198,8 +207,8 @@ Deno.serve(async (req) => {
                                 if (item.type === 'Resource') {
                                     resourceMap[item.id] = {
                                         id: item.id,
-                                        name: item.attributes?.name,
-                                        kind: item.attributes?.kind
+                                        name: item.attributes?.name || 'Unnamed Resource',
+                                        kind: item.attributes?.kind || 'Unknown'
                                     };
                                 }
                             }
@@ -234,10 +243,12 @@ Deno.serve(async (req) => {
                                             
                                             let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
                                             
+                                            // Handle object values
                                             if (typeof value === 'object' && value !== null) {
                                                 value = JSON.stringify(value);
                                             }
                                             
+                                            // Only add if both question and value exist
                                             if (questionText && value) {
                                                 answers.push({
                                                     question: String(questionText),
@@ -247,7 +258,7 @@ Deno.serve(async (req) => {
                                         }
                                     }
                                 } catch (error) {
-                                    console.warn(`Warning: Error fetching answers for request ${request.id}:`, error.message);
+                                    console.warn(`⚠️ Error fetching answers for request ${request.id}:`, error.message);
                                 }
                                 
                                 resourceRequests.push({
@@ -261,14 +272,18 @@ Deno.serve(async (req) => {
                                 });
                             }
                         }
+                        
+                        if (resourceRequests.length === 0) {
+                            eventsWithoutResources++;
+                        }
                     }
                     
                     return {
                         eventId,
                         data: {
-                            name: event.attributes?.name,
-                            summary: event.attributes?.summary,
-                            description: event.attributes?.description,
+                            name: eventName || 'Untitled Event',
+                            summary: event.attributes?.summary || null,
+                            description: event.attributes?.description || null,
                             visible_in_church_center: event.attributes?.visible_in_church_center,
                             approval_status: event.attributes?.approval_status,
                             resource_requests: resourceRequests,
@@ -290,9 +305,13 @@ Deno.serve(async (req) => {
         }
 
         console.log('📊 Fetched full data for', Object.keys(eventDataMap).length, 'events');
+        console.log('⚠️ Events without names:', eventsWithoutNames);
+        console.log('⚠️ Events without resources:', eventsWithoutResources);
 
         // Process event instances
         const eventsWithResources = [];
+        let skippedNoDates = 0;
+        let skippedBeyond60Days = 0;
         
         for (const instance of instances) {
             const eventId = instance.relationships?.event?.data?.id;
@@ -303,12 +322,14 @@ Deno.serve(async (req) => {
             
             if (!starts_at || !ends_at) {
                 console.warn('⚠️ Skipping instance without dates:', instance.id);
+                skippedNoDates++;
                 continue;
             }
 
             // Filter to 60 days on our side
             const startDate = new Date(starts_at);
             if (startDate > sixtyDaysFromNow) {
+                skippedBeyond60Days++;
                 continue; // Skip events beyond 60 days
             }
             
@@ -358,11 +379,24 @@ Deno.serve(async (req) => {
         }
 
         console.log('🎯 Processed', eventsWithResources.length, 'event instances (within 60 days)');
+        console.log('⏭️ Skipped', skippedNoDates, 'events without dates');
+        console.log('⏭️ Skipped', skippedBeyond60Days, 'events beyond 60 days');
         
         if (eventsWithResources.length > 0) {
             const withResources = eventsWithResources.filter(e => e.resources.length > 0).length;
+            const withoutResources = eventsWithResources.filter(e => e.resources.length === 0).length;
+            const withAnswers = eventsWithResources.filter(e => 
+                e.resources.some(r => r.answers && r.answers.length > 0)
+            ).length;
+            
             console.log(`📊 Events with resources: ${withResources}`);
-            console.log(`📋 First few events:`, eventsWithResources.slice(0, 3).map(e => ({ name: e.name, date: e.starts_at, resources: e.resources.length })));
+            console.log(`📊 Events without resources: ${withoutResources}`);
+            console.log(`📊 Events with answers: ${withAnswers}`);
+            console.log(`📋 First few events:`, eventsWithResources.slice(0, 3).map(e => ({ 
+                name: e.name, 
+                date: e.starts_at, 
+                resources: e.resources.length 
+            })));
         }
 
         return Response.json({ 
@@ -371,6 +405,14 @@ Deno.serve(async (req) => {
             date_range: {
                 start: now.toISOString(),
                 end: sixtyDaysFromNow.toISOString()
+            },
+            stats: {
+                total_instances: instances.length,
+                unique_events: eventIds.size,
+                events_without_names: eventsWithoutNames,
+                events_without_resources: eventsWithoutResources,
+                skipped_no_dates: skippedNoDates,
+                skipped_beyond_60_days: skippedBeyond60Days
             }
         });
 

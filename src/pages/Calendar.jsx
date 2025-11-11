@@ -68,7 +68,16 @@ export default function Calendar() {
 
       const eventsData = eventsResponse.data.events;
       console.log('✅ Loaded', eventsData.length, 'events');
-      console.log('📊 Sample event:', eventsData[0]);
+      
+      // Log stats if available
+      if (eventsResponse.data.stats) {
+        console.log('📊 Stats:', eventsResponse.data.stats);
+        
+        // Show warning if many events are missing data
+        if (eventsResponse.data.stats.events_without_names > 10) {
+          toast.warning(`${eventsResponse.data.stats.events_without_names} events in PCO are missing names`);
+        }
+      }
       
       setEvents(eventsData);
       setLastSync(new Date());
@@ -369,18 +378,18 @@ export default function Calendar() {
         )}
       </div>
 
-      {/* Day Events List Dialog */}
+      {/* Day Events List Dialog - FIX: Add description */}
       <Dialog open={!!selectedDayEvents} onOpenChange={() => setSelectedDayEvents(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-describedby="day-events-description">
           <DialogHeader>
             <DialogTitle className="text-2xl">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </DialogTitle>
-            <p className="text-slate-600">
-              {selectedDayEvents?.length || 0} event{selectedDayEvents?.length !== 1 ? 's' : ''}
-            </p>
           </DialogHeader>
-          <div className="space-y-3 mt-4">
+          <p id="day-events-description" className="text-slate-600 mb-4">
+            {selectedDayEvents?.length || 0} event{selectedDayEvents?.length !== 1 ? 's' : ''} scheduled for this day
+          </p>
+          <div className="space-y-3">
             {selectedDayEvents?.map((event) => (
               <motion.div
                 key={event.id}
@@ -424,12 +433,15 @@ export default function Calendar() {
         </DialogContent>
       </Dialog>
 
-      {/* Event Detail Dialog */}
+      {/* Event Detail Dialog - FIX: Add description */}
       <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-describedby="event-detail-description">
           <DialogHeader>
             <DialogTitle className="text-2xl pr-8">{selectedEvent?.name}</DialogTitle>
           </DialogHeader>
+          <p id="event-detail-description" className="sr-only">
+            Full details for {selectedEvent?.name}
+          </p>
           {selectedEvent && (
             <div className="space-y-6">
               {/* Date & Time */}
