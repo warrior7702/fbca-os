@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Search } from "lucide-react";
+import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Search, Image, Megaphone } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,7 +25,7 @@ const capitalizeFullName = (name) => {
   if (!name) return "";
   return name
     .toLowerCase()
-    .split(/[\s.]+/) // Split by spaces or periods
+    .split(/[\s.]+/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 };
@@ -48,11 +49,41 @@ export default function CommunicationsRequestForm() {
     pco_event_id: "",
     pco_event_name: "",
     pco_event_date: "",
+    manual_event_name: "",
     project_name: "",
     ministry_department: "",
     event_theme: "",
-    request_type: "",
+    need_type: "", // "graphics", "marketing", or "both"
     event_date: "",
+    
+    // Graphics fields
+    graphics_items: {
+      digital_promo: false,
+      flyers: false,
+      metal_frame_signs: false,
+      posters_11x17: false,
+      postcards: false,
+      a_frame_signs: false,
+      posters_24x36: false,
+      booklet: false,
+      tshirt: false,
+      something_else: false
+    },
+    previous_event_photos: null,
+    graphics_folder_link: "",
+    
+    // Marketing fields
+    marketing_channels: {
+      social_media: false,
+      email_campaign: false,
+      website: false,
+      app_notification: false,
+      blog_post: false,
+      press_release: false
+    },
+    marketing_message: "",
+    marketing_assets_link: "",
+    
     project_description: "",
     target_audience: "",
     success_metrics: "",
@@ -76,18 +107,6 @@ export default function CommunicationsRequestForm() {
     "Other"
   ];
 
-  const requestTypes = [
-    "Graphics Only",
-    "Marketing Only",
-    "Both Graphics & Marketing",
-    "Social Media Campaign",
-    "Email Campaign",
-    "Print Materials",
-    "Video Production",
-    "Website Updates",
-    "Event Promotion"
-  ];
-
   useEffect(() => {
     loadUser();
   }, []);
@@ -97,7 +116,6 @@ export default function CommunicationsRequestForm() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // Pre-fill user info with proper capitalization
       setFormData(prev => ({
         ...prev,
         requester_name: capitalizeFullName(currentUser.full_name) || "",
@@ -118,6 +136,26 @@ export default function CommunicationsRequestForm() {
     }));
   };
 
+  const handleGraphicsItemChange = (item, checked) => {
+    setFormData(prev => ({
+      ...prev,
+      graphics_items: {
+        ...prev.graphics_items,
+        [item]: checked
+      }
+    }));
+  };
+
+  const handleMarketingChannelChange = (channel, checked) => {
+    setFormData(prev => ({
+      ...prev,
+      marketing_channels: {
+        ...prev.marketing_channels,
+        [channel]: checked
+      }
+    }));
+  };
+
   const searchPCOEvents = async () => {
     if (!user?.pco_access_token) {
       toast.error("Please connect Planning Center in Settings");
@@ -129,7 +167,6 @@ export default function CommunicationsRequestForm() {
       const response = await base44.functions.invoke('getPCOToken');
       const token = response.data.access_token;
 
-      // Fetch more events (100) to cover several months
       const eventsResponse = await fetch(
         'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
         {
@@ -142,7 +179,6 @@ export default function CommunicationsRequestForm() {
 
       const eventsData = await eventsResponse.json();
       
-      // Get unique events with details
       const eventIds = [...new Set(eventsData.data.map(inst => 
         inst.relationships?.event?.data?.id
       ).filter(Boolean))];
@@ -177,7 +213,6 @@ export default function CommunicationsRequestForm() {
         })
       );
 
-      // Filter out nulls and sort by date
       const validEvents = events
         .filter(e => e !== null)
         .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -198,22 +233,37 @@ export default function CommunicationsRequestForm() {
       pco_event_id: event.id,
       pco_event_name: event.name,
       pco_event_date: event.date,
-      project_name: event.name
+      event_date: event.date ? new Date(event.date).toISOString().slice(0, 16) : "",
+      project_name: event.name,
+      manual_event_name: event.name
     }));
     setEventSearchQuery("");
   };
 
-  // Filter events by search query
   const filteredEvents = pcoEvents.filter(event => 
     event.name.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
     (event.date && new Date(event.date).toLocaleDateString().includes(eventSearchQuery))
   );
 
+  const handleFileUpload = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        previous_event_photos: Array.from(files)
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.project_name || !formData.ministry_department || !formData.request_type) {
+    if (!formData.project_name && !formData.manual_event_name) {
+      toast.error("Please provide a project/event name");
+      return;
+    }
+    if (!formData.ministry_department || !formData.need_type) {
       toast.error("Please fill out all required fields");
       return;
     }
@@ -222,14 +272,28 @@ export default function CommunicationsRequestForm() {
 
     try {
       const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
+      const finalProjectName = formData.manual_event_name || formData.project_name;
+
+      // Upload photos if any
+      let photoUrls = [];
+      if (formData.previous_event_photos) {
+        for (const file of formData.previous_event_photos) {
+          try {
+            const uploadResult = await base44.integrations.Core.UploadFile({ file });
+            photoUrls.push(uploadResult.file_url);
+          } catch (err) {
+            console.error('Error uploading file:', err);
+          }
+        }
+      }
 
       const request = await base44.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: "manual_form",
         status: "request",
         priority: "medium",
-        title: formData.project_name,
-        description: formData.project_description || `${formData.request_type} request for ${formData.ministry_department}`,
+        title: finalProjectName,
+        description: formData.project_description || `${formData.need_type} request for ${formData.ministry_department}`,
         requestor_email: formData.requester_email,
         requestor_name: formData.requester_name,
         ministry_department: formData.ministry_department,
@@ -239,18 +303,26 @@ export default function CommunicationsRequestForm() {
         goal_review_data: {
           is_event_related: formData.is_event_related,
           event_source: formData.event_source,
+          need_type: formData.need_type,
+          graphics_items: formData.graphics_items,
+          marketing_channels: formData.marketing_channels,
+          marketing_message: formData.marketing_message,
+          marketing_assets_link: formData.marketing_assets_link,
+          graphics_folder_link: formData.graphics_folder_link,
+          previous_event_photos: photoUrls,
           ministry_goal: formData.project_description,
           target_audience: formData.target_audience,
           success_metrics: formData.success_metrics,
           budget_range: formData.budget_range,
           timeline: formData.timeline,
           event_theme: formData.event_theme,
-          request_type: formData.request_type
+          event_date: formData.event_date,
+          manual_event_name: formData.manual_event_name
         },
         conversation_history: [{
           timestamp: new Date().toISOString(),
           author: formData.requester_name,
-          message: `Request submitted via form: ${formData.request_type}`,
+          message: `Request submitted via form: ${formData.need_type}`,
           is_internal: false
         }]
       });
@@ -261,15 +333,15 @@ export default function CommunicationsRequestForm() {
         await base44.integrations.Core.SendEmail({
           from_name: 'Communications Team',
           to: formData.requester_email,
-          subject: `Communications Action Plan: ${formData.project_name}`,
+          subject: `Communications Action Plan: ${finalProjectName}`,
           body: `Hello ${formData.requester_name},
 
 Thank you for submitting your communications action plan!
 
 Request Number: ${requestNumber}
-Project: ${formData.project_name}
+Project: ${finalProjectName}
 Ministry: ${formData.ministry_department}
-Type: ${formData.request_type}
+Type: ${formData.need_type}
 
 Our communications team will review your request and reach out within 1-2 business days to discuss your needs.
 
@@ -370,7 +442,7 @@ FBC Arlington`
 
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Name & Email - Compact Row */}
+              {/* Name & Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="requester_name" className="text-sm font-medium">
@@ -444,150 +516,126 @@ FBC Arlington`
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-blue-300"
                   >
-                    {/* Event Source */}
-                    <div className="space-y-2">
+                    {/* PCO Event Search */}
+                    <div className="space-y-3">
                       <Label className="text-sm font-medium">
-                        Where is this event from? <span className="text-red-500">*</span>
+                        Search PCO Calendar Event
                       </Label>
-                      <div className="grid grid-cols-2 gap-3">
+                      
+                      {searchingEvents ? (
+                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
+                          <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                          <span className="text-sm text-slate-600">Loading events...</span>
+                        </div>
+                      ) : pcoEvents.length > 0 ? (
+                        <>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Input
+                              type="text"
+                              placeholder="Type to search events..."
+                              value={eventSearchQuery}
+                              onChange={(e) => setEventSearchQuery(e.target.value)}
+                              className="pl-10 h-10"
+                            />
+                          </div>
+
+                          {formData.pco_event_id && (
+                            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
+                                  <p className="text-sm text-purple-700">
+                                    {formData.pco_event_date ? new Date(formData.pco_event_date).toLocaleDateString('en-US', {
+                                      weekday: 'long',
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric'
+                                    }) : 'No date'}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    handleChange("pco_event_id", "");
+                                    handleChange("pco_event_name", "");
+                                    handleChange("pco_event_date", "");
+                                    handleChange("event_date", "");
+                                  }}
+                                >
+                                  Change
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {!formData.pco_event_id && (
+                            <div className="max-h-64 overflow-y-auto border rounded-lg">
+                              {filteredEvents.length > 0 ? (
+                                <div className="divide-y">
+                                  {filteredEvents.slice(0, 20).map(event => (
+                                    <button
+                                      key={event.id}
+                                      type="button"
+                                      onClick={() => handlePCOEventSelect(event)}
+                                      className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
+                                    >
+                                      <p className="font-medium text-slate-900">{event.name}</p>
+                                      <p className="text-sm text-slate-600">
+                                        {event.date ? new Date(event.date).toLocaleDateString('en-US', {
+                                          weekday: 'short',
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric'
+                                        }) : 'No date'}
+                                      </p>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="p-8 text-center text-slate-500">
+                                  <p>No events match your search</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <p className="text-xs text-slate-500">
+                            Showing {pcoEvents.length} upcoming events
+                          </p>
+                        </>
+                      ) : (
                         <Button
                           type="button"
-                          variant={formData.event_source === "pco" ? "default" : "outline"}
-                          onClick={() => {
-                            handleChange("event_source", "pco");
-                            if (pcoEvents.length === 0) {
-                              searchPCOEvents();
-                            }
-                          }}
-                          className={formData.event_source === "pco" ? "bg-purple-600" : ""}
-                        >
-                          <Calendar className="w-4 h-4 mr-2" />
-                          PCO Calendar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={formData.event_source === "email" ? "default" : "outline"}
-                          onClick={() => handleChange("event_source", "email")}
-                          disabled
-                          className="opacity-50"
+                          variant="outline"
+                          onClick={searchPCOEvents}
+                          className="w-full"
                         >
                           <Search className="w-4 h-4 mr-2" />
-                          Email Request (Coming Soon)
+                          Load PCO Calendar Events
                         </Button>
-                      </div>
+                      )}
                     </div>
 
-                    {/* PCO Event Search & Selection */}
-                    {formData.event_source === "pco" && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-3"
-                      >
-                        <Label className="text-sm font-medium">
-                          Search & Select Event <span className="text-red-500">*</span>
-                        </Label>
-                        
-                        {searchingEvents ? (
-                          <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
-                            <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                            <span className="text-sm text-slate-600">Loading events from PCO Calendar...</span>
-                          </div>
-                        ) : pcoEvents.length > 0 ? (
-                          <>
-                            {/* Search Input */}
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                              <Input
-                                type="text"
-                                placeholder="Type to search events..."
-                                value={eventSearchQuery}
-                                onChange={(e) => setEventSearchQuery(e.target.value)}
-                                className="pl-10 h-10"
-                              />
-                            </div>
-
-                            {/* Selected Event Display */}
-                            {formData.pco_event_id && (
-                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
-                                    <p className="text-sm text-purple-700">
-                                      {formData.pco_event_date ? new Date(formData.pco_event_date).toLocaleDateString('en-US', {
-                                        weekday: 'long',
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                      }) : 'No date'}
-                                    </p>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      handleChange("pco_event_id", "");
-                                      handleChange("pco_event_name", "");
-                                      handleChange("pco_event_date", "");
-                                      handleChange("project_name", "");
-                                    }}
-                                  >
-                                    Change
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Event List */}
-                            {!formData.pco_event_id && (
-                              <div className="max-h-64 overflow-y-auto border rounded-lg">
-                                {filteredEvents.length > 0 ? (
-                                  <div className="divide-y">
-                                    {filteredEvents.slice(0, 20).map(event => (
-                                      <button
-                                        key={event.id}
-                                        type="button"
-                                        onClick={() => handlePCOEventSelect(event)}
-                                        className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
-                                      >
-                                        <p className="font-medium text-slate-900">{event.name}</p>
-                                        <p className="text-sm text-slate-600">
-                                          {event.date ? new Date(event.date).toLocaleDateString('en-US', {
-                                            weekday: 'short',
-                                            year: 'numeric',
-                                            month: 'short',
-                                            day: 'numeric'
-                                          }) : 'No date'}
-                                        </p>
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="p-8 text-center text-slate-500">
-                                    <p>No events match your search</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            <p className="text-xs text-slate-500">
-                              Showing {pcoEvents.length} upcoming events. Use search to filter.
-                            </p>
-                          </>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={searchPCOEvents}
-                            className="w-full"
-                          >
-                            <Search className="w-4 h-4 mr-2" />
-                            Load PCO Calendar Events
-                          </Button>
-                        )}
-                      </motion.div>
-                    )}
+                    {/* Manual Event Name (if PCO search doesn't find it) */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="manual_event_name" className="text-sm font-medium">
+                        Event Name {!formData.pco_event_id && <span className="text-red-500">*</span>}
+                      </Label>
+                      <Input
+                        id="manual_event_name"
+                        value={formData.manual_event_name}
+                        onChange={(e) => handleChange("manual_event_name", e.target.value)}
+                        placeholder="Enter event name if not found above"
+                        required={formData.is_event_related === "yes" && !formData.pco_event_id}
+                        className="h-10"
+                      />
+                      <p className="text-xs text-slate-500">
+                        If you can't find your event above, type the name here
+                      </p>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -601,7 +649,6 @@ FBC Arlington`
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-green-300"
                   >
-                    {/* Project Name */}
                     <div className="space-y-1.5">
                       <Label htmlFor="project_name" className="text-sm font-medium">
                         Project/Initiative Name <span className="text-red-500">*</span>
@@ -616,7 +663,6 @@ FBC Arlington`
                       />
                     </div>
 
-                    {/* Event Theme */}
                     <div className="space-y-1.5">
                       <Label htmlFor="event_theme" className="text-sm font-medium">
                         Theme/Message
@@ -633,180 +679,349 @@ FBC Arlington`
                 )}
               </AnimatePresence>
 
-              {/* Common Fields */}
+              {/* SECOND BRANCH: What do you need? */}
               {formData.is_event_related && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="space-y-4 pt-4 border-t"
                 >
-                  {/* Ministry & Request Type Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="ministry_department" className="text-sm font-medium">
-                        Ministry <span className="text-red-500">*</span>
-                      </Label>
-                      <Select
-                        value={formData.ministry_department}
-                        onValueChange={(value) => handleChange("ministry_department", value)}
-                        required
-                      >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ministries.map(ministry => (
-                            <SelectItem key={ministry} value={ministry}>{ministry}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="request_type" className="text-sm font-medium">
-                        What do you need? <span className="text-red-500">*</span>
-                      </Label>
-                      <Select
-                        value={formData.request_type}
-                        onValueChange={(value) => handleChange("request_type", value)}
-                        required
-                      >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {requestTypes.map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* Ministry */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ministry_department" className="text-sm font-medium">
+                      Ministry <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={formData.ministry_department}
+                      onValueChange={(value) => handleChange("ministry_department", value)}
+                      required
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ministries.map(ministry => (
+                          <SelectItem key={ministry} value={ministry}>{ministry}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Event Date (for new initiatives only) */}
-                  {formData.is_event_related === "no" && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="event_date" className="text-sm font-medium">
-                        Target Date
-                      </Label>
-                      <Input
-                        id="event_date"
-                        type="datetime-local"
-                        value={formData.event_date}
-                        onChange={(e) => handleChange("event_date", e.target.value)}
-                        className="h-10"
-                      />
-                    </div>
-                  )}
-
-                  {/* Description */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="project_description" className="text-sm font-medium">
-                      Project Description
+                  {/* What do you need? */}
+                  <div className="space-y-2 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <Label className="text-sm font-semibold text-orange-900">
+                      What do you need? <span className="text-red-500">*</span>
                     </Label>
-                    <Textarea
-                      id="project_description"
-                      value={formData.project_description}
-                      onChange={(e) => handleChange("project_description", e.target.value)}
-                      placeholder="Tell us about your project, goals, and vision..."
-                      rows={4}
-                      className="resize-none"
+                    <RadioGroup
+                      value={formData.need_type}
+                      onValueChange={(value) => handleChange("need_type", value)}
+                      className="flex flex-col gap-3"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="graphics" id="need-graphics" />
+                        <Label htmlFor="need-graphics" className="cursor-pointer font-normal flex items-center gap-2">
+                          <Image className="w-4 h-4 text-orange-600" />
+                          Graphics Only
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="marketing" id="need-marketing" />
+                        <Label htmlFor="need-marketing" className="cursor-pointer font-normal flex items-center gap-2">
+                          <Megaphone className="w-4 h-4 text-orange-600" />
+                          Marketing Only
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="both" id="need-both" />
+                        <Label htmlFor="need-both" className="cursor-pointer font-normal flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-orange-600" />
+                          Both Graphics & Marketing
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* Event Date & Time */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="event_date" className="text-sm font-medium">
+                      Event Date & Time <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="event_date"
+                      type="datetime-local"
+                      value={formData.event_date}
+                      onChange={(e) => handleChange("event_date", e.target.value)}
+                      required
+                      className="h-10"
                     />
                   </div>
 
-                  {/* Target Audience & Timeline Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="target_audience" className="text-sm font-medium">
-                        Target Audience
-                      </Label>
-                      <Input
-                        id="target_audience"
-                        value={formData.target_audience}
-                        onChange={(e) => handleChange("target_audience", e.target.value)}
-                        placeholder="e.g., Young families"
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="timeline" className="text-sm font-medium">
-                        Timeline
-                      </Label>
-                      <Select
-                        value={formData.timeline}
-                        onValueChange={(value) => handleChange("timeline", value)}
+                  {/* GRAPHICS FIELDS */}
+                  <AnimatePresence>
+                    {(formData.need_type === "graphics" || formData.need_type === "both") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 pl-4 border-l-4 border-purple-300"
                       >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="When?" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ASAP">ASAP (1 week)</SelectItem>
-                          <SelectItem value="2-3 weeks">2-3 weeks</SelectItem>
-                          <SelectItem value="1 month">1 month</SelectItem>
-                          <SelectItem value="2-3 months">2-3 months</SelectItem>
-                          <SelectItem value="Flexible">Flexible</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                          <Image className="w-5 h-5 text-purple-600" />
+                          Graphics Items
+                        </h3>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-sm">Select all the design items you need:</Label>
+                          <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg">
+                            {[
+                              { id: 'digital_promo', label: 'Digital Promotion Package' },
+                              { id: 'flyers', label: 'Flyers' },
+                              { id: 'metal_frame_signs', label: 'Metal Frame (Top 5) Signs' },
+                              { id: 'posters_11x17', label: 'Posters (11x17)' },
+                              { id: 'postcards', label: 'Postcards' },
+                              { id: 'a_frame_signs', label: 'A Frame Signs' },
+                              { id: 'posters_24x36', label: 'Posters (24x36)' },
+                              { id: 'booklet', label: 'Booklet' },
+                              { id: 'tshirt', label: 'T-shirt' },
+                              { id: 'something_else', label: 'Something Else' }
+                            ].map(item => (
+                              <div key={item.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={item.id}
+                                  checked={formData.graphics_items[item.id]}
+                                  onCheckedChange={(checked) => handleGraphicsItemChange(item.id, checked)}
+                                />
+                                <Label htmlFor={item.id} className="text-sm cursor-pointer">
+                                  {item.label}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                  {/* Budget & Success Metrics Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="budget_range" className="text-sm font-medium">
-                        Budget Range
-                      </Label>
-                      <Select
-                        value={formData.budget_range}
-                        onValueChange={(value) => handleChange("budget_range", value)}
+                        {/* Previous Event Photos */}
+                        <div className="space-y-2">
+                          <Label htmlFor="previous_photos" className="text-sm font-medium">
+                            Previous Event Photos (Optional)
+                          </Label>
+                          <p className="text-xs text-slate-500 mb-2">
+                            If you have any pictures from previous events, you can drop them here. If not, no worries!
+                          </p>
+                          <Input
+                            id="previous_photos"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="h-10"
+                          />
+                        </div>
+
+                        {/* Link to Graphics Folder */}
+                        <div className="space-y-2">
+                          <Label htmlFor="graphics_folder_link" className="text-sm font-medium">
+                            Link to Graphics Folder (Optional)
+                          </Label>
+                          <Input
+                            id="graphics_folder_link"
+                            value={formData.graphics_folder_link}
+                            onChange={(e) => handleChange("graphics_folder_link", e.target.value)}
+                            placeholder="Paste the link to your graphics folder here..."
+                            className="h-10"
+                          />
+                          <p className="text-xs text-slate-500">
+                            Share a link to existing graphics or assets
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* MARKETING FIELDS */}
+                  <AnimatePresence>
+                    {(formData.need_type === "marketing" || formData.need_type === "both") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 pl-4 border-l-4 border-pink-300"
                       >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="$0 - $500">$0 - $500</SelectItem>
-                          <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
-                          <SelectItem value="$1,000 - $2,500">$1,000 - $2,500</SelectItem>
-                          <SelectItem value="$2,500+">$2,500+</SelectItem>
-                          <SelectItem value="Not sure">Not sure</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                          <Megaphone className="w-5 h-5 text-pink-600" />
+                          Marketing Channels
+                        </h3>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-sm">Select marketing channels you need:</Label>
+                          <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg">
+                            {[
+                              { id: 'social_media', label: 'Social Media Posts' },
+                              { id: 'email_campaign', label: 'Email Campaign' },
+                              { id: 'website', label: 'Website Updates' },
+                              { id: 'app_notification', label: 'App Notification' },
+                              { id: 'blog_post', label: 'Blog Post' },
+                              { id: 'press_release', label: 'Press Release' }
+                            ].map(channel => (
+                              <div key={channel.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={channel.id}
+                                  checked={formData.marketing_channels[channel.id]}
+                                  onCheckedChange={(checked) => handleMarketingChannelChange(channel.id, checked)}
+                                />
+                                <Label htmlFor={channel.id} className="text-sm cursor-pointer">
+                                  {channel.label}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                    <div className="space-y-1.5">
-                      <Label htmlFor="success_metrics" className="text-sm font-medium">
-                        Success Metric
-                      </Label>
-                      <Input
-                        id="success_metrics"
-                        value={formData.success_metrics}
-                        onChange={(e) => handleChange("success_metrics", e.target.value)}
-                        placeholder="e.g., 100 attendees"
-                        className="h-10"
-                      />
-                    </div>
-                  </div>
+                        {/* Marketing Message */}
+                        <div className="space-y-2">
+                          <Label htmlFor="marketing_message" className="text-sm font-medium">
+                            Key Marketing Message
+                          </Label>
+                          <Textarea
+                            id="marketing_message"
+                            value={formData.marketing_message}
+                            onChange={(e) => handleChange("marketing_message", e.target.value)}
+                            placeholder="What's the main message you want to communicate?"
+                            rows={3}
+                            className="resize-none"
+                          />
+                        </div>
 
-                  {/* Submit Button */}
-                  <div className="pt-4">
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
+                        {/* Link to Marketing Assets */}
+                        <div className="space-y-2">
+                          <Label htmlFor="marketing_assets_link" className="text-sm font-medium">
+                            Link to Marketing Assets (Optional)
+                          </Label>
+                          <Input
+                            id="marketing_assets_link"
+                            value={formData.marketing_assets_link}
+                            onChange={(e) => handleChange("marketing_assets_link", e.target.value)}
+                            placeholder="Share links to existing content, brand guidelines, etc..."
+                            className="h-10"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Common Additional Fields */}
+                  {formData.need_type && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="space-y-4 pt-4 border-t"
                     >
-                      {submitting ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          Submit Request 🚀
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="project_description" className="text-sm font-medium">
+                          Project Description
+                        </Label>
+                        <Textarea
+                          id="project_description"
+                          value={formData.project_description}
+                          onChange={(e) => handleChange("project_description", e.target.value)}
+                          placeholder="Tell us about your project, goals, and vision..."
+                          rows={4}
+                          className="resize-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="target_audience" className="text-sm font-medium">
+                            Target Audience
+                          </Label>
+                          <Input
+                            id="target_audience"
+                            value={formData.target_audience}
+                            onChange={(e) => handleChange("target_audience", e.target.value)}
+                            placeholder="e.g., Young families"
+                            className="h-10"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="timeline" className="text-sm font-medium">
+                            Timeline
+                          </Label>
+                          <Select
+                            value={formData.timeline}
+                            onValueChange={(value) => handleChange("timeline", value)}
+                          >
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="When?" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ASAP">ASAP (1 week)</SelectItem>
+                              <SelectItem value="2-3 weeks">2-3 weeks</SelectItem>
+                              <SelectItem value="1 month">1 month</SelectItem>
+                              <SelectItem value="2-3 months">2-3 months</SelectItem>
+                              <SelectItem value="Flexible">Flexible</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="budget_range" className="text-sm font-medium">
+                            Budget Range
+                          </Label>
+                          <Select
+                            value={formData.budget_range}
+                            onValueChange={(value) => handleChange("budget_range", value)}
+                          >
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="$0 - $500">$0 - $500</SelectItem>
+                              <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
+                              <SelectItem value="$1,000 - $2,500">$1,000 - $2,500</SelectItem>
+                              <SelectItem value="$2,500+">$2,500+</SelectItem>
+                              <SelectItem value="Not sure">Not sure</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="success_metrics" className="text-sm font-medium">
+                            Success Metric
+                          </Label>
+                          <Input
+                            id="success_metrics"
+                            value={formData.success_metrics}
+                            onChange={(e) => handleChange("success_metrics", e.target.value)}
+                            placeholder="e.g., 100 attendees"
+                            className="h-10"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Submit Button */}
+                      <div className="pt-4">
+                        <Button
+                          type="submit"
+                          disabled={submitting}
+                          className="w-full h-12 text-base bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg"
+                        >
+                          {submitting ? (
+                            <>
+                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              Submit Request 🚀
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </form>
