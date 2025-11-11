@@ -479,7 +479,7 @@ export default function MyTasks() {
               <ScheduleCalendar 
                 events={myScheduleEvents}
                 meetings={meetings}
-                weekCount={1}
+                weekCount={2}
                 onEventClick={handleScheduleEventClick}
               />
             )}
@@ -547,33 +547,6 @@ export default function MyTasks() {
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5" />
-                Task Calendar
-              </CardTitle>
-              <CardDescription>Your upcoming tasks</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFullCalendar(true)}
-            >
-              <Maximize2 className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Full Calendar</span>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <TaskCalendar
-              tasks={allTasks}
-              onTaskClick={handleTaskClick}
-              weekCount={2}
-            />
           </CardContent>
         </Card>
 
