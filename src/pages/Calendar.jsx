@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
@@ -26,12 +26,14 @@ import {
 export default function Calendar() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
-  const [resourceKinds, setResourceKinds] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
+  const [resourceTypes, setResourceTypes] = useState([]);
   const [eventTags, setEventTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
-  const [selectedResourceKind, setSelectedResourceKind] = useState("all");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [selectedResourceType, setSelectedResourceType] = useState("all");
   const [selectedTag, setSelectedTag] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -82,21 +84,30 @@ export default function Calendar() {
       setEvents(eventsData);
       setLastSync(new Date());
 
-      // Extract unique resource kinds
-      const kindsSet = new Set();
+      // Extract unique rooms and resource types
+      const roomsSet = new Set();
+      const typesSet = new Set();
+      
       eventsData.forEach(event => {
         if (event.resources && Array.isArray(event.resources)) {
           event.resources.forEach(resource => {
-            if (resource.kind) {
-              kindsSet.add(resource.kind);
+            if (resource.kind === 'Room') {
+              roomsSet.add(resource.name);
+            } else if (resource.kind) {
+              typesSet.add(resource.kind);
             }
           });
         }
       });
       
-      const uniqueKinds = Array.from(kindsSet).sort();
-      console.log('🔧 Extracted resource kinds:', uniqueKinds);
-      setResourceKinds(uniqueKinds);
+      const uniqueRooms = Array.from(roomsSet).sort();
+      const uniqueTypes = Array.from(typesSet).sort();
+      
+      console.log('🚪 Extracted rooms:', uniqueRooms.length);
+      console.log('🔧 Extracted resource types:', uniqueTypes);
+      
+      setAllRooms(uniqueRooms);
+      setResourceTypes(uniqueTypes);
 
       // Extract unique tags
       const tagsSet = new Set();
@@ -128,15 +139,27 @@ export default function Calendar() {
     setSyncing(false);
   };
 
-  // Filter events by resource kind and tag
+  // Filter events by room search, resource type, and tag
   const filteredEvents = events.filter(event => {
-    const kindMatch = selectedResourceKind === "all" || 
-      event.resources?.some(r => r.kind === selectedResourceKind);
+    // Room search filter
+    const roomMatch = !roomSearch || 
+      event.resources?.some(r => 
+        r.kind === 'Room' && 
+        r.name.toLowerCase().includes(roomSearch.toLowerCase())
+      );
     
+    // Resource type filter
+    const typeMatch = selectedResourceType === "all" || 
+      event.resources?.some(r => 
+        r.kind !== 'Room' && 
+        r.kind === selectedResourceType
+      );
+    
+    // Tag filter
     const tagMatch = selectedTag === "all" || 
       event.tags?.includes(selectedTag);
     
-    return kindMatch && tagMatch;
+    return roomMatch && typeMatch && tagMatch;
   });
 
   console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Month: ${format(currentMonth, 'MMMM yyyy')}`);
@@ -221,21 +244,34 @@ export default function Calendar() {
           iconColor="from-blue-500 to-indigo-500"
           action={
             <div className="flex gap-2 flex-wrap">
-              <Select value={selectedResourceKind} onValueChange={setSelectedResourceKind}>
-                <SelectTrigger className="w-48">
+              {/* Room Search */}
+              <div className="relative w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search rooms..."
+                  value={roomSearch}
+                  onChange={(e) => setRoomSearch(e.target.value)}
+                  className="pl-9 h-10"
+                />
+              </div>
+
+              {/* Resource Type Dropdown */}
+              <Select value={selectedResourceType} onValueChange={setSelectedResourceType}>
+                <SelectTrigger className="w-52">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Resource Kind" />
+                  <SelectValue placeholder="Resource Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Resource Kinds</SelectItem>
-                  {resourceKinds.map(kind => (
-                    <SelectItem key={kind} value={kind}>
-                      {kind}
+                  <SelectItem value="all">All Resources</SelectItem>
+                  {resourceTypes.map(type => (
+                    <SelectItem key={type} value={type}>
+                      {type}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
+              {/* Tag Filter */}
               <Select value={selectedTag} onValueChange={setSelectedTag}>
                 <SelectTrigger className="w-48">
                   <Filter className="w-4 h-4 mr-2" />
@@ -378,7 +414,7 @@ export default function Calendar() {
         )}
       </div>
 
-      {/* Day Events List Dialog - FIX: Add description */}
+      {/* Day Events List Dialog */}
       <Dialog open={!!selectedDayEvents} onOpenChange={() => setSelectedDayEvents(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-describedby="day-events-description">
           <DialogHeader>
@@ -433,7 +469,7 @@ export default function Calendar() {
         </DialogContent>
       </Dialog>
 
-      {/* Event Detail Dialog - FIX: Add description */}
+      {/* Event Detail Dialog */}
       <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-describedby="event-detail-description">
           <DialogHeader>
