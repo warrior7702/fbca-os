@@ -1,169 +1,145 @@
 import React from 'react';
-import { format, startOfWeek, addDays, parseISO, isToday, isPast } from 'date-fns';
-import { Key, MapPin, Clock, Video, Building2 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { Clock, Key, MapPin, Lock, Unlock } from 'lucide-react';
 
-export default function ScheduleCalendar({ events = [], meetings = [], weekCount = 1, onEventClick }) {
+export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
-  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-  
-  const days = [];
-  for (let week = 0; week < weekCount; week++) {
-    for (let day = 0; day < 7; day++) {
-      days.push(addDays(weekStart, week * 7 + day));
+  const startDate = today;
+
+  const weeks = [];
+  for (let w = 0; w < weekCount; w++) {
+    const weekStart = addDays(startDate, w * 7);
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      days.push(addDays(weekStart, d));
     }
+    weeks.push(days);
   }
 
   const getEventsForDay = (day) => {
-    const dayEvents = events.filter(event => {
-      const eventDate = new Date(event.starts_at);
-      return eventDate.toDateString() === day.toDateString();
-    }).map(event => ({
-      ...event,
-      type: 'pco',
-      color: 'green'
-    }));
-
-    return dayEvents;
-  };
-
-  const getMeetingsForDay = (day) => {
-    const dayMeetings = meetings.filter(meeting => {
-      try {
-        const meetingDate = parseISO(meeting.start);
-        return meetingDate.toDateString() === day.toDateString();
-      } catch (error) {
-        console.error('Error parsing meeting date:', meeting.start, error);
-        return false;
-      }
-    }).map(meeting => ({
-      ...meeting,
-      type: 'meeting',
-      color: 'purple'
-    }));
-
-    return dayMeetings;
-  };
-
-  const getCombinedItemsForDay = (day) => {
-    const pcoEvents = getEventsForDay(day);
-    const meetingItems = getMeetingsForDay(day);
-    
-    const combined = [...pcoEvents, ...meetingItems];
-    
-    combined.sort((a, b) => {
-      const timeA = a.type === 'pco' ? new Date(a.starts_at) : parseISO(a.start);
-      const timeB = b.type === 'pco' ? new Date(b.starts_at) : parseISO(b.start);
-      return timeA - timeB;
+    return events.filter(event => {
+      const eventDate = parseISO(event.starts_at);
+      return isSameDay(eventDate, day);
     });
-    
-    return combined;
   };
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-7 gap-3">
-        {days.map((day, index) => {
-          const items = getCombinedItemsForDay(day);
-          const dayIsToday = isToday(day);
-          const dayIsPast = isPast(day) && !dayIsToday;
+    <div className="space-y-6">
+      {weeks.map((week, weekIndex) => (
+        <div key={weekIndex}>
+          <p className="text-sm font-semibold text-slate-600 mb-3">
+            {weekIndex === 0 ? 'This Week' : `Week ${weekIndex + 1}`} • {format(week[0], 'MMM d')} - {format(week[6], 'MMM d')}
+          </p>
+          <div className="grid grid-cols-7 gap-2">
+            {week.map((day, dayIndex) => {
+              const dayEvents = getEventsForDay(day);
+              const isToday = isSameDay(day, today);
+              const isPast = day < today && !isToday;
 
-          return (
-            <div key={index} className="flex flex-col">
-              <div className={`text-center mb-2 py-2 rounded-lg ${
-                dayIsToday ? 'bg-green-100' : 'bg-slate-50'
-              }`}>
-                <div className="text-xs font-medium text-slate-600">
-                  {format(day, 'EEE')}
+              return (
+                <div key={dayIndex} className="min-h-[120px]">
+                  <div className={`
+                    rounded-lg border-2 p-2 h-full
+                    ${isToday ? 'border-green-500 bg-green-50' : 'border-slate-200 bg-white'}
+                    ${isPast ? 'opacity-50' : ''}
+                  `}>
+                    <div className="text-center mb-2">
+                      <p className="text-xs font-medium text-slate-600">
+                        {format(day, 'EEE')}
+                      </p>
+                      <p className={`text-lg font-bold ${isToday ? 'text-green-700' : 'text-slate-900'}`}>
+                        {format(day, 'd')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      {dayEvents.map((event) => {
+                        const isUnlock = event.posted_door_code && 
+                                       event.posted_door_code.toLowerCase() === 'unlock';
+                        
+                        return (
+                          <Card 
+                            key={event.id} 
+                            className={`
+                              border transition-all cursor-pointer
+                              ${isUnlock 
+                                ? 'border-orange-300 bg-orange-50 hover:bg-orange-100 hover:shadow-md' 
+                                : 'border-green-200 bg-green-50 hover:bg-green-100 hover:shadow-md'
+                              }
+                            `}
+                            onClick={() => onEventClick && onEventClick(event)}
+                          >
+                            <CardContent className="p-2 space-y-1">
+                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                {event.name}
+                              </p>
+                              
+                              <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                <Clock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                <span>{format(parseISO(event.starts_at), 'h:mm a')}</span>
+                              </div>
+
+                              {event.access_time && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                  <Lock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                  <span className="line-clamp-1">{event.access_time}</span>
+                                </div>
+                              )}
+
+                              {event.resources && event.resources.length > 0 && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                  <MapPin className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                  <span className="line-clamp-1">
+                                    {event.resources[0].name}
+                                    {event.resources.length > 1 && ` +${event.resources.length - 1}`}
+                                  </span>
+                                </div>
+                              )}
+
+                              {event.posted_door_code && (
+                                <div className={`
+                                  mt-1 p-1 rounded flex items-center gap-1
+                                  ${isUnlock 
+                                    ? 'bg-gradient-to-r from-orange-200 to-amber-200' 
+                                    : 'bg-green-200'
+                                  }
+                                `}>
+                                  {isUnlock ? (
+                                    <Unlock className={`w-3 h-3 ${isUnlock ? 'text-orange-700' : 'text-green-700'}`} />
+                                  ) : (
+                                    <Key className="w-3 h-3 text-green-700" />
+                                  )}
+                                  <span className={`
+                                    text-[10px] font-bold
+                                    ${isUnlock 
+                                      ? 'text-orange-700 font-sans' 
+                                      : 'text-green-700 font-mono'
+                                    }
+                                  `}>
+                                    {isUnlock ? 'Unlock' : `${event.posted_door_code}#`}
+                                  </span>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className={`text-2xl font-bold ${
-                  dayIsToday ? 'text-green-700' : 'text-slate-900'
-                }`}>
-                  {format(day, 'd')}
-                </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
-              <div className="space-y-2 min-h-[200px]">
-                {items.map((item, idx) => {
-                  if (item.type === 'pco') {
-                    return (
-                      <Card
-                        key={`pco-${item.id || idx}`}
-                        onClick={() => onEventClick && onEventClick(item)}
-                        className="p-3 bg-white border-l-4 border-green-500 hover:shadow-md transition-all cursor-pointer"
-                      >
-                        <div className="space-y-2">
-                          <h3 className="font-semibold text-slate-900 text-sm line-clamp-2">
-                            {item.event_name}
-                          </h3>
-                          
-                          <div className="flex items-center gap-1 text-xs text-green-700">
-                            <Clock className="w-3 h-3" />
-                            <span>{format(new Date(item.starts_at), 'h:mm a')}</span>
-                          </div>
-
-                          {item.resources && item.resources.length > 0 && (
-                            <div className="flex items-start gap-1 text-xs text-green-700">
-                              <Building2 className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2">
-                                {item.resources[0].resource_name}
-                                {item.resources.length > 1 && ` +${item.resources.length - 1}`}
-                              </span>
-                            </div>
-                          )}
-
-                          {item.door_codes && item.door_codes.length > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-green-700 font-mono">
-                              <Key className="w-3 h-3" />
-                              <span>
-                                {item.door_codes[0].pin}#
-                                {item.door_codes.length > 1 && ` +${item.door_codes.length - 1}`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    );
-                  } else {
-                    return (
-                      <Card
-                        key={`meeting-${item.id || idx}`}
-                        onClick={() => onEventClick && onEventClick(item)}
-                        className="p-3 bg-white border-l-4 border-purple-500 hover:shadow-md transition-all cursor-pointer"
-                      >
-                        <div className="space-y-2">
-                          <h3 className="font-semibold text-slate-900 text-sm line-clamp-2">
-                            {item.subject}
-                          </h3>
-                          
-                          <div className="flex items-center gap-1 text-xs text-purple-700">
-                            <Clock className="w-3 h-3" />
-                            <span>{format(parseISO(item.start), 'h:mm a')}</span>
-                          </div>
-
-                          {item.meetingLink && (
-                            <div className="flex items-center gap-1 text-xs text-purple-700">
-                              <Video className="w-3 h-3" />
-                              <span>{item.meetingLink.provider === 'Microsoft Teams' ? 'Teams' : item.meetingLink.provider}</span>
-                            </div>
-                          )}
-
-                          {!item.meetingLink && item.location && (
-                            <div className="flex items-center gap-1 text-xs text-purple-700">
-                              <MapPin className="w-3 h-3" />
-                              <span className="line-clamp-1">{item.location}</span>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    );
-                  }
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {events.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-slate-500">No upcoming events with your approval groups</p>
+        </div>
+      )}
     </div>
   );
 }
