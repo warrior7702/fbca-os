@@ -63,6 +63,18 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                         const isUnlock = !isMicrosoftMeeting && event.posted_door_code && 
                                        event.posted_door_code.toLowerCase() === 'unlock';
                         
+                        // Determine meeting type badge
+                        let meetingBadge = null;
+                        if (isMicrosoftMeeting) {
+                          if (event.meetingLink?.type === 'teams') {
+                            meetingBadge = { text: 'Teams', color: 'bg-purple-100 border-purple-300 text-purple-700' };
+                          } else if (event.meetingLink?.type === 'zoom') {
+                            meetingBadge = { text: 'Zoom', color: 'bg-blue-100 border-blue-300 text-blue-700' };
+                          } else {
+                            meetingBadge = { text: 'In Person', color: 'bg-slate-100 border-slate-300 text-slate-700' };
+                          }
+                        }
+                        
                         return (
                           <Card 
                             key={event.id} 
@@ -95,12 +107,6 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                               {/* Microsoft Meeting Indicators */}
                               {isMicrosoftMeeting && (
                                 <>
-                                  {event.meetingLink && (
-                                    <div className="flex items-center gap-1 text-[10px] text-purple-700">
-                                      <Video className="w-3 h-3" />
-                                      <span>{event.meetingLink.provider}</span>
-                                    </div>
-                                  )}
                                   {event.location && (
                                     <div className="flex items-center gap-1 text-[10px] text-slate-600">
                                       <MapPin className="w-3 h-3 text-purple-600" />
@@ -113,9 +119,11 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                                       <span>{event.attendees.length} attendee{event.attendees.length !== 1 ? 's' : ''}</span>
                                     </div>
                                   )}
-                                  <Badge variant="outline" className="text-[9px] bg-purple-100 border-purple-300 text-purple-700">
-                                    Microsoft 365
-                                  </Badge>
+                                  {meetingBadge && (
+                                    <Badge variant="outline" className={`text-[9px] ${meetingBadge.color}`}>
+                                      {meetingBadge.text}
+                                    </Badge>
+                                  )}
                                 </>
                               )}
 
