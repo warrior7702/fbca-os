@@ -585,6 +585,134 @@ export default function PCOAPITester() {
     }
   };
 
+  // NEW: Find all Mystery Resource events
+  const testFindMysteryResourceEvents = async () => {
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔮 Searching for Mystery Resource events...');
+      
+      // Get PCO token
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      if (!tokenResponse.data.ok) {
+        throw new Error('Failed to get PCO token');
+      }
+      
+      const token = tokenResponse.data.access_token;
+      
+      // Fetch all pending resource requests
+      console.log('📋 Fetching pending resource requests...');
+      const requestsResponse = await fetch(
+        'https://api.planningcenteronline.com/calendar/v2/resource_requests?filter=pending&per_page=100',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!requestsResponse.ok) {
+        throw new Error(`Failed to fetch requests: ${requestsResponse.status}`);
+      }
+      
+      const requestsData = await requestsResponse.json();
+      const allRequests = requestsData.data || [];
+      console.log(`✅ Found ${allRequests.length} pending resource requests`);
+      
+      // Check each request for Mystery Resource
+      const mysteryEvents = [];
+      
+      for (const request of allRequests) {
+        const resourceId = request.relationships?.resource?.data?.id;
+        
+        if (!resourceId) continue;
+        
+        // Fetch resource details
+        const resourceResponse = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (!resourceResponse.ok) continue;
+        
+        const resourceData = await resourceResponse.json();
+        const resourceName = resourceData.data?.attributes?.name || '';
+        
+        // Check if this is Mystery Resource
+        if (resourceName.toLowerCase().includes('mystery resource')) {
+          console.log('🔮 Found Mystery Resource:', request.id);
+          
+          // Fetch event details
+          const eventId = request.relationships?.event?.data?.id;
+          let eventDetails = null;
+          
+          if (eventId) {
+            const eventResponse = await fetch(
+              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (eventResponse.ok) {
+              const eventData = await eventResponse.json();
+              eventDetails = eventData.data;
+            }
+          }
+          
+          mysteryEvents.push({
+            request_id: request.id,
+            request_created: request.attributes?.created_at,
+            request_status: request.attributes?.approval_status,
+            resource_id: resourceId,
+            resource_name: resourceName,
+            quantity: request.attributes?.quantity,
+            event_id: eventId,
+            event: eventDetails
+          });
+        }
+      }
+      
+      console.log(`🎯 Found ${mysteryEvents.length} Mystery Resource events`);
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: {
+          total_requests: allRequests.length,
+          mystery_events: mysteryEvents,
+          count: mysteryEvents.length
+        },
+        endpoint: 'findMysteryResourceEvents'
+      });
+      
+      if (mysteryEvents.length > 0) {
+        toast.success(`Found ${mysteryEvents.length} Mystery Resource event(s)!`);
+      } else {
+        toast.info('No Mystery Resource events found');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to search: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   // Translation helper
   const translateResult = () => {
     if (!result || !result.ok || !result.data) return null;
@@ -1502,6 +1630,114 @@ export default function PCOAPITester() {
       );
     }
 
+    // NEW: Mystery Resource Events Result
+    if (result.endpoint === 'findMysteryResourceEvents') {
+      const mysteryEvents = data.mystery_events || [];
+      
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-slate-900 text-lg">🔮 Mystery Resource Events: {mysteryEvents.length}</h3>
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+              Scanned {data.total_requests} pending requests
+            </Badge>
+          </div>
+          
+          {mysteryEvents.length > 0 ? (
+            <div className="space-y-3">
+              {mysteryEvents.map((item, idx) => {
+                const event = item.event;
+                const eventAttrs = event?.attributes;
+                
+                return (
+                  <Card key={idx} className="bg-purple-50 border-2 border-purple-300">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {/* Event Info */}
+                        <div>
+                          <h4 className="font-semibold text-slate-900 text-lg">
+                            {eventAttrs?.name || 'Untitled Event'}
+                          </h4>
+                          {eventAttrs?.summary && (
+                            <p className="text-sm text-slate-600 mt-1">{eventAttrs.summary}</p>
+                          )}
+                        </div>
+                        
+                        {/* Event Dates */}
+                        {eventAttrs?.starts_at && (
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Calendar className="w-4 h-4" />
+                            <span>
+                              {new Date(eventAttrs.starts_at).toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Request Details */}
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="p-2 bg-white rounded border">
+                            <p className="text-xs text-slate-500">Request ID</p>
+                            <p className="font-mono text-blue-600">{item.request_id}</p>
+                          </div>
+                          <div className="p-2 bg-white rounded border">
+                            <p className="text-xs text-slate-500">Event ID</p>
+                            <p className="font-mono text-blue-600">{item.event_id}</p>
+                          </div>
+                          <div className="p-2 bg-white rounded border">
+                            <p className="text-xs text-slate-500">Approval Status</p>
+                            <p className="font-semibold">
+                              {item.request_status === 'P' ? '⏳ Pending' : 
+                               item.request_status === 'A' ? '✅ Approved' : 
+                               item.request_status === 'R' ? '❌ Rejected' : 
+                               item.request_status || 'Unknown'}
+                            </p>
+                          </div>
+                          <div className="p-2 bg-white rounded border">
+                            <p className="text-xs text-slate-500">Quantity</p>
+                            <p className="font-semibold">{item.quantity || 1}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Resource Info */}
+                        <div className="p-3 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg border border-purple-300">
+                          <p className="text-xs font-semibold text-purple-900 mb-1">Resource Requested:</p>
+                          <p className="font-semibold text-purple-900">🔮 {item.resource_name}</p>
+                        </div>
+                        
+                        {/* Created Date */}
+                        {item.request_created && (
+                          <p className="text-xs text-slate-500">
+                            Request created: {new Date(item.request_created).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                No events found with Mystery Resource requests. This could mean:
+                <ul className="list-disc list-inside mt-2 text-sm">
+                  <li>All Mystery Resource requests have been processed</li>
+                  <li>No pending Mystery Resource requests exist</li>
+                  <li>The resource might be named differently in PCO</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1864,10 +2100,36 @@ export default function PCOAPITester() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-purple-600" />
-                  Test Communication Request Email
+                  Test Communication Request Workflow
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* NEW: Find Mystery Resource Events */}
+                <div className="border-4 border-purple-300 bg-purple-50 rounded-lg p-4 space-y-2">
+                  <Label className="flex items-center gap-2 text-purple-900">
+                    <AlertCircle className="w-5 h-5 text-purple-600" />
+                    <strong className="text-lg">🔮 Find All Mystery Resource Events</strong>
+                  </Label>
+                  <p className="text-sm text-purple-800">
+                    Scans all pending resource requests and finds events that requested "Mystery Resource". 
+                    This is exactly what the Sync PCO button does to create Communication Requests.
+                  </p>
+                  <Button 
+                    onClick={testFindMysteryResourceEvents} 
+                    disabled={testLoading} 
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12 text-base font-semibold"
+                  >
+                    {testLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <MessageSquare className="w-5 h-5 mr-2" />}
+                    Find Mystery Resource Events
+                  </Button>
+                  <Alert className="bg-purple-100 border-purple-300 mt-3">
+                    <AlertDescription className="text-sm">
+                      <strong>What this shows:</strong> All events with pending Mystery Resource requests, 
+                      including event details, request IDs, and approval status. Use this to debug the workflow.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
                 <Alert className="bg-blue-50 border-blue-200">
                   <AlertDescription className="text-sm">
                     <strong>How it works:</strong> When a "Mystery Resource" is requested in PCO Calendar, 
@@ -1995,7 +2257,7 @@ export default function PCOAPITester() {
                   {/* Summary Stats */}
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-semibold text-blue-900 mb-2">
-                      Found {result.data?.data?.length || result.data?.approvals?.length || 0} items
+                      Found {result.data?.data?.length || result.data?.approvals?.length || result.data?.mystery_events?.length || 0} items
                     </p>
                     {result.data?.meta && (
                       <p className="text-xs text-blue-700">
