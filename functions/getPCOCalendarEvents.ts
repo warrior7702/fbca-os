@@ -8,13 +8,9 @@ async function refreshTokenIfNeeded(base44, user) {
         return user.pco_access_token;
     }
 
-    console.log('🔄 Refreshing PCO token...');
-
     const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             grant_type: 'refresh_token',
             refresh_token: user.pco_refresh_token,
@@ -23,9 +19,7 @@ async function refreshTokenIfNeeded(base44, user) {
         })
     });
 
-    if (!tokenResponse.ok) {
-        throw new Error('PCO token refresh failed');
-    }
+    if (!tokenResponse.ok) throw new Error('PCO token refresh failed');
 
     const tokens = await tokenResponse.json();
     const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
@@ -39,69 +33,20 @@ async function refreshTokenIfNeeded(base44, user) {
     return tokens.access_token;
 }
 
-async function fetchAllInstances(accessToken, baseUrl) {
-    let allInstances = [];
-    let nextUrl = baseUrl;
-    let pageCount = 0;
-    const maxPages = 10;
-    
-    while (nextUrl && pageCount < maxPages) {
-        pageCount++;
-        console.log(`📄 Fetching page ${pageCount}...`);
-        
-        const response = await fetch(nextUrl, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ PCO instances fetch failed:', response.status, errorText);
-            throw new Error(`Failed to fetch calendar events: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.data && data.data.length > 0) {
-            allInstances = allInstances.concat(data.data);
-            console.log(`  ✅ Got ${data.data.length} instances (total: ${allInstances.length})`);
-        }
-        
-        nextUrl = data.links?.next;
-    }
-    
-    console.log(`📊 Total pages fetched: ${pageCount}`);
-    console.log(`📊 Total instances: ${allInstances.length}`);
-    
-    return allInstances;
-}
-
-// Helper to add delay between requests
-async function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Fetch with retry on 429
-async function fetchWithRetry(url, options, maxRetries = 3) {
+async function fetchWithRetry(url, options, maxRetries = 2) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         const response = await fetch(url, options);
         
-        if (response.status === 429) {
-            if (attempt < maxRetries) {
-                const waitTime = attempt * 1000; // Progressive backoff: 1s, 2s, 3s
-                console.warn(`⚠️ Rate limited (429), waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`);
-                await delay(waitTime);
-                continue;
-            }
+        if (response.status === 429 && attempt < maxRetries) {
+            await delay(1000 * attempt);
+            continue;
         }
         
         return response;
     }
-    
-    // If we get here, all retries failed
-    throw new Error('Rate limit exceeded after retries');
+    throw new Error('Rate limit exceeded');
 }
 
 Deno.serve(async (req) => {
@@ -110,17 +55,13 @@ Deno.serve(async (req) => {
         const currentUser = await base44.auth.me();
 
         if (!currentUser) {
-            console.error('❌ No current user');
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
-
-        console.log('✅ Current user:', currentUser.email);
 
         const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
         const user = users[0];
 
         if (!user || !user.pco_access_token) {
-            console.error('❌ No PCO token for user');
             return Response.json({ 
                 events: [], 
                 message: 'PCO not connected. Please connect in Settings > Integrations' 
@@ -128,269 +69,146 @@ Deno.serve(async (req) => {
         }
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
-        console.log('✅ Access token ready');
+        const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
-        // Fetch future event instances
-        const baseUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
+        // Fetch event instances (first 3 pages only for speed)
+        const instances = [];
+        let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100';
+        let pageCount = 0;
         
-        console.log('🔗 Base URL:', baseUrl);
-        
-        const instances = await fetchAllInstances(accessToken, baseUrl);
-        
-        console.log('📦 Total event instances fetched:', instances.length);
+        while (nextUrl && pageCount < 3) {
+            const response = await fetchWithRetry(nextUrl, { headers });
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            instances.push(...(data.data || []));
+            nextUrl = data.links?.next;
+            pageCount++;
+        }
         
         if (instances.length === 0) {
-            console.warn('⚠️ No event instances in response from PCO');
-            return Response.json({ 
-                events: [],
-                message: 'No upcoming event instances found in PCO Calendar'
-            });
+            return Response.json({ events: [], message: 'No upcoming events found' });
         }
 
-        // Filter to next 60 days on our side
+        // Filter to next 60 days
         const now = new Date();
         const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
 
-        // Get unique event IDs
         const eventIds = new Set();
         instances.forEach(instance => {
             const eventId = instance.relationships?.event?.data?.id;
             if (eventId) eventIds.add(eventId);
         });
 
-        console.log('📊 Unique events:', eventIds.size);
-
-        // Fetch full event data with SMALLER BATCHES and DELAYS to avoid rate limiting
+        // Fetch event data in OPTIMIZED batches
         const eventDataMap = {};
         const eventIdArray = Array.from(eventIds);
-        const batchSize = 5; // REDUCED from 15 to 5
-        
-        let eventsWithoutNames = 0;
-        let eventsWithoutResources = 0;
-        let rateLimitRetries = 0;
+        const batchSize = 8; // INCREASED for speed
         
         for (let i = 0; i < eventIdArray.length; i += batchSize) {
             const batch = eventIdArray.slice(i, i + batchSize);
-            console.log(`🔄 Processing event batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(eventIdArray.length / batchSize)}`);
             
-            const batchPromises = batch.map(async (eventId) => {
-                try {
-                    // Fetch event with tags (WITH RETRY)
-                    const eventResponse = await fetchWithRetry(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
+            const batchResults = await Promise.all(
+                batch.map(async (eventId) => {
+                    try {
+                        // Fetch event and requests in parallel
+                        const [eventRes, requestsRes] = await Promise.all([
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`, { headers }),
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource,resource_approval_groups&per_page=100`, { headers })
+                        ]);
+
+                        if (!eventRes.ok) {
+                            return { eventId, data: { name: 'Loading...', resource_requests: [], tags: [] } };
+                        }
+
+                        const eventData = await eventRes.json();
+                        const event = eventData.data;
+                        
+                        const eventName = event.attributes?.name || event.attributes?.summary || 'Unnamed Event';
+                        
+                        const tags = [];
+                        if (eventData.included) {
+                            for (const item of eventData.included) {
+                                if (item.type === 'Tag') tags.push(item.attributes?.name);
                             }
                         }
-                    );
-
-                    if (!eventResponse.ok) {
-                        console.error(`❌ Failed to fetch event ${eventId}: ${eventResponse.status}`);
+                        
+                        const resourceRequests = [];
+                        
+                        if (requestsRes.ok) {
+                            const requestsData = await requestsRes.json();
+                            
+                            const resourceMap = {};
+                            const approvalGroupMap = {};
+                            
+                            if (requestsData.included) {
+                                for (const item of requestsData.included) {
+                                    if (item.type === 'Resource') {
+                                        resourceMap[item.id] = {
+                                            id: item.id,
+                                            name: item.attributes?.name || 'Unknown',
+                                            kind: item.attributes?.kind || 'Unknown'
+                                        };
+                                    } else if (item.type === 'ResourceApprovalGroup') {
+                                        approvalGroupMap[item.id] = {
+                                            id: item.id,
+                                            name: item.attributes?.name || 'Unknown'
+                                        };
+                                    }
+                                }
+                            }
+                            
+                            for (const request of (requestsData.data || [])) {
+                                const resourceId = request.relationships?.resource?.data?.id;
+                                const approvalGroupId = request.relationships?.resource_approval_groups?.data?.[0]?.id;
+                                const resource = resourceMap[resourceId];
+                                const approvalGroup = approvalGroupMap[approvalGroupId];
+                                
+                                if (resource) {
+                                    resourceRequests.push({
+                                        id: request.id,
+                                        resource_id: resourceId,
+                                        resource_name: resource.name,
+                                        resource_kind: resource.kind,
+                                        resource_category: approvalGroup?.name || 'Uncategorized',
+                                        approval_status: request.attributes?.approval_status,
+                                        quantity: request.attributes?.quantity,
+                                        answers: [] // Skip fetching answers for speed
+                                    });
+                                }
+                            }
+                        }
+                        
                         return {
                             eventId,
                             data: {
-                                name: `Loading Event ${eventId}...`,
-                                summary: null,
-                                description: null,
-                                visible_in_church_center: false,
-                                approval_status: null,
-                                resource_requests: [],
-                                tags: [],
-                                _error: true
+                                name: eventName,
+                                summary: event.attributes?.summary || null,
+                                description: event.attributes?.description || null,
+                                visible_in_church_center: event.attributes?.visible_in_church_center,
+                                approval_status: event.attributes?.approval_status,
+                                resource_requests: resourceRequests,
+                                tags: tags
                             }
                         };
+                    } catch (error) {
+                        return { eventId, data: { name: 'Error', resource_requests: [], tags: [] } };
                     }
-
-                    const eventData = await eventResponse.json();
-                    const event = eventData.data;
-                    
-                    // Get event name
-                    let eventName = null;
-                    
-                    if (event.attributes?.name && typeof event.attributes.name === 'string' && event.attributes.name.trim() !== '') {
-                        eventName = event.attributes.name.trim();
-                    } else if (event.attributes?.summary && typeof event.attributes.summary === 'string' && event.attributes.summary.trim() !== '') {
-                        eventName = event.attributes.summary.trim();
-                    } else if (event.attributes?.visible_title && typeof event.attributes.visible_title === 'string' && event.attributes.visible_title.trim() !== '') {
-                        eventName = event.attributes.visible_title.trim();
-                    } else {
-                        console.warn(`⚠️ Event ${eventId} has NO name/summary/visible_title`);
-                        eventName = `Unnamed Event`;
-                        eventsWithoutNames++;
-                    }
-                    
-                    // Extract tags from included
-                    const tags = [];
-                    if (eventData.included) {
-                        for (const item of eventData.included) {
-                            if (item.type === 'Tag') {
-                                tags.push(item.attributes?.name);
-                            }
-                        }
-                    }
-                    
-                    // Fetch event_resource_requests with resource AND approval_group (WITH RETRY)
-                    const requestsResponse = await fetchWithRetry(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource,resource_approval_groups&per_page=100`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            }
-                        }
-                    );
-
-                    const resourceRequests = [];
-                    
-                    if (requestsResponse.ok) {
-                        const requestsData = await requestsResponse.json();
-                        
-                        // Build maps from included data
-                        const resourceMap = {};
-                        const approvalGroupMap = {};
-                        
-                        if (requestsData.included) {
-                            for (const item of requestsData.included) {
-                                if (item.type === 'Resource') {
-                                    resourceMap[item.id] = {
-                                        id: item.id,
-                                        name: item.attributes?.name || 'Unnamed Resource',
-                                        kind: item.attributes?.kind || 'Unknown'
-                                    };
-                                } else if (item.type === 'ResourceApprovalGroup') {
-                                    approvalGroupMap[item.id] = {
-                                        id: item.id,
-                                        name: item.attributes?.name || 'Unknown Group'
-                                    };
-                                }
-                            }
-                        }
-                        
-                        // Build resource requests with full resource info AND approval group
-                        for (const request of (requestsData.data || [])) {
-                            const resourceId = request.relationships?.resource?.data?.id;
-                            const approvalGroupId = request.relationships?.resource_approval_groups?.data?.[0]?.id;
-                            
-                            const resource = resourceMap[resourceId];
-                            const approvalGroup = approvalGroupMap[approvalGroupId];
-                            
-                            if (resource) {
-                                // Fetch answers for this resource request (WITH RETRY)
-                                const answers = [];
-                                try {
-                                    const answersResponse = await fetchWithRetry(
-                                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
-                                        {
-                                            headers: {
-                                                'Authorization': `Bearer ${accessToken}`,
-                                                'Content-Type': 'application/json'
-                                            }
-                                        }
-                                    );
-
-                                    if (answersResponse.ok) {
-                                        const answersData = await answersResponse.json();
-                                        
-                                        for (const answer of (answersData.data || [])) {
-                                            const questionAttr = answer.attributes?.question;
-                                            const questionText = typeof questionAttr === 'string' ? questionAttr : 
-                                                               (questionAttr?.question || questionAttr?.text || '');
-                                            
-                                            let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                                            
-                                            if (typeof value === 'object' && value !== null) {
-                                                value = JSON.stringify(value);
-                                            }
-                                            
-                                            if (questionText && value) {
-                                                answers.push({
-                                                    question: String(questionText),
-                                                    answer: String(value)
-                                                });
-                                            }
-                                        }
-                                    }
-                                } catch (error) {
-                                    console.warn(`⚠️ Error fetching answers for request ${request.id}:`, error.message);
-                                }
-                                
-                                resourceRequests.push({
-                                    id: request.id,
-                                    resource_id: resourceId,
-                                    resource_name: resource.name,
-                                    resource_kind: resource.kind,
-                                    resource_category: approvalGroup?.name || 'Uncategorized',
-                                    approval_status: request.attributes?.approval_status,
-                                    quantity: request.attributes?.quantity,
-                                    answers: answers
-                                });
-                            }
-                        }
-                        
-                        if (resourceRequests.length === 0) {
-                            eventsWithoutResources++;
-                        }
-                    }
-                    
-                    return {
-                        eventId,
-                        data: {
-                            name: eventName,
-                            summary: event.attributes?.summary || null,
-                            description: event.attributes?.description || null,
-                            visible_in_church_center: event.attributes?.visible_in_church_center,
-                            approval_status: event.attributes?.approval_status,
-                            resource_requests: resourceRequests,
-                            tags: tags
-                        }
-                    };
-                } catch (error) {
-                    console.error(`❌ Error fetching event ${eventId}:`, error.message);
-                    if (error.message.includes('Rate limit')) {
-                        rateLimitRetries++;
-                    }
-                    return {
-                        eventId,
-                        data: {
-                            name: `Event ${eventId} (Temporarily Unavailable)`,
-                            summary: null,
-                            description: null,
-                            visible_in_church_center: false,
-                            approval_status: null,
-                            resource_requests: [],
-                            tags: [],
-                            _error: true
-                        }
-                    };
-                }
-            });
-
-            const batchResults = await Promise.all(batchPromises);
+                })
+            );
+            
             batchResults.forEach(result => {
-                if (result) {
-                    eventDataMap[result.eventId] = result.data;
-                }
+                if (result) eventDataMap[result.eventId] = result.data;
             });
             
-            // Add delay between batches to avoid rate limiting
+            // Shorter delay between batches
             if (i + batchSize < eventIdArray.length) {
-                await delay(500); // 500ms delay between batches
+                await delay(200);
             }
         }
 
-        console.log('📊 Fetched full data for', Object.keys(eventDataMap).length, 'events');
-        console.log('⚠️ Events without names:', eventsWithoutNames);
-        console.log('⚠️ Events without resources:', eventsWithoutResources);
-        if (rateLimitRetries > 0) {
-            console.log('⚠️ Rate limit retries needed:', rateLimitRetries);
-        }
-
-        // Process event instances
+        // Process instances
         const eventsWithResources = [];
-        let skippedNoDates = 0;
-        let skippedBeyond60Days = 0;
         
         for (const instance of instances) {
             const eventId = instance.relationships?.event?.data?.id;
@@ -399,40 +217,22 @@ Deno.serve(async (req) => {
             const starts_at = instance.attributes?.starts_at;
             const ends_at = instance.attributes?.ends_at;
             
-            if (!starts_at || !ends_at) {
-                console.warn('⚠️ Skipping instance without dates:', instance.id);
-                skippedNoDates++;
-                continue;
-            }
+            if (!starts_at || !ends_at) continue;
 
-            // Filter to 60 days on our side
             const startDate = new Date(starts_at);
-            if (startDate > sixtyDaysFromNow) {
-                skippedBeyond60Days++;
-                continue;
-            }
+            if (startDate > sixtyDaysFromNow) continue;
             
-            // Build resources array from resource requests - DEDUPLICATE by resource_id
             const resourcesMap = new Map();
             if (eventData?.resource_requests) {
                 for (const request of eventData.resource_requests) {
-                    const resourceId = request.resource_id;
-                    
-                    if (resourcesMap.has(resourceId)) {
-                        const existing = resourcesMap.get(resourceId);
-                        if (request.answers && request.answers.length > 0) {
-                            existing.answers = [...(existing.answers || []), ...request.answers];
-                        }
-                    } else {
-                        resourcesMap.set(resourceId, {
-                            id: request.resource_id,
-                            name: request.resource_name,
-                            kind: request.resource_kind,
-                            category: request.resource_category,
-                            approval_status: request.approval_status,
-                            answers: request.answers || []
-                        });
-                    }
+                    resourcesMap.set(request.resource_id, {
+                        id: request.resource_id,
+                        name: request.resource_name,
+                        kind: request.resource_kind,
+                        category: request.resource_category,
+                        approval_status: request.approval_status,
+                        answers: []
+                    });
                 }
             }
             
@@ -441,7 +241,7 @@ Deno.serve(async (req) => {
             eventsWithResources.push({
                 id: instance.id,
                 event_id: eventId,
-                name: eventData?.name || `Unnamed Event`,
+                name: eventData?.name || 'Unnamed Event',
                 starts_at: starts_at,
                 ends_at: ends_at,
                 summary: eventData?.summary,
@@ -451,29 +251,8 @@ Deno.serve(async (req) => {
                 resources: resources,
                 tags: eventData?.tags || [],
                 resource_count: resources.length,
-                has_valid_dates: true,
-                _has_error: eventData?._error || false
+                has_valid_dates: true
             });
-        }
-
-        console.log('🎯 Processed', eventsWithResources.length, 'event instances (within 60 days)');
-        console.log('⏭️ Skipped', skippedNoDates, 'events without dates');
-        console.log('⏭️ Skipped', skippedBeyond60Days, 'events beyond 60 days');
-        
-        if (eventsWithResources.length > 0) {
-            const withResources = eventsWithResources.filter(e => e.resources.length > 0).length;
-            const withoutResources = eventsWithResources.filter(e => e.resources.length === 0).length;
-            const withAnswers = eventsWithResources.filter(e => 
-                e.resources.some(r => r.answers && r.answers.length > 0)
-            ).length;
-            const withErrors = eventsWithResources.filter(e => e._has_error).length;
-            
-            console.log(`📊 Events with resources: ${withResources}`);
-            console.log(`📊 Events without resources: ${withoutResources}`);
-            console.log(`📊 Events with answers: ${withAnswers}`);
-            if (withErrors > 0) {
-                console.log(`⚠️ Events with loading errors: ${withErrors}`);
-            }
         }
 
         return Response.json({ 
@@ -482,25 +261,14 @@ Deno.serve(async (req) => {
             date_range: {
                 start: now.toISOString(),
                 end: sixtyDaysFromNow.toISOString()
-            },
-            stats: {
-                total_instances: instances.length,
-                unique_events: eventIds.size,
-                events_without_names: eventsWithoutNames,
-                events_without_resources: eventsWithoutResources,
-                skipped_no_dates: skippedNoDates,
-                skipped_beyond_60_days: skippedBeyond60Days,
-                rate_limit_retries: rateLimitRetries
             }
         });
 
     } catch (error) {
-        console.error('❌ Get PCO calendar events error:', error);
-        console.error('❌ Error stack:', error.stack);
+        console.error('❌ Error:', error);
         return Response.json({ 
             error: error.message, 
-            events: [],
-            details: error.stack
+            events: []
         }, { status: 500 });
     }
 });
