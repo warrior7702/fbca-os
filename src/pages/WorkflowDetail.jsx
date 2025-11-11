@@ -40,6 +40,7 @@ export default function WorkflowDetail() {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Minister Goal Review Chat State
   const [chatMessages, setChatMessages] = useState([]);
@@ -102,6 +103,27 @@ export default function WorkflowDetail() {
       toast.error('Failed to load request');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    setSendingEmail(true);
+    try {
+      const response = await base44.functions.invoke('resendIntakeEmail', {
+        request_id: requestId
+      });
+
+      if (response.data.success) {
+        toast.success(`Email sent to ${response.data.email_sent_to}!`);
+        await loadRequest(); // Reload to show updated email status
+      } else {
+        toast.error('Failed to send email');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send email');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -402,6 +424,55 @@ Return ONLY valid JSON:
           </div>
         </div>
 
+        {/* Email Status Card - NEW */}
+        {user?.role === 'admin' && (
+          <Card className="border-2 border-blue-200 bg-blue-50">
+            <CardHeader className="border-b bg-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                📧 Email Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {request.email_sent ? (
+                      <span className="text-green-700">✅ Email sent to: {request.requestor_email}</span>
+                    ) : (
+                      <span className="text-orange-700">⚠️ No email sent yet</span>
+                    )}
+                  </p>
+                  {request.email_sent_at && (
+                    <p className="text-xs text-slate-600">
+                      Sent: {format(new Date(request.email_sent_at), 'PPp')}
+                    </p>
+                  )}
+                  {request.email_error && (
+                    <p className="text-xs text-red-600">Error: {request.email_error}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={handleResendEmail}
+                  disabled={sendingEmail}
+                  size="sm"
+                  variant="outline"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      📤 {request.email_sent ? 'Resend' : 'Send'} Email
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Minister Goal Review Section */}
         {request.status === 'minister_goal_review' && (
           <Card className="border border-slate-200 shadow-sm">
@@ -449,7 +520,7 @@ Return ONLY valid JSON:
                             </div>
                           </motion.div>
                         ))}
-                      </AnimatePresence>
+                      </AnanimatePresence>
 
                       {isAIThinking && (
                         <div className="flex justify-start">
