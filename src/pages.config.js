@@ -28,6 +28,7 @@ import SupportTickets from './pages/SupportTickets';
 import CreateTicket from './pages/CreateTicket';
 import PCOAPITester from './pages/PCOAPITester';
 import PhantomUserHunter from './pages/PhantomUserHunter';
+import WorkflowHub from './pages/WorkflowHub';
 import Layout from './Layout.jsx';
 
 
@@ -62,6 +63,7 @@ export const PAGES = {
     "CreateTicket": CreateTicket,
     "PCOAPITester": PCOAPITester,
     "PhantomUserHunter": PhantomUserHunter,
+    "WorkflowHub": WorkflowHub,
 }
 
 export const pagesConfig = {

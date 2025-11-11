@@ -73,9 +73,9 @@ const apps = [
     color: "text-violet-500"
   },
   {
-    name: "Marketing",
-    path: "Marketing",
-    icon: Megaphone,
+    name: "Workflow Hub",
+    path: "WorkflowHub",
+    icon: Layers,
     color: "text-purple-500"
   },
   {
