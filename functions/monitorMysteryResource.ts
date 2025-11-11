@@ -15,6 +15,8 @@ Deno.serve(async (req) => {
     console.log('👤 User:', user.email);
 
     const token = user.pco_access_token;
+    // Add baseUrl to be used in the email template
+    const baseUrl = Deno.env.get('BASE44_APP_URL') || 'https://workflow-hub-6a5c78c9.base44.app';
 
     // Fetch upcoming events from PCO
     const eventsResponse = await fetch(
@@ -239,30 +241,56 @@ Deno.serve(async (req) => {
         console.log(`✅ Created request: ${commRequest.id}`);
 
         // Send email notification to event owner if we have their email
+        // NEW EMAIL TEMPLATE
         if (mysteryReq.owner_email) {
           try {
             console.log('📧 Sending email to:', mysteryReq.owner_email);
+            const intakeLink = `${baseUrl}/workflowdetail?id=${commRequest.id}`;
             
             const emailResult = await base44.asServiceRole.integrations.Core.SendEmail({
-              from_name: 'Communications Team',
+              from_name: 'FBC Arlington Communications',
               to: mysteryReq.owner_email,
-              subject: `Communications Request: ${mysteryReq.event_name}`,
-              body: `Hello ${mysteryReq.owner_name},
+              subject: `📋 Action Required: Complete Communications Intake for ${mysteryReq.event_name}`,
+              body: `Hi ${mysteryReq.owner_name},
 
-A communications request has been created for your event:
+Thank you for requesting communications support for your event! We're excited to help you create an amazing experience.
 
-Request Number: ${requestNumber}
-Event: ${mysteryReq.event_name}
-Date: ${mysteryReq.event_start ? new Date(mysteryReq.event_start).toLocaleDateString() : 'TBD'}
+📅 EVENT: ${mysteryReq.event_name}
+🗓️ DATE: ${mysteryReq.event_start ? new Date(mysteryReq.event_start).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'TBD'}
+📋 REQUEST #: ${requestNumber}
 
-Your request is now in Minister Goal Review. Our communications team will reach out to discuss your ministry goals and needs for this event.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Request Details:
-- Automatically created from PCO Calendar
-- Resource: Mystery Resource
+✨ NEXT STEP: Complete Your AI-Powered Intake
 
-Thank you!
-Communications Team`
+We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan for your event.
+
+👉 Click here to start your intake:
+${intakeLink}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What to expect:
+• Quick Q&A about your event (5 minutes)
+• Questions about theme, audience, goals, and logistics
+• No need to prepare - just answer naturally
+• You can skip questions if unsure
+
+After you complete the intake:
+✅ Our communications team will review your responses
+✅ We'll create a detailed project plan
+✅ Tasks will be assigned to our design & marketing team
+✅ You'll be able to track progress in real-time
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Questions? Reply to this email or contact:
+📧 communications@fbcarlington.org
+
+Looking forward to making your event a success!
+
+— Communications Team
+FBC Arlington`
             });
 
             console.log('✅ Email sent successfully to:', mysteryReq.owner_email);

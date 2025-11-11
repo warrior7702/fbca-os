@@ -328,11 +328,11 @@ Return ONLY valid JSON:
         status: 'project_review'
       });
 
-      toast.success('Moved to Project Review');
-      navigate(createPageUrl('ProjectReview') + `?id=${requestId}`);
+      toast.success('✅ Interview complete! Your responses have been sent to our communications team.');
+      navigate(createPageUrl('WorkflowHub'));
     } catch (error) {
-      console.error('Error moving to project review:', error);
-      toast.error('Failed to move to project review');
+      console.error('Error updating request:', error);
+      toast.error('Failed to complete interview');
     }
   };
 
@@ -408,7 +408,7 @@ Return ONLY valid JSON:
             <CardHeader className="border-b bg-slate-50">
               <CardTitle className="flex items-center gap-2 text-lg font-medium">
                 <Target className="w-5 h-5 text-slate-700" />
-                Minister Goal Review
+                Communications Intake Interview
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -489,7 +489,7 @@ Return ONLY valid JSON:
                     </div>
                   )}
 
-                  {/* Complete Button */}
+                  {/* Complete Button - UPDATED */}
                   {goalReviewComplete && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -500,17 +500,23 @@ Return ONLY valid JSON:
                         <div className="flex items-center gap-3">
                           <CheckCircle2 className="w-5 h-5 text-green-600" />
                           <div>
-                            <p className="font-medium text-slate-900">Interview Complete</p>
-                            <p className="text-sm text-slate-600">Ready for project review</p>
+                            <p className="font-medium text-slate-900">✅ Interview Complete!</p>
+                            <p className="text-sm text-slate-600">Thank you! Your responses have been recorded.</p>
                           </div>
                         </div>
                         <Button
                           onClick={moveToProjectReview}
-                          className="bg-slate-900 hover:bg-slate-800"
+                          className="bg-green-600 hover:bg-green-700"
                         >
-                          Continue to Project Review
-                          <ArrowRight className="w-4 h-4 ml-2" />
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Submit Intake
                         </Button>
+                      </div>
+                      
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-900">
+                          <strong>What's Next:</strong> Our communications team will review your responses and create a detailed project plan. You'll receive updates as tasks are assigned and completed.
+                        </p>
                       </div>
                     </motion.div>
                   )}

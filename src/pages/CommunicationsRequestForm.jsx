@@ -166,7 +166,7 @@ export default function CommunicationsRequestForm() {
 
   const handleMarketingChannelChange = (channel, checked) => {
     setFormData(prev => ({
-      ...prev.marketing_channels,
+      ...prev,
       marketing_channels: {
         ...prev.marketing_channels,
         [channel]: checked
@@ -432,7 +432,6 @@ export default function CommunicationsRequestForm() {
 
       let photoUrls = [];
       
-      // Handle photo uploads
       if (photoUploadMethod === "upload" && formData.previous_event_photos) {
         for (const file of formData.previous_event_photos) {
           try {
@@ -449,7 +448,7 @@ export default function CommunicationsRequestForm() {
       const request = await base44.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: "manual_form",
-        status: "minister_goal_review", // CHANGED: Move directly to goal review
+        status: "minister_goal_review",
         priority: "medium",
         title: finalProjectName,
         description: `${formData.need_type} request for ${formData.ministry_department}`,
@@ -482,36 +481,64 @@ export default function CommunicationsRequestForm() {
 
       console.log('✅ Request created:', request.id);
 
+      // NEW EMAIL TEMPLATE
       try {
+        const baseUrl = window.location.origin;
+        const intakeLink = `${baseUrl}/workflowdetail?id=${request.id}`;
+        
         await base44.integrations.Core.SendEmail({
-          from_name: 'Communications Team',
+          from_name: 'FBC Arlington Communications',
           to: formData.requester_email,
-          subject: `Communications Action Plan: ${finalProjectName}`,
-          body: `Hello ${formData.requester_name},
+          subject: `📋 Action Required: Complete Communications Intake for ${finalProjectName}`,
+          body: `Hi ${formData.requester_name},
 
-Thank you for submitting your communications action plan!
+Thank you for requesting communications support! We're excited to help you create an amazing experience.
 
-Request Number: ${requestNumber}
-Project: ${finalProjectName}
-Ministry: ${formData.ministry_department}
-Type: ${formData.need_type}
+📅 PROJECT: ${finalProjectName}
+🏢 MINISTRY: ${formData.ministry_department}
+📋 REQUEST #: ${requestNumber}
 
-Your request is now in Minister Goal Review. Our communications team will review your request and reach out within 1-2 business days to discuss your ministry goals and vision.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You can track your request at: ${window.location.origin}${createPageUrl('WorkflowDetail')}?id=${request.id}
+✨ NEXT STEP: Complete Your AI-Powered Intake
 
-Best regards,
-Communications Team
+We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan.
+
+👉 Click here to start your intake:
+${intakeLink}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What to expect:
+• Quick Q&A about your event (5 minutes)
+• Questions about theme, audience, goals, and logistics
+• No need to prepare - just answer naturally
+• You can skip questions if unsure
+
+After you complete the intake:
+✅ Our communications team will review your responses
+✅ We'll create a detailed project plan
+✅ Tasks will be assigned to our design & marketing team
+✅ You'll be able to track progress in real-time
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Questions? Reply to this email or contact:
+📧 communications@fbcarlington.org
+
+Looking forward to making your project a success!
+
+— Communications Team
 FBC Arlington`
         });
 
-        console.log('✅ Confirmation email sent');
+        console.log('✅ Email sent to:', formData.requester_email);
       } catch (emailError) {
         console.error('Email send failed (non-critical):', emailError);
       }
 
       setSubmitted(true);
-      toast.success("Request submitted successfully!");
+      toast.success("Request submitted successfully! Check your email for next steps.");
 
       setTimeout(() => {
         navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
