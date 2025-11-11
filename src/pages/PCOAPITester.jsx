@@ -1744,6 +1744,13 @@ export default function PCOAPITester() {
               <AlertCircle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-900">
                 {data.error || 'Failed to send email'}
+                {result.data?.details && <p className="mt-2 text-xs">Details: {result.data.details}</p>}
+                {result.data?.received && (
+                  <div className="mt-2 text-xs">
+                    <p>Received:</p>
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(result.data.received, null, 2)}</pre>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -1774,7 +1781,7 @@ export default function PCOAPITester() {
                   <Card key={idx} className="bg-purple-50 border-2 border-purple-300">
                     <CardContent className="p-4">
                       <div className="space-y-3">
-                        {/* Event Info */}
+                        {/* Event Header */}
                         <div>
                           <h4 className="font-semibold text-slate-900 text-lg">
                             {eventAttrs?.name || 'Untitled Event'}
@@ -2422,6 +2429,13 @@ export default function PCOAPITester() {
                           setTestLoading(true);
                           try {
                             console.log('📝 Creating test Communication Request and sending email...');
+                            console.log('📦 Sending data:', {
+                              event_id: eventId,
+                              event_name: result.data.event.attributes?.name,
+                              event_date: result.data.event.attributes?.starts_at,
+                              owner_email: result.data.owner.attributes?.email,
+                              owner_name: result.data.owner.attributes?.name
+                            });
                             
                             // Call backend function to create request and send email
                             const response = await base44.functions.invoke('sendTestEmailFromEvent', {
@@ -2447,7 +2461,27 @@ export default function PCOAPITester() {
                             }
                           } catch (error) {
                             console.error('❌ Error:', error);
-                            toast.error('Failed: ' + error.message);
+                            console.error('❌ Error response:', error.response?.data);
+                            
+                            // Show detailed error message
+                            const errorMsg = error.response?.data?.error || error.message;
+                            const errorDetails = error.response?.data?.details;
+                            const errorReceived = error.response?.data?.received;
+                            
+                            let fullError = errorMsg;
+                            if (errorDetails) fullError += `\n${errorDetails}`;
+                            if (errorReceived) fullError += `\nReceived: ${JSON.stringify(errorReceived)}`;
+                            
+                            toast.error(fullError);
+                            
+                            // Show error in results
+                            setResult({
+                              ok: false,
+                              status: error.response?.status || 500,
+                              error: errorMsg,
+                              data: error.response?.data, // Store full error data for display
+                              endpoint: 'sendTestEmail'
+                            });
                           } finally {
                             setTestLoading(false);
                           }
@@ -2588,6 +2622,13 @@ export default function PCOAPITester() {
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-900 font-semibold mb-2">Error:</p>
                   <p className="text-red-700 text-sm">{result.error}</p>
+                  {result.data?.details && <p className="text-red-700 text-sm mt-1">Details: {result.data.details}</p>}
+                  {result.data?.received && (
+                    <div className="text-red-700 text-xs mt-2">
+                      <p>Received:</p>
+                      <pre className="whitespace-pre-wrap">{JSON.stringify(result.data.received, null, 2)}</pre>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>

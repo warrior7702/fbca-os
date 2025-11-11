@@ -10,12 +10,36 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const body = await req.json();
+    // Parse request body
+    let body;
+    try {
+      body = await req.json();
+      console.log('📦 Received body:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      return Response.json({ 
+        error: 'Invalid JSON in request body',
+        details: parseError.message
+      }, { status: 400 });
+    }
+
     const { event_id, event_name, event_date, owner_email, owner_name } = body;
 
+    console.log('🔍 Extracted values:');
+    console.log('  event_id:', event_id);
+    console.log('  event_name:', event_name);
+    console.log('  event_date:', event_date);
+    console.log('  owner_email:', owner_email);
+    console.log('  owner_name:', owner_name);
+
     if (!event_id || !owner_email) {
+      console.error('❌ Missing required fields');
       return Response.json({ 
-        error: 'Missing required fields: event_id, owner_email' 
+        error: 'Missing required fields: event_id, owner_email',
+        received: {
+          event_id: event_id || null,
+          owner_email: owner_email || null
+        }
       }, { status: 400 });
     }
 
@@ -75,9 +99,11 @@ Created from: API Tester`
 
   } catch (error) {
     console.error('❌ Error sending test email:', error);
+    console.error('Stack:', error.stack);
     return Response.json({ 
       error: error.message,
-      details: 'Failed to create test request and send email'
+      details: 'Failed to create test request and send email',
+      stack: error.stack
     }, { status: 500 });
   }
 });
