@@ -479,7 +479,7 @@ export default function MyTasks() {
               <ScheduleCalendar 
                 events={myScheduleEvents}
                 meetings={meetings}
-                weekCount={2}
+                weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
             )}
