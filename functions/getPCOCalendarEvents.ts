@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
         // Fetch full event data with resources and tags for each unique event (in parallel batches)
         const eventDataMap = {};
         const eventIdArray = Array.from(eventIds);
-        const batchSize = 15; // Increased batch size for faster processing
+        const batchSize = 15;
         
         let eventsWithoutNames = 0;
         let eventsWithoutResources = 0;
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
                         return {
                             eventId,
                             data: {
-                                name: `Unnamed Event`,
+                                name: `Event ${eventId} (Error)`, // Changed this line
                                 summary: null,
                                 description: null,
                                 visible_in_church_center: false,
@@ -179,17 +179,34 @@ Deno.serve(async (req) => {
                     const eventData = await eventResponse.json();
                     const event = eventData.data;
                     
-                    // Get event name - try multiple sources
-                    let eventName = event.attributes?.name;
-                    
-                    // If name is missing or empty, try summary
-                    if (!eventName || eventName.trim() === '') {
-                        eventName = event.attributes?.summary;
+                    // DEBUG: Log the full attributes object for first few events
+                    if (i === 0) {
+                        console.log(`🔍 DEBUG Event ${eventId} attributes:`, JSON.stringify(event.attributes, null, 2));
                     }
                     
-                    // If still missing, use friendly fallback
-                    if (!eventName || eventName.trim() === '') {
-                        console.warn(`⚠️ Event ${eventId} has no name or summary!`);
+                    // Get event name - check ALL possible fields
+                    let eventName = null;
+                    
+                    // Try name field
+                    if (event.attributes?.name && typeof event.attributes.name === 'string' && event.attributes.name.trim() !== '') {
+                        eventName = event.attributes.name.trim();
+                    }
+                    
+                    // Try summary if name is missing
+                    if (!eventName && event.attributes?.summary && typeof event.attributes.summary === 'string' && event.attributes.summary.trim() !== '') {
+                        eventName = event.attributes.summary.trim();
+                        console.log(`📋 Using summary as name for event ${eventId}: "${eventName}"`);
+                    }
+                    
+                    // Try visible_title (some PCO events use this)
+                    if (!eventName && event.attributes?.visible_title && typeof event.attributes.visible_title === 'string' && event.attributes.visible_title.trim() !== '') {
+                        eventName = event.attributes.visible_title.trim();
+                        console.log(`📋 Using visible_title as name for event ${eventId}: "${eventName}"`);
+                    }
+                    
+                    // Last resort - check if there's any text field we can use
+                    if (!eventName) {
+                        console.warn(`⚠️ Event ${eventId} has NO name/summary/visible_title in attributes:`, Object.keys(event.attributes || {}));
                         eventName = `Unnamed Event`;
                         eventsWithoutNames++;
                     }
@@ -315,7 +332,7 @@ Deno.serve(async (req) => {
                     return {
                         eventId,
                         data: {
-                            name: `Unnamed Event`,
+                            name: `Event ${eventId} (Error)`, // Changed this line
                             summary: null,
                             description: null,
                             visible_in_church_center: false,
