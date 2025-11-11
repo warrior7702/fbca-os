@@ -43,6 +43,7 @@ export default function MyMeetings() {
   const [showMeetingDetail, setShowMeetingDetail] = useState(false); // New state for dialog
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timezone, setTimezone] = useState(''); // Renamed from userTimezone
+  const [user, setUser] = useState(null); // NEW: Add user state
 
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -50,6 +51,7 @@ export default function MyMeetings() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [processingNotes, setProcessingNotes] = useState(false);
   const [meetingNotes, setMeetingNotes] = useState(null);
+  const [savedNotes, setSavedNotes] = useState(null); // NEW: For displaying saved notes
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
@@ -74,6 +76,7 @@ export default function MyMeetings() {
     setLoading(true);
     try {
       const currentUser = await base44.auth.me();
+      setUser(currentUser); // NEW: Store user
 
       if (!currentUser || !currentUser.microsoft_access_token) {
         // If not connected, set meetings to empty and display warning
@@ -141,6 +144,31 @@ export default function MyMeetings() {
     return parseISO(dateStr);
   };
 
+  // NEW: Load saved notes when modal opens
+  const loadSavedNotes = async (meetingId) => {
+    if (!user) return; // Ensure user is loaded
+
+    try {
+      // Assuming 'base44.entities.MeetingNote' is available for database interaction
+      const notes = await base44.entities.MeetingNote.filter({
+        meeting_id: meetingId,
+        user_email: user.email // Filter by current user's email
+      });
+
+      if (notes && notes.length > 0) {
+        setSavedNotes(notes[0]); // Assuming one note per meeting per user
+        setMeetingNotes(notes[0]); // Display the saved notes
+        console.log('✅ Loaded saved notes for meeting:', meetingId);
+      } else {
+        setSavedNotes(null);
+        setMeetingNotes(null);
+      }
+    } catch (error) {
+      console.error('Error loading saved notes:', error);
+      toast.error('Failed to load saved notes.');
+    }
+  };
+
   // NEW: Recording functions
   const startRecording = async () => {
     try {
@@ -186,18 +214,14 @@ export default function MyMeetings() {
   };
 
   const generateNotes = async () => {
-    if (!audioBlob) {
-      toast.error("No recording available");
+    if (!audioBlob || !selectedMeeting || !user) { // Added !user check
+      toast.error("Missing required data (audio, meeting, or user)");
       return;
     }
 
     setProcessingNotes(true);
     try {
       console.log('🎙️ Uploading audio file...');
-
-      // Upload audio file
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'meeting-recording.webm');
 
       // base44.integrations.Core.UploadFile does not take FormData directly,
       // it expects a File or Blob object.
@@ -216,8 +240,25 @@ export default function MyMeetings() {
       });
 
       console.log('✅ Notes generated:', notesResponse.data);
+
+      // Save notes to database
+      const savedNote = await base44.entities.MeetingNote.create({
+        meeting_id: selectedMeeting.id,
+        meeting_subject: selectedMeeting.subject,
+        meeting_date: selectedMeeting.start,
+        user_email: user.email, // Use user email for tracking
+        audio_url: uploadResponse.file_url,
+        summary: notesResponse.data.summary,
+        action_items: notesResponse.data.action_items || [],
+        transcript: notesResponse.data.transcript,
+        recording_duration: recordingTime // Store recording duration
+      });
+
+      console.log('💾 Notes saved to database:', savedNote.id);
+
       setMeetingNotes(notesResponse.data);
-      toast.success("Meeting notes generated!");
+      setSavedNotes(savedNote);
+      toast.success("Meeting notes generated and saved!");
 
     } catch (error) {
       console.error("Error generating notes:", error);
@@ -610,10 +651,13 @@ ${meetingNotes.transcript || 'No transcript available.'}
           setAudioBlob(null);
           setProcessingNotes(false);
           setMeetingNotes(null);
+          setSavedNotes(null); // NEW: Clear savedNotes on close
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop(); // Stop any active recording
           }
           clearInterval(recordingIntervalRef.current);
+        } else if (selectedMeeting) { // NEW: Load saved notes when opening dialog
+          loadSavedNotes(selectedMeeting.id);
         }
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -671,60 +715,71 @@ ${meetingNotes.transcript || 'No transcript available.'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Recording Controls */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {!isRecording && !audioBlob && (
-                        <Button
-                          onClick={startRecording}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          <Mic className="w-4 h-4 mr-2" />
-                          Start Recording
-                        </Button>
-                      )}
+                    {/* Show if notes already exist */}
+                    {savedNotes && !audioBlob && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm text-green-800">
+                          <strong>✅ Notes saved:</strong> {format(new Date(savedNotes.created_date), 'PPp')}
+                        </p>
+                      </div>
+                    )}
 
-                      {isRecording && (
-                        <>
+                    {/* Recording Controls */}
+                    {!savedNotes && (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {!isRecording && !audioBlob && (
                           <Button
-                            onClick={stopRecording}
+                            onClick={startRecording}
                             className="bg-red-600 hover:bg-red-700"
                           >
-                            <Square className="w-4 h-4 mr-2" />
-                            Stop Recording
+                            <Mic className="w-4 h-4 mr-2" />
+                            Start Recording
                           </Button>
-                          <Badge className="bg-red-500 text-white animate-pulse">
-                            <div className="w-2 h-2 bg-white rounded-full mr-2" />
-                            Recording: {formatRecordingTime(recordingTime)}
-                          </Badge>
-                        </>
-                      )}
+                        )}
 
-                      {audioBlob && !meetingNotes && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className="bg-green-500 text-white">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Recording saved ({formatRecordingTime(recordingTime)})
-                          </Badge>
-                          <Button
-                            onClick={generateNotes}
-                            disabled={processingNotes}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            {processingNotes ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Generate Notes
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                        {isRecording && (
+                          <>
+                            <Button
+                              onClick={stopRecording}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              <Square className="w-4 h-4 mr-2" />
+                              Stop Recording
+                            </Button>
+                            <Badge className="bg-red-500 text-white animate-pulse">
+                              <div className="w-2 h-2 bg-white rounded-full mr-2" />
+                              Recording: {formatRecordingTime(recordingTime)}
+                            </Badge>
+                          </>
+                        )}
+
+                        {audioBlob && !meetingNotes && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className="bg-green-500 text-white">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Recording saved ({formatRecordingTime(recordingTime)})
+                            </Badge>
+                            <Button
+                              onClick={generateNotes}
+                              disabled={processingNotes}
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              {processingNotes ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 mr-2" />
+                                  Generate Notes
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Meeting Notes Display */}
                     {meetingNotes && (
@@ -736,7 +791,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                         <div className="flex items-center justify-between">
                           <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                             <FileText className="w-4 h-4" />
-                            Generated Meeting Notes
+                            Meeting Notes
                           </h3>
                           <Button
                             size="sm"
