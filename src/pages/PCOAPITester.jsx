@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock, ChevronDown, ChevronUp, MessageSquare, Mail } from "lucide-react";
+import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCircle, MapPin, Clock, ChevronDown, ChevronUp, MessageSquare, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -571,7 +571,7 @@ export default function PCOAPITester() {
       if (response.data.success) {
         toast.success(`📧 Email sent to ${response.data.recipient}!`);
       } else {
-        toast.error('Failed to send email');
+        toast.error(response.data.error || 'Failed to send email');
       }
     } catch (error) {
       console.error('❌ Error:', error);
@@ -728,6 +728,102 @@ export default function PCOAPITester() {
         error: error.message
       });
       toast.error('Failed to search: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  // NEW: Get event owner information
+  const testGetEventOwner = async () => {
+    if (!eventId) {
+      toast.error('Please enter an event ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('👤 Fetching event owner for event:', eventId);
+      
+      // Get PCO token
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      if (!tokenResponse.data.ok) {
+        throw new Error('Failed to get PCO token');
+      }
+      
+      const token = tokenResponse.data.access_token;
+      
+      // Fetch event details
+      const eventResponse = await fetch(
+        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!eventResponse.ok) {
+        throw new Error(`Failed to fetch event: ${eventResponse.status}`);
+      }
+      
+      const eventData = await eventResponse.json();
+      const event = eventData.data;
+      
+      console.log('✅ Event fetched:', event.attributes?.name);
+      
+      // Get owner ID from relationships
+      const ownerId = event.relationships?.owner?.data?.id;
+      
+      let ownerDetails = null;
+      if (ownerId) {
+        console.log('👤 Fetching owner details for ID:', ownerId);
+        
+        // Fetch owner details from Calendar API
+        const ownerResponse = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/people/${ownerId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (ownerResponse.ok) {
+          const ownerData = await ownerResponse.json();
+          ownerDetails = ownerData.data;
+          console.log('✅ Owner found:', ownerDetails.attributes?.name);
+        }
+      }
+      
+      setResult({
+        ok: true,
+        status: 200,
+        data: {
+          event: event,
+          owner: ownerDetails,
+          owner_id: ownerId,
+          owner_name: event.attributes?.owner_name,
+          owner_email: ownerDetails?.attributes?.email
+        },
+        endpoint: 'getEventOwner'
+      });
+      
+      if (ownerDetails) {
+        toast.success(`Found event owner: ${ownerDetails.attributes?.name}`);
+      } else {
+        toast.warning('Event has no owner assigned or owner details not found');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to fetch owner: ' + error.message);
     } finally {
       setTestLoading(false);
     }
@@ -1613,7 +1709,8 @@ export default function PCOAPITester() {
     }
 
     // NEW: Communication Request Email Result
-    if (result.endpoint === 'sendCommunicationRequestEmail') {
+    if (result.endpoint === 'sendCommunicationRequestEmail' || result.endpoint === 'sendTestEmail') {
+      const isTestEmail = result.endpoint === 'sendTestEmail';
       return (
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">📧 Email Notification Result</h3>
@@ -1629,6 +1726,9 @@ export default function PCOAPITester() {
                     <p><strong>Sent to:</strong> {data.recipient}</p>
                     <p><strong>Request Number:</strong> {data.request_number}</p>
                     <p><strong>Event:</strong> {data.request_title}</p>
+                    {isTestEmail && data.test_request && (
+                      <p><strong>Test Workflow Request ID:</strong> <code className="font-mono text-blue-700">{data.test_request.id}</code></p>
+                    )}
                   </div>
                   <Alert className="bg-white border-green-300 mt-3">
                     <AlertDescription className="text-sm">
@@ -1757,6 +1857,113 @@ export default function PCOAPITester() {
         </div>
       );
     }
+
+    // NEW: Event Owner Result
+    if (result.endpoint === 'getEventOwner') {
+      const event = data.event;
+      const owner = data.owner;
+      
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-slate-900 text-lg">👤 Event Owner Information</h3>
+          
+          {/* Event Info */}
+          <Card className="bg-blue-50 border-2 border-blue-300">
+            <CardHeader>
+              <CardTitle className="text-base">Event Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {event.attributes?.name || 'Untitled Event'}
+                </p>
+                {event.attributes?.summary && (
+                  <p className="text-xs text-slate-600 mt-1">{event.attributes.summary}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2 bg-white rounded border">
+                  <p className="text-slate-500">Event ID</p>
+                  <p className="font-mono text-blue-600">{event.id}</p>
+                </div>
+                {event.attributes?.starts_at && (
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-slate-500">Start Date</p>
+                    <p className="font-medium">
+                      {new Date(event.attributes.starts_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Owner Info */}
+          {owner ? (
+            <Card className="bg-green-50 border-2 border-green-300">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  Owner Found
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-white rounded border">
+                    <p className="text-xs text-slate-500 mb-1">Name</p>
+                    <p className="font-semibold text-slate-900">
+                      {owner.attributes?.name || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white rounded border">
+                    <p className="text-xs text-slate-500 mb-1">Email</p>
+                    <p className="font-semibold text-blue-600">
+                      {owner.attributes?.email || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white rounded border">
+                    <p className="text-xs text-slate-500 mb-1">PCO User ID</p>
+                    <p className="font-mono text-sm">{owner.id}</p>
+                  </div>
+                  <div className="p-3 bg-white rounded border">
+                    <p className="text-xs text-slate-500 mb-1">Status</p>
+                    <p className="font-medium capitalize">
+                      {owner.attributes?.status || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                
+                {owner.attributes?.permissions && (
+                  <div className="p-3 bg-white rounded border">
+                    <p className="text-xs text-slate-500 mb-1">Permissions</p>
+                    <p className="text-sm">{owner.attributes.permissions}</p>
+                  </div>
+                )}
+                
+                <Alert className="bg-green-100 border-green-300">
+                  <AlertDescription className="text-sm">
+                    <strong>Email Address:</strong> {owner.attributes?.email || 'No email found'}
+                    <br />
+                    This is the address that will receive communication request notifications.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          ) : (
+            <Alert className="border-yellow-300 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription>
+                <strong>No owner assigned</strong> to this event, or owner details not found.
+                {data.owner_name && (
+                  <p className="mt-1">Event shows owner name: <strong>{data.owner_name}</strong></p>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      );
+    }
+
 
     return null;
   };
@@ -2158,6 +2365,141 @@ export default function PCOAPITester() {
                   </AlertDescription>
                 </Alert>
 
+                {/* NEW: Event Owner & Email Test */}
+                <div className="border-2 border-blue-300 bg-blue-50 rounded-lg p-4 space-y-3">
+                  <Label className="flex items-center gap-2 text-blue-900">
+                    <User className="w-5 h-5 text-blue-600" />
+                    <strong className="text-base">👤 Get Event Owner & Send Test Email</strong>
+                  </Label>
+                  <p className="text-sm text-blue-800">
+                    Enter an Event ID to find the owner and see their contact information. 
+                    Then you can send them a test communication request email.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <Label>Event ID</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter Event ID (e.g., 12345678)"
+                        value={eventId}
+                        onChange={(e) => setEventId(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button 
+                        onClick={testGetEventOwner} 
+                        disabled={testLoading}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {testLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <User className="w-4 h-4 mr-2" />}
+                        Get Owner
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Show Send Email button if we have owner info */}
+                  {result && result.endpoint === 'getEventOwner' && result.data?.owner && (
+                    <div
+                      className="pt-3 border-t border-blue-300"
+                    >
+                      <Alert className="bg-green-50 border-green-300 mb-3">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-sm">
+                          <strong>Owner found:</strong> {result.data.owner.attributes?.name}
+                          <br />
+                          <strong>Email:</strong> {result.data.owner.attributes?.email}
+                        </AlertDescription>
+                      </Alert>
+                      
+                      <p className="text-sm text-blue-800 mb-2">
+                        Now you can create a test Communication Request for this event and send an email notification:
+                      </p>
+                      
+                      <Button 
+                        onClick={async () => {
+                          setTestLoading(true);
+                          try {
+                            // First create a test workflow request
+                            console.log('📝 Creating test Communication Request...');
+                            
+                            const requestNumber = `CR-TEST-${Date.now().toString().slice(-6)}`;
+                            const testRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
+                              request_number: requestNumber,
+                              type: 'mystery_resource',
+                              status: 'request',
+                              priority: 'medium',
+                              title: result.data.event.attributes?.name || 'Test Event',
+                              description: 'TEST Communication Request - Created from API Tester',
+                              requestor_email: result.data.owner.attributes?.email,
+                              requestor_name: result.data.owner.attributes?.name,
+                              pco_event_id: eventId,
+                              pco_event_name: result.data.event.attributes?.name,
+                              pco_event_date: result.data.event.attributes?.starts_at
+                            });
+                            
+                            console.log('✅ Test request created:', testRequest.id);
+                            
+                            // Send email
+                            console.log('📧 Sending test email...');
+                            const emailResponse = await base44.functions.invoke('sendCommunicationRequestEmail', {
+                              request_id: testRequest.id
+                            });
+                            
+                            setResult({
+                              ok: emailResponse.data.success,
+                              status: 200,
+                              data: {
+                                ...emailResponse.data,
+                                test_request: testRequest
+                              },
+                              endpoint: 'sendTestEmail' // Use a different endpoint name for this specific flow
+                            });
+
+                            if (emailResponse.data.success) {
+                              toast.success(`✅ Test email sent to ${result.data.owner.attributes?.email}!`);
+                            } else {
+                              throw new Error(emailResponse.data.error || 'Email failed');
+                            }
+                          } catch (error) {
+                            console.error('❌ Error:', error);
+                            toast.error('Failed: ' + error.message);
+                          } finally {
+                            setTestLoading(false);
+                          }
+                        }}
+                        disabled={testLoading}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {testLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending Test Email...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Create Test Request & Send Email
+                          </>
+                        )}
+                      </Button>
+                      
+                      <p className="text-xs text-slate-500 mt-2">
+                        This will create a TEST Communication Request and send a notification email to the event owner.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <Alert className="bg-blue-100 border-blue-300">
+                    <AlertDescription className="text-xs">
+                      <strong>How to find Event ID:</strong>
+                      <ol className="list-decimal list-inside mt-1 space-y-1">
+                        <li>Use the "Events" tab above to search for events by date</li>
+                        <li>Find the Event ID in the results</li>
+                        <li>Or use the Mystery Resource finder to see event IDs</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Test Email Notification</Label>
                   <div className="flex gap-2">
@@ -2277,7 +2619,7 @@ export default function PCOAPITester() {
                   {/* Summary Stats */}
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-semibold text-blue-900 mb-2">
-                      Found {result.data?.data?.length || result.data?.approvals?.length || result.data?.mystery_events?.length || 0} items
+                      Found {result.data?.data?.length || result.data?.approvals?.length || result.data?.mystery_events?.length || (result.endpoint === 'getEventOwner' && result.data.event ? 1 : 0) || 0} items
                     </p>
                     {result.data?.meta && (
                       <p className="text-xs text-blue-700">
