@@ -213,11 +213,11 @@ Deno.serve(async (req) => {
       console.log(`   Owner: ${mysteryReq.owner_name} (${mysteryReq.owner_email})`);
 
       try {
-        // Create communication request - CHANGED: Set status to minister_goal_review
+        // Create communication request 
         const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
           request_number: requestNumber,
           type: 'mystery_resource',
-          status: 'minister_goal_review', // CHANGED: Move directly to goal review
+          status: 'minister_goal_review', // Move directly to goal review
           priority: 'medium',
           title: mysteryReq.event_name,
           description: `Communications request automatically created from PCO Calendar event`,
