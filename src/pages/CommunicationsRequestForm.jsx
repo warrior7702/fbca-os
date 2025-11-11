@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -16,9 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Search, Image, Megaphone } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar as CalendarIcon, Search, Image, Megaphone, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, addDays, addMonths, startOfDay, endOfDay } from "date-fns";
 
 // Helper function to capitalize names properly
 const capitalizeFullName = (name) => {
@@ -38,6 +42,9 @@ export default function CommunicationsRequestForm() {
   const [searchingEvents, setSearchingEvents] = useState(false);
   const [pcoEvents, setPcoEvents] = useState([]);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [dateRange, setDateRange] = useState("30"); // "30", "60", "90", "all"
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState({ hour: "12", minute: "00", period: "PM" });
   const navigate = useNavigate();
 
   // Form state
@@ -53,10 +60,9 @@ export default function CommunicationsRequestForm() {
     project_name: "",
     ministry_department: "",
     event_theme: "",
-    need_type: "", // "graphics", "marketing", or "both"
+    need_type: "",
     event_date: "",
     
-    // Graphics fields
     graphics_items: {
       digital_promo: false,
       flyers: false,
@@ -72,7 +78,6 @@ export default function CommunicationsRequestForm() {
     previous_event_photos: null,
     graphics_folder_link: "",
     
-    // Marketing fields
     marketing_channels: {
       social_media: false,
       email_campaign: false,
@@ -156,7 +161,33 @@ export default function CommunicationsRequestForm() {
     }));
   };
 
-  const searchPCOEvents = async () => {
+  // Construct full datetime from date and time
+  const getFullDateTime = () => {
+    if (!selectedDate) return "";
+    
+    let hour = parseInt(selectedTime.hour);
+    if (selectedTime.period === "PM" && hour !== 12) {
+      hour += 12;
+    } else if (selectedTime.period === "AM" && hour === 12) {
+      hour = 0;
+    }
+    
+    const dateTime = new Date(selectedDate);
+    dateTime.setHours(hour);
+    dateTime.setMinutes(parseInt(selectedTime.minute));
+    
+    return dateTime.toISOString();
+  };
+
+  // Update event_date when date/time changes
+  useEffect(() => {
+    if (selectedDate) {
+      const fullDateTime = getFullDateTime();
+      handleChange("event_date", fullDateTime);
+    }
+  }, [selectedDate, selectedTime]);
+
+  const searchPCOEvents = async (range = dateRange) => {
     if (!user?.pco_access_token) {
       toast.error("Please connect Planning Center in Settings");
       return;
@@ -166,6 +197,26 @@ export default function CommunicationsRequestForm() {
     try {
       const response = await base44.functions.invoke('getPCOToken');
       const token = response.data.access_token;
+
+      // Calculate date range
+      const now = new Date();
+      let endDate;
+      switch(range) {
+        case "30":
+          endDate = addDays(now, 30);
+          break;
+        case "60":
+          endDate = addDays(now, 60);
+          break;
+        case "90":
+          endDate = addDays(now, 90);
+          break;
+        case "all":
+          endDate = addMonths(now, 12); // 1 year
+          break;
+        default:
+          endDate = addDays(now, 30);
+      }
 
       const eventsResponse = await fetch(
         'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
@@ -213,12 +264,17 @@ export default function CommunicationsRequestForm() {
         })
       );
 
+      // Filter by date range and sort
       const validEvents = events
-        .filter(e => e !== null)
+        .filter(e => e !== null && e.date)
+        .filter(e => {
+          const eventDate = new Date(e.date);
+          return eventDate >= now && eventDate <= endDate;
+        })
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 
       setPcoEvents(validEvents);
-      toast.success(`Found ${validEvents.length} upcoming events`);
+      toast.success(`Found ${validEvents.length} events in the next ${range === "all" ? "year" : range + " days"}`);
     } catch (error) {
       console.error('Error fetching PCO events:', error);
       toast.error('Failed to fetch events from PCO');
@@ -228,12 +284,28 @@ export default function CommunicationsRequestForm() {
   };
 
   const handlePCOEventSelect = (event) => {
+    const eventDate = new Date(event.date);
+    
+    // Extract date and time
+    setSelectedDate(eventDate);
+    
+    const hours = eventDate.getHours();
+    const minutes = eventDate.getMinutes();
+    const period = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours % 12 || 12;
+    
+    setSelectedTime({
+      hour: displayHour.toString().padStart(2, '0'),
+      minute: minutes.toString().padStart(2, '0'),
+      period: period
+    });
+    
     setFormData(prev => ({
       ...prev,
       pco_event_id: event.id,
       pco_event_name: event.name,
       pco_event_date: event.date,
-      event_date: event.date ? new Date(event.date).toISOString().slice(0, 16) : "",
+      event_date: event.date,
       project_name: event.name,
       manual_event_name: event.name
     }));
@@ -241,8 +313,7 @@ export default function CommunicationsRequestForm() {
   };
 
   const filteredEvents = pcoEvents.filter(event => 
-    event.name.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
-    (event.date && new Date(event.date).toLocaleDateString().includes(eventSearchQuery))
+    event.name.toLowerCase().includes(eventSearchQuery.toLowerCase())
   );
 
   const handleFileUpload = (e) => {
@@ -258,12 +329,11 @@ export default function CommunicationsRequestForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.project_name && !formData.manual_event_name) {
       toast.error("Please provide a project/event name");
       return;
     }
-    if (!formData.ministry_department || !formData.need_type) {
+    if (!formData.ministry_department || !formData.need_type || !formData.event_date) {
       toast.error("Please fill out all required fields");
       return;
     }
@@ -274,7 +344,6 @@ export default function CommunicationsRequestForm() {
       const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
       const finalProjectName = formData.manual_event_name || formData.project_name;
 
-      // Upload photos if any
       let photoUrls = [];
       if (formData.previous_event_photos) {
         for (const file of formData.previous_event_photos) {
@@ -516,7 +585,7 @@ FBC Arlington`
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-blue-300"
                   >
-                    {/* PCO Event Search */}
+                    {/* PCO Event Search with Date Range Tabs */}
                     <div className="space-y-3">
                       <Label className="text-sm font-medium">
                         Search PCO Calendar Event
@@ -527,99 +596,108 @@ FBC Arlington`
                           <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
                           <span className="text-sm text-slate-600">Loading events...</span>
                         </div>
-                      ) : pcoEvents.length > 0 ? (
+                      ) : (
                         <>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                              type="text"
-                              placeholder="Type to search events..."
-                              value={eventSearchQuery}
-                              onChange={(e) => setEventSearchQuery(e.target.value)}
-                              className="pl-10 h-10"
-                            />
-                          </div>
+                          {/* Date Range Tabs */}
+                          <Tabs value={dateRange} onValueChange={(value) => {
+                            setDateRange(value);
+                            if (pcoEvents.length > 0) {
+                              searchPCOEvents(value);
+                            }
+                          }} className="w-full">
+                            <TabsList className="grid w-full grid-cols-4">
+                              <TabsTrigger value="30">Next 30 Days</TabsTrigger>
+                              <TabsTrigger value="60">60 Days</TabsTrigger>
+                              <TabsTrigger value="90">90 Days</TabsTrigger>
+                              <TabsTrigger value="all">All</TabsTrigger>
+                            </TabsList>
+                          </Tabs>
 
-                          {formData.pco_event_id && (
-                            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
-                                  <p className="text-sm text-purple-700">
-                                    {formData.pco_event_date ? new Date(formData.pco_event_date).toLocaleDateString('en-US', {
-                                      weekday: 'long',
-                                      year: 'numeric',
-                                      month: 'long',
-                                      day: 'numeric'
-                                    }) : 'No date'}
-                                  </p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    handleChange("pco_event_id", "");
-                                    handleChange("pco_event_name", "");
-                                    handleChange("pco_event_date", "");
-                                    handleChange("event_date", "");
-                                  }}
-                                >
-                                  Change
-                                </Button>
+                          {pcoEvents.length > 0 ? (
+                            <>
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                  type="text"
+                                  placeholder="Type event name to search..."
+                                  value={eventSearchQuery}
+                                  onChange={(e) => setEventSearchQuery(e.target.value)}
+                                  className="pl-10 h-10"
+                                />
                               </div>
-                            </div>
-                          )}
 
-                          {!formData.pco_event_id && (
-                            <div className="max-h-64 overflow-y-auto border rounded-lg">
-                              {filteredEvents.length > 0 ? (
-                                <div className="divide-y">
-                                  {filteredEvents.slice(0, 20).map(event => (
-                                    <button
-                                      key={event.id}
-                                      type="button"
-                                      onClick={() => handlePCOEventSelect(event)}
-                                      className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
-                                    >
-                                      <p className="font-medium text-slate-900">{event.name}</p>
-                                      <p className="text-sm text-slate-600">
-                                        {event.date ? new Date(event.date).toLocaleDateString('en-US', {
-                                          weekday: 'short',
-                                          year: 'numeric',
-                                          month: 'short',
-                                          day: 'numeric'
-                                        }) : 'No date'}
+                              {formData.pco_event_id && (
+                                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
+                                      <p className="text-sm text-purple-700">
+                                        {formData.pco_event_date ? format(new Date(formData.pco_event_date), 'EEEE, MMMM d, yyyy - h:mm a') : 'No date'}
                                       </p>
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="p-8 text-center text-slate-500">
-                                  <p>No events match your search</p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        handleChange("pco_event_id", "");
+                                        handleChange("pco_event_name", "");
+                                        handleChange("pco_event_date", "");
+                                        setSelectedDate(null);
+                                      }}
+                                    >
+                                      Change
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
-                            </div>
-                          )}
 
-                          <p className="text-xs text-slate-500">
-                            Showing {pcoEvents.length} upcoming events
-                          </p>
+                              {!formData.pco_event_id && (
+                                <div className="max-h-64 overflow-y-auto border rounded-lg">
+                                  {filteredEvents.length > 0 ? (
+                                    <div className="divide-y">
+                                      {filteredEvents.slice(0, 20).map(event => (
+                                        <button
+                                          key={event.id}
+                                          type="button"
+                                          onClick={() => handlePCOEventSelect(event)}
+                                          className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
+                                        >
+                                          <p className="font-medium text-slate-900">{event.name}</p>
+                                          <p className="text-sm text-slate-600">
+                                            {event.date ? format(new Date(event.date), 'EEE, MMM d, yyyy - h:mm a') : 'No date'}
+                                          </p>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="p-8 text-center text-slate-500">
+                                      <p>No events found</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <p className="text-xs text-slate-500">
+                                Showing {filteredEvents.length} of {pcoEvents.length} events
+                              </p>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => searchPCOEvents()}
+                              className="w-full"
+                            >
+                              <Search className="w-4 h-4 mr-2" />
+                              Load Events
+                            </Button>
+                          )}
                         </>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={searchPCOEvents}
-                          className="w-full"
-                        >
-                          <Search className="w-4 h-4 mr-2" />
-                          Load PCO Calendar Events
-                        </Button>
                       )}
                     </div>
 
-                    {/* Manual Event Name (if PCO search doesn't find it) */}
+                    {/* Manual Event Name */}
                     <div className="space-y-1.5">
                       <Label htmlFor="manual_event_name" className="text-sm font-medium">
                         Event Name {!formData.pco_event_id && <span className="text-red-500">*</span>}
@@ -633,7 +711,7 @@ FBC Arlington`
                         className="h-10"
                       />
                       <p className="text-xs text-slate-500">
-                        If you can't find your event above, type the name here
+                        Type the event name if you can't find it in the search
                       </p>
                     </div>
                   </motion.div>
@@ -741,19 +819,104 @@ FBC Arlington`
                     </RadioGroup>
                   </div>
 
-                  {/* Event Date & Time */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="event_date" className="text-sm font-medium">
+                  {/* Beautiful Date & Time Picker */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
                       Event Date & Time <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="event_date"
-                      type="datetime-local"
-                      value={formData.event_date}
-                      onChange={(e) => handleChange("event_date", e.target.value)}
-                      required
-                      className="h-10"
-                    />
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Date Picker */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`justify-start text-left font-normal h-10 ${!selectedDate && "text-muted-foreground"}`}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={setSelectedDate}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Time Picker */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="justify-start text-left font-normal h-10"
+                          >
+                            <Clock className="mr-2 h-4 w-4" />
+                            {selectedTime.hour}:{selectedTime.minute} {selectedTime.period}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-4" align="start">
+                          <div className="space-y-3">
+                            <Label className="text-sm font-medium">Select Time</Label>
+                            <div className="flex gap-2">
+                              <Select
+                                value={selectedTime.hour}
+                                onValueChange={(value) => setSelectedTime(prev => ({ ...prev, hour: value }))}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: 12 }, (_, i) => {
+                                    const hour = (i + 1).toString().padStart(2, '0');
+                                    return <SelectItem key={hour} value={hour}>{hour}</SelectItem>;
+                                  })}
+                                </SelectContent>
+                              </Select>
+
+                              <span className="flex items-center">:</span>
+
+                              <Select
+                                value={selectedTime.minute}
+                                onValueChange={(value) => setSelectedTime(prev => ({ ...prev, minute: value }))}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["00", "15", "30", "45"].map(min => (
+                                    <SelectItem key={min} value={min}>{min}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Select
+                                value={selectedTime.period}
+                                onValueChange={(value) => setSelectedTime(prev => ({ ...prev, period: value }))}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="AM">AM</SelectItem>
+                                  <SelectItem value="PM">PM</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {selectedDate && (
+                      <p className="text-xs text-slate-500">
+                        {format(selectedDate, "EEEE, MMMM d, yyyy")} at {selectedTime.hour}:{selectedTime.minute} {selectedTime.period}
+                      </p>
+                    )}
                   </div>
 
                   {/* GRAPHICS FIELDS */}
@@ -799,7 +962,6 @@ FBC Arlington`
                           </div>
                         </div>
 
-                        {/* Previous Event Photos */}
                         <div className="space-y-2">
                           <Label htmlFor="previous_photos" className="text-sm font-medium">
                             Previous Event Photos (Optional)
@@ -817,7 +979,6 @@ FBC Arlington`
                           />
                         </div>
 
-                        {/* Link to Graphics Folder */}
                         <div className="space-y-2">
                           <Label htmlFor="graphics_folder_link" className="text-sm font-medium">
                             Link to Graphics Folder (Optional)
@@ -876,7 +1037,6 @@ FBC Arlington`
                           </div>
                         </div>
 
-                        {/* Marketing Message */}
                         <div className="space-y-2">
                           <Label htmlFor="marketing_message" className="text-sm font-medium">
                             Key Marketing Message
@@ -891,7 +1051,6 @@ FBC Arlington`
                           />
                         </div>
 
-                        {/* Link to Marketing Assets */}
                         <div className="space-y-2">
                           <Label htmlFor="marketing_assets_link" className="text-sm font-medium">
                             Link to Marketing Assets (Optional)
