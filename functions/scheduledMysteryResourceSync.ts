@@ -4,14 +4,16 @@ Deno.serve(async (req) => {
   try {
     // Verify cron secret for security
     const cronSecret = Deno.env.get('CRON_SECRET');
-    const providedSecret = req.headers.get('x-cron-secret');
+    const providedSecret = req.headers.get('x-cron-secret') || req.headers.get('authorization')?.replace('Bearer ', '');
     
+    // Vercel Cron sends authorization header, manual calls use x-cron-secret
     if (cronSecret && providedSecret !== cronSecret) {
       console.error('❌ Invalid cron secret');
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.log('⏰ Scheduled Mystery Resource sync started...');
+    console.log('🔍 Triggered by:', req.headers.get('user-agent') || 'unknown');
     
     const base44 = createClientFromRequest(req);
     
@@ -35,14 +37,16 @@ Deno.serve(async (req) => {
     const syncUser = users.find(u => u.role === 'admin') || users[0];
     console.log(`🔄 Syncing with user: ${syncUser.email}`);
 
-    // Call monitorMysteryResource function
+    // Call monitorMysteryResource function directly
+    console.log('📞 Calling monitorMysteryResource function...');
+    
     const functionUrl = `${Deno.env.get('BASE44_APP_URL')}/api/apps/${Deno.env.get('BASE44_APP_ID')}/functions/monitorMysteryResource`;
     
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${syncUser.pco_access_token}`
+        'Authorization': req.headers.get('authorization') || '' // Pass through auth
       }
     });
 
@@ -56,21 +60,25 @@ Deno.serve(async (req) => {
       return Response.json({
         success: true,
         sync_result: result,
-        synced_by: syncUser.email
+        synced_by: syncUser.email,
+        timestamp: new Date().toISOString()
       });
     } else {
       console.error('❌ Sync failed:', result);
       return Response.json({
         success: false,
-        error: result.error || 'Sync failed'
+        error: result.error || 'Sync failed',
+        details: result
       }, { status: 500 });
     }
 
   } catch (error) {
     console.error('❌ Scheduled sync error:', error);
+    console.error('Stack:', error.stack);
     return Response.json({
       success: false,
-      error: error.message
+      error: error.message,
+      stack: error.stack
     }, { status: 500 });
   }
 });
