@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -44,7 +43,7 @@ async function fetchAllInstances(accessToken, baseUrl) {
     let allInstances = [];
     let nextUrl = baseUrl;
     let pageCount = 0;
-    const maxPages = 10; // Increased to fetch up to 1000 instances (10 pages * 100)
+    const maxPages = 10;
     
     while (nextUrl && pageCount < maxPages) {
         pageCount++;
@@ -77,6 +76,32 @@ async function fetchAllInstances(accessToken, baseUrl) {
     console.log(`📊 Total instances: ${allInstances.length}`);
     
     return allInstances;
+}
+
+// Helper to add delay between requests
+async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Fetch with retry on 429
+async function fetchWithRetry(url, options, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const response = await fetch(url, options);
+        
+        if (response.status === 429) {
+            if (attempt < maxRetries) {
+                const waitTime = attempt * 1000; // Progressive backoff: 1s, 2s, 3s
+                console.warn(`⚠️ Rate limited (429), waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`);
+                await delay(waitTime);
+                continue;
+            }
+        }
+        
+        return response;
+    }
+    
+    // If we get here, all retries failed
+    throw new Error('Rate limit exceeded after retries');
 }
 
 Deno.serve(async (req) => {
@@ -135,13 +160,14 @@ Deno.serve(async (req) => {
 
         console.log('📊 Unique events:', eventIds.size);
 
-        // Fetch full event data with resources and tags for each unique event (in parallel batches)
+        // Fetch full event data with SMALLER BATCHES and DELAYS to avoid rate limiting
         const eventDataMap = {};
         const eventIdArray = Array.from(eventIds);
-        const batchSize = 15;
+        const batchSize = 5; // REDUCED from 15 to 5
         
         let eventsWithoutNames = 0;
         let eventsWithoutResources = 0;
+        let rateLimitRetries = 0;
         
         for (let i = 0; i < eventIdArray.length; i += batchSize) {
             const batch = eventIdArray.slice(i, i + batchSize);
@@ -149,8 +175,8 @@ Deno.serve(async (req) => {
             
             const batchPromises = batch.map(async (eventId) => {
                 try {
-                    // Fetch event with tags
-                    const eventResponse = await fetch(
+                    // Fetch event with tags (WITH RETRY)
+                    const eventResponse = await fetchWithRetry(
                         `https://api.planningcenteronline.com/calendar/v2/events/${eventId}?include=tags`,
                         {
                             headers: {
@@ -165,13 +191,14 @@ Deno.serve(async (req) => {
                         return {
                             eventId,
                             data: {
-                                name: `Event ${eventId} (Error)`, // Changed this line
+                                name: `Loading Event ${eventId}...`,
                                 summary: null,
                                 description: null,
                                 visible_in_church_center: false,
                                 approval_status: null,
                                 resource_requests: [],
-                                tags: []
+                                tags: [],
+                                _error: true
                             }
                         };
                     }
@@ -179,34 +206,17 @@ Deno.serve(async (req) => {
                     const eventData = await eventResponse.json();
                     const event = eventData.data;
                     
-                    // DEBUG: Log the full attributes object for first few events
-                    if (i === 0) {
-                        console.log(`🔍 DEBUG Event ${eventId} attributes:`, JSON.stringify(event.attributes, null, 2));
-                    }
-                    
-                    // Get event name - check ALL possible fields
+                    // Get event name
                     let eventName = null;
                     
-                    // Try name field
                     if (event.attributes?.name && typeof event.attributes.name === 'string' && event.attributes.name.trim() !== '') {
                         eventName = event.attributes.name.trim();
-                    }
-                    
-                    // Try summary if name is missing
-                    if (!eventName && event.attributes?.summary && typeof event.attributes.summary === 'string' && event.attributes.summary.trim() !== '') {
+                    } else if (event.attributes?.summary && typeof event.attributes.summary === 'string' && event.attributes.summary.trim() !== '') {
                         eventName = event.attributes.summary.trim();
-                        console.log(`📋 Using summary as name for event ${eventId}: "${eventName}"`);
-                    }
-                    
-                    // Try visible_title (some PCO events use this)
-                    if (!eventName && event.attributes?.visible_title && typeof event.attributes.visible_title === 'string' && event.attributes.visible_title.trim() !== '') {
+                    } else if (event.attributes?.visible_title && typeof event.attributes.visible_title === 'string' && event.attributes.visible_title.trim() !== '') {
                         eventName = event.attributes.visible_title.trim();
-                        console.log(`📋 Using visible_title as name for event ${eventId}: "${eventName}"`);
-                    }
-                    
-                    // Last resort - check if there's any text field we can use
-                    if (!eventName) {
-                        console.warn(`⚠️ Event ${eventId} has NO name/summary/visible_title in attributes:`, Object.keys(event.attributes || {}));
+                    } else {
+                        console.warn(`⚠️ Event ${eventId} has NO name/summary/visible_title`);
                         eventName = `Unnamed Event`;
                         eventsWithoutNames++;
                     }
@@ -221,8 +231,8 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    // Fetch event_resource_requests separately
-                    const requestsResponse = await fetch(
+                    // Fetch event_resource_requests separately (WITH RETRY)
+                    const requestsResponse = await fetchWithRetry(
                         `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
                         {
                             headers: {
@@ -257,10 +267,10 @@ Deno.serve(async (req) => {
                             const resource = resourceMap[resourceId];
                             
                             if (resource) {
-                                // Fetch answers for this resource request
+                                // Fetch answers for this resource request (WITH RETRY)
                                 const answers = [];
                                 try {
-                                    const answersResponse = await fetch(
+                                    const answersResponse = await fetchWithRetry(
                                         `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
                                         {
                                             headers: {
@@ -280,12 +290,10 @@ Deno.serve(async (req) => {
                                             
                                             let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
                                             
-                                            // Handle object values
                                             if (typeof value === 'object' && value !== null) {
                                                 value = JSON.stringify(value);
                                             }
                                             
-                                            // Only add if both question and value exist
                                             if (questionText && value) {
                                                 answers.push({
                                                     question: String(questionText),
@@ -328,17 +336,21 @@ Deno.serve(async (req) => {
                         }
                     };
                 } catch (error) {
-                    console.error(`❌ Error fetching event ${eventId}:`, error);
+                    console.error(`❌ Error fetching event ${eventId}:`, error.message);
+                    if (error.message.includes('Rate limit')) {
+                        rateLimitRetries++;
+                    }
                     return {
                         eventId,
                         data: {
-                            name: `Event ${eventId} (Error)`, // Changed this line
+                            name: `Event ${eventId} (Temporarily Unavailable)`,
                             summary: null,
                             description: null,
                             visible_in_church_center: false,
                             approval_status: null,
                             resource_requests: [],
-                            tags: []
+                            tags: [],
+                            _error: true
                         }
                     };
                 }
@@ -350,11 +362,19 @@ Deno.serve(async (req) => {
                     eventDataMap[result.eventId] = result.data;
                 }
             });
+            
+            // Add delay between batches to avoid rate limiting
+            if (i + batchSize < eventIdArray.length) {
+                await delay(500); // 500ms delay between batches
+            }
         }
 
         console.log('📊 Fetched full data for', Object.keys(eventDataMap).length, 'events');
         console.log('⚠️ Events without names:', eventsWithoutNames);
         console.log('⚠️ Events without resources:', eventsWithoutResources);
+        if (rateLimitRetries > 0) {
+            console.log('⚠️ Rate limit retries needed:', rateLimitRetries);
+        }
 
         // Process event instances
         const eventsWithResources = [];
@@ -387,15 +407,12 @@ Deno.serve(async (req) => {
                 for (const request of eventData.resource_requests) {
                     const resourceId = request.resource_id;
                     
-                    // If we already have this resource, merge answers
                     if (resourcesMap.has(resourceId)) {
                         const existing = resourcesMap.get(resourceId);
-                        // Merge answers from multiple requests for same resource
                         if (request.answers && request.answers.length > 0) {
                             existing.answers = [...(existing.answers || []), ...request.answers];
                         }
                     } else {
-                        // First time seeing this resource
                         resourcesMap.set(resourceId, {
                             id: request.resource_id,
                             name: request.resource_name,
@@ -422,7 +439,8 @@ Deno.serve(async (req) => {
                 resources: resources,
                 tags: eventData?.tags || [],
                 resource_count: resources.length,
-                has_valid_dates: true
+                has_valid_dates: true,
+                _has_error: eventData?._error || false
             });
         }
 
@@ -436,10 +454,14 @@ Deno.serve(async (req) => {
             const withAnswers = eventsWithResources.filter(e => 
                 e.resources.some(r => r.answers && r.answers.length > 0)
             ).length;
+            const withErrors = eventsWithResources.filter(e => e._has_error).length;
             
             console.log(`📊 Events with resources: ${withResources}`);
             console.log(`📊 Events without resources: ${withoutResources}`);
             console.log(`📊 Events with answers: ${withAnswers}`);
+            if (withErrors > 0) {
+                console.log(`⚠️ Events with loading errors: ${withErrors}`);
+            }
         }
 
         return Response.json({ 
@@ -455,7 +477,8 @@ Deno.serve(async (req) => {
                 events_without_names: eventsWithoutNames,
                 events_without_resources: eventsWithoutResources,
                 skipped_no_dates: skippedNoDates,
-                skipped_beyond_60_days: skippedBeyond60Days
+                skipped_beyond_60_days: skippedBeyond60Days,
+                rate_limit_retries: rateLimitRetries
             }
         });
 
