@@ -30,6 +30,7 @@ import {
   User,
   Key,
   Clock,
+  Video, // Added Video icon
 } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -71,6 +72,9 @@ export default function MyTasks() {
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
   const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
+  const [meetings, setMeetings] = useState([]); // New state for meetings
+  const [loadingMeetings, setLoadingMeetings] = useState(true); // New state for loading meetings
+  const [userTimezone, setUserTimezone] = useState('America/Chicago'); // New state for user timezone
 
   const navigate = useNavigate();
 
@@ -122,9 +126,41 @@ export default function MyTasks() {
     }
   };
 
+  const loadMeetings = async () => { // New function to load meetings
+    console.log('📅 ========== LOADING MEETINGS ==========');
+    
+    setLoadingMeetings(true);
+    
+    try {
+      // Detect timezone
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setUserTimezone(detectedTimezone);
+      console.log('🌍 Using timezone:', detectedTimezone);
+      
+      const response = await base44.functions.invoke('getMicrosoftCalendar', {
+        timezone: detectedTimezone
+      });
+      
+      if (response.data && response.data.events) {
+        const meetingEvents = response.data.events || [];
+        console.log(`✅ Got ${meetingEvents.length} meetings`);
+        setMeetings(meetingEvents);
+      } else {
+        setMeetings([]);
+      }
+      
+    } catch (error) {
+      console.error('❌ ERROR loading meetings:', error.message);
+      // Don't show error toast - user might not have Microsoft connected
+      setMeetings([]);
+    } finally {
+      setLoadingMeetings(false);
+    }
+  };
+
   const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh clicked - refreshing schedule');
-    await loadMySchedule();
+    console.log('🔄 Manual refresh clicked - refreshing schedule and meetings'); // Updated message
+    await Promise.all([loadMySchedule(), loadMeetings()]); // Refresh both
     toast.success('Schedule refreshed!');
   };
 
@@ -136,14 +172,24 @@ export default function MyTasks() {
     console.log('📢 User changed:', user?.email);
     if (user) {
       loadSupportTickets();
-      console.log('📢 About to call loadMySchedule()');
+      console.log('📢 About to call loadMySchedule() and loadMeetings()'); // Updated message
       loadMySchedule();
+      loadMeetings(); // Call loadMeetings when user loads
     }
   }, [user]);
 
   const handleScheduleEventClick = (event) => {
-    setSelectedScheduleEvent(event);
-    setShowScheduleEventDetail(true);
+    if (event.type === 'meeting') { // Handle meeting click
+      if (event.meetingLink?.url) {
+        window.open(event.meetingLink.url, '_blank');
+        toast.success(`Opening ${event.meetingLink.provider || 'meeting'}...`);
+      } else {
+        toast.info('No meeting link available for this event.');
+      }
+    } else { // Existing PCO event click handling
+      setSelectedScheduleEvent(event);
+      setShowScheduleEventDetail(true);
+    }
   };
 
   const loadData = async () => {
@@ -287,11 +333,18 @@ export default function MyTasks() {
     }
   };
 
-  // Calculate events today
-  const eventsToday = myScheduleEvents.filter(event => {
+  // Calculate events today - combine PCO and meetings
+  const pcoEventsToday = myScheduleEvents.filter(event => {
     const eventDate = new Date(event.starts_at);
     return isToday(eventDate);
   }).length;
+
+  const meetingsToday = meetings.filter(meeting => {
+    const meetingDate = parseISO(meeting.start);
+    return isToday(meetingDate);
+  }).length;
+
+  const eventsToday = pcoEventsToday + meetingsToday; // Combined count
 
   if (loading) {
     return (
@@ -308,7 +361,7 @@ export default function MyTasks() {
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6"> {/* Added responsive padding and spacing */}
         {(!user?.clickup_access_token && !user?.microsoft_access_token) && <ConnectionWarning />}
 
         <AppHeader
@@ -320,18 +373,18 @@ export default function MyTasks() {
             <div className="flex gap-2">
               <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm">
                 <CalendarIcon className="w-4 h-4 mr-2" />
-                Calendar
+                <span className="hidden sm:inline">Calendar</span> {/* Added sm:inline */}
               </Button>
               <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
+                    <span className="hidden sm:inline">Syncing...</span> {/* Added sm:inline */}
                   </>
                 ) : (
                   <>
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync
+                    <span className="hidden sm:inline">Sync</span> {/* Added sm:inline */}
                   </>
                 )}
               </Button>
@@ -339,72 +392,98 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"> {/* Adjusted grid for 3 columns on md screens */}
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-5 h-5 text-indigo-600" />
-                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300">Today</Badge>
+                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" /> {/* Responsive icon size */}
+                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 text-xs">Today</Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
-              <p className="text-sm text-slate-600">Tasks Due</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{myDayTasks.length}</p> {/* Responsive text size */}
+              <p className="text-xs md:text-sm text-slate-600">Tasks Due</p> {/* Responsive text size */}
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-5 h-5 text-green-600" />
-                <Badge className="bg-green-100 text-green-700 border-green-300">
-                  {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday}
+                <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 text-green-600" /> {/* Responsive icon size */}
+                <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                  {(loadingSchedule || loadingMeetings) ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday} {/* Updated loading check */}
                 </Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{eventsToday}</p>
-              <p className="text-sm text-slate-600">Events Today</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{eventsToday}</p> {/* Responsive text size */}
+              <p className="text-xs md:text-sm text-slate-600">Events Today</p> {/* Responsive text size */}
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6"> {/* Responsive padding */}
               <div className="flex items-center justify-between mb-2">
-                <TicketIcon className="w-5 h-5 text-purple-600" />
-                <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                <TicketIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-600" /> {/* Responsive icon size */}
+                <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs">
                   {loadingTickets ? <Loader2 className="h-3 w-3 animate-spin" /> : supportTickets.length}
                 </Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-              <p className="text-sm text-slate-600">Support Tickets</p>
+              <p className="text-xl md:text-2xl font-bold text-slate-900">{supportTickets.length}</p> {/* Responsive text size */}
+              <p className="text-xs md:text-sm text-slate-600">Support Tickets</p> {/* Responsive text size */}
             </CardContent>
           </Card>
         </div>
 
         <Card className="border-2 border-green-200 bg-white">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  <CalendarIcon className="w-6 h-6 text-green-600" />
-                  My Schedule
+            <div className="flex items-center justify-between flex-wrap gap-2"> {/* Added flex-wrap and gap */}
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-xl md:text-2xl flex items-center gap-2"> {/* Responsive text size */}
+                  <CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-green-600" /> {/* Responsive icon size */}
+                  <span>My Schedule</span> {/* Wrapped text in span */}
                 </CardTitle>
-                <p className="text-slate-600 text-sm mt-1">
-                  Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                <p className="text-slate-600 text-xs md:text-sm mt-1"> {/* Responsive text size */}
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                  </span>
+                  {meetings.length > 0 && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Video className="w-3 h-3 text-purple-600" />
+                        {meetings.length} meeting{meetings.length !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
+              <Button
+                onClick={handleManualRefresh}
+                disabled={loadingSchedule || loadingMeetings}
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0"
+              >
+                {(loadingSchedule || loadingMeetings) ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {loadingSchedule ? (
+            {(loadingSchedule || loadingMeetings) ? (
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                <p className="text-slate-600">Loading your schedule...</p>
+                <p className="text-slate-600 text-sm">Loading your schedule...</p> {/* Responsive text size */}
               </div>
-            ) : myScheduleEvents.length === 0 ? (
+            ) : (myScheduleEvents.length === 0 && meetings.length === 0) ? (
               <div className="text-center py-8">
-                <p className="text-slate-600">No upcoming events found</p>
+                <p className="text-slate-600 text-sm">No upcoming events or meetings found</p> {/* Responsive text size */}
               </div>
             ) : (
               <ScheduleCalendar 
                 events={myScheduleEvents} 
+                meetings={meetings} {/* Pass meetings to ScheduleCalendar */}
                 weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
@@ -491,7 +570,7 @@ export default function MyTasks() {
               onClick={() => setShowFullCalendar(true)}
             >
               <Maximize2 className="w-4 h-4 mr-2" />
-              Full Calendar
+              <span className="hidden sm:inline">Full Calendar</span> {/* Added sm:inline */}
             </Button>
           </CardHeader>
           <CardContent>
