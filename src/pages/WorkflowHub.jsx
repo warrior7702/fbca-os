@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -135,6 +136,15 @@ export default function WorkflowHub() {
     navigate(createPageUrl('WorkflowDetail') + `?id=${selectedRequestId}`);
   };
 
+  const handleRequestClick = (request) => {
+    // Route based on status
+    if (request.status === 'project_review') {
+      navigate(createPageUrl('ProjectReview') + `?id=${request.id}`);
+    } else {
+      navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'minister_goal_review': return 'bg-purple-100 text-purple-700 border-purple-300';
@@ -198,7 +208,7 @@ export default function WorkflowHub() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer p-4 mb-3"
-      onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`)}
+      onClick={() => handleRequestClick(request)}
     >
       <div className="space-y-3">
         <div className="flex items-start justify-between">
@@ -245,12 +255,12 @@ export default function WorkflowHub() {
           className="w-full text-xs h-7"
           onClick={(e) => {
             e.stopPropagation();
-            navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
+            handleRequestClick(request);
           }}
         >
-          {request.status === 'minister_goal_review' ? 'Start Goal Review' : 
+          {request.status === 'minister_goal_review' ? 'Start Interview' : 
            request.status === 'project_review' ? 'Review Project' : 
-           'View Campaign'}
+           'View Details'}
           <ArrowRight className="w-3 h-3 ml-1" />
         </Button>
       </div>
@@ -262,7 +272,7 @@ export default function WorkflowHub() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-lg border border-slate-200 hover:shadow-lg transition-all cursor-pointer"
-      onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`)}
+      onClick={() => handleRequestClick(request)}
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
