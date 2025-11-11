@@ -50,8 +50,9 @@ export default function WorkflowHub() {
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
   const [view, setView] = useState('requestor');
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'list'
+  const [viewMode, setViewMode] = useState('kanban');
   const [selectedRequestId, setSelectedRequestId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,30 +65,38 @@ export default function WorkflowHub() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      // Determine user role - check if they're a comm director or team member
-      const isWorker = currentUser.role === 'admin' ||
-                      currentUser.email.toLowerCase().includes('comm') ||
-                      currentUser.email.toLowerCase().includes('director') ||
-                      currentUser.email.toLowerCase().includes('marketing');
+      // Check if user is admin
+      const adminCheck = currentUser.role === 'admin';
+      setIsAdmin(adminCheck);
 
-      setView(isWorker ? 'worker' : 'requestor');
-
-      // Load my requests (as requestor)
-      const myReqs = await base44.entities.WorkflowRequest.filter({
-        requestor_email: currentUser.email
-      }, '-created_date');
+      // Load my requests (as requestor) - for regular users, exclude completed/cancelled
+      const myReqsQuery = adminCheck 
+        ? { requestor_email: currentUser.email }
+        : { 
+            requestor_email: currentUser.email,
+            status: { $nin: ['completed', 'cancelled'] }
+          };
+      
+      const myReqs = await base44.entities.WorkflowRequest.filter(myReqsQuery, '-created_date');
       setMyRequests(myReqs);
 
-      // Load requests assigned to me (as worker)
-      const assignedReqs = await base44.entities.WorkflowRequest.filter({
-        assigned_to: currentUser.email
-      }, '-created_date');
-      setAssignedToMe(assignedReqs);
+      if (adminCheck) {
+        // If admin, load assigned requests and all requests
+        const assignedReqs = await base44.entities.WorkflowRequest.filter({
+          assigned_to: currentUser.email
+        }, '-created_date');
+        setAssignedToMe(assignedReqs);
 
-      // If admin/worker, load all requests
-      if (isWorker) {
         const allReqs = await base44.entities.WorkflowRequest.list('-created_date', 100);
         setAllRequests(allReqs);
+        
+        // Default to worker view for admins
+        setView('worker');
+      } else {
+        // Regular users don't need these
+        setAssignedToMe([]);
+        setAllRequests([]);
+        setView('requestor');
       }
 
     } catch (error) {
@@ -101,7 +110,6 @@ export default function WorkflowHub() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Monitor for Mystery Resource requests
       const response = await base44.functions.invoke('monitorMysteryResource');
 
       if (response.data.new_requests_created > 0) {
@@ -170,7 +178,6 @@ export default function WorkflowHub() {
     return statusMap[status] || status;
   };
 
-  // Get requests by status
   const getRequestsByStatus = (requests, status) => {
     return requests.filter(r => r.status === status);
   };
@@ -320,7 +327,6 @@ export default function WorkflowHub() {
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Minister Goal Review Column */}
         <div className="bg-purple-50/50 rounded-lg p-4 border-2 border-purple-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -341,7 +347,6 @@ export default function WorkflowHub() {
           </div>
         </div>
 
-        {/* Project Review Column */}
         <div className="bg-orange-50/50 rounded-lg p-4 border-2 border-orange-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -362,7 +367,6 @@ export default function WorkflowHub() {
           </div>
         </div>
 
-        {/* Campaign Running Column */}
         <div className="bg-green-50/50 rounded-lg p-4 border-2 border-green-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -383,7 +387,6 @@ export default function WorkflowHub() {
           </div>
         </div>
 
-        {/* Archived/Completed Column */}
         <div className="bg-slate-50/50 rounded-lg p-4 border-2 border-slate-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -415,30 +418,31 @@ export default function WorkflowHub() {
         <AppHeader
           icon={MessageSquare}
           title="Communications Request"
-          description="Track all your creative projects"
+          description={isAdmin ? "Track all creative projects" : "Your communication requests"}
           iconColor="from-purple-500 to-pink-500"
           action={
             <div className="flex gap-2">
-              <Button
-                onClick={handleSync}
-                disabled={syncing}
-                variant="outline"
-                size="sm"
-              >
-                {syncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync PCO
-                  </>
-                )}
-              </Button>
+              {isAdmin && (
+                <Button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  variant="outline"
+                  size="sm"
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync PCO
+                    </>
+                  )}
+                </Button>
+              )}
               
-              {/* Edit Existing Plan Button */}
               <div className="flex gap-2 items-center">
                 <Select
                   value={selectedRequestId}
@@ -467,7 +471,6 @@ export default function WorkflowHub() {
                 </Button>
               </div>
               
-              {/* New Communication Plan Button */}
               <Button
                 onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}
                 className="bg-purple-600 hover:bg-purple-700"
@@ -480,105 +483,134 @@ export default function WorkflowHub() {
           }
         />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-2 border-slate-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <LayoutGrid className="w-5 h-5 text-slate-600" />
-                <Badge className="bg-slate-100 text-slate-700">{allActiveRequests.length}</Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">{allActiveRequests.length}</p>
-              <p className="text-sm text-slate-600">Total Requests</p>
-            </CardContent>
-          </Card>
+        {/* Stats Cards - ADMIN ONLY */}
+        {isAdmin && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="border-2 border-slate-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <LayoutGrid className="w-5 h-5 text-slate-600" />
+                  <Badge className="bg-slate-100 text-slate-700">{allActiveRequests.length}</Badge>
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{allActiveRequests.length}</p>
+                <p className="text-sm text-slate-600">Total Requests</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-2 border-purple-200 bg-purple-50/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <Target className="w-5 h-5 text-purple-600" />
-                <Badge className="bg-purple-100 text-purple-700">
+            <Card className="border-2 border-purple-200 bg-purple-50/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Target className="w-5 h-5 text-purple-600" />
+                  <Badge className="bg-purple-100 text-purple-700">
+                    {getRequestsByStatus(allActiveRequests, 'minister_goal_review').length}
+                  </Badge>
+                </div>
+                <p className="text-2xl font-bold text-slate-900">
                   {getRequestsByStatus(allActiveRequests, 'minister_goal_review').length}
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">
-                {getRequestsByStatus(allActiveRequests, 'minister_goal_review').length}
-              </p>
-              <p className="text-sm text-slate-600">Goal Review</p>
-            </CardContent>
-          </Card>
+                </p>
+                <p className="text-sm text-slate-600">Goal Review</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-2 border-green-200 bg-green-50/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <Megaphone className="w-5 h-5 text-green-600" />
-                <Badge className="bg-green-100 text-green-700">
+            <Card className="border-2 border-green-200 bg-green-50/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Megaphone className="w-5 h-5 text-green-600" />
+                  <Badge className="bg-green-100 text-green-700">
+                    {getRequestsByStatus(allActiveRequests, 'campaign_running').length}
+                  </Badge>
+                </div>
+                <p className="text-2xl font-bold text-slate-900">
                   {getRequestsByStatus(allActiveRequests, 'campaign_running').length}
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">
-                {getRequestsByStatus(allActiveRequests, 'campaign_running').length}
-              </p>
-              <p className="text-sm text-slate-600">Campaign Running</p>
-            </CardContent>
-          </Card>
+                </p>
+                <p className="text-sm text-slate-600">Campaign Running</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-2 border-slate-200 bg-slate-50/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <CheckCircle2 className="w-5 h-5 text-slate-600" />
-                <Badge className="bg-slate-100 text-slate-700">
+            <Card className="border-2 border-slate-200 bg-slate-50/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <CheckCircle2 className="w-5 h-5 text-slate-600" />
+                  <Badge className="bg-slate-100 text-slate-700">
+                    {getRequestsByStatus(allActiveRequests, 'completed').length}
+                  </Badge>
+                </div>
+                <p className="text-2xl font-bold text-slate-900">
                   {getRequestsByStatus(allActiveRequests, 'completed').length}
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold text-slate-900">
-                {getRequestsByStatus(allActiveRequests, 'completed').length}
-              </p>
-              <p className="text-sm text-slate-600">Archived</p>
-            </CardContent>
-          </Card>
-        </div>
+                </p>
+                <p className="text-sm text-slate-600">Archived</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-        {/* View Toggle */}
-        <div className="flex items-center justify-between">
-          <Tabs value={view} onValueChange={setView} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="requestor">
-                <User className="w-4 h-4 mr-2" />
-                My Requests
-              </TabsTrigger>
-              <TabsTrigger value="worker">
-                <Users className="w-4 h-4 mr-2" />
-                Team View
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        {/* View Toggle - ADMIN ONLY */}
+        {isAdmin && (
+          <div className="flex items-center justify-between">
+            <Tabs value={view} onValueChange={setView} className="w-auto">
+              <TabsList>
+                <TabsTrigger value="requestor">
+                  <User className="w-4 h-4 mr-2" />
+                  My Requests
+                </TabsTrigger>
+                <TabsTrigger value="worker">
+                  <Users className="w-4 h-4 mr-2" />
+                  Team View
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <Tabs value={viewMode} onValueChange={setViewMode} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="kanban">
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Kanban View
-              </TabsTrigger>
-              <TabsTrigger value="list">
-                <List className="w-4 h-4 mr-2" />
-                List View
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+            <Tabs value={viewMode} onValueChange={setViewMode} className="w-auto">
+              <TabsList>
+                <TabsTrigger value="kanban">
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  Kanban View
+                </TabsTrigger>
+                <TabsTrigger value="list">
+                  <List className="w-4 h-4 mr-2" />
+                  List View
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
 
         {/* Main Content */}
-        {viewMode === 'kanban' ? (
-          <KanbanView requests={allActiveRequests} />
+        {isAdmin ? (
+          viewMode === 'kanban' ? (
+            <KanbanView requests={allActiveRequests} />
+          ) : (
+            <div>
+              {allActiveRequests.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="p-12 text-center">
+                    <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
+                    <p className="text-slate-600 mb-4">Create your first communications request</p>
+                    <Button onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Request
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {allActiveRequests.map(request => (
+                    <RequestCard key={request.id} request={request} showAssignee={view === 'worker'} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
         ) : (
+          // Regular user view - simple card grid, only open requests
           <div>
-            {allActiveRequests.length === 0 ? (
+            {myRequests.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="p-12 text-center">
                   <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
-                  <p className="text-slate-600 mb-4">Create your first communications request</p>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No open requests</h3>
+                  <p className="text-slate-600 mb-4">Create a new communications request to get started</p>
                   <Button onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}>
                     <Plus className="w-4 h-4 mr-2" />
                     Create Request
@@ -587,8 +619,8 @@ export default function WorkflowHub() {
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {allActiveRequests.map(request => (
-                  <RequestCard key={request.id} request={request} showAssignee={view === 'worker'} />
+                {myRequests.map(request => (
+                  <RequestCard key={request.id} request={request} />
                 ))}
               </div>
             )}
