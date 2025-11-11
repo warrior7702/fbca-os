@@ -33,27 +33,20 @@ async function refreshTokenIfNeeded(base44, user) {
     return tokens.access_token;
 }
 
-// Helper to add delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Fetch with retry on 429
-async function fetchWithRetry(url, options, maxRetries = 3) {
+async function fetchWithRetry(url, options, maxRetries = 2) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         const response = await fetch(url, options);
         
-        if (response.status === 429) {
-            if (attempt < maxRetries) {
-                const waitTime = attempt * 1000;
-                console.warn(`⚠️ Rate limited (429), waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`);
-                await delay(waitTime);
-                continue;
-            }
+        if (response.status === 429 && attempt < maxRetries) {
+            await delay(1000 * attempt);
+            continue;
         }
         
         return response;
     }
-    
-    throw new Error('Rate limit exceeded after retries');
+    throw new Error('Rate limit exceeded');
 }
 
 Deno.serve(async (req) => {
@@ -62,7 +55,6 @@ Deno.serve(async (req) => {
         const currentUser = await base44.auth.me();
 
         if (!currentUser) {
-            console.error('❌ No current user');
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
 
@@ -77,17 +69,13 @@ Deno.serve(async (req) => {
         const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
         // Get my PCO person ID
-        const meResponse = await fetchWithRetry(
-            'https://api.planningcenteronline.com/calendar/v2/me',
-            { headers }
-        );
-
+        const meResponse = await fetchWithRetry('https://api.planningcenteronline.com/calendar/v2/me', { headers });
         if (!meResponse.ok) throw new Error('Failed to get PCO person ID');
 
         const meData = await meResponse.json();
         const myPersonId = meData.data?.id;
 
-        // Get approval groups I'm in
+        // Get approval groups (first 100)
         const groupsResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers }
@@ -98,9 +86,10 @@ Deno.serve(async (req) => {
         const groupsData = await groupsResponse.json();
         const allGroups = groupsData.data || [];
 
+        // Check my groups (limited to speed up)
         const myGroups = [];
-        for (const group of allGroups) {
-            await delay(100);
+        for (const group of allGroups.slice(0, 20)) { // Check first 20 groups only
+            await delay(50);
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
@@ -127,10 +116,9 @@ Deno.serve(async (req) => {
 
         // Get resources for my groups
         const myResourceIds = new Set();
-        const myResources = [];
         
         for (const group of myGroups) {
-            await delay(100);
+            await delay(50);
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
@@ -141,12 +129,6 @@ Deno.serve(async (req) => {
                 const resourcesData = await resourcesResponse.json();
                 for (const resource of (resourcesData.data || [])) {
                     myResourceIds.add(resource.id);
-                    myResources.push({
-                        id: resource.id,
-                        name: resource.attributes?.name,
-                        kind: resource.attributes?.kind,
-                        group: group.name
-                    });
                 }
             }
         }
@@ -159,68 +141,56 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Get future event instances
+        // Get future event instances (first 2 pages only)
         const now = new Date();
-        const twoWeeksFromNow = new Date(now);
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+        const twoWeeksFromNow = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
         
-        const instancesResponse = await fetchWithRetry(
-            `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`,
-            { headers }
-        );
-
-        if (!instancesResponse.ok) {
-            throw new Error('Failed to fetch event instances');
+        const instances = [];
+        let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at';
+        let pageCount = 0;
+        
+        while (nextUrl && pageCount < 2) {
+            const response = await fetchWithRetry(nextUrl, { headers });
+            if (!response.ok) break;
+            
+            const data = await response.json();
+            instances.push(...(data.data || []));
+            nextUrl = data.links?.next;
+            pageCount++;
         }
-
-        const instancesData = await instancesResponse.json();
-        const allInstances = instancesData.data || [];
         
-        if (allInstances.length === 0) {
+        if (instances.length === 0) {
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'No future events found in PCO Calendar'
+                message: 'No future events found'
             });
         }
 
         // Get unique event IDs
         const eventIds = new Set();
-        allInstances.forEach(instance => {
+        instances.forEach(instance => {
             const eventId = instance.relationships?.event?.data?.id;
             if (eventId) eventIds.add(eventId);
         });
 
-        // Process events in SMALLER BATCHES with RETRIES
+        // Process events in OPTIMIZED batches
         const eventsWithMyResources = [];
         const eventIdArray = Array.from(eventIds);
-        const batchSize = 5; // REDUCED from previous implementation
-        
-        console.log(`📦 Processing ${eventIdArray.length} events in batches of ${batchSize}...`);
+        const batchSize = 8;
         
         for (let i = 0; i < eventIdArray.length; i += batchSize) {
             const batch = eventIdArray.slice(i, i + batchSize);
-            console.log(`🔄 Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(eventIdArray.length / batchSize)}`);
             
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        // Fetch event and requests WITH RETRIES
                         const [eventResponse, requestsResponse] = await Promise.all([
-                            fetchWithRetry(
-                                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-                                { headers },
-                                3
-                            ),
-                            fetchWithRetry(
-                                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                                { headers },
-                                3
-                            )
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}`, { headers }),
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`, { headers })
                         ]);
 
                         if (!eventResponse.ok || !requestsResponse.ok) {
-                            console.warn(`⚠️ Failed to fetch event ${eventId}`);
                             return { events: [] };
                         }
 
@@ -228,9 +198,7 @@ Deno.serve(async (req) => {
                         const requestsData = await requestsResponse.json();
                         const event = eventData.data;
 
-                        // Check resources
                         const myRequestedResources = [];
-                        const buildingAccessRequests = [];
                         
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
@@ -243,14 +211,6 @@ Deno.serve(async (req) => {
                                     name: resourceName,
                                     approval_status: request.attributes?.approval_status
                                 });
-                                
-                                const isBuildingAccess = resourceName.toLowerCase().includes('building access') || 
-                                                       resourceName.toLowerCase().includes('door code') ||
-                                                       resourceName.toLowerCase().includes('access code');
-                                
-                                if (isBuildingAccess && request.id) {
-                                    buildingAccessRequests.push(request.id);
-                                }
                             }
                         }
 
@@ -258,62 +218,8 @@ Deno.serve(async (req) => {
                             return { events: [] };
                         }
 
-                        // Fetch answers ONLY for building access WITH RETRIES
-                        let accessTime = null;
-                        
-                        if (buildingAccessRequests.length > 0) {
-                            try {
-                                for (const requestId of buildingAccessRequests) {
-                                    await delay(100);
-                                    
-                                    const answersResponse = await fetchWithRetry(
-                                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`,
-                                        { headers },
-                                        2
-                                    );
-
-                                    if (answersResponse.ok) {
-                                        const answersData = await answersResponse.json();
-                                        
-                                        for (const answer of (answersData.data || [])) {
-                                            const questionAttr = answer.attributes?.question;
-                                            const questionText = typeof questionAttr === 'string' ? questionAttr : 
-                                                               (questionAttr?.question || questionAttr?.text || '');
-                                            
-                                            const question = String(questionText || '').toLowerCase();
-                                            let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                                            
-                                            if (typeof value === 'object' && value !== null) {
-                                                value = JSON.stringify(value);
-                                            }
-                                            
-                                            const answerText = String(value || '').toLowerCase();
-                                            
-                                            const isAccessQuestion = question.includes('access') || 
-                                                                   question.includes('time') || 
-                                                                   question.includes('begin') || 
-                                                                   question.includes('end') ||
-                                                                   question.includes('other details');
-                                            
-                                            const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
-                                                                       /\d+:\d+/.test(answerText);
-                                            
-                                            if (isAccessQuestion && looksLikeTimeRange) {
-                                                accessTime = String(value);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    
-                                    if (accessTime) break;
-                                }
-                            } catch (error) {
-                                console.warn('Warning: Error fetching answers:', error.message);
-                            }
-                        }
-
                         // Find instances for this event
-                        const eventInstances = allInstances.filter(i => 
+                        const eventInstances = instances.filter(i => 
                             i.relationships?.event?.data?.id === eventId
                         );
 
@@ -335,35 +241,29 @@ Deno.serve(async (req) => {
                                 ends_at: endsAt,
                                 summary: event.attributes?.summary,
                                 resources: myRequestedResources,
-                                access_time: accessTime
+                                access_time: null
                             });
                         }
                         
                         return { events };
                     } catch (error) {
-                        console.error('❌ Error processing event', eventId, ':', error.message);
                         return { events: [] };
                     }
                 })
             );
             
-            // Collect results
             for (const result of batchResults) {
                 if (result.events) {
                     eventsWithMyResources.push(...result.events);
                 }
             }
             
-            // Delay between batches
             if (i + batchSize < eventIdArray.length) {
-                await delay(500);
+                await delay(200);
             }
         }
 
-        // Sort by start date
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-        console.log(`✅ Finished: ${eventsWithMyResources.length} events with my resources`);
 
         return Response.json({
             events: eventsWithMyResources,
@@ -373,7 +273,7 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('❌ Get my schedule error:', error);
+        console.error('❌ Error:', error);
         return Response.json({
             error: error.message,
             events: []
