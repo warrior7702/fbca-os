@@ -29,6 +29,7 @@ import CreateTicket from './pages/CreateTicket';
 import PCOAPITester from './pages/PCOAPITester';
 import PhantomUserHunter from './pages/PhantomUserHunter';
 import WorkflowHub from './pages/WorkflowHub';
+import TestMysterySync from './pages/TestMysterySync';
 import Layout from './Layout.jsx';
 
 
@@ -64,6 +65,7 @@ export const PAGES = {
     "PCOAPITester": PCOAPITester,
     "PhantomUserHunter": PhantomUserHunter,
     "WorkflowHub": WorkflowHub,
+    "TestMysterySync": TestMysterySync,
 }
 
 export const pagesConfig = {
