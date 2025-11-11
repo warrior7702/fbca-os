@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -50,7 +51,7 @@ export default function WorkflowHub() {
       setUser(currentUser);
 
       // Determine user role - check if they're a comm director or team member
-      const isWorker = currentUser.role === 'admin' || 
+      const isWorker = currentUser.role === 'admin' ||
                       currentUser.email.toLowerCase().includes('comm') ||
                       currentUser.email.toLowerCase().includes('director') ||
                       currentUser.email.toLowerCase().includes('marketing');
@@ -88,7 +89,7 @@ export default function WorkflowHub() {
     try {
       // Monitor for Mystery Resource requests
       const response = await base44.functions.invoke('monitorMysteryResource');
-      
+
       if (response.data.new_requests_created > 0) {
         toast.success(`Created ${response.data.new_requests_created} new request(s) from PCO`);
       } else {
@@ -252,7 +253,7 @@ export default function WorkflowHub() {
                 )}
               </Button>
               <Button
-                onClick={() => navigate(createPageUrl('NewCommunicationRequest'))}
+                onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}
                 className="bg-purple-600 hover:bg-purple-700"
                 size="sm"
               >
@@ -272,7 +273,7 @@ export default function WorkflowHub() {
                 <p className="text-sm font-semibold text-slate-900 mb-1">3 Ways to Create Requests</p>
                 <div className="text-xs text-slate-600 space-y-1">
                   <p>🔄 <strong>Auto:</strong> PCO Calendar events with "Mystery Resource"</p>
-                  <p>📝 <strong>Manual Form:</strong> Submit directly through our form (coming soon)</p>
+                  <p>📝 <strong>Manual Form:</strong> Submit directly through our form</p>
                   <p>💬 <strong>Continue Existing:</strong> Add to your current requests</p>
                 </div>
               </div>
@@ -361,7 +362,7 @@ export default function WorkflowHub() {
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
                     <p className="text-slate-600 mb-4">Create your first communications request</p>
-                    <Button onClick={() => navigate(createPageUrl('NewCommunicationRequest'))}>
+                    <Button onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Request
                     </Button>
