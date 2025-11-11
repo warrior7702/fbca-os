@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -34,67 +33,30 @@ async function refreshTokenIfNeeded(base44, user) {
     return tokens.access_token;
 }
 
-// Helper to add delay between API calls
+// Helper to add delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Rate limiter that adapts to 429 errors
-class AdaptiveRateLimiter {
-    constructor() {
-        this.batchSize = 12; // Start aggressive
-        this.batchDelay = 200; // Start fast
-        this.requestDelay = 50; // Delay within batch
-        this.retryDelay = 1500;
-        this.hitRateLimit = false;
-    }
-
-    // Call this when you hit a 429
-    slowDown() {
-        if (!this.hitRateLimit) {
-            console.log('⚠️ Rate limit hit! Slowing down...');
-            this.hitRateLimit = true;
-            this.batchSize = Math.max(4, Math.floor(this.batchSize / 2));
-            this.batchDelay = Math.min(800, this.batchDelay * 2);
-            this.requestDelay = Math.min(150, this.requestDelay * 2);
-            console.log(`📊 New settings: batchSize=${this.batchSize}, batchDelay=${this.batchDelay}ms, requestDelay=${this.requestDelay}ms`);
-        }
-    }
-
-    getSettings() {
-        return {
-            batchSize: this.batchSize,
-            batchDelay: this.batchDelay,
-            requestDelay: this.requestDelay,
-            retryDelay: this.retryDelay
-        };
-    }
-}
-
-// Fetch with retry on rate limit
-async function fetchWithRetry(url, headers, rateLimiter, retries = 3) {
-    const settings = rateLimiter.getSettings();
-    
-    for (let i = 0; i < retries; i++) {
-        const response = await fetch(url, { headers });
+// Fetch with retry on 429
+async function fetchWithRetry(url, options, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const response = await fetch(url, options);
         
         if (response.status === 429) {
-            rateLimiter.slowDown(); // Adjust settings for future requests
-            const waitTime = settings.retryDelay * Math.pow(2, i);
-            console.log(`⏳ Rate limited, waiting ${waitTime}ms before retry ${i + 1}/${retries} for ${url}`);
-            await delay(waitTime);
-            continue;
+            if (attempt < maxRetries) {
+                const waitTime = attempt * 1000;
+                console.warn(`⚠️ Rate limited (429), waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`);
+                await delay(waitTime);
+                continue;
+            }
         }
         
         return response;
     }
     
-    // Final attempt
-    return fetch(url, { headers });
+    throw new Error('Rate limit exceeded after retries');
 }
 
 Deno.serve(async (req) => {
-    const debugLog = [];
-    const rateLimiter = new AdaptiveRateLimiter();
-    
     try {
         const base44 = createClientFromRequest(req);
         const currentUser = await base44.auth.me();
@@ -104,48 +66,37 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized', events: [] }, { status: 401 });
         }
 
-        debugLog.push({ step: 'user', email: currentUser.email });
-
         const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
         const user = users[0];
 
         if (!user || !user.pco_access_token) {
-            debugLog.push({ step: 'error', message: 'No PCO token' });
-            return Response.json({ events: [], message: 'PCO not connected', debug: debugLog });
+            return Response.json({ events: [], message: 'PCO not connected' });
         }
 
         const accessToken = await refreshTokenIfNeeded(base44, user);
-        const headers = { 'Authorization': `Bearer ${accessToken}` };
+        const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
-        // Step 1: Get my PCO person ID
+        // Get my PCO person ID
         const meResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/me',
-            headers,
-            rateLimiter
+            { headers }
         );
 
-        if (!meResponse.ok) {
-            throw new Error('Failed to get PCO person ID');
-        }
+        if (!meResponse.ok) throw new Error('Failed to get PCO person ID');
 
         const meData = await meResponse.json();
         const myPersonId = meData.data?.id;
-        debugLog.push({ step: 'person_id', id: myPersonId });
 
-        // Step 2: Get approval groups I'm in
+        // Get approval groups I'm in
         const groupsResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            headers,
-            rateLimiter
+            { headers }
         );
 
-        if (!groupsResponse.ok) {
-            throw new Error('Failed to get approval groups');
-        }
+        if (!groupsResponse.ok) throw new Error('Failed to get approval groups');
 
         const groupsData = await groupsResponse.json();
         const allGroups = groupsData.data || [];
-        debugLog.push({ step: 'total_groups', count: allGroups.length });
 
         const myGroups = [];
         for (const group of allGroups) {
@@ -153,8 +104,7 @@ Deno.serve(async (req) => {
             
             const membersResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                headers,
-                rateLimiter
+                { headers }
             );
 
             if (membersResponse.ok) {
@@ -162,26 +112,20 @@ Deno.serve(async (req) => {
                 const isMember = membersData.data?.some(m => m.id === myPersonId);
                 
                 if (isMember) {
-                    myGroups.push({
-                        id: group.id,
-                        name: group.attributes?.name
-                    });
+                    myGroups.push({ id: group.id, name: group.attributes?.name });
                 }
             }
         }
-
-        debugLog.push({ step: 'my_groups', count: myGroups.length, groups: myGroups.map(g => g.name) });
 
         if (myGroups.length === 0) {
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'You are not in any approval groups',
-                debug: debugLog
+                message: 'You are not in any approval groups'
             });
         }
 
-        // Step 3: Get resources for my groups
+        // Get resources for my groups
         const myResourceIds = new Set();
         const myResources = [];
         
@@ -190,8 +134,7 @@ Deno.serve(async (req) => {
             
             const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                headers,
-                rateLimiter
+                { headers }
             );
 
             if (resourcesResponse.ok) {
@@ -208,46 +151,36 @@ Deno.serve(async (req) => {
             }
         }
 
-        debugLog.push({ 
-            step: 'my_resources', 
-            count: myResourceIds.size, 
-            resources: myResources 
-        });
-
         if (myResourceIds.size === 0) {
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'No resources assigned to your approval groups',
-                debug: debugLog
+                message: 'No resources assigned to your approval groups'
             });
         }
 
-        // Step 4: Get future event instances
+        // Get future event instances
         const now = new Date();
         const twoWeeksFromNow = new Date(now);
         twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
         
-        const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
-        
-        const instancesResponse = await fetchWithRetry(instancesUrl, headers, rateLimiter);
+        const instancesResponse = await fetchWithRetry(
+            `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`,
+            { headers }
+        );
 
         if (!instancesResponse.ok) {
-            const errorText = await instancesResponse.text();
-            throw new Error('Failed to fetch event instances: ' + errorText);
+            throw new Error('Failed to fetch event instances');
         }
 
         const instancesData = await instancesResponse.json();
         const allInstances = instancesData.data || [];
         
-        debugLog.push({ step: 'instances', count: allInstances.length });
-
         if (allInstances.length === 0) {
             return Response.json({
                 events: [],
                 count: 0,
-                message: 'No future events found in PCO Calendar',
-                debug: debugLog
+                message: 'No future events found in PCO Calendar'
             });
         }
 
@@ -258,56 +191,37 @@ Deno.serve(async (req) => {
             if (eventId) eventIds.add(eventId);
         });
 
-        debugLog.push({ step: 'unique_events', count: eventIds.size });
-
-        // Step 5: Process events with ADAPTIVE RATE LIMITING
+        // Process events in SMALLER BATCHES with RETRIES
         const eventsWithMyResources = [];
-        const skippedEvents = [];
-        
         const eventIdArray = Array.from(eventIds);
-        debugLog.push({ step: 'processing_events', count: eventIdArray.length });
+        const batchSize = 5; // REDUCED from previous implementation
         
-        console.log(`🚀 Processing ${eventIdArray.length} events with adaptive rate limiting...`);
+        console.log(`📦 Processing ${eventIdArray.length} events in batches of ${batchSize}...`);
         
-        for (let i = 0; i < eventIdArray.length;) {
-            const settings = rateLimiter.getSettings();
-            const batch = eventIdArray.slice(i, i + settings.batchSize);
-            const batchNum = Math.floor(i / settings.batchSize) + 1;
-            const totalBatches = Math.ceil(eventIdArray.length / settings.batchSize);
+        for (let i = 0; i < eventIdArray.length; i += batchSize) {
+            const batch = eventIdArray.slice(i, i + batchSize);
+            console.log(`🔄 Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(eventIdArray.length / batchSize)}`);
             
-            console.log(`📦 Batch ${batchNum}/${totalBatches} (size: ${batch.length}, delay: ${settings.batchDelay}ms, reqDelay: ${settings.requestDelay}ms)`);
-            
-            // Process batch in parallel
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        await delay(Math.random() * settings.requestDelay);
-                        
-                        // Fetch event and requests
+                        // Fetch event and requests WITH RETRIES
                         const [eventResponse, requestsResponse] = await Promise.all([
                             fetchWithRetry(
                                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-                                headers,
-                                rateLimiter,
+                                { headers },
                                 3
                             ),
                             fetchWithRetry(
                                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-                                headers,
-                                rateLimiter,
+                                { headers },
                                 3
                             )
                         ]);
 
                         if (!eventResponse.ok || !requestsResponse.ok) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    reason: 'fetch_failed',
-                                    eventStatus: eventResponse.status,
-                                    requestsStatus: requestsResponse.status
-                                }
-                            };
+                            console.warn(`⚠️ Failed to fetch event ${eventId}`);
+                            return { events: [] };
                         }
 
                         const eventData = await eventResponse.json();
@@ -316,20 +230,12 @@ Deno.serve(async (req) => {
 
                         // Check resources
                         const myRequestedResources = [];
-                        const allRequestedResources = [];
                         const buildingAccessRequests = [];
                         
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
                             const resource = requestsData.included?.find(i => i.type === 'Resource' && i.id === resourceId);
                             const resourceName = resource?.attributes?.name || 'Unknown';
-                            
-                            allRequestedResources.push({
-                                id: resourceId,
-                                name: resourceName,
-                                kind: resource?.attributes?.kind || 'Unknown',
-                                isMyResource: myResourceIds.has(resourceId)
-                            });
                             
                             if (myResourceIds.has(resourceId)) {
                                 myRequestedResources.push({
@@ -349,76 +255,60 @@ Deno.serve(async (req) => {
                         }
 
                         if (myRequestedResources.length === 0) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    name: event.attributes?.name,
-                                    reason: 'no_matching_resources',
-                                    total_resources: allRequestedResources.length,
-                                    resources_requested: allRequestedResources
-                                }
-                            };
+                            return { events: [] };
                         }
 
-                        // Fetch answers ONLY for building access
+                        // Fetch answers ONLY for building access WITH RETRIES
                         let accessTime = null;
                         
                         if (buildingAccessRequests.length > 0) {
                             try {
-                                const answerResults = await Promise.all(
-                                    buildingAccessRequests.map(async (requestId) => {
-                                        try {
-                                            await delay(30);
-                                            
-                                            const answersResponse = await fetchWithRetry(
-                                                `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`,
-                                                headers,
-                                                rateLimiter,
-                                                2
-                                            );
+                                for (const requestId of buildingAccessRequests) {
+                                    await delay(100);
+                                    
+                                    const answersResponse = await fetchWithRetry(
+                                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`,
+                                        { headers },
+                                        2
+                                    );
 
-                                            if (answersResponse.ok) {
-                                                const answersData = await answersResponse.json();
-                                                
-                                                for (const answer of (answersData.data || [])) {
-                                                    const questionAttr = answer.attributes?.question;
-                                                    const questionText = typeof questionAttr === 'string' ? questionAttr : 
-                                                                       (questionAttr?.question || questionAttr?.text || '');
-                                                    
-                                                    const question = String(questionText || '').toLowerCase();
-                                                    let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
-                                                    
-                                                    if (typeof value === 'object' && value !== null) {
-                                                        value = JSON.stringify(value);
-                                                    }
-                                                    
-                                                    const answerText = String(value || '').toLowerCase();
-                                                    
-                                                    const isAccessQuestion = question.includes('access') || 
-                                                                           question.includes('time') || 
-                                                                           question.includes('begin') || 
-                                                                           question.includes('end') ||
-                                                                           question.includes('other details');
-                                                    
-                                                    const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
-                                                                               /\d+:\d+/.test(answerText);
-                                                    
-                                                    if (isAccessQuestion && looksLikeTimeRange) {
-                                                        return String(value);
-                                                    }
-                                                }
+                                    if (answersResponse.ok) {
+                                        const answersData = await answersResponse.json();
+                                        
+                                        for (const answer of (answersData.data || [])) {
+                                            const questionAttr = answer.attributes?.question;
+                                            const questionText = typeof questionAttr === 'string' ? questionAttr : 
+                                                               (questionAttr?.question || questionAttr?.text || '');
+                                            
+                                            const question = String(questionText || '').toLowerCase();
+                                            let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                                            
+                                            if (typeof value === 'object' && value !== null) {
+                                                value = JSON.stringify(value);
                                             }
-                                            return null;
-                                        } catch (error) {
-                                            console.warn(`Warning: Error fetching answer for request ${requestId}: ${error.message}`);
-                                            return null;
+                                            
+                                            const answerText = String(value || '').toLowerCase();
+                                            
+                                            const isAccessQuestion = question.includes('access') || 
+                                                                   question.includes('time') || 
+                                                                   question.includes('begin') || 
+                                                                   question.includes('end') ||
+                                                                   question.includes('other details');
+                                            
+                                            const looksLikeTimeRange = answerText.includes('am') || answerText.includes('pm') || 
+                                                                       /\d+:\d+/.test(answerText);
+                                            
+                                            if (isAccessQuestion && looksLikeTimeRange) {
+                                                accessTime = String(value);
+                                                break;
+                                            }
                                         }
-                                    })
-                                );
-                                
-                                accessTime = answerResults.find(result => result !== null) || null;
+                                    }
+                                    
+                                    if (accessTime) break;
+                                }
                             } catch (error) {
-                                console.error('Error fetching answers:', error);
+                                console.warn('Warning: Error fetching answers:', error.message);
                             }
                         }
 
@@ -426,16 +316,6 @@ Deno.serve(async (req) => {
                         const eventInstances = allInstances.filter(i => 
                             i.relationships?.event?.data?.id === eventId
                         );
-
-                        if (eventInstances.length === 0) {
-                            return {
-                                skipped: {
-                                    eventId,
-                                    name: event.attributes?.name,
-                                    reason: 'no_instances'
-                                }
-                            };
-                        }
 
                         const events = [];
                         for (const instance of eventInstances) {
@@ -445,9 +325,7 @@ Deno.serve(async (req) => {
                             if (!startsAt) continue;
                             
                             const startDate = new Date(startsAt);
-                            if (startDate > twoWeeksFromNow) {
-                                continue;
-                            }
+                            if (startDate > twoWeeksFromNow) continue;
 
                             events.push({
                                 id: instance.id,
@@ -463,14 +341,8 @@ Deno.serve(async (req) => {
                         
                         return { events };
                     } catch (error) {
-                        console.error('❌ Error processing event', eventId, ':', error);
-                        return {
-                            skipped: {
-                                eventId,
-                                reason: 'error',
-                                error: error.message
-                            }
-                        };
+                        console.error('❌ Error processing event', eventId, ':', error.message);
+                        return { events: [] };
                     }
                 })
             );
@@ -479,49 +351,32 @@ Deno.serve(async (req) => {
             for (const result of batchResults) {
                 if (result.events) {
                     eventsWithMyResources.push(...result.events);
-                } else if (result.skipped) {
-                    skippedEvents.push(result.skipped);
                 }
             }
             
-            // Move to next batch
-            i += settings.batchSize;
-            
-            // Delay between batches (except for last batch)
-            if (i < eventIdArray.length) {
-                await delay(settings.batchDelay);
+            // Delay between batches
+            if (i + batchSize < eventIdArray.length) {
+                await delay(500);
             }
         }
-
-        console.log(`✅ Finished processing all events`);
 
         // Sort by start date
         eventsWithMyResources.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
-        debugLog.push({ 
-            step: 'final', 
-            included: eventsWithMyResources.length,
-            skipped: skippedEvents.length,
-            rate_limit_hit: rateLimiter.hitRateLimit,
-            final_settings: rateLimiter.getSettings(),
-            skipped_details: skippedEvents
-        });
+        console.log(`✅ Finished: ${eventsWithMyResources.length} events with my resources`);
 
         return Response.json({
             events: eventsWithMyResources,
             count: eventsWithMyResources.length,
             my_groups_count: myGroups.length,
-            my_resources_count: myResourceIds.size,
-            debug: debugLog
+            my_resources_count: myResourceIds.size
         });
 
     } catch (error) {
         console.error('❌ Get my schedule error:', error);
-        debugLog.push({ step: 'error', error: error.message, stack: error.stack });
         return Response.json({
             error: error.message,
-            events: [],
-            debug: debugLog
+            events: []
         }, { status: 500 });
     }
 });
