@@ -27,13 +27,13 @@ export default function Calendar() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
-  const [resourceTypes, setResourceTypes] = useState([]);
+  const [resourceCategories, setResourceCategories] = useState([]);
   const [eventTags, setEventTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [roomSearch, setRoomSearch] = useState("");
-  const [selectedResourceType, setSelectedResourceType] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTag, setSelectedTag] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -84,30 +84,33 @@ export default function Calendar() {
       setEvents(eventsData);
       setLastSync(new Date());
 
-      // Extract unique rooms and resource types
+      // Extract unique rooms and resource categories
       const roomsSet = new Set();
-      const typesSet = new Set();
+      const categoriesSet = new Set();
       
       eventsData.forEach(event => {
         if (event.resources && Array.isArray(event.resources)) {
           event.resources.forEach(resource => {
             if (resource.kind === 'Room') {
               roomsSet.add(resource.name);
-            } else if (resource.kind) {
-              typesSet.add(resource.kind);
+            } else {
+              // Use the approval group category
+              if (resource.category && resource.category !== 'Uncategorized') {
+                categoriesSet.add(resource.category);
+              }
             }
           });
         }
       });
       
       const uniqueRooms = Array.from(roomsSet).sort();
-      const uniqueTypes = Array.from(typesSet).sort();
+      const uniqueCategories = Array.from(categoriesSet).sort();
       
       console.log('🚪 Extracted rooms:', uniqueRooms.length);
-      console.log('🔧 Extracted resource types:', uniqueTypes);
+      console.log('🔧 Extracted resource categories:', uniqueCategories);
       
       setAllRooms(uniqueRooms);
-      setResourceTypes(uniqueTypes);
+      setResourceCategories(uniqueCategories);
 
       // Extract unique tags
       const tagsSet = new Set();
@@ -139,7 +142,7 @@ export default function Calendar() {
     setSyncing(false);
   };
 
-  // Filter events by room search, resource type, and tag
+  // Filter events by room search, resource category, and tag
   const filteredEvents = events.filter(event => {
     // Room search filter
     const roomMatch = !roomSearch || 
@@ -148,18 +151,18 @@ export default function Calendar() {
         r.name.toLowerCase().includes(roomSearch.toLowerCase())
       );
     
-    // Resource type filter
-    const typeMatch = selectedResourceType === "all" || 
+    // Resource category filter
+    const categoryMatch = selectedCategory === "all" || 
       event.resources?.some(r => 
         r.kind !== 'Room' && 
-        r.kind === selectedResourceType
+        r.category === selectedCategory
       );
     
     // Tag filter
     const tagMatch = selectedTag === "all" || 
       event.tags?.includes(selectedTag);
     
-    return roomMatch && typeMatch && tagMatch;
+    return roomMatch && categoryMatch && tagMatch;
   });
 
   console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Month: ${format(currentMonth, 'MMMM yyyy')}`);
@@ -255,17 +258,17 @@ export default function Calendar() {
                 />
               </div>
 
-              {/* Resource Type Dropdown */}
-              <Select value={selectedResourceType} onValueChange={setSelectedResourceType}>
+              {/* Resource Category Dropdown */}
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-52">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Resource Type" />
+                  <SelectValue placeholder="Resource Category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Resources</SelectItem>
-                  {resourceTypes.map(type => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                  {resourceCategories.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -447,7 +450,7 @@ export default function Calendar() {
                       <div className="flex flex-wrap gap-1 mb-2">
                         {event.resources.map(resource => (
                           <Badge key={resource.id} variant="secondary" className="text-xs">
-                            {resource.name} ({resource.kind})
+                            {resource.name} {resource.category && resource.category !== 'Uncategorized' && `(${resource.category})`}
                           </Badge>
                         ))}
                       </div>
@@ -546,6 +549,12 @@ export default function Calendar() {
                                     <p className="font-medium text-slate-900">{resource.name}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <span className="text-xs text-slate-500">{resource.kind}</span>
+                                      {resource.category && resource.category !== 'Uncategorized' && (
+                                        <>
+                                          <span className="text-xs text-slate-400">•</span>
+                                          <span className="text-xs text-blue-600">{resource.category}</span>
+                                        </>
+                                      )}
                                       {resource.approval_status && (
                                         <>
                                           <span className="text-xs text-slate-400">•</span>
@@ -622,6 +631,12 @@ export default function Calendar() {
                                     <p className="font-medium text-slate-900">{resource.name}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <span className="text-xs text-slate-500">{resource.kind}</span>
+                                      {resource.category && resource.category !== 'Uncategorized' && (
+                                        <>
+                                          <span className="text-xs text-slate-400">•</span>
+                                          <span className="text-xs text-green-600">{resource.category}</span>
+                                        </>
+                                      )}
                                       {resource.approval_status && (
                                         <>
                                           <span className="text-xs text-slate-400">•</span>
