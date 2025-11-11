@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
-// Normalize text for pattern matching
 function normalizePattern(text) {
   if (!text) return '';
   return text
@@ -10,7 +9,6 @@ function normalizePattern(text) {
     .trim();
 }
 
-// Extract key words from event name
 function extractKeyWords(text) {
   if (!text) return '';
   
@@ -18,10 +16,9 @@ function extractKeyWords(text) {
   const normalized = normalizePattern(text);
   const words = normalized.split(' ').filter(w => w.length > 2 && !stopWords.includes(w));
   
-  return words.slice(0, 3).join(' '); // Top 3 keywords
+  return words.slice(0, 3).join(' ');
 }
 
-// Calculate similarity between two strings (simple word overlap)
 function calculateSimilarity(str1, str2) {
   const words1 = new Set(str1.split(' '));
   const words2 = new Set(str2.split(' '));
@@ -50,7 +47,11 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    console.log('🧠 Getting smart suggestion for:', event_name);
+    console.log('========================================');
+    console.log('🧠 SMART SUGGESTION REQUEST');
+    console.log('Event:', event_name);
+    console.log('Resource:', resource_name);
+    console.log('========================================');
 
     // Extract patterns from current request
     const eventPattern = extractKeyWords(event_name);
@@ -62,40 +63,35 @@ Deno.serve(async (req) => {
     ].join(' '));
 
     console.log('🔍 Event pattern:', eventPattern);
+    console.log('🔍 Resource pattern:', resourcePattern);
 
-    // Get all learned patterns
-    const learnedPatterns = await base44.asServiceRole.entities.SmartSearchPattern.list('-confidence_score', 100);
+    // Get learned patterns for this EXACT event+resource combo
+    const learnedPatterns = await base44.asServiceRole.entities.SmartSearchPattern.filter({
+      event_name_pattern: eventPattern,
+      resource_name_pattern: resourcePattern
+    });
 
-    console.log('📚 Found', learnedPatterns.length, 'learned patterns');
+    console.log(`📚 Found ${learnedPatterns.length} learned patterns for this EXACT event+resource`);
 
-    // Find best matching pattern
-    let bestMatch = null;
-    let bestScore = 0;
+    if (learnedPatterns.length > 0) {
+      // Sort by confidence and times used
+      learnedPatterns.sort((a, b) => {
+        const scoreA = (a.confidence_score || 1) * (a.times_selected || 1);
+        const scoreB = (b.confidence_score || 1) * (b.times_selected || 1);
+        return scoreB - scoreA;
+      });
 
-    for (const pattern of learnedPatterns) {
-      // Calculate similarity score
-      const eventSimilarity = calculateSimilarity(eventPattern, pattern.event_name_pattern || '');
-      const resourceSimilarity = resourcePattern && pattern.resource_name_pattern 
-        ? calculateSimilarity(resourcePattern, pattern.resource_name_pattern)
-        : 0;
-      
-      // Weighted score: event pattern is more important
-      const totalScore = (eventSimilarity * 0.7) + (resourceSimilarity * 0.3);
-      const finalScore = totalScore * (pattern.confidence_score || 1);
+      const bestMatch = learnedPatterns[0];
 
-      if (finalScore > bestScore && finalScore > 0.3) { // Minimum 30% similarity
-        bestScore = finalScore;
-        bestMatch = pattern;
-      }
-    }
-
-    if (bestMatch) {
-      console.log('✅ Found learned pattern match!');
-      console.log('   Pattern:', bestMatch.event_name_pattern);
-      console.log('   Suggests:', bestMatch.selected_cardholder_name);
-      console.log('   Confidence:', bestMatch.confidence_score);
-      console.log('   Times used:', bestMatch.times_selected);
-      console.log('   Match score:', bestScore.toFixed(2));
+      console.log('========================================');
+      console.log('✅ EXACT MATCH FOUND!');
+      console.log('Pattern:', bestMatch.event_name_pattern);
+      console.log('Resource:', bestMatch.resource_name_pattern);
+      console.log('→ Cardholder:', bestMatch.selected_cardholder_name);
+      console.log('→ PIN:', bestMatch.selected_pin);
+      console.log('→ Confidence:', bestMatch.confidence_score);
+      console.log('→ Times used:', bestMatch.times_selected);
+      console.log('========================================');
 
       return Response.json({
         ok: true,
@@ -107,15 +103,66 @@ Deno.serve(async (req) => {
             pin: bestMatch.selected_pin,
             member_id: bestMatch.selected_member_id
           },
-          reason: `learned from ${bestMatch.times_selected} similar event${bestMatch.times_selected > 1 ? 's' : ''}`,
+          reason: `learned from ${bestMatch.times_selected} previous selection${bestMatch.times_selected > 1 ? 's' : ''}`,
           confidence: bestMatch.confidence_score,
-          match_score: bestScore
+          match_score: 1.0 // Perfect match
+        }
+      });
+    }
+
+    // No exact match - try fuzzy matching on event name only
+    console.log('🔍 No exact match - trying fuzzy event name matching...');
+    
+    const allPatterns = await base44.asServiceRole.entities.SmartSearchPattern.list('-confidence_score', 100);
+    console.log(`📚 Checking ${allPatterns.length} total learned patterns`);
+
+    let bestFuzzyMatch = null;
+    let bestFuzzyScore = 0;
+
+    for (const pattern of allPatterns) {
+      const eventSimilarity = calculateSimilarity(eventPattern, pattern.event_name_pattern || '');
+      const resourceSimilarity = resourcePattern && pattern.resource_name_pattern 
+        ? calculateSimilarity(resourcePattern, pattern.resource_name_pattern)
+        : 0;
+      
+      // Weighted: event 80%, resource 20%
+      const totalScore = (eventSimilarity * 0.8) + (resourceSimilarity * 0.2);
+      const finalScore = totalScore * (pattern.confidence_score || 1);
+
+      if (finalScore > bestFuzzyScore && finalScore > 0.4) { // 40% threshold
+        bestFuzzyScore = finalScore;
+        bestFuzzyMatch = pattern;
+      }
+    }
+
+    if (bestFuzzyMatch) {
+      console.log('========================================');
+      console.log('✅ FUZZY MATCH FOUND');
+      console.log('Pattern:', bestFuzzyMatch.event_name_pattern);
+      console.log('→ Cardholder:', bestFuzzyMatch.selected_cardholder_name);
+      console.log('→ PIN:', bestFuzzyMatch.selected_pin);
+      console.log('→ Match score:', bestFuzzyScore.toFixed(2));
+      console.log('========================================');
+
+      return Response.json({
+        ok: true,
+        learned: true,
+        suggestion: {
+          search: bestFuzzyMatch.search_term_used || bestFuzzyMatch.selected_cardholder_name,
+          cardholder: {
+            name: bestFuzzyMatch.selected_cardholder_name,
+            pin: bestFuzzyMatch.selected_pin,
+            member_id: bestFuzzyMatch.selected_member_id
+          },
+          reason: `similar to ${bestFuzzyMatch.times_selected} previous event${bestFuzzyMatch.times_selected > 1 ? 's' : ''}`,
+          confidence: bestFuzzyMatch.confidence_score,
+          match_score: bestFuzzyScore
         }
       });
     }
 
     // Fallback to rule-based suggestions
-    console.log('📍 No learned pattern - using rule-based suggestion');
+    console.log('📍 No learned patterns - using rule-based suggestion');
 
     // Look for explicit 6-digit code
     const codeMatch = allText.match(/\b(\d{6})\b/);
@@ -130,7 +177,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Look for keywords
+    // NEW: Use event name as search term
+    const eventWords = eventPattern.split(' ')[0]; // First keyword
+    if (eventWords) {
+      console.log('💡 Suggesting event-based search:', eventWords);
+      return Response.json({
+        ok: true,
+        learned: false,
+        suggestion: {
+          search: eventWords,
+          reason: 'event name keyword'
+        }
+      });
+    }
+
+    // Keyword fallbacks
     const buildingKeywords = {
       'unlock': { search: 'unlock', reason: 'unlock keyword detected' },
       'pcb': { search: 'PCB', reason: 'PCB building detected' },

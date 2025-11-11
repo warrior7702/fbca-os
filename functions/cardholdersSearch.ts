@@ -30,6 +30,32 @@ function matchesBuilding(query, record) {
   return false;
 }
 
+// NEW: Check if query words match cardholder name words
+function wordMatchScore(query, record) {
+  const qn = normalize(query);
+  const name = normalize(record.name);
+  
+  // Split into words
+  const queryWords = qn.split(/\s+/).filter(w => w.length > 2);
+  const nameWords = name.split(/\s+/).filter(w => w.length > 2);
+  
+  if (queryWords.length === 0) return 0;
+  
+  // Count how many query words match name words
+  let matches = 0;
+  for (const qWord of queryWords) {
+    for (const nWord of nameWords) {
+      if (nWord.includes(qWord) || qWord.includes(nWord)) {
+        matches++;
+        break;
+      }
+    }
+  }
+  
+  // Return percentage of query words that matched
+  return (matches / queryWords.length) * 100;
+}
+
 function score(q, record) {
   const qn = normalize(q);
   const name = normalize(record.name);
@@ -47,6 +73,13 @@ function score(q, record) {
   
   // Exact name match
   if (name === qn) return 140;
+  
+  // NEW: Word-based matching for multi-word queries (e.g., "wow camp")
+  const wordScore = wordMatchScore(q, record);
+  if (wordScore > 0) {
+    // If multiple words match, this is very relevant
+    if (wordScore >= 50) return 120 + wordScore; // 120-220 range
+  }
   
   // Name starts with query
   if (name.startsWith(qn)) return 100;
@@ -84,7 +117,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // FIXED: Support both POST body and URL params
+    // Support both POST body and URL params
     let q = '';
     let limit = 12;
     
@@ -93,7 +126,6 @@ Deno.serve(async (req) => {
       q = body.q || body.query || '';
       limit = parseInt(body.limit || '12', 10);
     } else {
-      // GET request - read from URL params
       const url = new URL(req.url);
       q = url.searchParams.get('q') || url.searchParams.get('query') || '';
       limit = parseInt(url.searchParams.get('limit') || '12', 10);
@@ -114,14 +146,19 @@ Deno.serve(async (req) => {
     }
 
     // Score and filter results
-    const results = cardholders
+    const scoredResults = cardholders
       .map(r => ({ r, s: score(q, r) }))
       .filter(x => x.s > 0)
       .sort((a, b) => b.s - a.s)
-      .slice(0, limit)
-      .map(x => x.r);
+      .slice(0, limit);
 
-    console.log(`✅ Found ${results.length} matching results`);
+    // Log top results with scores
+    console.log(`✅ Top ${Math.min(3, scoredResults.length)} results:`);
+    scoredResults.slice(0, 3).forEach(({r, s}) => {
+      console.log(`  - ${r.name} (${r.pin}) [score: ${s}]`);
+    });
+
+    const results = scoredResults.map(x => x.r);
 
     return Response.json({ 
       ok: true, 
