@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -164,7 +165,7 @@ Deno.serve(async (req) => {
                         return {
                             eventId,
                             data: {
-                                name: `Event ${eventId}`,
+                                name: `Unnamed Event`,
                                 summary: null,
                                 description: null,
                                 visible_in_church_center: false,
@@ -186,10 +187,10 @@ Deno.serve(async (req) => {
                         eventName = event.attributes?.summary;
                     }
                     
-                    // If still missing, use ID-based name
+                    // If still missing, use friendly fallback
                     if (!eventName || eventName.trim() === '') {
-                        console.warn(`⚠️ Event ${eventId} has no name or summary! Using fallback.`);
-                        eventName = `Unnamed Event (${eventId})`;
+                        console.warn(`⚠️ Event ${eventId} has no name or summary!`);
+                        eventName = `Unnamed Event`;
                         eventsWithoutNames++;
                     }
                     
@@ -314,7 +315,7 @@ Deno.serve(async (req) => {
                     return {
                         eventId,
                         data: {
-                            name: `Event ${eventId} (Error)`,
+                            name: `Unnamed Event`,
                             summary: null,
                             description: null,
                             visible_in_church_center: false,
@@ -360,7 +361,7 @@ Deno.serve(async (req) => {
             const startDate = new Date(starts_at);
             if (startDate > sixtyDaysFromNow) {
                 skippedBeyond60Days++;
-                continue; // Skip events beyond 60 days
+                continue;
             }
             
             // Build resources array from resource requests - DEDUPLICATE by resource_id
@@ -394,7 +395,7 @@ Deno.serve(async (req) => {
             eventsWithResources.push({
                 id: instance.id,
                 event_id: eventId,
-                name: eventData?.name || `Event ${eventId}`,
+                name: eventData?.name || `Unnamed Event`,
                 starts_at: starts_at,
                 ends_at: ends_at,
                 summary: eventData?.summary,
