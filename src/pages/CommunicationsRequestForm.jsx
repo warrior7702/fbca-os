@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -165,7 +166,7 @@ export default function CommunicationsRequestForm() {
 
   const handleMarketingChannelChange = (channel, checked) => {
     setFormData(prev => ({
-      ...prev,
+      ...prev.marketing_channels,
       marketing_channels: {
         ...prev.marketing_channels,
         [channel]: checked
@@ -448,7 +449,7 @@ export default function CommunicationsRequestForm() {
       const request = await base44.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: "manual_form",
-        status: "request",
+        status: "minister_goal_review", // CHANGED: Move directly to goal review
         priority: "medium",
         title: finalProjectName,
         description: `${formData.need_type} request for ${formData.ministry_department}`,
@@ -495,7 +496,7 @@ Project: ${finalProjectName}
 Ministry: ${formData.ministry_department}
 Type: ${formData.need_type}
 
-Our communications team will review your request and reach out within 1-2 business days to discuss your needs.
+Your request is now in Minister Goal Review. Our communications team will review your request and reach out within 1-2 business days to discuss your ministry goals and vision.
 
 You can track your request at: ${window.location.origin}${createPageUrl('WorkflowDetail')}?id=${request.id}
 

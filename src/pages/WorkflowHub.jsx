@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -24,11 +23,19 @@ import {
   FileText,
   Target,
   Presentation,
-  Megaphone
+  Megaphone,
+  Edit
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function WorkflowHub() {
   const [user, setUser] = useState(null);
@@ -38,6 +45,7 @@ export default function WorkflowHub() {
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
   const [view, setView] = useState('requestor');
+  const [selectedRequestId, setSelectedRequestId] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -103,6 +111,14 @@ export default function WorkflowHub() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleEditExisting = () => {
+    if (!selectedRequestId) {
+      toast.error('Please select a request to edit');
+      return;
+    }
+    navigate(createPageUrl('WorkflowDetail') + `?id=${selectedRequestId}`);
   };
 
   const getStatusColor = (status) => {
@@ -252,13 +268,44 @@ export default function WorkflowHub() {
                   </>
                 )}
               </Button>
+              
+              {/* Edit Existing Plan Button */}
+              <div className="flex gap-2 items-center">
+                <Select
+                  value={selectedRequestId}
+                  onValueChange={setSelectedRequestId}
+                >
+                  <SelectTrigger className="w-48 h-9">
+                    <SelectValue placeholder="Select request..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {myRequests.map(req => (
+                      <SelectItem key={req.id} value={req.id}>
+                        {req.request_number} - {req.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Button
+                  onClick={handleEditExisting}
+                  disabled={!selectedRequestId}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Existing Plan
+                </Button>
+              </div>
+              
+              {/* New Communication Plan Button */}
               <Button
                 onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}
                 className="bg-purple-600 hover:bg-purple-700"
                 size="sm"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                New Request
+                New Communication Plan
               </Button>
             </div>
           }

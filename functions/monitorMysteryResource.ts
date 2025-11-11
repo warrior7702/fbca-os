@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
@@ -212,15 +213,15 @@ Deno.serve(async (req) => {
       console.log(`   Owner: ${mysteryReq.owner_name} (${mysteryReq.owner_email})`);
 
       try {
-        // Create communication request
+        // Create communication request - CHANGED: Set status to minister_goal_review
         const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
           request_number: requestNumber,
           type: 'mystery_resource',
-          status: 'request',
+          status: 'minister_goal_review', // CHANGED: Move directly to goal review
           priority: 'medium',
           title: mysteryReq.event_name,
           description: `Communications request automatically created from PCO Calendar event`,
-          requestor_email: mysteryReq.owner_email || user.email, // Use owner email or fallback to sync user
+          requestor_email: mysteryReq.owner_email || user.email,
           requestor_name: mysteryReq.owner_name,
           pco_event_id: mysteryReq.event_id,
           pco_event_name: mysteryReq.event_name,
@@ -254,7 +255,7 @@ Request Number: ${requestNumber}
 Event: ${mysteryReq.event_name}
 Date: ${mysteryReq.event_start ? new Date(mysteryReq.event_start).toLocaleDateString() : 'TBD'}
 
-Our communications team will review your request and reach out to discuss your needs.
+Your request is now in Minister Goal Review. Our communications team will reach out to discuss your ministry goals and needs for this event.
 
 Request Details:
 - Automatically created from PCO Calendar
