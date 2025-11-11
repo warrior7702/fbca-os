@@ -231,9 +231,9 @@ Deno.serve(async (req) => {
                         }
                     }
                     
-                    // Fetch event_resource_requests separately (WITH RETRY)
+                    // Fetch event_resource_requests with resource AND approval_group (WITH RETRY)
                     const requestsResponse = await fetchWithRetry(
-                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+                        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource,resource_approval_groups&per_page=100`,
                         {
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
@@ -247,8 +247,10 @@ Deno.serve(async (req) => {
                     if (requestsResponse.ok) {
                         const requestsData = await requestsResponse.json();
                         
-                        // Build a map of resources from included
+                        // Build maps from included data
                         const resourceMap = {};
+                        const approvalGroupMap = {};
+                        
                         if (requestsData.included) {
                             for (const item of requestsData.included) {
                                 if (item.type === 'Resource') {
@@ -257,14 +259,22 @@ Deno.serve(async (req) => {
                                         name: item.attributes?.name || 'Unnamed Resource',
                                         kind: item.attributes?.kind || 'Unknown'
                                     };
+                                } else if (item.type === 'ResourceApprovalGroup') {
+                                    approvalGroupMap[item.id] = {
+                                        id: item.id,
+                                        name: item.attributes?.name || 'Unknown Group'
+                                    };
                                 }
                             }
                         }
                         
-                        // Build resource requests with full resource info AND fetch answers
+                        // Build resource requests with full resource info AND approval group
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
+                            const approvalGroupId = request.relationships?.resource_approval_groups?.data?.[0]?.id;
+                            
                             const resource = resourceMap[resourceId];
+                            const approvalGroup = approvalGroupMap[approvalGroupId];
                             
                             if (resource) {
                                 // Fetch answers for this resource request (WITH RETRY)
@@ -311,6 +321,7 @@ Deno.serve(async (req) => {
                                     resource_id: resourceId,
                                     resource_name: resource.name,
                                     resource_kind: resource.kind,
+                                    resource_category: approvalGroup?.name || 'Uncategorized',
                                     approval_status: request.attributes?.approval_status,
                                     quantity: request.attributes?.quantity,
                                     answers: answers
@@ -417,6 +428,7 @@ Deno.serve(async (req) => {
                             id: request.resource_id,
                             name: request.resource_name,
                             kind: request.resource_kind,
+                            category: request.resource_category,
                             approval_status: request.approval_status,
                             answers: request.answers || []
                         });
