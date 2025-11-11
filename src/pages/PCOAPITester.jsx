@@ -10,6 +10,7 @@ import { Bug, Loader2, Calendar, Package, Users, AlertCircle, CheckCircle, XCirc
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion"; // NEW: Import motion from framer-motion
 
 export default function PCOAPITester() {
   const [user, setUser] = useState(null);
@@ -2398,7 +2399,9 @@ export default function PCOAPITester() {
                   
                   {/* Show Send Email button if we have owner info */}
                   {result && result.endpoint === 'getEventOwner' && result.data?.owner && (
-                    <div
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       className="pt-3 border-t border-blue-300"
                     >
                       <Alert className="bg-green-50 border-green-300 mb-3">
@@ -2418,46 +2421,29 @@ export default function PCOAPITester() {
                         onClick={async () => {
                           setTestLoading(true);
                           try {
-                            // First create a test workflow request
-                            console.log('📝 Creating test Communication Request...');
+                            console.log('📝 Creating test Communication Request and sending email...');
                             
-                            const requestNumber = `CR-TEST-${Date.now().toString().slice(-6)}`;
-                            const testRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
-                              request_number: requestNumber,
-                              type: 'mystery_resource',
-                              status: 'request',
-                              priority: 'medium',
-                              title: result.data.event.attributes?.name || 'Test Event',
-                              description: 'TEST Communication Request - Created from API Tester',
-                              requestor_email: result.data.owner.attributes?.email,
-                              requestor_name: result.data.owner.attributes?.name,
-                              pco_event_id: eventId,
-                              pco_event_name: result.data.event.attributes?.name,
-                              pco_event_date: result.data.event.attributes?.starts_at
+                            // Call backend function to create request and send email
+                            const response = await base44.functions.invoke('sendTestEmailFromEvent', {
+                              event_id: eventId,
+                              event_name: result.data.event.attributes?.name,
+                              event_date: result.data.event.attributes?.starts_at,
+                              owner_email: result.data.owner.attributes?.email,
+                              owner_name: result.data.owner.attributes?.name
                             });
                             
-                            console.log('✅ Test request created:', testRequest.id);
+                            console.log('✅ Response:', response.data);
                             
-                            // Send email
-                            console.log('📧 Sending test email...');
-                            const emailResponse = await base44.functions.invoke('sendCommunicationRequestEmail', {
-                              request_id: testRequest.id
-                            });
-                            
-                            setResult({
-                              ok: emailResponse.data.success,
-                              status: 200,
-                              data: {
-                                ...emailResponse.data,
-                                test_request: testRequest
-                              },
-                              endpoint: 'sendTestEmail' // Use a different endpoint name for this specific flow
-                            });
-
-                            if (emailResponse.data.success) {
-                              toast.success(`✅ Test email sent to ${result.data.owner.attributes?.email}!`);
+                            if (response.data.success) {
+                              toast.success(`✅ Test email sent to ${response.data.recipient}!`);
+                              setResult({
+                                ok: true,
+                                status: 200,
+                                data: response.data,
+                                endpoint: 'sendTestEmail'
+                              });
                             } else {
-                              throw new Error(emailResponse.data.error || 'Email failed');
+                              throw new Error(response.data.error || 'Failed to send email');
                             }
                           } catch (error) {
                             console.error('❌ Error:', error);
@@ -2485,9 +2471,9 @@ export default function PCOAPITester() {
                       <p className="text-xs text-slate-500 mt-2">
                         This will create a TEST Communication Request and send a notification email to the event owner.
                       </p>
-                    </div>
+                    </motion.div>
                   )}
-                  
+
                   <Alert className="bg-blue-100 border-blue-300">
                     <AlertDescription className="text-xs">
                       <strong>How to find Event ID:</strong>
