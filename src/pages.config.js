@@ -30,6 +30,7 @@ import PCOAPITester from './pages/PCOAPITester';
 import PhantomUserHunter from './pages/PhantomUserHunter';
 import WorkflowHub from './pages/WorkflowHub';
 import TestMysterySync from './pages/TestMysterySync';
+import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
 import Layout from './Layout.jsx';
 
 
@@ -66,6 +67,7 @@ export const PAGES = {
     "PhantomUserHunter": PhantomUserHunter,
     "WorkflowHub": WorkflowHub,
     "TestMysterySync": TestMysterySync,
+    "CommunicationsRequestForm": CommunicationsRequestForm,
 }
 
 export const pagesConfig = {
