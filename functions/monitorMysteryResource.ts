@@ -10,6 +10,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'PCO not connected' }, { status: 401 });
     }
 
+    console.log('🔍 Starting Mystery Resource monitor...');
+
     // Fetch all pending resource requests from PCO
     const pcoResponse = await fetch(
       'https://api.planningcenteronline.com/calendar/v2/resource_requests?filter=pending&per_page=100',
@@ -22,11 +24,13 @@ Deno.serve(async (req) => {
     );
 
     if (!pcoResponse.ok) {
+      console.error('❌ PCO API error:', pcoResponse.status);
       throw new Error(`PCO API error: ${pcoResponse.status}`);
     }
 
     const data = await pcoResponse.json();
     const resourceRequests = data.data || [];
+    console.log(`📋 Found ${resourceRequests.length} pending resource requests`);
 
     // Fetch resource details to find "Mystery Resource"
     const mysteryResourceRequests = [];
@@ -52,6 +56,8 @@ Deno.serve(async (req) => {
 
           // Check if this is the Mystery Resource
           if (resourceName.toLowerCase().includes('mystery resource')) {
+            console.log('🔮 Found Mystery Resource request:', request.id);
+            
             // Fetch event details
             const eventId = request.relationships?.event?.data?.id;
             let eventDetails = null;
@@ -88,6 +94,8 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(`✅ Found ${mysteryResourceRequests.length} Mystery Resource requests`);
+
     // Check existing workflow requests to avoid duplicates
     const existingRequests = await base44.asServiceRole.entities.WorkflowRequest.filter({
       type: 'mystery_resource',
@@ -95,6 +103,7 @@ Deno.serve(async (req) => {
     });
 
     const existingPCORequestIds = existingRequests.map(r => r.pco_resource_request_id);
+    console.log(`📊 ${existingRequests.length} existing requests in database`);
 
     // Create new communication requests for mystery resources
     const newRequests = [];
@@ -102,11 +111,14 @@ Deno.serve(async (req) => {
     for (const mysteryReq of mysteryResourceRequests) {
       // Skip if we already have a workflow for this PCO request
       if (existingPCORequestIds.includes(mysteryReq.request_id)) {
+        console.log(`⏭️ Skipping duplicate request: ${mysteryReq.request_id}`);
         continue;
       }
 
       // Generate request number
       const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
+
+      console.log(`📝 Creating new request: ${requestNumber}`);
 
       // Create communication request
       const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
@@ -131,19 +143,29 @@ Deno.serve(async (req) => {
       });
 
       newRequests.push(commRequest);
+      console.log(`✅ Created request: ${commRequest.id}`);
 
       // Send email notification to event owner
       try {
-        console.log('📧 Sending email notification for request:', commRequest.id);
-        await base44.asServiceRole.functions.invoke('sendCommunicationRequestEmail', {
+        console.log('📧 Sending email notification...');
+        
+        // Use the correct SDK method for calling functions from within functions
+        const emailResponse = await base44.functions.invoke('sendCommunicationRequestEmail', {
           request_id: commRequest.id
         });
-        console.log('✅ Email sent successfully');
+        
+        if (emailResponse.data?.success) {
+          console.log('✅ Email sent to:', emailResponse.data.recipient);
+        } else {
+          console.warn('⚠️ Email send returned non-success:', emailResponse.data);
+        }
       } catch (emailError) {
-        console.error('❌ Failed to send email:', emailError);
+        console.error('❌ Failed to send email:', emailError.message);
         // Continue even if email fails - don't block the request creation
       }
     }
+
+    console.log('🎉 Monitor complete!');
 
     return Response.json({
       success: true,
@@ -154,10 +176,11 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error monitoring Mystery Resource:', error);
+    console.error('❌ Error monitoring Mystery Resource:', error);
     return Response.json({ 
       error: error.message,
-      details: 'Failed to monitor Mystery Resource requests'
+      details: 'Failed to monitor Mystery Resource requests',
+      stack: error.stack
     }, { status: 500 });
   }
 });
