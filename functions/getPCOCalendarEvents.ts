@@ -1,3 +1,4 @@
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 async function refreshTokenIfNeeded(base44, user) {
@@ -204,19 +205,59 @@ Deno.serve(async (req) => {
                             }
                         }
                         
-                        // Build resource requests with full resource info
+                        // Build resource requests with full resource info AND fetch answers
                         for (const request of (requestsData.data || [])) {
                             const resourceId = request.relationships?.resource?.data?.id;
                             const resource = resourceMap[resourceId];
                             
                             if (resource) {
+                                // Fetch answers for this resource request
+                                const answers = [];
+                                try {
+                                    const answersResponse = await fetch(
+                                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers?per_page=100`,
+                                        {
+                                            headers: {
+                                                'Authorization': `Bearer ${accessToken}`,
+                                                'Content-Type': 'application/json'
+                                            }
+                                        }
+                                    );
+
+                                    if (answersResponse.ok) {
+                                        const answersData = await answersResponse.json();
+                                        
+                                        for (const answer of (answersData.data || [])) {
+                                            const questionAttr = answer.attributes?.question;
+                                            const questionText = typeof questionAttr === 'string' ? questionAttr : 
+                                                               (questionAttr?.question || questionAttr?.text || '');
+                                            
+                                            let value = answer.attributes?.value || answer.attributes?.answer || answer.attributes?.text;
+                                            
+                                            if (typeof value === 'object' && value !== null) {
+                                                value = JSON.stringify(value);
+                                            }
+                                            
+                                            if (questionText && value) {
+                                                answers.push({
+                                                    question: String(questionText),
+                                                    answer: String(value)
+                                                });
+                                            }
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.warn(`Warning: Error fetching answers for request ${request.id}:`, error.message);
+                                }
+                                
                                 resourceRequests.push({
                                     id: request.id,
                                     resource_id: resourceId,
                                     resource_name: resource.name,
                                     resource_kind: resource.kind,
                                     approval_status: request.attributes?.approval_status,
-                                    quantity: request.attributes?.quantity
+                                    quantity: request.attributes?.quantity,
+                                    answers: answers
                                 });
                             }
                         }
@@ -271,18 +312,33 @@ Deno.serve(async (req) => {
                 continue; // Skip events beyond 60 days
             }
             
-            // Build resources array from resource requests
-            const resources = [];
+            // Build resources array from resource requests - DEDUPLICATE by resource_id
+            const resourcesMap = new Map();
             if (eventData?.resource_requests) {
                 for (const request of eventData.resource_requests) {
-                    resources.push({
-                        id: request.resource_id,
-                        name: request.resource_name,
-                        kind: request.resource_kind,
-                        approval_status: request.approval_status
-                    });
+                    const resourceId = request.resource_id;
+                    
+                    // If we already have this resource, merge answers
+                    if (resourcesMap.has(resourceId)) {
+                        const existing = resourcesMap.get(resourceId);
+                        // Merge answers from multiple requests for same resource
+                        if (request.answers && request.answers.length > 0) {
+                            existing.answers = [...(existing.answers || []), ...request.answers];
+                        }
+                    } else {
+                        // First time seeing this resource
+                        resourcesMap.set(resourceId, {
+                            id: request.resource_id,
+                            name: request.resource_name,
+                            kind: request.resource_kind,
+                            approval_status: request.approval_status,
+                            answers: request.answers || []
+                        });
+                    }
                 }
             }
+            
+            const resources = Array.from(resourcesMap.values());
             
             eventsWithResources.push({
                 id: instance.id,
