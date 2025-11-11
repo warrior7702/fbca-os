@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
     }
 
     console.log('🔍 Starting Mystery Resource monitor...');
+    console.log('👤 User:', user.email);
 
     // Fetch all pending resource requests from PCO
     const pcoResponse = await fetch(
@@ -24,7 +25,8 @@ Deno.serve(async (req) => {
     );
 
     if (!pcoResponse.ok) {
-      console.error('❌ PCO API error:', pcoResponse.status);
+      const errorText = await pcoResponse.text();
+      console.error('❌ PCO API error:', pcoResponse.status, errorText);
       throw new Error(`PCO API error: ${pcoResponse.status}`);
     }
 
@@ -120,51 +122,65 @@ Deno.serve(async (req) => {
 
       console.log(`📝 Creating new request: ${requestNumber}`);
 
-      // Create communication request
-      const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
-        request_number: requestNumber,
-        type: 'mystery_resource',
-        status: 'request',
-        priority: 'medium',
-        title: mysteryReq.event_name,
-        description: `Communications request automatically created from PCO Calendar event`,
-        requestor_email: user.email,
-        requestor_name: mysteryReq.requestor,
-        pco_event_id: mysteryReq.event_id,
-        pco_event_name: mysteryReq.event_name,
-        pco_event_date: mysteryReq.event_start,
-        pco_resource_request_id: mysteryReq.request_id,
-        conversation_history: [{
-          timestamp: new Date().toISOString(),
-          author: 'System',
-          message: `Request created automatically from PCO Calendar. Event: ${mysteryReq.event_name}`,
-          is_internal: false
-        }]
-      });
-
-      newRequests.push(commRequest);
-      console.log(`✅ Created request: ${commRequest.id}`);
-
-      // Send email notification to event owner
       try {
-        console.log('📧 Sending email notification...');
-        
-        // Call the email function using asServiceRole
-        const emailResponse = await base44.asServiceRole.functions.invoke('sendCommunicationRequestEmail', {
-          request_id: commRequest.id
+        // Create communication request
+        const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
+          request_number: requestNumber,
+          type: 'mystery_resource',
+          status: 'request',
+          priority: 'medium',
+          title: mysteryReq.event_name,
+          description: `Communications request automatically created from PCO Calendar event`,
+          requestor_email: user.email,
+          requestor_name: mysteryReq.requestor,
+          pco_event_id: mysteryReq.event_id,
+          pco_event_name: mysteryReq.event_name,
+          pco_event_date: mysteryReq.event_start,
+          pco_resource_request_id: mysteryReq.request_id,
+          conversation_history: [{
+            timestamp: new Date().toISOString(),
+            author: 'System',
+            message: `Request created automatically from PCO Calendar. Event: ${mysteryReq.event_name}`,
+            is_internal: false
+          }]
         });
-        
-        console.log('📧 Email function response:', emailResponse);
-        
-        if (emailResponse?.data?.success) {
-          console.log('✅ Email sent to:', emailResponse.data.recipient);
-        } else {
-          console.warn('⚠️ Email send returned non-success:', emailResponse?.data);
+
+        newRequests.push(commRequest);
+        console.log(`✅ Created request: ${commRequest.id}`);
+
+        // Send email notification to event owner
+        // We'll do this in a try-catch so if email fails, we still create the request
+        try {
+          console.log('📧 Attempting to send email notification...');
+          
+          // Call email function directly using fetch to avoid SDK issues
+          const emailFunctionUrl = `${Deno.env.get('BASE44_APP_URL')}/api/apps/${Deno.env.get('BASE44_APP_ID')}/functions/sendCommunicationRequestEmail`;
+          
+          const emailResponse = await fetch(emailFunctionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': req.headers.get('Authorization') || ''
+            },
+            body: JSON.stringify({
+              request_id: commRequest.id
+            })
+          });
+
+          if (emailResponse.ok) {
+            const emailData = await emailResponse.json();
+            console.log('✅ Email sent successfully:', emailData);
+          } else {
+            const errorText = await emailResponse.text();
+            console.warn('⚠️ Email send failed:', emailResponse.status, errorText);
+          }
+        } catch (emailError) {
+          console.error('❌ Failed to send email:', emailError.message);
+          // Continue - email failure shouldn't block request creation
         }
-      } catch (emailError) {
-        console.error('❌ Failed to send email:', emailError.message);
-        console.error('Email error stack:', emailError.stack);
-        // Continue even if email fails - don't block the request creation
+      } catch (createError) {
+        console.error('❌ Failed to create request:', createError.message);
+        // Continue to next request
       }
     }
 
