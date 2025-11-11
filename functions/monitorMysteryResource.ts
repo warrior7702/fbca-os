@@ -13,12 +13,14 @@ Deno.serve(async (req) => {
     console.log('🔍 Starting Mystery Resource monitor...');
     console.log('👤 User:', user.email);
 
+    const token = user.pco_access_token;
+
     // Fetch upcoming events from PCO
     const eventsResponse = await fetch(
       'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
       {
         headers: {
-          'Authorization': `Bearer ${user.pco_access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       }
@@ -51,7 +53,7 @@ Deno.serve(async (req) => {
           `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
           {
             headers: {
-              'Authorization': `Bearer ${user.pco_access_token}`,
+              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           }
@@ -82,16 +84,77 @@ Deno.serve(async (req) => {
                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
                 {
                   headers: {
-                    'Authorization': `Bearer ${user.pco_access_token}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                   }
                 }
               );
 
               let eventDetails = null;
+              let ownerEmail = null;
+              let ownerName = null;
+              
               if (eventResponse.ok) {
                 const eventData = await eventResponse.json();
                 eventDetails = eventData.data?.attributes;
+                
+                // Get owner ID
+                const ownerId = eventData.data?.relationships?.owner?.data?.id;
+                ownerName = eventData.data?.attributes?.owner_name;
+                
+                // Try to fetch owner email from PCO
+                if (ownerId) {
+                  console.log('👤 Fetching owner email for ID:', ownerId);
+                  
+                  // Try Calendar API first
+                  const ownerResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/people/${ownerId}`,
+                    {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                      }
+                    }
+                  );
+                  
+                  if (ownerResponse.ok) {
+                    const ownerData = await ownerResponse.json();
+                    ownerEmail = ownerData.data?.attributes?.email;
+                    console.log('📧 Found email in Calendar API:', ownerEmail);
+                  }
+                  
+                  // If no email, try People API
+                  if (!ownerEmail) {
+                    console.log('🔍 No email in Calendar API, trying People API...');
+                    const peopleResponse = await fetch(
+                      `https://api.planningcenteronline.com/people/v2/people/${ownerId}?include=emails`,
+                      {
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                          'Content-Type': 'application/json'
+                        }
+                      }
+                    );
+                    
+                    if (peopleResponse.ok) {
+                      const peopleData = await peopleResponse.json();
+                      
+                      // Look for primary email
+                      if (peopleData.included && peopleData.included.length > 0) {
+                        const primaryEmail = peopleData.included.find(item => 
+                          item.type === 'Email' && item.attributes?.primary
+                        );
+                        if (primaryEmail) {
+                          ownerEmail = primaryEmail.attributes?.address;
+                          console.log('✅ Found primary email in People API:', ownerEmail);
+                        } else if (peopleData.included[0]?.attributes?.address) {
+                          ownerEmail = peopleData.included[0].attributes.address;
+                          console.log('✅ Found first email in People API:', ownerEmail);
+                        }
+                      }
+                    }
+                  }
+                }
               }
 
               // Find the event instance for start date
@@ -107,7 +170,8 @@ Deno.serve(async (req) => {
                 created_at: request.attributes?.created_at,
                 quantity: request.attributes?.quantity,
                 resource_name: resourceName,
-                requestor: eventDetails?.owner_name || user.full_name
+                owner_email: ownerEmail,
+                owner_name: ownerName || 'Unknown'
               });
             }
           }
@@ -131,6 +195,7 @@ Deno.serve(async (req) => {
 
     // Create new communication requests for mystery resources
     const newRequests = [];
+    const emailResults = [];
     
     for (const mysteryReq of mysteryResourceRequests) {
       // Skip if we already have a workflow for this PCO request
@@ -143,6 +208,8 @@ Deno.serve(async (req) => {
       const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
 
       console.log(`📝 Creating new request: ${requestNumber}`);
+      console.log(`   Event: ${mysteryReq.event_name}`);
+      console.log(`   Owner: ${mysteryReq.owner_name} (${mysteryReq.owner_email})`);
 
       try {
         // Create communication request
@@ -153,8 +220,8 @@ Deno.serve(async (req) => {
           priority: 'medium',
           title: mysteryReq.event_name,
           description: `Communications request automatically created from PCO Calendar event`,
-          requestor_email: user.email,
-          requestor_name: mysteryReq.requestor,
+          requestor_email: mysteryReq.owner_email || user.email, // Use owner email or fallback to sync user
+          requestor_name: mysteryReq.owner_name,
           pco_event_id: mysteryReq.event_id,
           pco_event_name: mysteryReq.event_name,
           pco_event_date: mysteryReq.event_start,
@@ -170,33 +237,55 @@ Deno.serve(async (req) => {
         newRequests.push(commRequest);
         console.log(`✅ Created request: ${commRequest.id}`);
 
-        // Send email notification to event owner
-        try {
-          console.log('📧 Attempting to send email notification...');
-          
-          const emailFunctionUrl = `${Deno.env.get('BASE44_APP_URL')}/api/apps/${Deno.env.get('BASE44_APP_ID')}/functions/sendCommunicationRequestEmail`;
-          
-          const emailResponse = await fetch(emailFunctionUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': req.headers.get('Authorization') || ''
-            },
-            body: JSON.stringify({
-              request_id: commRequest.id
-            })
-          });
+        // Send email notification to event owner if we have their email
+        if (mysteryReq.owner_email) {
+          try {
+            console.log('📧 Sending email to:', mysteryReq.owner_email);
+            
+            const emailResult = await base44.asServiceRole.integrations.Core.SendEmail({
+              from_name: 'Communications Team',
+              to: mysteryReq.owner_email,
+              subject: `Communications Request: ${mysteryReq.event_name}`,
+              body: `Hello ${mysteryReq.owner_name},
 
-          if (emailResponse.ok) {
-            const emailData = await emailResponse.json();
-            console.log('✅ Email sent successfully:', emailData);
-          } else {
-            const errorText = await emailResponse.text();
-            console.warn('⚠️ Email send failed:', emailResponse.status, errorText);
+A communications request has been created for your event:
+
+Request Number: ${requestNumber}
+Event: ${mysteryReq.event_name}
+Date: ${mysteryReq.event_start ? new Date(mysteryReq.event_start).toLocaleDateString() : 'TBD'}
+
+Our communications team will review your request and reach out to discuss your needs.
+
+Request Details:
+- Automatically created from PCO Calendar
+- Resource: Mystery Resource
+
+Thank you!
+Communications Team`
+            });
+
+            console.log('✅ Email sent successfully to:', mysteryReq.owner_email);
+            emailResults.push({
+              request_id: commRequest.id,
+              email_sent: true,
+              recipient: mysteryReq.owner_email
+            });
+          } catch (emailError) {
+            console.error('❌ Failed to send email:', emailError.message);
+            emailResults.push({
+              request_id: commRequest.id,
+              email_sent: false,
+              error: emailError.message
+            });
+            // Continue - email failure shouldn't block request creation
           }
-        } catch (emailError) {
-          console.error('❌ Failed to send email:', emailError.message);
-          // Continue - email failure shouldn't block request creation
+        } else {
+          console.warn('⚠️ No owner email found, skipping email notification');
+          emailResults.push({
+            request_id: commRequest.id,
+            email_sent: false,
+            error: 'No owner email found'
+          });
         }
       } catch (createError) {
         console.error('❌ Failed to create request:', createError.message);
@@ -212,7 +301,9 @@ Deno.serve(async (req) => {
       found: mysteryResourceRequests.length,
       new_requests_created: newRequests.length,
       existing_requests: existingRequests.length,
-      new_requests: newRequests
+      new_requests: newRequests,
+      emails_sent: emailResults.filter(r => r.email_sent).length,
+      email_results: emailResults
     });
 
   } catch (error) {
