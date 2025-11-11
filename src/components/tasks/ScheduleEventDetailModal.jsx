@@ -144,17 +144,31 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
               </CardContent>
             </Card>
 
-            {/* Door Code */}
+            {/* Door Code - DIFFERENT COLOR FOR UNLOCK */}
             {latestDoorCode && (
-              <Card className="border-yellow-300 bg-yellow-50">
+              <Card className={`
+                border-2
+                ${latestDoorCode.is_unlock 
+                  ? 'border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50' 
+                  : 'border-yellow-300 bg-yellow-50'
+                }
+              `}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Lock className="w-5 h-5 text-yellow-700" />
-                      <span className="font-semibold text-yellow-900">Building Access Code</span>
+                      <Lock className={`w-5 h-5 ${latestDoorCode.is_unlock ? 'text-orange-700' : 'text-yellow-700'}`} />
+                      <span className={`font-semibold ${latestDoorCode.is_unlock ? 'text-orange-900' : 'text-yellow-900'}`}>
+                        Building Access Code
+                      </span>
                     </div>
-                    <div className="text-2xl font-mono font-bold text-yellow-900 bg-yellow-200 px-4 py-2 rounded-lg">
-                      {latestDoorCode}
+                    <div className={`
+                      text-2xl font-bold px-4 py-2 rounded-lg
+                      ${latestDoorCode.is_unlock 
+                        ? 'bg-gradient-to-r from-orange-200 to-amber-200 text-orange-900 font-sans' 
+                        : 'bg-yellow-200 text-yellow-900 font-mono'
+                      }
+                    `}>
+                      {latestDoorCode.is_unlock ? 'Unlock' : latestDoorCode.code}
                     </div>
                   </div>
                 </CardContent>

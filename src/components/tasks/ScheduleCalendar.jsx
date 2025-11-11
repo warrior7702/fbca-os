@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock } from 'lucide-react';
 
 export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
@@ -55,50 +55,77 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                     </div>
 
                     <div className="space-y-1">
-                      {dayEvents.map((event) => (
-                        <Card 
-                          key={event.id} 
-                          className="border border-green-200 bg-green-50 hover:shadow-md transition-all cursor-pointer hover:bg-green-100"
-                          onClick={() => onEventClick && onEventClick(event)}
-                        >
-                          <CardContent className="p-2 space-y-1">
-                            <p className="text-xs font-semibold text-slate-900 line-clamp-2">
-                              {event.name}
-                            </p>
-                            
-                            <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                              <Clock className="w-3 h-3 text-green-600" />
-                              <span>{format(parseISO(event.starts_at), 'h:mm a')}</span>
-                            </div>
-
-                            {event.access_time && (
+                      {dayEvents.map((event) => {
+                        const isUnlock = event.posted_door_code && 
+                                       event.posted_door_code.toLowerCase() === 'unlock';
+                        
+                        return (
+                          <Card 
+                            key={event.id} 
+                            className={`
+                              border transition-all cursor-pointer
+                              ${isUnlock 
+                                ? 'border-orange-300 bg-orange-50 hover:bg-orange-100 hover:shadow-md' 
+                                : 'border-green-200 bg-green-50 hover:bg-green-100 hover:shadow-md'
+                              }
+                            `}
+                            onClick={() => onEventClick && onEventClick(event)}
+                          >
+                            <CardContent className="p-2 space-y-1">
+                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                {event.name}
+                              </p>
+                              
                               <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                                <Lock className="w-3 h-3 text-green-600" />
-                                <span className="line-clamp-1">{event.access_time}</span>
+                                <Clock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                <span>{format(parseISO(event.starts_at), 'h:mm a')}</span>
                               </div>
-                            )}
 
-                            {event.resources && event.resources.length > 0 && (
-                              <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                                <MapPin className="w-3 h-3 text-green-600" />
-                                <span className="line-clamp-1">
-                                  {event.resources[0].name}
-                                  {event.resources.length > 1 && ` +${event.resources.length - 1}`}
-                                </span>
-                              </div>
-                            )}
+                              {event.access_time && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                  <Lock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                  <span className="line-clamp-1">{event.access_time}</span>
+                                </div>
+                              )}
 
-                            {event.posted_door_code && (
-                              <div className="mt-1 p-1 bg-green-200 rounded flex items-center gap-1">
-                                <Key className="w-3 h-3 text-green-700" />
-                                <span className="text-[10px] font-mono font-bold text-green-700">
-                                  {event.posted_door_code}#
-                                </span>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
+                              {event.resources && event.resources.length > 0 && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                  <MapPin className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                  <span className="line-clamp-1">
+                                    {event.resources[0].name}
+                                    {event.resources.length > 1 && ` +${event.resources.length - 1}`}
+                                  </span>
+                                </div>
+                              )}
+
+                              {event.posted_door_code && (
+                                <div className={`
+                                  mt-1 p-1 rounded flex items-center gap-1
+                                  ${isUnlock 
+                                    ? 'bg-gradient-to-r from-orange-200 to-amber-200' 
+                                    : 'bg-green-200'
+                                  }
+                                `}>
+                                  {isUnlock ? (
+                                    <Unlock className={`w-3 h-3 ${isUnlock ? 'text-orange-700' : 'text-green-700'}`} />
+                                  ) : (
+                                    <Key className="w-3 h-3 text-green-700" />
+                                  )}
+                                  <span className={`
+                                    text-[10px] font-bold
+                                    ${isUnlock 
+                                      ? 'text-orange-700 font-sans' 
+                                      : 'text-green-700 font-mono'
+                                    }
+                                  `}>
+                                    {isUnlock ? 'Unlock' : `${event.posted_door_code}#`}
+                                  </span>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
