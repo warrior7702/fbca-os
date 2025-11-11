@@ -149,18 +149,21 @@ Deno.serve(async (req) => {
       try {
         console.log('📧 Sending email notification...');
         
-        // Use the correct SDK method for calling functions from within functions
-        const emailResponse = await base44.functions.invoke('sendCommunicationRequestEmail', {
+        // Call the email function using asServiceRole
+        const emailResponse = await base44.asServiceRole.functions.invoke('sendCommunicationRequestEmail', {
           request_id: commRequest.id
         });
         
-        if (emailResponse.data?.success) {
+        console.log('📧 Email function response:', emailResponse);
+        
+        if (emailResponse?.data?.success) {
           console.log('✅ Email sent to:', emailResponse.data.recipient);
         } else {
-          console.warn('⚠️ Email send returned non-success:', emailResponse.data);
+          console.warn('⚠️ Email send returned non-success:', emailResponse?.data);
         }
       } catch (emailError) {
         console.error('❌ Failed to send email:', emailError.message);
+        console.error('Email error stack:', emailError.stack);
         // Continue even if email fails - don't block the request creation
       }
     }
@@ -177,6 +180,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error monitoring Mystery Resource:', error);
+    console.error('Stack trace:', error.stack);
     return Response.json({ 
       error: error.message,
       details: 'Failed to monitor Mystery Resource requests',
