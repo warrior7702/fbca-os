@@ -13,9 +13,9 @@ Deno.serve(async (req) => {
     console.log('🔍 Starting Mystery Resource monitor...');
     console.log('👤 User:', user.email);
 
-    // Fetch all pending resource requests from PCO
-    const pcoResponse = await fetch(
-      'https://api.planningcenteronline.com/calendar/v2/resource_requests?filter=pending&per_page=100',
+    // Fetch upcoming events from PCO
+    const eventsResponse = await fetch(
+      'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
       {
         headers: {
           'Authorization': `Bearer ${user.pco_access_token}`,
@@ -24,26 +24,31 @@ Deno.serve(async (req) => {
       }
     );
 
-    if (!pcoResponse.ok) {
-      const errorText = await pcoResponse.text();
-      console.error('❌ PCO API error:', pcoResponse.status, errorText);
-      throw new Error(`PCO API error: ${pcoResponse.status}`);
+    if (!eventsResponse.ok) {
+      const errorText = await eventsResponse.text();
+      console.error('❌ PCO API error:', eventsResponse.status, errorText);
+      throw new Error(`PCO API error: ${eventsResponse.status}`);
     }
 
-    const data = await pcoResponse.json();
-    const resourceRequests = data.data || [];
-    console.log(`📋 Found ${resourceRequests.length} pending resource requests`);
+    const eventsData = await eventsResponse.json();
+    const eventInstances = eventsData.data || [];
+    console.log(`📅 Found ${eventInstances.length} upcoming event instances`);
 
-    // Fetch resource details to find "Mystery Resource"
+    // Get unique event IDs
+    const eventIds = [...new Set(eventInstances.map(instance => 
+      instance.relationships?.event?.data?.id
+    ).filter(Boolean))];
+    
+    console.log(`📋 Checking ${eventIds.length} unique events for Mystery Resource...`);
+
+    // Fetch resource requests for each event to find Mystery Resource
     const mysteryResourceRequests = [];
 
-    for (const request of resourceRequests) {
-      const resourceId = request.relationships?.resource?.data?.id;
-      
-      if (resourceId) {
-        // Fetch resource details
-        const resourceResponse = await fetch(
-          `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
+    for (const eventId of eventIds) {
+      try {
+        // Fetch resource requests for this event
+        const resourcesResponse = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
           {
             headers: {
               'Authorization': `Bearer ${user.pco_access_token}`,
@@ -52,19 +57,27 @@ Deno.serve(async (req) => {
           }
         );
 
-        if (resourceResponse.ok) {
-          const resourceData = await resourceResponse.json();
-          const resourceName = resourceData.data?.attributes?.name || '';
+        if (!resourcesResponse.ok) continue;
 
-          // Check if this is the Mystery Resource
+        const resourcesData = await resourcesResponse.json();
+        const requests = resourcesData.data || [];
+        const included = resourcesData.included || [];
+
+        // Check each request for Mystery Resource
+        for (const request of requests) {
+          const resourceId = request.relationships?.resource?.data?.id;
+          const resourceDetails = included.find(r => r.type === 'Resource' && r.id === resourceId);
+          const resourceName = resourceDetails?.attributes?.name || '';
+
+          // Check if this is the Mystery Resource and is pending
           if (resourceName.toLowerCase().includes('mystery resource')) {
-            console.log('🔮 Found Mystery Resource request:', request.id);
+            const approvalStatus = request.attributes?.approval_status;
             
-            // Fetch event details
-            const eventId = request.relationships?.event?.data?.id;
-            let eventDetails = null;
-
-            if (eventId) {
+            // Only process pending requests
+            if (approvalStatus === 'P' || !approvalStatus) {
+              console.log('🔮 Found Mystery Resource request:', request.id, 'for event:', eventId);
+              
+              // Fetch event details
               const eventResponse = await fetch(
                 `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
                 {
@@ -75,28 +88,37 @@ Deno.serve(async (req) => {
                 }
               );
 
+              let eventDetails = null;
               if (eventResponse.ok) {
                 const eventData = await eventResponse.json();
                 eventDetails = eventData.data?.attributes;
               }
-            }
 
-            mysteryResourceRequests.push({
-              request_id: request.id,
-              event_id: eventId,
-              event_name: eventDetails?.name || 'Unknown Event',
-              event_start: eventDetails?.starts_at,
-              created_at: request.attributes?.created_at,
-              quantity: request.attributes?.quantity,
-              resource_name: resourceName,
-              requestor: request.attributes?.created_by || user.full_name
-            });
+              // Find the event instance for start date
+              const eventInstance = eventInstances.find(inst => 
+                inst.relationships?.event?.data?.id === eventId
+              );
+
+              mysteryResourceRequests.push({
+                request_id: request.id,
+                event_id: eventId,
+                event_name: eventDetails?.name || 'Unknown Event',
+                event_start: eventInstance?.attributes?.starts_at || eventDetails?.starts_at,
+                created_at: request.attributes?.created_at,
+                quantity: request.attributes?.quantity,
+                resource_name: resourceName,
+                requestor: eventDetails?.owner_name || user.full_name
+              });
+            }
           }
         }
+      } catch (eventError) {
+        console.error(`Error processing event ${eventId}:`, eventError.message);
+        // Continue to next event
       }
     }
 
-    console.log(`✅ Found ${mysteryResourceRequests.length} Mystery Resource requests`);
+    console.log(`✅ Found ${mysteryResourceRequests.length} pending Mystery Resource requests`);
 
     // Check existing workflow requests to avoid duplicates
     const existingRequests = await base44.asServiceRole.entities.WorkflowRequest.filter({
@@ -149,11 +171,9 @@ Deno.serve(async (req) => {
         console.log(`✅ Created request: ${commRequest.id}`);
 
         // Send email notification to event owner
-        // We'll do this in a try-catch so if email fails, we still create the request
         try {
           console.log('📧 Attempting to send email notification...');
           
-          // Call email function directly using fetch to avoid SDK issues
           const emailFunctionUrl = `${Deno.env.get('BASE44_APP_URL')}/api/apps/${Deno.env.get('BASE44_APP_ID')}/functions/sendCommunicationRequestEmail`;
           
           const emailResponse = await fetch(emailFunctionUrl, {
@@ -188,6 +208,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
+      events_checked: eventIds.length,
       found: mysteryResourceRequests.length,
       new_requests_created: newRequests.length,
       existing_requests: existingRequests.length,

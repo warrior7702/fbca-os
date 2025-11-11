@@ -600,10 +600,10 @@ export default function PCOAPITester() {
       
       const token = tokenResponse.data.access_token;
       
-      // Fetch all pending resource requests
-      console.log('📋 Fetching pending resource requests...');
-      const requestsResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/resource_requests?filter=pending&per_page=100',
+      // Fetch upcoming events (next 90 days)
+      console.log('📅 Fetching upcoming events...');
+      const eventsResponse = await fetch(
+        'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -612,73 +612,93 @@ export default function PCOAPITester() {
         }
       );
       
-      if (!requestsResponse.ok) {
-        throw new Error(`Failed to fetch requests: ${requestsResponse.status}`);
+      if (!eventsResponse.ok) {
+        throw new Error(`Failed to fetch events: ${eventsResponse.status}`);
       }
       
-      const requestsData = await requestsResponse.json();
-      const allRequests = requestsData.data || [];
-      console.log(`✅ Found ${allRequests.length} pending resource requests`);
+      const eventsData = await eventsResponse.json();
+      const eventInstances = eventsData.data || [];
+      console.log(`✅ Found ${eventInstances.length} upcoming event instances`);
       
-      // Check each request for Mystery Resource
+      // Get unique event IDs
+      const eventIds = [...new Set(eventInstances.map(instance => 
+        instance.relationships?.event?.data?.id
+      ).filter(Boolean))];
+      
+      console.log(`📋 Found ${eventIds.length} unique events to check`);
+      
+      // Check each event for Mystery Resource requests
       const mysteryEvents = [];
       
-      for (const request of allRequests) {
-        const resourceId = request.relationships?.resource?.data?.id;
-        
-        if (!resourceId) continue;
-        
-        // Fetch resource details
-        const resourceResponse = await fetch(
-          `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        if (!resourceResponse.ok) continue;
-        
-        const resourceData = await resourceResponse.json();
-        const resourceName = resourceData.data?.attributes?.name || '';
-        
-        // Check if this is Mystery Resource
-        if (resourceName.toLowerCase().includes('mystery resource')) {
-          console.log('🔮 Found Mystery Resource:', request.id);
-          
-          // Fetch event details
-          const eventId = request.relationships?.event?.data?.id;
-          let eventDetails = null;
-          
-          if (eventId) {
-            const eventResponse = await fetch(
-              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
+      for (const eventId of eventIds) {
+        try {
+          // Fetch resource requests for this event
+          const resourcesResponse = await fetch(
+            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
               }
-            );
+            }
+          );
+          
+          if (!resourcesResponse.ok) continue;
+          
+          const resourcesData = await resourcesResponse.json();
+          const requests = resourcesData.data || [];
+          const included = resourcesData.included || [];
+          
+          // Check if any request is for Mystery Resource
+          for (const request of requests) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const resourceDetails = included.find(r => r.type === 'Resource' && r.id === resourceId);
+            const resourceName = resourceDetails?.attributes?.name || '';
             
-            if (eventResponse.ok) {
-              const eventData = await eventResponse.json();
-              eventDetails = eventData.data;
+            if (resourceName.toLowerCase().includes('mystery resource')) {
+              console.log('🔮 Found Mystery Resource:', eventId);
+              
+              // Fetch event details
+              const eventResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              
+              let eventDetails = null;
+              if (eventResponse.ok) {
+                const eventData = await eventResponse.json();
+                eventDetails = eventData.data;
+              }
+              
+              // Find the event instance for this event
+              const eventInstance = eventInstances.find(inst => 
+                inst.relationships?.event?.data?.id === eventId
+              );
+              
+              mysteryEvents.push({
+                request_id: request.id,
+                request_created: request.attributes?.created_at,
+                request_status: request.attributes?.approval_status,
+                resource_id: resourceId,
+                resource_name: resourceName,
+                quantity: request.attributes?.quantity,
+                event_id: eventId,
+                event: eventDetails,
+                event_instance_start: eventInstance?.attributes?.starts_at
+              });
+              
+              // Only need to add this event once, even if multiple mystery resources
+              break;
             }
           }
-          
-          mysteryEvents.push({
-            request_id: request.id,
-            request_created: request.attributes?.created_at,
-            request_status: request.attributes?.approval_status,
-            resource_id: resourceId,
-            resource_name: resourceName,
-            quantity: request.attributes?.quantity,
-            event_id: eventId,
-            event: eventDetails
-          });
+        } catch (eventError) {
+          console.error(`Error checking event ${eventId}:`, eventError);
+          // Continue to next event
         }
       }
       
@@ -688,7 +708,7 @@ export default function PCOAPITester() {
         ok: true,
         status: 200,
         data: {
-          total_requests: allRequests.length,
+          total_events_checked: eventIds.length,
           mystery_events: mysteryEvents,
           count: mysteryEvents.length
         },
@@ -1639,7 +1659,7 @@ export default function PCOAPITester() {
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-slate-900 text-lg">🔮 Mystery Resource Events: {mysteryEvents.length}</h3>
             <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
-              Scanned {data.total_requests} pending requests
+              Scanned {data.total_events_checked} events
             </Badge>
           </div>
           
@@ -1664,11 +1684,11 @@ export default function PCOAPITester() {
                         </div>
                         
                         {/* Event Dates */}
-                        {eventAttrs?.starts_at && (
+                        {item.event_instance_start && (
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Calendar className="w-4 h-4" />
                             <span>
-                              {new Date(eventAttrs.starts_at).toLocaleDateString('en-US', {
+                              {new Date(item.event_instance_start).toLocaleDateString('en-US', {
                                 weekday: 'long',
                                 year: 'numeric',
                                 month: 'long',
@@ -2111,7 +2131,7 @@ export default function PCOAPITester() {
                     <strong className="text-lg">🔮 Find All Mystery Resource Events</strong>
                   </Label>
                   <p className="text-sm text-purple-800">
-                    Scans all pending resource requests and finds events that requested "Mystery Resource". 
+                    Scans all upcoming events and finds those that requested "Mystery Resource". 
                     This is exactly what the Sync PCO button does to create Communication Requests.
                   </p>
                   <Button 
