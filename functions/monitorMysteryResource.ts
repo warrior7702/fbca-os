@@ -80,7 +80,8 @@ Deno.serve(async (req) => {
               event_start: eventDetails?.starts_at,
               created_at: request.attributes?.created_at,
               quantity: request.attributes?.quantity,
-              resource_name: resourceName
+              resource_name: resourceName,
+              requestor: request.attributes?.created_by || user.full_name
             });
           }
         }
@@ -90,12 +91,12 @@ Deno.serve(async (req) => {
     // Check existing workflow requests to avoid duplicates
     const existingRequests = await base44.asServiceRole.entities.WorkflowRequest.filter({
       type: 'mystery_resource',
-      status: { $in: ['intake', 'ai_review', 'comm_director_review', 'in_progress'] }
+      status: { $in: ['request', 'minister_goal_review', 'project_review', 'campaign_running'] }
     });
 
     const existingPCORequestIds = existingRequests.map(r => r.pco_resource_request_id);
 
-    // Create new workflow requests for mystery resources
+    // Create new communication requests for mystery resources
     const newRequests = [];
     
     for (const mysteryReq of mysteryResourceRequests) {
@@ -105,36 +106,41 @@ Deno.serve(async (req) => {
       }
 
       // Generate request number
-      const requestNumber = `WF-${Date.now().toString().slice(-6)}`;
+      const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
 
-      // Create workflow request
-      const workflowRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
+      // Create communication request
+      const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: 'mystery_resource',
-        status: 'intake',
+        status: 'request',
         priority: 'medium',
-        title: `Mystery Resource Request: ${mysteryReq.event_name}`,
-        description: `Automated workflow triggered from PCO Calendar event "${mysteryReq.event_name}"`,
+        title: mysteryReq.event_name,
+        description: `Communications request automatically created from PCO Calendar event`,
         requestor_email: user.email,
-        requestor_name: user.full_name,
+        requestor_name: mysteryReq.requestor,
         pco_event_id: mysteryReq.event_id,
+        pco_event_name: mysteryReq.event_name,
+        pco_event_date: mysteryReq.event_start,
         pco_resource_request_id: mysteryReq.request_id,
         conversation_history: [{
           timestamp: new Date().toISOString(),
           author: 'System',
-          message: `Workflow created automatically from PCO Calendar. Event: ${mysteryReq.event_name}, Starting: ${mysteryReq.event_start}`,
+          message: `Request created automatically from PCO Calendar. Event: ${mysteryReq.event_name}`,
           is_internal: false
         }]
       });
 
-      newRequests.push(workflowRequest);
+      newRequests.push(commRequest);
+
+      // TODO: Send email notification to requestor
+      // Will be implemented in next step with email testing
     }
 
     return Response.json({
       success: true,
       found: mysteryResourceRequests.length,
-      new_workflows_created: newRequests.length,
-      existing_workflows: existingRequests.length,
+      new_requests_created: newRequests.length,
+      existing_requests: existingRequests.length,
       new_requests: newRequests
     });
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Workflow,
+  MessageSquare,
   Plus,
   Loader2,
   RefreshCw,
@@ -20,8 +20,10 @@ import {
   User,
   Users,
   ArrowRight,
-  MessageSquare,
-  FileText
+  FileText,
+  Target,
+  Presentation,
+  Megaphone
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -34,7 +36,7 @@ export default function WorkflowHub() {
   const [myRequests, setMyRequests] = useState([]);
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
-  const [view, setView] = useState('requestor'); // 'requestor' or 'worker'
+  const [view, setView] = useState('requestor');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,10 +49,11 @@ export default function WorkflowHub() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      // Determine user role - check if they're a comm director or worker
+      // Determine user role - check if they're a comm director or team member
       const isWorker = currentUser.role === 'admin' || 
                       currentUser.email.toLowerCase().includes('comm') ||
-                      currentUser.email.toLowerCase().includes('director');
+                      currentUser.email.toLowerCase().includes('director') ||
+                      currentUser.email.toLowerCase().includes('marketing');
 
       setView(isWorker ? 'worker' : 'requestor');
 
@@ -74,7 +77,7 @@ export default function WorkflowHub() {
 
     } catch (error) {
       console.error('Error loading workflow data:', error);
-      toast.error('Failed to load workflow data');
+      toast.error('Failed to load communications requests');
     } finally {
       setLoading(false);
     }
@@ -86,8 +89,8 @@ export default function WorkflowHub() {
       // Monitor for Mystery Resource requests
       const response = await base44.functions.invoke('monitorMysteryResource');
       
-      if (response.data.new_workflows_created > 0) {
-        toast.success(`Found ${response.data.new_workflows_created} new Mystery Resource request(s)`);
+      if (response.data.new_requests_created > 0) {
+        toast.success(`Created ${response.data.new_requests_created} new request(s) from PCO`);
       } else {
         toast.info('No new Mystery Resource requests found');
       }
@@ -95,7 +98,7 @@ export default function WorkflowHub() {
       await loadData();
     } catch (error) {
       console.error('Error syncing:', error);
-      toast.error('Failed to sync with PCO');
+      toast.error('Failed to sync with PCO Calendar');
     } finally {
       setSyncing(false);
     }
@@ -103,22 +106,22 @@ export default function WorkflowHub() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'intake': return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'ai_review': return 'bg-purple-100 text-purple-700 border-purple-300';
-      case 'comm_director_review': return 'bg-orange-100 text-orange-700 border-orange-300';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'completed': return 'bg-green-100 text-green-700 border-green-300';
-      case 'cancelled': return 'bg-slate-100 text-slate-700 border-slate-300';
+      case 'request': return 'bg-blue-100 text-blue-700 border-blue-300';
+      case 'minister_goal_review': return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'project_review': return 'bg-orange-100 text-orange-700 border-orange-300';
+      case 'campaign_running': return 'bg-green-100 text-green-700 border-green-300';
+      case 'completed': return 'bg-slate-100 text-slate-700 border-slate-300';
+      case 'cancelled': return 'bg-red-100 text-red-700 border-red-300';
       default: return 'bg-slate-100 text-slate-700 border-slate-300';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'intake': return <Sparkles className="w-4 h-4" />;
-      case 'ai_review': return <Sparkles className="w-4 h-4" />;
-      case 'comm_director_review': return <ClipboardList className="w-4 h-4" />;
-      case 'in_progress': return <Clock className="w-4 h-4" />;
+      case 'request': return <FileText className="w-4 h-4" />;
+      case 'minister_goal_review': return <Target className="w-4 h-4" />;
+      case 'project_review': return <Presentation className="w-4 h-4" />;
+      case 'campaign_running': return <Megaphone className="w-4 h-4" />;
       case 'completed': return <CheckCircle2 className="w-4 h-4" />;
       case 'cancelled': return <AlertCircle className="w-4 h-4" />;
       default: return <FileText className="w-4 h-4" />;
@@ -136,9 +139,15 @@ export default function WorkflowHub() {
   };
 
   const formatStatus = (status) => {
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    const statusMap = {
+      'request': 'Request',
+      'minister_goal_review': 'Minister Goal Review',
+      'project_review': 'Project Review',
+      'campaign_running': 'Campaign Running',
+      'completed': 'Completed',
+      'cancelled': 'Cancelled'
+    };
+    return statusMap[status] || status;
   };
 
   if (loading) {
@@ -146,7 +155,7 @@ export default function WorkflowHub() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
-          <p className="text-slate-600">Loading Workflow Hub...</p>
+          <p className="text-slate-600">Loading Communications Requests...</p>
         </div>
       </div>
     );
@@ -165,22 +174,31 @@ export default function WorkflowHub() {
             <div className="flex items-center gap-2 mb-2">
               <span className="font-mono text-xs text-slate-500">{request.request_number}</span>
               <div className={`w-2 h-2 rounded-full ${getPriorityColor(request.priority)}`} />
+              {request.type === 'mystery_resource' && (
+                <Badge variant="outline" className="text-xs">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Auto-created
+                </Badge>
+              )}
             </div>
             <h3 className="font-semibold text-slate-900 mb-1">{request.title}</h3>
+            {request.ministry_department && (
+              <p className="text-xs text-slate-500 mb-1">📋 {request.ministry_department}</p>
+            )}
+            {request.pco_event_date && (
+              <p className="text-xs text-slate-500 mb-1">
+                📅 Event: {format(new Date(request.pco_event_date), 'MMM d, yyyy')}
+              </p>
+            )}
             <p className="text-sm text-slate-600 line-clamp-2">{request.description}</p>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={getStatusColor(request.status)}>
-              {getStatusIcon(request.status)}
-              <span className="ml-1">{formatStatus(request.status)}</span>
-            </Badge>
-            <Badge variant="outline" className="text-xs capitalize">
-              {request.type.replace('_', ' ')}
-            </Badge>
-          </div>
+          <Badge variant="outline" className={getStatusColor(request.status)}>
+            {getStatusIcon(request.status)}
+            <span className="ml-1">{formatStatus(request.status)}</span>
+          </Badge>
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
             {request.conversation_history && request.conversation_history.length > 0 && (
@@ -197,7 +215,7 @@ export default function WorkflowHub() {
           <div className="mt-2 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <User className="w-3 h-3" />
-              <span>Assigned to: {request.assigned_to_name}</span>
+              <span>Assigned: {request.assigned_to_name}</span>
             </div>
           </div>
         )}
@@ -209,9 +227,9 @@ export default function WorkflowHub() {
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         <AppHeader
-          icon={Workflow}
-          title="Workflow Hub"
-          description="Manage requests, workflows, and work orders"
+          icon={MessageSquare}
+          title="Communications Request"
+          description="Minister Goal Review → Project Review → Campaign Running"
           iconColor="from-purple-500 to-pink-500"
           action={
             <div className="flex gap-2">
@@ -234,7 +252,7 @@ export default function WorkflowHub() {
                 )}
               </Button>
               <Button
-                onClick={() => navigate(createPageUrl('NewWorkflowRequest'))}
+                onClick={() => navigate(createPageUrl('NewCommunicationRequest'))}
                 className="bg-purple-600 hover:bg-purple-700"
                 size="sm"
               >
@@ -244,6 +262,23 @@ export default function WorkflowHub() {
             </div>
           }
         />
+
+        {/* Entry Points Info */}
+        <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-purple-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 mb-1">3 Ways to Create Requests</p>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <p>🔄 <strong>Auto:</strong> PCO Calendar events with "Mystery Resource"</p>
+                  <p>📝 <strong>Manual Form:</strong> Submit directly through our form (coming soon)</p>
+                  <p>💬 <strong>Continue Existing:</strong> Add to your current requests</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -261,45 +296,45 @@ export default function WorkflowHub() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <Users className="w-5 h-5 text-purple-600" />
-                <Badge className="bg-purple-100 text-purple-700">{assignedToMe.length}</Badge>
+                <Target className="w-5 h-5 text-purple-600" />
+                <Badge className="bg-purple-100 text-purple-700">
+                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'minister_goal_review').length}
+                </Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{assignedToMe.length}</p>
-              <p className="text-sm text-slate-600">Assigned to Me</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {[...myRequests, ...assignedToMe].filter(r => r.status === 'minister_goal_review').length}
+              </p>
+              <p className="text-sm text-slate-600">Goal Review</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <Clock className="w-5 h-5 text-orange-600" />
+                <Presentation className="w-5 h-5 text-orange-600" />
                 <Badge className="bg-orange-100 text-orange-700">
-                  {[...myRequests, ...assignedToMe].filter(r => 
-                    ['intake', 'ai_review', 'comm_director_review'].includes(r.status)
-                  ).length}
+                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'project_review').length}
                 </Badge>
               </div>
               <p className="text-2xl font-bold text-slate-900">
-                {[...myRequests, ...assignedToMe].filter(r => 
-                  ['intake', 'ai_review', 'comm_director_review'].includes(r.status)
-                ).length}
+                {[...myRequests, ...assignedToMe].filter(r => r.status === 'project_review').length}
               </p>
-              <p className="text-sm text-slate-600">Pending Review</p>
+              <p className="text-sm text-slate-600">Project Review</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <Megaphone className="w-5 h-5 text-green-600" />
                 <Badge className="bg-green-100 text-green-700">
-                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'completed').length}
+                  {[...myRequests, ...assignedToMe].filter(r => r.status === 'campaign_running').length}
                 </Badge>
               </div>
               <p className="text-2xl font-bold text-slate-900">
-                {[...myRequests, ...assignedToMe].filter(r => r.status === 'completed').length}
+                {[...myRequests, ...assignedToMe].filter(r => r.status === 'campaign_running').length}
               </p>
-              <p className="text-sm text-slate-600">Completed</p>
+              <p className="text-sm text-slate-600">Running</p>
             </CardContent>
           </Card>
         </div>
@@ -313,7 +348,7 @@ export default function WorkflowHub() {
             </TabsTrigger>
             <TabsTrigger value="worker">
               <Users className="w-4 h-4 mr-2" />
-              Work Queue
+              Team Queue
             </TabsTrigger>
           </TabsList>
 
@@ -325,8 +360,8 @@ export default function WorkflowHub() {
                   <CardContent className="p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No requests yet</h3>
-                    <p className="text-slate-600 mb-4">Start by creating a new request or syncing with PCO</p>
-                    <Button onClick={() => navigate(createPageUrl('NewWorkflowRequest'))}>
+                    <p className="text-slate-600 mb-4">Create your first communications request</p>
+                    <Button onClick={() => navigate(createPageUrl('NewCommunicationRequest'))}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Request
                     </Button>
@@ -350,7 +385,7 @@ export default function WorkflowHub() {
                   <CardContent className="p-12 text-center">
                     <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No assigned tasks</h3>
-                    <p className="text-slate-600">Tasks assigned to you will appear here</p>
+                    <p className="text-slate-600">Requests assigned to you will appear here</p>
                   </CardContent>
                 </Card>
               ) : (
