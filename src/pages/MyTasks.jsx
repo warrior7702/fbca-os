@@ -87,28 +87,78 @@ export default function MyTasks() {
     setLoadingSchedule(true);
     
     try {
-      console.log('📞 Calling getMySchedule (which filters getPCOCalendarEvents)...');
+      console.log('📞 Calling getMySchedule (PCO events with door codes)...');
       
-      // Call getMySchedule which will filter the events from getPCOCalendarEvents
-      const response = await base44.functions.invoke('getMySchedule');
+      // Load PCO events
+      const pcoResponse = await base44.functions.invoke('getMySchedule');
       
-      console.log('✅ Response:', response.data);
+      console.log('✅ PCO Response:', pcoResponse.data);
       
-      if (!response.data) {
-        throw new Error('No data returned');
+      if (!pcoResponse.data) {
+        throw new Error('No PCO data returned');
       }
       
-      const events = response.data.events || [];
+      const pcoEvents = pcoResponse.data.events || [];
       
-      console.log(`✅ Got ${events.length} events for my schedule`);
-      console.log(`📊 I'm in ${response.data.my_groups_count || 0} approval groups`);
-      console.log(`📊 Managing ${response.data.my_resources_count || 0} resources`);
-      
-      if (events.length === 0 && response.data.message) {
-        console.log('ℹ️', response.data.message);
+      console.log(`✅ Got ${pcoEvents.length} PCO events`);
+      console.log(`📊 I'm in ${pcoResponse.data.my_groups_count || 0} approval groups`);
+      console.log(`📊 Managing ${pcoResponse.data.my_resources_count || 0} resources`);
+
+      // Load Microsoft meetings if connected
+      let microsoftMeetings = [];
+      if (user?.microsoft_access_token) {
+        console.log('📞 Loading Microsoft meetings...');
+        try {
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const msResponse = await base44.functions.invoke('getMicrosoftCalendar', {
+            timezone: timezone
+          });
+          
+          if (msResponse.data && msResponse.data.events) {
+            // Format Microsoft meetings to match PCO event structure
+            microsoftMeetings = msResponse.data.events.map(meeting => ({
+              // Use a distinct prefix to identify Microsoft meetings
+              id: `ms-${meeting.id}`,
+              name: meeting.subject || 'Untitled Meeting',
+              starts_at: meeting.start,
+              ends_at: meeting.end,
+              // Mark as Microsoft meeting
+              source: 'microsoft',
+              meetingLink: meeting.onlineMeeting?.joinUrl || null,
+              location: meeting.location?.displayName || null,
+              organizer: meeting.organizer?.emailAddress?.name || meeting.organizer?.emailAddress?.address || null,
+              attendees: meeting.attendees?.map(att => ({
+                email: att.emailAddress?.address,
+                name: att.emailAddress?.name,
+                type: att.type,
+                status: att.status?.response,
+              })) || [],
+              isOnlineMeeting: meeting.isOnlineMeeting,
+              responseStatus: meeting.responseStatus?.response || null,
+              // No door codes or PCO-specific fields for Microsoft events
+              resources: [],
+              posted_door_code: null,
+              access_time: null,
+              // Add other potentially useful MS-specific fields
+              type: meeting.type, 
+              sensitivity: meeting.sensitivity, 
+            }));
+            console.log(`✅ Got ${microsoftMeetings.length} Microsoft meetings`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to load Microsoft meetings:', error.message);
+        }
       }
+
+      // Merge events - PCO first, then Microsoft
+      const allEvents = [...pcoEvents, ...microsoftMeetings];
       
-      setMyScheduleEvents(events);
+      // Sort by start time
+      allEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+      
+      console.log(`✅ Total events: ${allEvents.length} (${pcoEvents.length} PCO + ${microsoftMeetings.length} Microsoft)`);
+      
+      setMyScheduleEvents(allEvents);
       console.log('✅ SUCCESS! Schedule loaded');
       
     } catch (error) {
@@ -287,7 +337,7 @@ export default function MyTasks() {
     }
   };
 
-  // Calculate events today
+  // Calculate events today - including Microsoft meetings
   const eventsToday = myScheduleEvents.filter(event => {
     const eventDate = new Date(event.starts_at);
     return isToday(eventDate);
