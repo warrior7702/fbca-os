@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -18,11 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar as CalendarIcon, Search, Image, Megaphone, Clock, Upload, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, addDays, addMonths } from "date-fns";
+import { format } from "date-fns";
 
 // Helper function to capitalize names properly
 const capitalizeFullName = (name) => {
@@ -34,6 +33,21 @@ const capitalizeFullName = (name) => {
     .join(" ");
 };
 
+// Custom debounce hook
+const useDebounced = (value, delay = 450) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
+
 export default function CommunicationsRequestForm() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +56,13 @@ export default function CommunicationsRequestForm() {
   const [searchingEvents, setSearchingEvents] = useState(false);
   const [pcoEvents, setPcoEvents] = useState([]);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState("30");
+  const debouncedSearchQuery = useDebounced(eventSearchQuery, 450);
+  const [searchError, setSearchError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState({ hour: "12", minute: "00", period: "PM" });
-  const [photoUploadMethod, setPhotoUploadMethod] = useState("upload"); // "upload" or "link"
+  const [photoUploadMethod, setPhotoUploadMethod] = useState("upload");
+  const abortControllerRef = useRef(null);
+  const searchCacheRef = useRef(new Map());
   const navigate = useNavigate();
 
   // Form state
@@ -88,7 +105,6 @@ export default function CommunicationsRequestForm() {
       blog_post: false,
       press_release: false
     },
-    marketing_message: "",
     marketing_assets_link: ""
   });
 
@@ -183,98 +199,177 @@ export default function CommunicationsRequestForm() {
     }
   }, [selectedDate, selectedTime]);
 
-  const searchPCOEvents = async (range = dateRange) => {
+  // Debounced search with caching and abort control
+  useEffect(() => {
+    const searchTerm = debouncedSearchQuery.trim();
+    
+    // Clear results if query is too short
+    if (searchTerm.length < 3) {
+      setPcoEvents([]);
+      setSearchError(null);
+      return;
+    }
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Check cache
+    const cacheKey = searchTerm.toLowerCase();
+    if (searchCacheRef.current.has(cacheKey)) {
+      console.log('✅ Using cached results for:', searchTerm);
+      setPcoEvents(searchCacheRef.current.get(cacheKey));
+      return;
+    }
+
+    // Perform search
+    searchPCOEvents(searchTerm);
+  }, [debouncedSearchQuery]);
+
+  const searchPCOEvents = async (searchTerm) => {
     if (!user?.pco_access_token) {
       toast.error("Please connect Planning Center in Settings");
       return;
     }
 
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setSearchingEvents(true);
-    try {
-      const response = await base44.functions.invoke('getPCOToken');
-      const token = response.data.access_token;
+    setSearchError(null);
 
-      const now = new Date();
-      let endDate;
-      switch(range) {
-        case "30":
-          endDate = addDays(now, 30);
-          break;
-        case "60":
-          endDate = addDays(now, 60);
-          break;
-        case "90":
-          endDate = addDays(now, 90);
-          break;
-        case "all":
-          endDate = addMonths(now, 12);
-          break;
-        default:
-          endDate = addDays(now, 30);
-      }
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      const eventsResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      const eventsData = await eventsResponse.json();
+    while (attempts < maxAttempts) {
+      attempts++;
       
-      const eventIds = [...new Set(eventsData.data.map(inst => 
-        inst.relationships?.event?.data?.id
-      ).filter(Boolean))];
+      try {
+        const response = await base44.functions.invoke('getPCOToken');
+        const token = response.data.access_token;
 
-      const events = await Promise.all(
-        eventIds.map(async (eventId) => {
-          try {
-            const eventResponse = await fetch(
-              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-            const eventData = await eventResponse.json();
-            const instance = eventsData.data.find(inst => 
-              inst.relationships?.event?.data?.id === eventId
-            );
-            
-            return {
-              id: eventId,
-              name: eventData.data?.attributes?.name || 'Untitled',
-              date: instance?.attributes?.starts_at,
-              summary: eventData.data?.attributes?.summary
-            };
-          } catch (err) {
-            console.error('Error fetching event:', eventId, err);
-            return null;
+        // Date window: past 30 days to +180 days (6 months)
+        const now = new Date();
+        const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const endDate = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
+
+        // Single list query - fetch event instances in date range
+        const eventsResponse = await fetch(
+          'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            signal
           }
-        })
-      );
+        );
 
-      const validEvents = events
-        .filter(e => e !== null && e.date)
-        .filter(e => {
-          const eventDate = new Date(e.date);
-          return eventDate >= now && eventDate <= endDate;
-        })
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+        // Handle rate limiting
+        if (eventsResponse.status === 429) {
+          const retryAfter = parseInt(eventsResponse.headers.get('Retry-After') || '1');
+          const waitTime = Math.min(retryAfter, 5) * 1000;
+          console.warn(`⚠️ Rate limited. Waiting ${waitTime}ms...`);
+          
+          if (attempts >= maxAttempts) {
+            throw new Error('Rate limit exceeded. Please try again in a moment.');
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
 
-      setPcoEvents(validEvents);
-      toast.success(`Found ${validEvents.length} events in the next ${range === "all" ? "year" : range + " days"}`);
-    } catch (error) {
-      console.error('Error fetching PCO events:', error);
-      toast.error('Failed to fetch events from PCO');
-    } finally {
-      setSearchingEvents(false);
+        if (!eventsResponse.ok) {
+          throw new Error(`PCO API error: ${eventsResponse.status}`);
+        }
+
+        const eventsData = await eventsResponse.json();
+        
+        // Get unique event IDs
+        const eventIds = [...new Set(eventsData.data.map(inst => 
+          inst.relationships?.event?.data?.id
+        ).filter(Boolean))];
+
+        // Fetch event details (only names and dates - minimal data)
+        const events = await Promise.all(
+          eventIds.slice(0, 50).map(async (eventId) => {
+            try {
+              const eventResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  signal
+                }
+              );
+              
+              if (!eventResponse.ok) return null;
+              
+              const eventData = await eventResponse.json();
+              const instance = eventsData.data.find(inst => 
+                inst.relationships?.event?.data?.id === eventId
+              );
+              
+              return {
+                id: eventId,
+                name: eventData.data?.attributes?.name || 'Untitled',
+                date: instance?.attributes?.starts_at,
+                location: eventData.data?.attributes?.location
+              };
+            } catch (err) {
+              if (err.name === 'AbortError') throw err;
+              return null;
+            }
+          })
+        );
+
+        // Filter by search term and date range
+        const validEvents = events
+          .filter(e => e !== null && e.date)
+          .filter(e => {
+            const eventDate = new Date(e.date);
+            const matchesDate = eventDate >= startDate && eventDate <= endDate;
+            const matchesSearch = e.name.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchesDate && matchesSearch;
+          })
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Cache the results
+        searchCacheRef.current.set(searchTerm.toLowerCase(), validEvents);
+
+        setPcoEvents(validEvents);
+        console.log(`✅ Found ${validEvents.length} events matching "${searchTerm}"`);
+        
+        break; // Success, exit retry loop
+
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log('🚫 Search aborted');
+          return;
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.error('❌ Search failed after retries:', error);
+          setSearchError(error.message || 'Search failed');
+          setPcoEvents([]);
+          return;
+        }
+        
+        // Wait before retry with exponential backoff
+        const waitTime = 500 * attempts;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } finally {
+        if (attempts >= maxAttempts || signal.aborted) {
+          setSearchingEvents(false);
+        }
+      }
     }
+
+    setSearchingEvents(false);
   };
 
   const handlePCOEventSelect = (event) => {
@@ -303,11 +398,8 @@ export default function CommunicationsRequestForm() {
       manual_event_name: event.name
     }));
     setEventSearchQuery("");
+    setPcoEvents([]);
   };
-
-  const filteredEvents = pcoEvents.filter(event => 
-    event.name.toLowerCase().includes(eventSearchQuery.toLowerCase())
-  );
 
   const handleFileUpload = (e) => {
     const files = e.target.files;
@@ -372,7 +464,6 @@ export default function CommunicationsRequestForm() {
           need_type: formData.need_type,
           graphics_items: formData.graphics_items,
           marketing_channels: formData.marketing_channels,
-          marketing_message: formData.marketing_message,
           marketing_assets_link: formData.marketing_assets_link,
           graphics_folder_link: formData.graphics_folder_link,
           previous_event_photos: photoUrls,
@@ -549,6 +640,7 @@ FBC Arlington`
                       handleChange("pco_event_date", "");
                       setPcoEvents([]);
                       setEventSearchQuery("");
+                      searchCacheRef.current.clear();
                     }
                   }}
                   className="flex gap-6"
@@ -577,114 +669,91 @@ FBC Arlington`
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-blue-300"
                   >
-                    {/* PCO Event Search with Date Range Tabs */}
+                    {/* PCO Event Search - Simplified */}
                     <div className="space-y-3">
                       <Label className="text-sm font-medium">
                         Search PCO Calendar Event
                       </Label>
                       
-                      {searchingEvents ? (
-                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
-                          <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                          <span className="text-sm text-slate-600">Loading events...</span>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                          type="text"
+                          placeholder="Type at least 3 characters to search..."
+                          value={eventSearchQuery}
+                          onChange={(e) => setEventSearchQuery(e.target.value)}
+                          className="pl-10 h-10"
+                        />
+                        {searchingEvents && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-purple-600" />
+                        )}
+                      </div>
+
+                      {eventSearchQuery.length > 0 && eventSearchQuery.length < 3 && (
+                        <p className="text-xs text-slate-500">
+                          Type at least 3 characters to search events
+                        </p>
+                      )}
+
+                      {searchError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-700">{searchError}</p>
                         </div>
-                      ) : (
-                        <>
-                          <Tabs value={dateRange} onValueChange={(value) => {
-                            setDateRange(value);
-                            if (pcoEvents.length > 0) {
-                              searchPCOEvents(value);
-                            }
-                          }} className="w-full">
-                            <TabsList className="grid w-full grid-cols-4">
-                              <TabsTrigger value="30">Next 30 Days</TabsTrigger>
-                              <TabsTrigger value="60">60 Days</TabsTrigger>
-                              <TabsTrigger value="90">90 Days</TabsTrigger>
-                              <TabsTrigger value="all">All</TabsTrigger>
-                            </TabsList>
-                          </Tabs>
+                      )}
 
-                          {pcoEvents.length > 0 ? (
-                            <>
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input
-                                  type="text"
-                                  placeholder="Type event name to search..."
-                                  value={eventSearchQuery}
-                                  onChange={(e) => setEventSearchQuery(e.target.value)}
-                                  className="pl-10 h-10"
-                                />
-                              </div>
-
-                              {formData.pco_event_id && (
-                                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                  <div className="flex items-start justify-between">
-                                    <div>
-                                      <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
-                                      <p className="text-sm text-purple-700">
-                                        {formData.pco_event_date ? format(new Date(formData.pco_event_date), 'EEEE, MMMM d, yyyy - h:mm a') : 'No date'}
-                                      </p>
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        handleChange("pco_event_id", "");
-                                        handleChange("pco_event_name", "");
-                                        handleChange("pco_event_date", "");
-                                        setSelectedDate(null);
-                                      }}
-                                    >
-                                      Change
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-
-                              {!formData.pco_event_id && (
-                                <div className="max-h-64 overflow-y-auto border rounded-lg">
-                                  {filteredEvents.length > 0 ? (
-                                    <div className="divide-y">
-                                      {filteredEvents.slice(0, 20).map(event => (
-                                        <button
-                                          key={event.id}
-                                          type="button"
-                                          onClick={() => handlePCOEventSelect(event)}
-                                          className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
-                                        >
-                                          <p className="font-medium text-slate-900">{event.name}</p>
-                                          <p className="text-sm text-slate-600">
-                                            {event.date ? format(new Date(event.date), 'EEE, MMM d, yyyy - h:mm a') : 'No date'}
-                                          </p>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="p-8 text-center text-slate-500">
-                                      <p>No events found</p>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              <p className="text-xs text-slate-500">
-                                Showing {filteredEvents.length} of {pcoEvents.length} events
+                      {formData.pco_event_id && (
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
+                              <p className="text-sm text-purple-700">
+                                {formData.pco_event_date ? format(new Date(formData.pco_event_date), 'EEEE, MMMM d, yyyy - h:mm a') : 'No date'}
                               </p>
-                            </>
-                          ) : (
+                            </div>
                             <Button
                               type="button"
-                              variant="outline"
-                              onClick={() => searchPCOEvents()}
-                              className="w-full"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                handleChange("pco_event_id", "");
+                                handleChange("pco_event_name", "");
+                                handleChange("pco_event_date", "");
+                                setSelectedDate(null);
+                              }}
                             >
-                              <Search className="w-4 h-4 mr-2" />
-                              Load Events
+                              Change
                             </Button>
-                          )}
-                        </>
+                          </div>
+                        </div>
+                      )}
+
+                      {!formData.pco_event_id && pcoEvents.length > 0 && (
+                        <div className="max-h-64 overflow-y-auto border rounded-lg">
+                          <div className="divide-y">
+                            {pcoEvents.map(event => (
+                              <button
+                                key={event.id}
+                                type="button"
+                                onClick={() => handlePCOEventSelect(event)}
+                                className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
+                              >
+                                <p className="font-medium text-slate-900">{event.name}</p>
+                                <p className="text-sm text-slate-600">
+                                  {event.date ? format(new Date(event.date), 'EEE, MMM d, yyyy - h:mm a') : 'No date'}
+                                </p>
+                                {event.location && (
+                                  <p className="text-xs text-slate-500 mt-1">{event.location}</p>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {!formData.pco_event_id && pcoEvents.length > 0 && (
+                        <p className="text-xs text-slate-500">
+                          Showing {pcoEvents.length} event{pcoEvents.length !== 1 ? 's' : ''} (next 6 months)
+                        </p>
                       )}
                     </div>
 
@@ -1058,21 +1127,6 @@ FBC Arlington`
                               </div>
                             ))}
                           </div>
-                        </div>
-
-                        {/* Marketing Message */}
-                        <div className="space-y-2">
-                          <Label htmlFor="marketing_message" className="text-sm font-medium">
-                            Key Marketing Message
-                          </Label>
-                          <Textarea
-                            id="marketing_message"
-                            value={formData.marketing_message}
-                            onChange={(e) => handleChange("marketing_message", e.target.value)}
-                            placeholder="What's the main message you want to communicate?"
-                            rows={3}
-                            className="resize-none"
-                          />
                         </div>
 
                         {/* Link to Marketing Assets */}
