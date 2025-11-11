@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -118,14 +119,13 @@ export default function WorkflowDetail() {
         need_type: request.goal_review_data?.need_type
       };
 
-      const initialPrompt = `You are a ministry communications consultant. Your goal is to gather information for project planning.
+      const initialPrompt = `You are a ministry communications consultant gathering event details. Keep responses brief and professional.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
-Date: ${context.event_date ? format(new Date(context.event_date), 'PPP') : 'TBD'}
 Type: ${context.need_type}
 
-Start by asking ONE clear question about their target audience. Keep it brief and professional.`;
+Start by asking about the event theme.`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: initialPrompt,
@@ -185,7 +185,7 @@ Start by asking ONE clear question about their target audience. Keep it brief an
         conversation_so_far: conversationHistory
       };
 
-      const prompt = `You are a ministry communications consultant gathering information for project planning.
+      const prompt = `You are a ministry communications consultant gathering event details. Keep responses brief and direct.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
@@ -193,21 +193,32 @@ Ministry: ${context.ministry}
 Conversation:
 ${context.conversation_so_far}
 
-Based on their response, ask ONE follow-up question to gather project details:
-- Target audience details
-- Key message or theme
-- Expected attendance
-- Registration needs
-- Specific deliverables
+Ask these questions IN ORDER (one at a time):
+1. Event theme
+2. Expected attendance (how many people)
+3. Materials/items being given to attendees
+4. What makes this program special/unique
+5. What attendees should leave with (spiritually, emotionally, relationally)
+6. Date and time of event
+7. Is childcare provided? ${context.is_youth_college ? '(Skip if youth/college event)' : ''}
+8. Food/menu details
+9. Event logistics/flow/speakers/topics
+10. Any other specific information
 
-Keep responses brief and professional. After 4-5 exchanges, summarize the collected information in this format:
+After collecting all info, summarize in this format:
 
-TARGET AUDIENCE: [who this is for]
-KEY MESSAGE: [main theme/message]
-DELIVERABLES: [what they need]
-SPECIAL NOTES: [any additional details]
+EVENT THEME: [theme]
+EXPECTED ATTENDANCE: [number]
+MATERIALS: [items for attendees]
+WHAT MAKES IT SPECIAL: [unique aspects]
+DESIRED IMPACT: [spiritual/emotional/relational outcomes]
+DATE/TIME: [when]
+CHILDCARE: [yes/no/details]
+FOOD: [menu details]
+EVENT FLOW: [logistics/speakers/topics]
+SPECIAL NOTES: [additional info]
 
-Then say: "I have the information needed. Ready to move to project review."`;
+Then say: "Information complete. Ready for project review."`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
@@ -223,25 +234,28 @@ Then say: "I have the information needed. Ready to move to project review."`;
       const updatedMessages = [...newMessages, aiMessage];
       setChatMessages(updatedMessages);
 
-      const isDone = response.toLowerCase().includes('ready to move to project review') || 
-                     response.toLowerCase().includes('i have the information needed');
+      const isDone = response.toLowerCase().includes('ready for project review') || 
+                     response.toLowerCase().includes('information complete');
 
-      // Extract structured data from conversation
       let extractedData = {};
       if (isDone) {
         try {
-          const extractPrompt = `Extract project details from this conversation into JSON format:
+          const extractPrompt = `Extract event details from this conversation into JSON:
 
 ${conversationHistory}
 
-Return ONLY valid JSON with these fields (use null if not mentioned):
+Return ONLY valid JSON:
 {
-  "target_audience": "who this is for",
-  "key_message": "main message or theme",
-  "expected_attendance": "estimated number or null",
-  "registration_link": "any registration URL or null",
-  "deliverables": ["list", "of", "items"],
-  "special_notes": "any additional details or null"
+  "event_theme": "theme or null",
+  "expected_attendance": "number or null",
+  "materials_for_attendees": "items being given or null",
+  "what_makes_special": "unique aspects or null",
+  "desired_impact": "spiritual/emotional/relational outcomes or null",
+  "event_date_time": "date and time or null",
+  "childcare_details": "childcare info or null",
+  "food_menu": "food details or null",
+  "event_flow": "logistics/speakers/topics or null",
+  "special_notes": "additional info or null"
 }`;
 
           const extractedResponse = await base44.integrations.Core.InvokeLLM({
@@ -249,11 +263,15 @@ Return ONLY valid JSON with these fields (use null if not mentioned):
             response_json_schema: {
               type: "object",
               properties: {
-                target_audience: { type: "string" },
-                key_message: { type: "string" },
+                event_theme: { type: ["string", "null"] },
                 expected_attendance: { type: ["string", "null"] },
-                registration_link: { type: ["string", "null"] },
-                deliverables: { type: "array", items: { type: "string" } },
+                materials_for_attendees: { type: ["string", "null"] },
+                what_makes_special: { type: ["string", "null"] },
+                desired_impact: { type: ["string", "null"] },
+                event_date_time: { type: ["string", "null"] },
+                childcare_details: { type: ["string", "null"] },
+                food_menu: { type: ["string", "null"] },
+                event_flow: { type: ["string", "null"] },
                 special_notes: { type: ["string", "null"] }
               }
             }

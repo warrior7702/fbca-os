@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -44,6 +45,13 @@ export default function ProjectReview() {
     registration_link: '',
     target_audience: '',
     key_message: '',
+    event_theme: '', // NEW
+    materials_for_attendees: '', // NEW
+    what_makes_special: '', // NEW
+    desired_impact: '', // NEW
+    childcare_details: '', // NEW
+    food_menu: '', // NEW
+    event_flow: '', // NEW
     design_items: [],
     expected_attendance: '',
     special_notes: ''
@@ -70,12 +78,19 @@ export default function ProjectReview() {
           ministry_area: foundRequest.ministry_department || '',
           request_type: goalData.need_type || '',
           event_date: foundRequest.pco_event_date || goalData.event_date || '',
+          event_theme: goalData.event_theme || '', // NEW
+          expected_attendance: goalData.expected_attendance || '',
+          materials_for_attendees: goalData.materials_for_attendees || '', // NEW
+          what_makes_special: goalData.what_makes_special || '', // NEW
+          desired_impact: goalData.desired_impact || '', // NEW
+          childcare_details: goalData.childcare_details || '', // NEW
+          food_menu: goalData.food_menu || '', // NEW
+          event_flow: goalData.event_flow || '', // NEW
+          special_notes: goalData.special_notes || '',
           registration_link: goalData.registration_link || '',
           target_audience: goalData.target_audience || '',
           key_message: goalData.key_message || '',
           design_items: goalData.deliverables || [],
-          expected_attendance: goalData.expected_attendance || '',
-          special_notes: goalData.special_notes || ''
         });
       } else {
         toast.error('Request not found');
@@ -238,45 +253,129 @@ export default function ProjectReview() {
                     </label>
                     <Input
                       type="text"
-                      value={projectDetails.event_date ? format(new Date(projectDetails.event_date), 'MMM d, yyyy h:mm a') : ''}
-                      readOnly
-                      placeholder="Event date"
-                      className="bg-slate-50"
+                      value={projectDetails.event_date}
+                      onChange={(e) => setProjectDetails({...projectDetails, event_date: e.target.value})}
+                      placeholder="e.g., Jan 1, 2024 7:00 PM"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                    Website or Registration Link
+                    Event Theme
                   </label>
                   <Input
-                    value={projectDetails.registration_link}
-                    onChange={(e) => setProjectDetails({...projectDetails, registration_link: e.target.value})}
-                    placeholder="https://..."
+                    value={projectDetails.event_theme}
+                    onChange={(e) => setProjectDetails({...projectDetails, event_theme: e.target.value})}
+                    placeholder="Main theme of the event"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                      Expected Attendance
+                    </label>
+                    <Input
+                      value={projectDetails.expected_attendance}
+                      onChange={(e) => setProjectDetails({...projectDetails, expected_attendance: e.target.value})}
+                      placeholder="How many people"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                      Website or Registration Link
+                    </label>
+                    <Input
+                      value={projectDetails.registration_link}
+                      onChange={(e) => setProjectDetails({...projectDetails, registration_link: e.target.value})}
+                      placeholder="https://..."
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                    Target Audience
-                  </label>
-                  <Input
-                    value={projectDetails.target_audience}
-                    onChange={(e) => setProjectDetails({...projectDetails, target_audience: e.target.value})}
-                    placeholder="e.g., families, college students"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                    Key Message
+                    Materials for Attendees
                   </label>
                   <Textarea
-                    value={projectDetails.key_message}
-                    onChange={(e) => setProjectDetails({...projectDetails, key_message: e.target.value})}
-                    placeholder="Main theme or message for this project"
+                    value={projectDetails.materials_for_attendees}
+                    onChange={(e) => setProjectDetails({...projectDetails, materials_for_attendees: e.target.value})}
+                    placeholder="What items are you giving to attendees?"
+                    rows={2}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    What Makes This Special
+                  </label>
+                  <Textarea
+                    value={projectDetails.what_makes_special}
+                    onChange={(e) => setProjectDetails({...projectDetails, what_makes_special: e.target.value})}
+                    placeholder="What sets this program apart from others?"
                     rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    Desired Impact (Spiritual, Emotional, Relational)
+                  </label>
+                  <Textarea
+                    value={projectDetails.desired_impact}
+                    onChange={(e) => setProjectDetails({...projectDetails, desired_impact: e.target.value})}
+                    placeholder="What should attendees leave with?"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                      Childcare Details
+                    </label>
+                    <Input
+                      value={projectDetails.childcare_details}
+                      onChange={(e) => setProjectDetails({...projectDetails, childcare_details: e.target.value})}
+                      placeholder="Provided, included, or alternate programming?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                      Food / Menu
+                    </label>
+                    <Input
+                      value={projectDetails.food_menu}
+                      onChange={(e) => setProjectDetails({...projectDetails, food_menu: e.target.value})}
+                      placeholder="What's the menu?"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    Event Flow / Speakers / Topics
+                  </label>
+                  <Textarea
+                    value={projectDetails.event_flow}
+                    onChange={(e) => setProjectDetails({...projectDetails, event_flow: e.target.value})}
+                    placeholder="Event logistics and flow"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    Special Notes
+                  </label>
+                  <Textarea
+                    value={projectDetails.special_notes}
+                    onChange={(e) => setProjectDetails({...projectDetails, special_notes: e.target.value})}
+                    placeholder="Any other specific information"
+                    rows={2}
                   />
                 </div>
 
@@ -329,7 +428,7 @@ export default function ProjectReview() {
             {/* Extracted Data Summary */}
             <Card>
               <CardHeader className="border-b bg-slate-50">
-                <CardTitle className="text-base font-medium">Key Information</CardTitle>
+                <CardTitle className="text-base font-medium">Collected Information</CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-6">
@@ -345,10 +444,52 @@ export default function ProjectReview() {
                       <p className="text-sm text-slate-900">{projectDetails.key_message}</p>
                     </div>
                   )}
+                  {projectDetails.event_theme && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Event Theme</p>
+                      <p className="text-sm text-slate-900">{projectDetails.event_theme}</p>
+                    </div>
+                  )}
                   {projectDetails.expected_attendance && (
                     <div>
                       <p className="text-xs text-slate-500 mb-1">Expected Attendance</p>
                       <p className="text-sm text-slate-900">{projectDetails.expected_attendance}</p>
+                    </div>
+                  )}
+                  {projectDetails.materials_for_attendees && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">Materials for Attendees</p>
+                      <p className="text-sm text-slate-900">{projectDetails.materials_for_attendees}</p>
+                    </div>
+                  )}
+                  {projectDetails.what_makes_special && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">What Makes It Special</p>
+                      <p className="text-sm text-slate-900">{projectDetails.what_makes_special}</p>
+                    </div>
+                  )}
+                  {projectDetails.desired_impact && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">Desired Impact</p>
+                      <p className="text-sm text-slate-900">{projectDetails.desired_impact}</p>
+                    </div>
+                  )}
+                  {projectDetails.childcare_details && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Childcare</p>
+                      <p className="text-sm text-slate-900">{projectDetails.childcare_details}</p>
+                    </div>
+                  )}
+                  {projectDetails.food_menu && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Food / Menu</p>
+                      <p className="text-sm text-slate-900">{projectDetails.food_menu}</p>
+                    </div>
+                  )}
+                  {projectDetails.event_flow && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">Event Flow / Speakers / Topics</p>
+                      <p className="text-sm text-slate-900">{projectDetails.event_flow}</p>
                     </div>
                   )}
                   {projectDetails.special_notes && (
