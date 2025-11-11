@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -520,7 +519,7 @@ Return ONLY valid JSON:
                             </div>
                           </motion.div>
                         ))}
-                      </AnanimatePresence>
+                      </AnimatePresence>
 
                       {isAIThinking && (
                         <div className="flex justify-start">
