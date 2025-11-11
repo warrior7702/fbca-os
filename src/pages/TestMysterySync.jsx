@@ -3,12 +3,26 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Play, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, Play, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 
 export default function TestMysterySync() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+
+  React.useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (err) {
+      console.error('Failed to load user:', err);
+    }
+  };
 
   const runSync = async () => {
     setLoading(true);
@@ -17,18 +31,33 @@ export default function TestMysterySync() {
 
     try {
       console.log('🔮 Triggering Mystery Resource sync...');
+      console.log('📊 User PCO token exists:', !!user?.pco_access_token);
       
       const response = await base44.functions.invoke('monitorMysteryResource');
       
       console.log('✅ Response:', response.data);
       setResult(response.data);
     } catch (err) {
-      console.error('❌ Error:', err);
-      setError(err.message || 'Unknown error');
+      console.error('❌ Full error:', err);
+      console.error('❌ Error response:', err.response);
+      
+      // Extract detailed error info
+      const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+      const errorDetails = err.response?.data?.details;
+      const errorStack = err.response?.data?.stack;
+      
+      setError({
+        message: errorMsg,
+        details: errorDetails,
+        stack: errorStack,
+        status: err.response?.status
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  const hasPCOToken = user && user.pco_access_token;
 
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto p-6">
@@ -43,6 +72,31 @@ export default function TestMysterySync() {
             <p className="text-slate-600">Manually trigger the PCO Mystery Resource monitor</p>
           </div>
         </div>
+
+        {/* Connection Status */}
+        {user && (
+          <Card className={hasPCOToken ? "border-green-300 bg-green-50" : "border-yellow-300 bg-yellow-50"}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                {hasPCOToken ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-yellow-600" />
+                )}
+                <div>
+                  <p className="font-semibold text-sm">
+                    {hasPCOToken ? 'PCO Connected' : 'PCO Not Connected'}
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    {hasPCOToken 
+                      ? `Logged in as: ${user.email}` 
+                      : 'Please connect Planning Center in Settings → Integrations'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Test Button */}
         <Card>
@@ -61,7 +115,7 @@ export default function TestMysterySync() {
 
             <Button
               onClick={runSync}
-              disabled={loading}
+              disabled={loading || !hasPCOToken}
               className="w-full bg-purple-600 hover:bg-purple-700"
               size="lg"
             >
@@ -77,6 +131,16 @@ export default function TestMysterySync() {
                 </>
               )}
             </Button>
+
+            {!hasPCOToken && (
+              <Alert className="border-yellow-300 bg-yellow-50">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-900">
+                  You must connect Planning Center Online before running the sync.
+                  Go to Settings → Integrations to connect.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 
@@ -85,7 +149,19 @@ export default function TestMysterySync() {
           <Alert className="border-red-300 bg-red-50">
             <XCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-900">
-              <strong>Error:</strong> {error}
+              <div className="space-y-2">
+                <p><strong>Error:</strong> {error.message}</p>
+                {error.status && <p className="text-sm">Status: {error.status}</p>}
+                {error.details && <p className="text-sm">{error.details}</p>}
+                {error.stack && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-sm font-semibold">View Stack Trace</summary>
+                    <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-48">
+                      {error.stack}
+                    </pre>
+                  </details>
+                )}
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -224,6 +300,16 @@ export default function TestMysterySync() {
               <li>Verify event owners received notification emails</li>
               <li>The cron job will run this automatically every 5 minutes</li>
             </ol>
+
+            <div className="mt-4 pt-4 border-t">
+              <p className="font-semibold mb-2">Debugging Tips:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs text-slate-500">
+                <li>Check browser console (F12) for detailed error logs</li>
+                <li>Verify you have PCO Calendar access in Planning Center</li>
+                <li>Make sure your PCO token hasn't expired (try reconnecting)</li>
+                <li>Check that "Mystery Resource" exists in your PCO resources</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
       </div>
