@@ -15,9 +15,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Plus, Search } from "lucide-react";
+import { MessageSquare, Loader2, CheckCircle2, Sparkles, Calendar, Search } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Helper function to capitalize names properly
+const capitalizeFullName = (name) => {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .split(/[\s.]+/) // Split by spaces or periods
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 export default function CommunicationsRequestForm() {
   const [user, setUser] = useState(null);
@@ -26,14 +36,15 @@ export default function CommunicationsRequestForm() {
   const [submitted, setSubmitted] = useState(false);
   const [searchingEvents, setSearchingEvents] = useState(false);
   const [pcoEvents, setPcoEvents] = useState([]);
+  const [eventSearchQuery, setEventSearchQuery] = useState("");
   const navigate = useNavigate();
 
   // Form state
   const [formData, setFormData] = useState({
     requester_name: "",
     requester_email: "",
-    is_event_related: "", // "yes" or "no"
-    event_source: "", // "pco" or "email" (for existing events)
+    is_event_related: "",
+    event_source: "",
     pco_event_id: "",
     pco_event_name: "",
     pco_event_date: "",
@@ -86,10 +97,10 @@ export default function CommunicationsRequestForm() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // Pre-fill user info
+      // Pre-fill user info with proper capitalization
       setFormData(prev => ({
         ...prev,
-        requester_name: currentUser.full_name || "",
+        requester_name: capitalizeFullName(currentUser.full_name) || "",
         requester_email: currentUser.email || ""
       }));
     } catch (error) {
@@ -115,12 +126,12 @@ export default function CommunicationsRequestForm() {
 
     setSearchingEvents(true);
     try {
-      // Get future events
       const response = await base44.functions.invoke('getPCOToken');
       const token = response.data.access_token;
 
+      // Fetch more events (100) to cover several months
       const eventsResponse = await fetch(
-        'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=20&order=starts_at',
+        'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -131,37 +142,48 @@ export default function CommunicationsRequestForm() {
 
       const eventsData = await eventsResponse.json();
       
-      // Get unique events with their details
+      // Get unique events with details
       const eventIds = [...new Set(eventsData.data.map(inst => 
         inst.relationships?.event?.data?.id
       ).filter(Boolean))];
 
       const events = await Promise.all(
-        eventIds.slice(0, 10).map(async (eventId) => {
-          const eventResponse = await fetch(
-            `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+        eventIds.map(async (eventId) => {
+          try {
+            const eventResponse = await fetch(
+              `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
               }
-            }
-          );
-          const eventData = await eventResponse.json();
-          const instance = eventsData.data.find(inst => 
-            inst.relationships?.event?.data?.id === eventId
-          );
-          
-          return {
-            id: eventId,
-            name: eventData.data?.attributes?.name || 'Untitled',
-            date: instance?.attributes?.starts_at,
-            summary: eventData.data?.attributes?.summary
-          };
+            );
+            const eventData = await eventResponse.json();
+            const instance = eventsData.data.find(inst => 
+              inst.relationships?.event?.data?.id === eventId
+            );
+            
+            return {
+              id: eventId,
+              name: eventData.data?.attributes?.name || 'Untitled',
+              date: instance?.attributes?.starts_at,
+              summary: eventData.data?.attributes?.summary
+            };
+          } catch (err) {
+            console.error('Error fetching event:', eventId, err);
+            return null;
+          }
         })
       );
 
-      setPcoEvents(events);
+      // Filter out nulls and sort by date
+      const validEvents = events
+        .filter(e => e !== null)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      setPcoEvents(validEvents);
+      toast.success(`Found ${validEvents.length} upcoming events`);
     } catch (error) {
       console.error('Error fetching PCO events:', error);
       toast.error('Failed to fetch events from PCO');
@@ -170,18 +192,22 @@ export default function CommunicationsRequestForm() {
     }
   };
 
-  const handlePCOEventSelect = (eventId) => {
-    const event = pcoEvents.find(e => e.id === eventId);
-    if (event) {
-      setFormData(prev => ({
-        ...prev,
-        pco_event_id: event.id,
-        pco_event_name: event.name,
-        pco_event_date: event.date,
-        project_name: event.name
-      }));
-    }
+  const handlePCOEventSelect = (event) => {
+    setFormData(prev => ({
+      ...prev,
+      pco_event_id: event.id,
+      pco_event_name: event.name,
+      pco_event_date: event.date,
+      project_name: event.name
+    }));
+    setEventSearchQuery("");
   };
+
+  // Filter events by search query
+  const filteredEvents = pcoEvents.filter(event => 
+    event.name.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+    (event.date && new Date(event.date).toLocaleDateString().includes(eventSearchQuery))
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -195,10 +221,8 @@ export default function CommunicationsRequestForm() {
     setSubmitting(true);
 
     try {
-      // Generate request number
       const requestNumber = `CR-${Date.now().toString().slice(-6)}`;
 
-      // Create WorkflowRequest
       const request = await base44.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: "manual_form",
@@ -233,15 +257,14 @@ export default function CommunicationsRequestForm() {
 
       console.log('✅ Request created:', request.id);
 
-      // Send confirmation email
       try {
         await base44.integrations.Core.SendEmail({
           from_name: 'Communications Team',
           to: formData.requester_email,
-          subject: `Communications Request Received: ${formData.project_name}`,
+          subject: `Communications Action Plan: ${formData.project_name}`,
           body: `Hello ${formData.requester_name},
 
-Thank you for submitting your communications request!
+Thank you for submitting your communications action plan!
 
 Request Number: ${requestNumber}
 Project: ${formData.project_name}
@@ -306,7 +329,7 @@ FBC Arlington`
                 Request Submitted! 🎉
               </h2>
               <p className="text-slate-600 mb-6">
-                Your communications request has been received. We'll review it and reach out within 1-2 business days.
+                Your communications action plan has been received. We'll review it and reach out within 1-2 business days.
               </p>
               <div className="p-4 bg-green-50 rounded-lg border border-green-200 mb-6">
                 <p className="text-sm text-green-800">
@@ -329,7 +352,7 @@ FBC Arlington`
             <MessageSquare className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Communications Action Plan Request
+            Communications Action Plan
           </h1>
           <p className="text-slate-600">
             Let's create something amazing together! ✨
@@ -386,12 +409,13 @@ FBC Arlington`
                   value={formData.is_event_related}
                   onValueChange={(value) => {
                     handleChange("is_event_related", value);
-                    // Reset event-related fields when changing
                     if (value === "no") {
                       handleChange("event_source", "");
                       handleChange("pco_event_id", "");
                       handleChange("pco_event_name", "");
                       handleChange("pco_event_date", "");
+                      setPcoEvents([]);
+                      setEventSearchQuery("");
                     }
                   }}
                   className="flex gap-6"
@@ -431,7 +455,9 @@ FBC Arlington`
                           variant={formData.event_source === "pco" ? "default" : "outline"}
                           onClick={() => {
                             handleChange("event_source", "pco");
-                            searchPCOEvents();
+                            if (pcoEvents.length === 0) {
+                              searchPCOEvents();
+                            }
                           }}
                           className={formData.event_source === "pco" ? "bg-purple-600" : ""}
                         >
@@ -451,38 +477,104 @@ FBC Arlington`
                       </div>
                     </div>
 
-                    {/* PCO Event Selection */}
+                    {/* PCO Event Search & Selection */}
                     {formData.event_source === "pco" && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="space-y-2"
+                        className="space-y-3"
                       >
                         <Label className="text-sm font-medium">
-                          Select Event <span className="text-red-500">*</span>
+                          Search & Select Event <span className="text-red-500">*</span>
                         </Label>
+                        
                         {searchingEvents ? (
                           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border">
                             <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                            <span className="text-sm text-slate-600">Loading events...</span>
+                            <span className="text-sm text-slate-600">Loading events from PCO Calendar...</span>
                           </div>
                         ) : pcoEvents.length > 0 ? (
-                          <Select
-                            value={formData.pco_event_id}
-                            onValueChange={handlePCOEventSelect}
-                            required
-                          >
-                            <SelectTrigger className="h-10">
-                              <SelectValue placeholder="Select an event..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {pcoEvents.map(event => (
-                                <SelectItem key={event.id} value={event.id}>
-                                  {event.name} - {event.date ? new Date(event.date).toLocaleDateString() : 'No date'}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <>
+                            {/* Search Input */}
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                              <Input
+                                type="text"
+                                placeholder="Type to search events..."
+                                value={eventSearchQuery}
+                                onChange={(e) => setEventSearchQuery(e.target.value)}
+                                className="pl-10 h-10"
+                              />
+                            </div>
+
+                            {/* Selected Event Display */}
+                            {formData.pco_event_id && (
+                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <p className="font-semibold text-purple-900">{formData.pco_event_name}</p>
+                                    <p className="text-sm text-purple-700">
+                                      {formData.pco_event_date ? new Date(formData.pco_event_date).toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                      }) : 'No date'}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleChange("pco_event_id", "");
+                                      handleChange("pco_event_name", "");
+                                      handleChange("pco_event_date", "");
+                                      handleChange("project_name", "");
+                                    }}
+                                  >
+                                    Change
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Event List */}
+                            {!formData.pco_event_id && (
+                              <div className="max-h-64 overflow-y-auto border rounded-lg">
+                                {filteredEvents.length > 0 ? (
+                                  <div className="divide-y">
+                                    {filteredEvents.slice(0, 20).map(event => (
+                                      <button
+                                        key={event.id}
+                                        type="button"
+                                        onClick={() => handlePCOEventSelect(event)}
+                                        className="w-full p-3 hover:bg-purple-50 transition-colors text-left"
+                                      >
+                                        <p className="font-medium text-slate-900">{event.name}</p>
+                                        <p className="text-sm text-slate-600">
+                                          {event.date ? new Date(event.date).toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                          }) : 'No date'}
+                                        </p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="p-8 text-center text-slate-500">
+                                    <p>No events match your search</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <p className="text-xs text-slate-500">
+                              Showing {pcoEvents.length} upcoming events. Use search to filter.
+                            </p>
+                          </>
                         ) : (
                           <Button
                             type="button"
@@ -491,7 +583,7 @@ FBC Arlington`
                             className="w-full"
                           >
                             <Search className="w-4 h-4 mr-2" />
-                            Search PCO Events
+                            Load PCO Calendar Events
                           </Button>
                         )}
                       </motion.div>
@@ -541,7 +633,7 @@ FBC Arlington`
                 )}
               </AnimatePresence>
 
-              {/* Common Fields (shown after event question is answered) */}
+              {/* Common Fields */}
               {formData.is_event_related && (
                 <motion.div
                   initial={{ opacity: 0 }}
