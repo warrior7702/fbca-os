@@ -124,11 +124,12 @@ export default function CronStatus() {
     }
   };
 
-  // Format date with timezone info
+  // Format date - Base44 stores in UTC, we need to show user's local time
   const formatLocalTime = (dateString) => {
+    // Base44 returns ISO strings that are already in UTC
+    // JavaScript Date constructor will parse UTC correctly
     const date = new Date(dateString);
     const localTime = format(date, 'MMM d, h:mm:ss a');
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const tzAbbr = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
     return `${localTime} ${tzAbbr}`;
   };
