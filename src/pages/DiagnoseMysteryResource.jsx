@@ -252,7 +252,6 @@ export default function DiagnoseMysteryResource() {
   return (
     <div className="h-full bg-gradient-to-br from-orange-50 to-red-50 overflow-auto">
       <div className="max-w-5xl mx-auto p-6 space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg">
@@ -294,7 +293,6 @@ export default function DiagnoseMysteryResource() {
           </div>
         </div>
 
-        {/* User Info */}
         <Card className="border-2 border-blue-200 bg-blue-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -309,7 +307,6 @@ export default function DiagnoseMysteryResource() {
           </CardContent>
         </Card>
 
-        {/* Error Display */}
         {error && (
           <Card className="border-2 border-red-200 bg-red-50">
             <CardContent className="p-4">
@@ -324,10 +321,8 @@ export default function DiagnoseMysteryResource() {
           </Card>
         )}
 
-        {/* Diagnostic Results */}
         {diagnosticData && (
           <div className="space-y-6">
-            {/* Summary */}
             <Card>
               <CardHeader>
                 <CardTitle>Scan Summary</CardTitle>
@@ -356,7 +351,6 @@ export default function DiagnoseMysteryResource() {
               </CardContent>
             </Card>
 
-            {/* Target Events */}
             {diagnosticData.target_events_found.length > 0 && (
               <Card className="border-2 border-green-200">
                 <CardHeader className="bg-green-50">
@@ -394,7 +388,6 @@ export default function DiagnoseMysteryResource() {
                           </div>
                         </div>
 
-                        {/* Owner Info */}
                         <div className="p-3 bg-slate-50 rounded-lg">
                           <p className="text-xs text-slate-500 mb-1">Event Owner</p>
                           <div className="flex items-center gap-2">
@@ -412,7 +405,6 @@ export default function DiagnoseMysteryResource() {
                           <p className="text-xs text-slate-400 mt-1">Owner ID: {event.owner_id}</p>
                         </div>
 
-                        {/* Mystery Resource Details */}
                         {event.has_mystery_resource && (
                           <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                             <p className="text-xs text-green-700 mb-1 font-semibold">Mystery Resource Details</p>
@@ -432,7 +424,6 @@ export default function DiagnoseMysteryResource() {
                           </div>
                         )}
 
-                        {/* All Resources */}
                         {event.all_resources.length > 0 && (
                           <div className="p-3 bg-slate-50 rounded-lg">
                             <p className="text-xs text-slate-500 mb-2 font-semibold">
@@ -453,7 +444,6 @@ export default function DiagnoseMysteryResource() {
                           </div>
                         )}
 
-                        {/* Diagnostic Result */}
                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                           <p className="text-xs font-semibold text-blue-900 mb-2">🔍 Why It's Not Triggering:</p>
                           {!event.has_mystery_resource && (
@@ -496,7 +486,6 @@ export default function DiagnoseMysteryResource() {
               </Card>
             )}
 
-            {/* No Events Found */}
             {diagnosticData.target_events_found.length === 0 && (
               <Card className="border-2 border-red-200 bg-red-50">
                 <CardContent className="p-8 text-center">
@@ -512,7 +501,6 @@ export default function DiagnoseMysteryResource() {
               </Card>
             )}
 
-            {/* Existing Workflows */}
             {diagnosticData.existing_workflow_requests.length > 0 && (
               <Card>
                 <CardHeader>
@@ -538,7 +526,6 @@ export default function DiagnoseMysteryResource() {
           </div>
         )}
 
-        {/* Instructions */}
         {!diagnosticData && (
           <Card className="border-2 border-blue-200 bg-blue-50">
             <CardContent className="p-6">
