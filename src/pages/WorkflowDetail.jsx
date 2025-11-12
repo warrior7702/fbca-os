@@ -59,12 +59,13 @@ export default function WorkflowDetail() {
     }
   }, [requestId]);
 
-  // Auto-scroll when messages change
+  // Auto-scroll when messages change - only scroll the chat container, not the whole page
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current && chatContainerRef.current) {
+      // Smooth scroll within the chat container only
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [chatMessages, isAIThinking]);
+  }, [chatMessages]);
 
   const loadUser = async () => {
     try {
@@ -233,18 +234,20 @@ Start with a warm greeting and naturally ask about what makes this event special
         message_count: messageCount
       };
 
-      // Check if we still need ministry or need_type
-      const needsMinistry = !request.ministry_department;
-      const needsNeedType = !request.goal_review_data?.need_type;
+      // Check if we still need ministry or need_type - check CURRENT request state
+      const currentMinistry = request.ministry_department;
+      const currentNeedType = request.goal_review_data?.need_type;
+      const needsMinistry = !currentMinistry;
+      const needsNeedType = !currentNeedType;
 
       let prompt = '';
       
       if (needsMinistry || needsNeedType) {
-        prompt = `You are a warm ministry communications consultant. We're missing some basic info:
+        prompt = `You are Lync, a warm ministry communications consultant. We're missing some basic info:
 
 Event: ${context.event_name}
-${request.ministry_department ? `Ministry: ${request.ministry_department}` : ''}
-${request.goal_review_data?.need_type ? `Need: ${request.goal_review_data.need_type}` : ''}
+${currentMinistry ? `Ministry: ${currentMinistry}` : ''}
+${currentNeedType ? `Need: ${currentNeedType}` : ''}
 
 Conversation:
 ${context.conversation_so_far}
@@ -253,16 +256,21 @@ MISSING INFO TO GATHER:
 ${needsMinistry ? '- Which ministry/department? (e.g., College Ministry, Youth, Pastoral Care, etc.)' : ''}
 ${needsNeedType ? '- What do they need? (Graphics design, Marketing/promotion, or Both graphics and marketing)' : ''}
 
-If they've now provided the missing info, acknowledge it warmly and extract it. Then move to asking about the event's vision/theme.
+CRITICAL - AVOID LOOPS:
+- Review the conversation above carefully
+- If you've ALREADY asked for missing info and they answered, EXTRACT it now and move forward
+- Look for ministry names in their responses (e.g., "college", "youth", "pastoral care")
+- Look for need type in their responses (e.g., "graphics", "marketing", "both")
+- DO NOT ask the same question twice
+- If they haven't answered yet, ask ONCE more clearly
 
-If info is still missing, gently ask for it in a natural way.
-
-Once you have ministry and need type, continue with the normal interview flow asking about theme, audience, etc.`;
+If they've provided the info, acknowledge warmly, extract it, and immediately move to asking about the event's theme/vision.`;
       } else {
-        prompt = `You are a warm, friendly ministry communications consultant having a natural conversation. Be conversational and encouraging, like chatting with a colleague over coffee. Ask leading questions that help them think through their event.
+        prompt = `You are Lync, a warm, friendly ministry communications consultant having a natural conversation. Be conversational and encouraging, like chatting with a colleague over coffee. Ask leading questions that help them think through their event.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
+Type: ${context.need_type}
 Messages exchanged: ${context.message_count}
 
 Conversation:
@@ -270,43 +278,41 @@ ${context.conversation_so_far}
 
 STYLE GUIDELINES:
 - Be conversational and warm, not robotic
-- Ask leading questions that help them think
+- Ask ONE new question per message
 - Acknowledge their answers genuinely ("That sounds great!", "I love that vision!", "Perfect!")
-- If they're vague, that's okay - move forward naturally
+- If they're vague, that's okay - move forward to next topic
 - Make it feel like a helpful conversation, not an interrogation
 - Keep responses 1-2 sentences
+- NEVER ask the same question twice - review conversation history first
 
-Topics to naturally explore (don't follow rigidly - flow with conversation):
+Topics to naturally explore (check what's already covered, don't repeat):
 1. What's the vision/theme for this event? What makes it special?
 2. Who are you hoping to reach? How many folks do you expect?
 3. Are you giving attendees any materials or takeaways?
 4. What's the desired impact - what should people leave feeling/experiencing?
-5. When is this happening?
-6. Will there be childcare ${context.is_youth_college ? '(skip for youth/college)' : 'or kids programming'}?
-7. Any food or refreshments?
-8. What's the flow of the event - activities, speakers, schedule?
-9. Anything else that would help us capture the heart of this event?
+5. Will there be childcare ${context.is_youth_college ? '(skip for youth/college)' : 'or kids programming'}?
+6. Any food or refreshments?
+7. What's the flow of the event - activities, speakers, schedule?
+8. Anything else that would help us capture the heart of this event?
 
-After covering the topics (even partially), warmly summarize what you heard:
+After 6-8 exchanges OR if you have enough info, warmly summarize:
 
 EVENT THEME: [answer or "Not specified"]
 EXPECTED ATTENDANCE: [answer or "TBD"]
 MATERIALS: [answer or "None specified"]
 WHAT MAKES IT SPECIAL: [answer or "To be determined"]
 DESIRED IMPACT: [answer or "To be determined"]
-DATE/TIME: [answer or "TBD"]
 CHILDCARE: [answer or "TBD"]
 FOOD: [answer or "TBD"]
 EVENT FLOW: [answer or "TBD"]
 SPECIAL NOTES: [answer or "None"]
 
-Then say: "Thanks for sharing all that! I have what I need to help our team create something amazing for this event. Ready to submit?"
+Then say: "Thanks for sharing! I have what I need to help our team create something amazing. Ready to submit?"
 
 IMPORTANT: 
-- If this is message 10+, provide summary and finish
-- Be encouraging and conversational throughout
-- Accept any level of detail they provide
-- Flow naturally - don't rigidly follow the list`;
+- If this is message 8+, provide summary and finish
+- Never ask a question that's already been asked in the conversation
+- Be encouraging and conversational throughout`;
       }
 
       const llmResponse = await base44.integrations.Core.InvokeLLM({
@@ -323,9 +329,9 @@ IMPORTANT:
       const updatedMessages = [...newMessages, aiMessage];
       setChatMessages(updatedMessages);
 
-      const isDone = llmResponse.toLowerCase().includes('ready for project review') || 
+      const isDone = llmResponse.toLowerCase().includes('ready to submit') || 
                      llmResponse.toLowerCase().includes('information complete') ||
-                     messageCount >= 12; // Force completion after 12 user messages
+                     messageCount >= 8; // Force completion after 8 user messages to avoid loops
 
       let extractedData = {};
       if (isDone) {
@@ -544,8 +550,8 @@ Return ONLY valid JSON:
           <Card className="border border-slate-200 shadow-sm">
             <CardHeader className="border-b bg-slate-50">
               <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                <Target className="w-5 h-5 text-slate-700" />
-                Communications Intake Interview
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Communications Intake Interview with Lync
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -589,8 +595,12 @@ Return ONLY valid JSON:
                       </AnimatePresence>
 
                       {isAIThinking && (
-                        <div className="flex justify-start">
+                        <div className="flex gap-2 justify-start">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                            <Sparkles className="w-4 h-4 text-purple-600" />
+                          </div>
                           <div className="bg-slate-100 rounded-lg px-4 py-2.5">
+                            <p className="text-xs font-semibold text-purple-600 mb-1">Lync</p>
                             <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
                           </div>
                         </div>
