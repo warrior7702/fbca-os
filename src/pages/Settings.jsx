@@ -136,9 +136,9 @@ export default function Settings() {
       setRoleTitle(currentUser.role_title || "");
       setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow");
       
-      // Check if user logged in via SSO (email domain + has Microsoft token from SSO)
-      const loggedInViaSSO = currentUser.email?.includes('@fbcarlington.org') && 
-                             !!currentUser.microsoft_access_token;
+      // Check if user logged in via SSO (email domain OR has Microsoft token)
+      // If they have @fbcarlington.org email, assume SSO user
+      const loggedInViaSSO = currentUser.email?.includes('@fbcarlington.org');
       setIsSSOUser(loggedInViaSSO);
       
       console.log('🔐 User loaded:', {
@@ -358,9 +358,9 @@ export default function Settings() {
   };
 
   const handleConnectMicrosoft = () => {
-    // Show message if they're an SSO user
+    // SSO users should never need to manually connect
     if (isSSOUser) {
-      toast.info("Already connected via SSO! Try logging out and back in if you need to refresh permissions.");
+      toast.info("You're logged in via Microsoft SSO! Your Microsoft 365 is automatically connected. Try refreshing the page if you don't see it.");
       return;
     }
     
@@ -492,7 +492,7 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-4">
-            {/* SSO Info Banner - Updated */}
+            {/* SSO Info Banner - Show for all @fbcarlington.org users */}
             {isSSOUser && (
               <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
                 <CardContent className="p-6">
@@ -576,54 +576,42 @@ export default function Settings() {
                 color="purple"
               />
 
-              {/* Microsoft 365 Card - Updated */}
-              <Card className={`border-2 ${user?.microsoft_access_token ? 'border-green-300' : 'border-slate-200'}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-orange-50 border-orange-200 text-orange-700">
-                        <Briefcase className="w-6 h-6" />
+              {/* Microsoft 365 Card - ONLY show if NOT an SSO user */}
+              {!isSSOUser && (
+                <Card className={`border-2 ${user?.microsoft_access_token ? 'border-green-300' : 'border-slate-200'}`}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-xl bg-orange-50 border-orange-200 text-orange-700">
+                          <Briefcase className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Microsoft 365</CardTitle>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Access email, calendar, and Office apps
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">Microsoft 365</CardTitle>
-                        <p className="text-sm text-slate-500 mt-1">
-                          {isSSOUser 
-                            ? '✅ Auto-connected via SSO - Email, Calendar, Files, To Do' 
-                            : 'Access email, calendar, and Office apps'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    {user?.microsoft_access_token ? (
-                      <Badge className="bg-green-100 text-green-700 border-green-300">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        {isSSOUser ? 'SSO Connected' : 'Connected'}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-slate-500">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Not Connected
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {user?.microsoft_access_token ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-green-600">
-                        <CheckCircle className="w-4 h-4" />
-                        <span>{isSSOUser ? '🔐 Full access via SSO login' : 'Active connection'}</span>
-                      </div>
-                      {isSSOUser ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled
-                          className="opacity-50 cursor-not-allowed"
-                        >
-                          Auto-Connected
-                        </Button>
+                      {user?.microsoft_access_token ? (
+                        <Badge className="bg-green-100 text-green-700 border-green-300">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Connected
+                        </Badge>
                       ) : (
+                        <Badge variant="outline" className="text-slate-500">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Not Connected
+                        </Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {user?.microsoft_access_token ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Active connection</span>
+                        </div>
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -631,25 +619,23 @@ export default function Settings() {
                         >
                           Disconnect
                         </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <Button 
-                        onClick={handleConnectMicrosoft}
-                        className="w-full"
-                      >
-                        Connect Microsoft 365
-                      </Button>
-                      {!isSSOUser && (
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <Button 
+                          onClick={handleConnectMicrosoft}
+                          className="w-full"
+                        >
+                          Connect Microsoft 365
+                        </Button>
                         <p className="text-xs text-slate-500 text-center">
                           💡 Tip: Login with Microsoft SSO for automatic connection!
                         </p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {user?.pco_access_token && (
