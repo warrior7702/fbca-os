@@ -238,17 +238,7 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-slate-100">
       <style>{`
         .fbca-logo-taskbar {
-          filter: 
-            drop-shadow(0 1px 2px rgba(255, 255, 255, 0.3))
-            drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4))
-            drop-shadow(0 0 12px rgba(255, 255, 255, 0.1));
-          transition: filter 0.2s ease;
-        }
-        .fbca-logo-taskbar:hover {
-          filter: 
-            drop-shadow(0 1px 3px rgba(255, 255, 255, 0.4))
-            drop-shadow(0 3px 12px rgba(0, 0, 0, 0.5))
-            drop-shadow(0 0 16px rgba(255, 255, 255, 0.2));
+          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.1));
         }
       `}</style>
 
@@ -309,17 +299,17 @@ export default function Layout({ children, currentPageName }) {
           {/* Start Button & Quick Launch */}
           <div className="flex items-center gap-2">
             <Link to={createPageUrl("Dashboard")}>
-              <motion.button
+              <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center transition-all p-1.5"
+                className="w-9 h-9 flex items-center justify-center cursor-pointer"
               >
                 <img 
                   src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/f6f1f08a0_image.png"
                   alt="FBCA"
-                  className="w-full h-full object-contain fbca-logo-taskbar"
+                  className="w-full h-full object-contain opacity-90 hover:opacity-100 transition-opacity fbca-logo-taskbar"
                 />
-              </motion.button>
+              </motion.div>
             </Link>
 
             <div className="h-10 w-px bg-white/20 mx-1" />
