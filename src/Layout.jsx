@@ -315,7 +315,7 @@ export default function Layout({ children, currentPageName }) {
                 className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center transition-all p-1.5"
               >
                 <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/0bf40efc2_FBCA_AppIcon_Ryl_web.png"
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/f6f1f08a0_image.png"
                   alt="FBCA"
                   className="w-full h-full object-contain fbca-logo-taskbar"
                 />
