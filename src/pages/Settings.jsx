@@ -193,32 +193,41 @@ export default function Settings() {
         u.id === userId ? { ...u, _updating: true } : u
       ));
       
-      // Try direct entity update first
-      await base44.asServiceRole.entities.User.update(userId, { role: newRole });
+      // Call backend function to update role
+      const response = await base44.functions.invoke('updateUserRole', {
+        user_id: userId,
+        role: newRole
+      });
       
-      console.log('✅ Role changed successfully!');
-      toast.success(`User role updated to ${newRole}`);
+      console.log('📦 Response:', response.data);
       
-      // Wait a moment for database to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Update the local state immediately
-      setAllUsers(prev => prev.map(u => 
-        u.id === userId ? { ...u, role: newRole, _updating: false } : u
-      ));
-      
-      // If we just changed our own role, reload the page
-      if (userId === user.id) {
-        toast.success('Your role was updated! Refreshing...');
+      if (response.data.success) {
+        console.log('✅ Role changed successfully!');
+        toast.success(`User role updated to ${newRole}`);
+        
+        // Wait a moment for database to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Update the local state immediately
+        setAllUsers(prev => prev.map(u => 
+          u.id === userId ? { ...u, role: newRole, _updating: false } : u
+        ));
+        
+        // If we just changed our own role, reload the page
+        if (userId === user.id) {
+          toast.success('Your role was updated! Refreshing...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+        
+        // Reload all users to ensure consistency
         setTimeout(() => {
-          window.location.reload();
+          loadAllUsers();
         }, 1000);
+      } else {
+        throw new Error(response.data.error || 'Failed to update role');
       }
-      
-      // Reload all users to ensure consistency
-      setTimeout(() => {
-        loadAllUsers();
-      }, 1000);
       
     } catch (error) {
       console.error("❌ Error changing user role:", error);
