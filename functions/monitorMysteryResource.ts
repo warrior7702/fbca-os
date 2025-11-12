@@ -212,13 +212,13 @@ Deno.serve(async (req) => {
     console.log(`✅ Found ${mysteryResourceRequests.length} pending Mystery Resource requests`);
 
     // Check existing workflow requests to avoid duplicates
+    // Include ALL statuses to catch completed ones too
     const existingRequests = await base44.asServiceRole.entities.WorkflowRequest.filter({
-      type: 'mystery_resource',
-      status: { $in: ['request', 'minister_goal_review', 'project_review', 'campaign_running'] }
+      type: 'mystery_resource'
     });
 
     const existingPCORequestIds = existingRequests.map(r => r.pco_resource_request_id);
-    console.log(`📊 ${existingRequests.length} existing requests in database`);
+    console.log(`📊 ${existingRequests.length} existing requests in database (checking ALL to avoid duplicates)`);
 
     // Create new communication requests for mystery resources
     const newRequests = [];
