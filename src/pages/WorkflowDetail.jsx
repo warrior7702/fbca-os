@@ -218,7 +218,7 @@ Start with a warm greeting and naturally ask about what makes this event special
 
     try {
       const conversationHistory = newMessages.map(m => 
-        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+        `${m.role === 'user' ? 'User' : 'Lync'}: ${m.content}`
       ).join('\n\n');
 
       const messageCount = newMessages.filter(m => m.role === 'user').length;
@@ -295,23 +295,26 @@ Topics to naturally explore (check what's already covered, don't repeat):
 7. What's the flow of the event - activities, speakers, schedule?
 8. Anything else that would help us capture the heart of this event?
 
-After 6-8 exchanges OR if you have enough info, warmly summarize:
+After 6-8 exchanges OR if you have enough info, warmly summarize what you learned in a clear format:
 
-EVENT THEME: [answer or "Not specified"]
-EXPECTED ATTENDANCE: [answer or "TBD"]
-MATERIALS: [answer or "None specified"]
-WHAT MAKES IT SPECIAL: [answer or "To be determined"]
-DESIRED IMPACT: [answer or "To be determined"]
-CHILDCARE: [answer or "TBD"]
-FOOD: [answer or "TBD"]
-EVENT FLOW: [answer or "TBD"]
-SPECIAL NOTES: [answer or "None"]
+"Great! Here's what I've captured:
 
-Then say: "Thanks for sharing! I have what I need to help our team create something amazing. Ready to submit?"
+📋 EVENT THEME: [their answer or "Will determine later"]
+👥 EXPECTED ATTENDANCE: [their answer or "TBD"]
+📦 MATERIALS FOR ATTENDEES: [their answer or "None mentioned"]
+✨ WHAT MAKES IT SPECIAL: [their answer or "To be determined"]
+💭 DESIRED IMPACT: [their answer or "To be determined"]
+👶 CHILDCARE: [their answer or "TBD"]
+🍴 FOOD/REFRESHMENTS: [their answer or "TBD"]
+📅 EVENT FLOW: [their answer or "TBD"]
+📝 SPECIAL NOTES: [any other details or "None"]
+
+Thanks for sharing! I have what I need to help our team create something amazing. Ready to submit?"
 
 IMPORTANT: 
-- If this is message 8+, provide summary and finish
-- Never ask a question that's already been asked in the conversation
+- If this is message 6+, provide the formatted summary and finish
+- The summary format MUST be EXACTLY as shown above with emoji bullets
+- Never ask a question that's already been asked
 - Be encouraging and conversational throughout`;
       }
 
@@ -331,30 +334,35 @@ IMPORTANT:
 
       const isDone = llmResponse.toLowerCase().includes('ready to submit') || 
                      llmResponse.toLowerCase().includes('information complete') ||
-                     messageCount >= 8; // Force completion after 8 user messages to avoid loops
+                     messageCount >= 6; // Force completion after 6 user messages
 
       let extractedData = {};
       if (isDone) {
         try {
-          const extractPrompt = `Extract event details from this conversation. Use "Not specified" or null for missing info:
+          console.log('🔍 Extracting data from conversation...');
+          
+          const extractPrompt = `Extract ALL available event details from this conversation. Be thorough and include everything mentioned.
 
+CONVERSATION:
 ${conversationHistory}
 
-Return ONLY valid JSON:
+Extract and return ONLY valid JSON with these exact fields. Use actual content from conversation, or null if not mentioned:
 {
-  "event_theme": "theme or null",
-  "expected_attendance": "number or null",
-  "materials_for_attendees": "items or null",
-  "what_makes_special": "unique aspects or null",
-  "desired_impact": "outcomes or null",
-  "event_date_time": "date/time or null",
-  "childcare_details": "info or null",
-  "food_menu": "details or null",
-  "event_flow": "logistics or null",
-  "special_notes": "additional info or null",
-  "ministry_department": "ministry name or null",
-  "need_type": "graphics, marketing, or both - or null"
-}`;
+  "event_theme": "the theme/vision mentioned OR null",
+  "expected_attendance": "number of people expected OR null",
+  "materials_for_attendees": "items/handouts mentioned OR null",
+  "what_makes_special": "unique aspects mentioned OR null",
+  "desired_impact": "what attendees should feel/experience OR null",
+  "event_date_time": "date/time mentioned OR null",
+  "childcare_details": "childcare info mentioned OR null",
+  "food_menu": "food/refreshments mentioned OR null",
+  "event_flow": "schedule/activities/speakers mentioned OR null",
+  "special_notes": "any other details mentioned OR null",
+  "ministry_department": "ministry name mentioned OR null",
+  "need_type": "graphics, marketing, or both - as mentioned OR null"
+}
+
+IMPORTANT: Extract EVERYTHING that was discussed. Don't leave fields null if they were mentioned.`;
 
           const extractedResponse = await base44.integrations.Core.InvokeLLM({
             prompt: extractPrompt,
@@ -378,8 +386,15 @@ Return ONLY valid JSON:
           });
 
           extractedData = extractedResponse;
+          console.log('✅ Extracted data:', extractedData);
+          
+          // Show success message with what was captured
+          const capturedCount = Object.values(extractedData).filter(v => v !== null).length;
+          toast.success(`Captured ${capturedCount} details from your conversation!`);
+          
         } catch (extractError) {
-          console.error('Failed to extract structured data:', extractError);
+          console.error('❌ Failed to extract structured data:', extractError);
+          toast.error('Note: Some details may need manual entry in the project review');
         }
       }
 
@@ -402,10 +417,14 @@ Return ONLY valid JSON:
         updateData.goal_review_data.need_type = extractedData.need_type;
       }
 
+      console.log('💾 Saving to database:', updateData);
       await base44.entities.WorkflowRequest.update(requestId, updateData);
+      console.log('✅ Saved to database');
 
       if (isDone) {
         setGoalReviewComplete(true);
+        // Reload the request to show updated data
+        await loadRequest();
       }
 
     } catch (error) {
