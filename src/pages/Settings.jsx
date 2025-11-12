@@ -181,6 +181,10 @@ export default function Settings() {
   };
 
   const handleChangeUserRole = async (userId, newRole) => {
+    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+      return;
+    }
+
     try {
       console.log('🔄 Starting role change:', { userId, newRole, currentUserRole: user?.role });
       
@@ -189,42 +193,33 @@ export default function Settings() {
         u.id === userId ? { ...u, _updating: true } : u
       ));
       
-      const response = await base44.functions.invoke('setUserRole', {
-        user_id: userId,
-        role: newRole
-      });
+      // Try direct entity update first
+      await base44.asServiceRole.entities.User.update(userId, { role: newRole });
       
-      console.log('📦 Full response:', response);
-      console.log('📦 Response data:', response.data);
-      console.log('📦 Response status:', response.status);
+      console.log('✅ Role changed successfully!');
+      toast.success(`User role updated to ${newRole}`);
       
-      // Check if the response indicates success
-      if (!response.data || response.data.error) {
-        throw new Error(response.data?.error || 'Failed to update role');
+      // Wait a moment for database to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Update the local state immediately
+      setAllUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, role: newRole, _updating: false } : u
+      ));
+      
+      // If we just changed our own role, reload the page
+      if (userId === user.id) {
+        toast.success('Your role was updated! Refreshing...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       }
       
-      if (response.data.success) {
-        console.log('✅ Role changed successfully!');
-        toast.success(`User role updated to ${newRole}`);
-        
-        // Wait a moment for database to update
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Update the local state immediately
-        setAllUsers(prev => prev.map(u => 
-          u.id === userId ? { ...u, role: newRole, _updating: false } : u
-        ));
-        
-        // If we just changed our own role, reload the page
-        if (userId === user.id) {
-          toast.success('Your role was updated! Refreshing...');
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-      } else {
-        throw new Error('Update failed - no success confirmation');
-      }
+      // Reload all users to ensure consistency
+      setTimeout(() => {
+        loadAllUsers();
+      }, 1000);
+      
     } catch (error) {
       console.error("❌ Error changing user role:", error);
       console.error("❌ Error details:", {
@@ -235,7 +230,9 @@ export default function Settings() {
       
       // Show detailed error
       const errorMsg = error.response?.data?.error || error.message || 'Unknown error';
-      toast.error(`Failed to change role: ${errorMsg}`);
+      toast.error(`Failed to change role: ${errorMsg}`, {
+        duration: 5000
+      });
       
       // Remove loading state and reload to get correct state
       setAllUsers(prev => prev.map(u => 
@@ -891,26 +888,16 @@ export default function Settings() {
                     User Management
                   </CardTitle>
                   <CardDescription>
-                    View all users and their current roles
+                    Manage user roles and permissions
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-semibold text-amber-900 mb-1">
-                          How to Change User Roles
-                        </p>
-                        <p className="text-sm text-amber-800 mb-2">
-                          For security reasons, user roles can only be changed through the Base44 Dashboard:
-                        </p>
-                        <ol className="text-sm text-amber-800 space-y-1 ml-4 list-decimal">
-                          <li>Go to your <strong>Base44 Dashboard</strong></li>
-                          <li>Navigate to <strong>Data → Users</strong></li>
-                          <li>Find the user and edit their <strong>role</strong> field</li>
-                          <li>Save changes</li>
-                        </ol>
+                      <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-semibold mb-1">Role Management</p>
+                        <p>Use the dropdown below to change user roles. If you get an error, you can also edit roles through the <strong>Base44 Dashboard → Data → Users</strong>.</p>
                       </div>
                     </div>
                   </div>
@@ -950,20 +937,47 @@ export default function Settings() {
                                   )}
                                 </div>
                               </div>
-                              <Badge 
-                                variant="outline"
-                                className={
-                                  u.role === 'super_user' 
-                                    ? 'bg-purple-50 text-purple-700 border-purple-300'
-                                    : u.role === 'admin'
-                                    ? 'bg-orange-50 text-orange-700 border-orange-300'
-                                    : 'bg-slate-50 text-slate-700 border-slate-300'
-                                }
-                              >
-                                {u.role === 'super_user' && <Crown className="w-3 h-3 mr-1" />}
-                                {u.role === 'admin' && <Crown className="w-3 h-3 mr-1" />}
-                                {u.role === 'super_user' ? 'Super User' : u.role === 'admin' ? 'Admin' : 'User'}
-                              </Badge>
+                              
+                              {u._updating ? (
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                              ) : (
+                                <Select
+                                  value={u.role}
+                                  onValueChange={(newRole) => handleChangeUserRole(u.id, newRole)}
+                                  disabled={u._updating}
+                                >
+                                  <SelectTrigger className="w-40">
+                                    <SelectValue>
+                                      <div className="flex items-center gap-2">
+                                        {(u.role === 'super_user' || u.role === 'admin') && (
+                                          <Crown className="w-3 h-3" />
+                                        )}
+                                        {u.role === 'super_user' ? 'Super User' : u.role === 'admin' ? 'Admin' : 'User'}
+                                      </div>
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="user">
+                                      <div className="flex items-center gap-2">
+                                        <User className="w-4 h-4" />
+                                        User
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="admin">
+                                      <div className="flex items-center gap-2">
+                                        <Crown className="w-4 h-4 text-orange-600" />
+                                        Admin
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="super_user">
+                                      <div className="flex items-center gap-2">
+                                        <Crown className="w-4 h-4 text-purple-600" />
+                                        Super User
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
