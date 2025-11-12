@@ -183,7 +183,7 @@ export default function Settings() {
 
   const handleChangeUserRole = async (userId, newRole) => {
     try {
-      console.log('🔄 Changing role for user:', userId, 'to:', newRole);
+      console.log('🔄 Starting role change:', { userId, newRole, currentUserRole: user?.role });
       
       // Show loading state
       setAllUsers(prev => prev.map(u => 
@@ -195,10 +195,21 @@ export default function Settings() {
         role: newRole
       });
       
-      console.log('✅ Role change response:', response);
+      console.log('📦 Full response:', response);
+      console.log('📦 Response data:', response.data);
+      console.log('📦 Response status:', response.status);
+      
+      // Check if the response indicates success
+      if (!response.data || response.data.error) {
+        throw new Error(response.data?.error || 'Failed to update role');
+      }
       
       if (response.data.success) {
+        console.log('✅ Role changed successfully!');
         toast.success(`User role updated to ${newRole}`);
+        
+        // Wait a moment for database to update
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Update the local state immediately
         setAllUsers(prev => prev.map(u => 
@@ -213,22 +224,29 @@ export default function Settings() {
           }, 1000);
         }
       } else {
-        throw new Error(response.data.error || 'Failed to update role');
+        throw new Error('Update failed - no success confirmation');
       }
     } catch (error) {
       console.error("❌ Error changing user role:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        response: error.response,
+        data: error.response?.data
+      });
       
       // Show detailed error
       const errorMsg = error.response?.data?.error || error.message || 'Unknown error';
       toast.error(`Failed to change role: ${errorMsg}`);
       
-      // Remove loading state
+      // Remove loading state and reload to get correct state
       setAllUsers(prev => prev.map(u => 
         u.id === userId ? { ...u, _updating: false } : u
       ));
       
-      // Reload to get correct state
-      await loadAllUsers();
+      // Reload users to ensure we have the correct state
+      setTimeout(() => {
+        loadAllUsers();
+      }, 500);
     }
   };
 
