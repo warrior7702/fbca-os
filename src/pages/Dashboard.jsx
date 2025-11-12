@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -26,15 +27,15 @@ import { useNavigate } from "react-router-dom";
 
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
-  { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-purple-500 to-pink-500", path: "MyMeetings" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
   { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" },
+  { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-purple-500 to-pink-500", path: "MyMeetings" },
+  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
   { id: "communications", name: "Communications Request", icon: MessageSquare, color: "from-purple-500 to-pink-500", path: "WorkflowHub" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
-  { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
-  { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
-  { id: "documents", name: "Documents", icon: Folder, color: "from-sky-500 to-blue-500", path: "Documents" },
   { id: "support", name: "Support Requests", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
+  { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
+  { id: "documents", name: "Documents", icon: Folder, color: "from-sky-500 to-blue-500", path: "Documents" },
   { id: "inboxhelper", name: "Inbox Helper", icon: Mail, color: "from-red-500 to-pink-500", path: "InboxHelper" },
   { id: "planningtool", name: "Planning Tool", icon: Briefcase, color: "from-indigo-500 to-purple-500", path: "PlanningTool" },
   { id: "sharepoint", name: "SharePoint", icon: FileSpreadsheet, color: "from-green-600 to-emerald-600", path: "SharePoint" },
@@ -55,15 +56,15 @@ const ROWS = 6;
 const getDefaultPositions = () => {
   return {
     mytasks: { row: 0, col: 0 },
-    mymeetings: { row: 0, col: 1 },
-    myapprovals: { row: 0, col: 2 },
-    calendar: { row: 0, col: 3 },
+    myapprovals: { row: 0, col: 1 },
+    calendar: { row: 0, col: 2 },
+    mymeetings: { row: 0, col: 3 },
     mydepartment: { row: 0, col: 4 },
     communications: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
     support: { row: 1, col: 2 },
     staffdir: { row: 1, col: 3 },
-    documents: { row: 2, col: 0 },
+    documents: { row: 1, col: 4 },
     inboxhelper: { row: 2, col: 1 },
     planningtool: { row: 2, col: 2 },
     sharepoint: { row: 2, col: 3 },
