@@ -152,7 +152,7 @@ export default function CronStatus() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Cron Status Monitor</h1>
-              <p className="text-slate-600">Mystery Resource Auto-Sync Logs (Local Time)</p>
+              <p className="text-slate-600">Mystery Resource Auto-Sync Logs</p>
             </div>
           </div>
           <div className="flex gap-2">
