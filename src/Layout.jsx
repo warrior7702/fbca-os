@@ -1,14 +1,8 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import EmailDomainCheck from "@/components/layout/EmailDomainCheck"; // Keep if needed, currently commented out in JSX
 import {
-  LayoutDashboard,
-  Megaphone,
-  UtensilsCrossed,
-  User,
   Wifi,
   Volume2,
   Battery,
@@ -16,17 +10,18 @@ import {
   Search,
   Settings,
   LogOut,
-  ChevronDown,
-  Layers,
-  Users,
+  User,
   Loader2,
   Folder,
-  ListChecks, // Used for My Tasks app and Task Results search
-  ClipboardCheck, // NEW: for My Approvals app
+  ListChecks,
+  ClipboardCheck,
   Sparkles,
-  Calendar as CalendarIcon, // Added CalendarIcon
-  Building2, // NEW: Added Building2 icon for My Department
-  MessageSquare // NEW: Added MessageSquare icon for Communications Request
+  Calendar as CalendarIcon,
+  Building2,
+  MessageSquare,
+  UtensilsCrossed,
+  Users,
+  Ticket
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,24 +35,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
-import toast from 'react-hot-toast'; // Added for toast notifications
+import { toast } from "sonner";
 
 const apps = [
   {
-    name: "My Tasks",
+    name: "Tasks",
     path: "MyTasks",
     icon: ListChecks,
     color: "text-indigo-500"
   },
   {
-    name: "My Meetings",
+    name: "Meetings",
     path: "MyMeetings",
     icon: CalendarIcon,
     color: "text-purple-500"
   },
   {
-    name: "My Approvals",
+    name: "Approvals",
     path: "MyApprovals",
     icon: ClipboardCheck,
     color: "text-orange-500"
@@ -75,22 +69,34 @@ const apps = [
     color: "text-violet-500"
   },
   {
-    name: "Communications Request",
+    name: "Communications",
     path: "WorkflowHub",
     icon: MessageSquare,
     color: "text-purple-500"
   },
   {
-    name: "Food Service",
+    name: "Hospitality",
     path: "FoodService",
     icon: UtensilsCrossed,
     color: "text-green-500"
   },
   {
-    name: "Staff Directory",
+    name: "Directory",
     path: "StaffDirectory",
     icon: Users,
     color: "text-teal-500"
+  },
+  {
+    name: "Documents",
+    path: "Documents",
+    icon: Folder,
+    color: "text-blue-500"
+  },
+  {
+    name: "Support",
+    path: "Ticketing",
+    icon: Ticket,
+    color: "text-amber-500"
   }
 ];
 
@@ -167,8 +173,6 @@ export default function Layout({ children, currentPageName }) {
   const performLiveSearch = async (query) => {
     setSearching(true);
 
-    console.log('🔍 Starting live search for:', query);
-
     try {
       const lowerQuery = query.toLowerCase();
       const newResults = { staff: [], files: [], modules: [] };
@@ -185,9 +189,8 @@ export default function Layout({ children, currentPageName }) {
                    person.email?.toLowerCase().includes(lowerQuery);
           })
           .slice(0, 5);
-        console.log('✅ Found', newResults.staff.length, 'staff members');
       } catch (staffError) {
-        console.error('❌ Staff search error:', staffError);
+        console.error('Staff search error:', staffError);
       }
 
       // Search modules
@@ -197,33 +200,24 @@ export default function Layout({ children, currentPageName }) {
           app.path.toLowerCase().includes(lowerQuery)
         )
         .slice(0, 3);
-      console.log('✅ Found', newResults.modules.length, 'modules');
 
       // Search files
       try {
         const filesResponse = await base44.functions.invoke('searchOneDrive', { query });
         newResults.files = (filesResponse.data.files || []).slice(0, 5);
-        console.log('✅ Found', newResults.files.length, 'files/folders');
       } catch (fileError) {
-        console.error('❌ File search error:', fileError);
+        console.error('File search error:', fileError);
       }
-
-      console.log('🎯 Final results:', {
-        staff: newResults.staff.length,
-        modules: newResults.modules.length,
-        files: newResults.files.length
-      });
 
       setSearchResults(newResults);
       
-      // Show results if we have any
       const total = newResults.staff.length + newResults.files.length + newResults.modules.length;
       if (total > 0) {
         setShowResults(true);
       }
       
     } catch (error) {
-      console.error('❌ Live search error:', error);
+      console.error('Live search error:', error);
       setSearchResults({ staff: [], files: [], modules: [] });
     } finally {
       setSearching(false);
@@ -258,8 +252,6 @@ export default function Layout({ children, currentPageName }) {
 
   const totalResults = searchResults.staff.length + searchResults.files.length + searchResults.modules.length;
 
-  console.log('🔢 Total search results:', totalResults, 'Show results:', showResults);
-
   const handleDismissLightBubble = () => {
     setShowLightBubble(false);
     sessionStorage.setItem('lightBubbleDismissed', 'true');
@@ -273,10 +265,7 @@ export default function Layout({ children, currentPageName }) {
         }
       `}</style>
 
-      {/* Email Domain Check - DISABLED */}
-      {/* {user && <EmailDomainCheck user={user} exceptionEmail="warrior7702@gmail.com" />} */}
-
-      {/* Main Content - Full Height */}
+      {/* Main Content */}
       <main className="h-screen pb-16">
         {children}
       </main>
@@ -316,14 +305,13 @@ export default function Layout({ children, currentPageName }) {
                 </Button>
               </Link>
 
-              {/* Speech bubble tail */}
               <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r-2 border-b-2 border-yellow-400 transform rotate-45" />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Taskbar - Always Visible */}
+      {/* Taskbar */}
       <motion.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
@@ -349,7 +337,7 @@ export default function Layout({ children, currentPageName }) {
 
             <div className="h-10 w-px bg-white/20 mx-1" />
 
-            {/* Quick Launch / Open Apps */}
+            {/* Quick Launch */}
             <div className="flex items-center gap-1">
               {apps.map((app) => {
                 const isActive = location.pathname === createPageUrl(app.path);
@@ -381,10 +369,7 @@ export default function Layout({ children, currentPageName }) {
                   type="text"
                   placeholder="Search apps, files, and people..."
                   value={searchQuery}
-                  onChange={(e) => {
-                    console.log('🔍 Search query changed:', e.target.value);
-                    setSearchQuery(e.target.value);
-                  }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
                     if (searchQuery.length >= 2 && totalResults > 0) {
                       setShowResults(true);
@@ -398,14 +383,13 @@ export default function Layout({ children, currentPageName }) {
               </div>
             </form>
 
-            {/* Live Search Results Dropdown */}
+            {/* Live Search Results */}
             {showResults && totalResults > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute bottom-12 left-0 right-0 bg-white rounded-lg shadow-2xl border border-slate-200 max-h-96 overflow-y-auto z-50"
               >
-                {/* Staff Results */}
                 {searchResults.staff.length > 0 && (
                   <div className="p-2">
                     <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
@@ -433,7 +417,6 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 )}
 
-                {/* Module Results */}
                 {searchResults.modules.length > 0 && (
                   <div className="p-2 border-t border-slate-100">
                     <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
@@ -456,7 +439,6 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 )}
 
-                {/* File Results */}
                 {searchResults.files.length > 0 && (
                   <div className="p-2 border-t border-slate-100">
                     <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
@@ -480,7 +462,6 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 )}
 
-                {/* View All Results */}
                 <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
@@ -499,7 +480,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* System Tray */}
           <div className="flex items-center gap-3">
-            {/* System Icons - Now clickable placeholders */}
+            {/* System Icons */}
             <div className="flex items-center gap-2">
               <motion.div
                 whileHover={{ scale: 1.1 }}
@@ -547,7 +528,6 @@ export default function Layout({ children, currentPageName }) {
                 className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer group"
               >
                 <Sparkles className={`w-4 h-4 ${hasConnectionAlert ? 'text-yellow-300' : 'text-yellow-600'}`} />
-                {/* Glow effect - only when there's an alert */}
                 {hasConnectionAlert && (
                   <motion.div
                     animate={{
@@ -622,7 +602,6 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {/* Profile link updated to point to Settings profile tab */}
                 <DropdownMenuItem asChild>
                   <Link to={createPageUrl("Settings") + "?tab=profile"} className="cursor-pointer"> 
                     <User className="w-4 h-4 mr-2" />
