@@ -1,31 +1,25 @@
-
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { base44 } from "@/api/base44Client";
 import {
   UtensilsCrossed,
-  User,
-  Folder,
-  Trash2,
-  Settings,
   Users,
+  Settings,
   ListChecks,
   ClipboardCheck,
-  Unlock,
-  Mail,
-  Ticket,
-  Building2,
-  Inbox,
   Video,
   CalendarIcon,
-  Layers, // Added Layers icon
-  MessageSquare // Added MessageSquare icon for Communications Request
+  Building2,
+  MessageSquare,
+  Ticket,
+  Folder
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
@@ -35,11 +29,10 @@ const defaultApps = [
   { id: "communications", name: "Communications Request", icon: MessageSquare, color: "from-purple-500 to-pink-500", path: "WorkflowHub" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "staffdir", name: "Directory", icon: Users, color: "from-teal-500 to-cyan-500", path: "StaffDirectory" },
-  { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" },
-  { id: "email", name: "Email", icon: Mail, color: "from-blue-600 to-sky-400", path: "mailto:" },
-  { id: "ticketing", name: "Ticketing", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
   { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
-  { id: "inboxhelper", name: "Inbox Helper", icon: Inbox, color: "from-rose-500 to-pink-600", path: "InboxHelper" }
+  { id: "documents", name: "Documents", icon: Folder, color: "from-sky-500 to-blue-500", path: "Documents" },
+  { id: "support", name: "Support Requests", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
+  { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" }
 ];
 
 const wallpapers = {
@@ -59,13 +52,12 @@ const getDefaultPositions = () => {
     mymeetings: { row: 0, col: 1 },
     myapprovals: { row: 0, col: 2 },
     calendar: { row: 0, col: 3 },
-    email: { row: 1, col: 0 },
-    communications: { row: 1, col: 1 },
-    foodservice: { row: 1, col: 2 },
-    staffdir: { row: 1, col: 3 },
-    ticketing: { row: 2, col: 0 },
-    mydepartment: { row: 2, col: 1 },
-    inboxhelper: { row: 2, col: 2 },
+    communications: { row: 1, col: 0 },
+    foodservice: { row: 1, col: 1 },
+    staffdir: { row: 1, col: 2 },
+    mydepartment: { row: 1, col: 3 },
+    documents: { row: 2, col: 0 },
+    support: { row: 2, col: 1 },
     settings: { row: 5, col: 0 }
   };
 };
@@ -78,6 +70,8 @@ export default function Dashboard() {
   const [draggedApp, setDraggedApp] = useState(null);
   const [approvalsCount, setApprovalsCount] = useState(0);
   const [tasksDueToday, setTasksDueToday] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadUser();
@@ -136,6 +130,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error loading user:", error);
       setAppPositions(getDefaultPositions());
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -158,61 +154,43 @@ export default function Dashboard() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      console.log('📅 Loading tasks due today...');
-      console.log('Today range:', today, 'to', tomorrow);
-
-      // Get ClickUp tasks if connected
       if (currentUser?.clickup_access_token) {
         try {
           const clickupResponse = await base44.functions.invoke('getMyClickUpTasks');
           const clickupTasks = clickupResponse.data.tasks || [];
-          console.log('📋 Total ClickUp tasks:', clickupTasks.length);
           
           const clickupDueToday = clickupTasks.filter(task => {
             if (!task.due_date) return false;
-            const dueDate = new Date(task.due_date); // Already in ISO format from function
-            const isDueToday = dueDate >= today && dueDate < tomorrow;
-            if (isDueToday) {
-              console.log('✅ ClickUp task due today:', task.name, 'due:', dueDate); // Changed task.title to task.name as per ClickUp API
-            }
-            return isDueToday;
+            const dueDate = new Date(task.due_date);
+            return dueDate >= today && dueDate < tomorrow;
           });
           
-          console.log('✅ ClickUp tasks due today:', clickupDueToday.length);
           todayCount += clickupDueToday.length;
         } catch (error) {
-          console.error('❌ Failed to load ClickUp tasks:', error);
+          console.error('Failed to load ClickUp tasks:', error);
         }
       }
 
-      // Get Microsoft To Do tasks if connected
       if (currentUser?.microsoft_access_token) {
         try {
           const todoResponse = await base44.functions.invoke('getMicrosoftToDo');
           const todoTasks = todoResponse.data.tasks || todoResponse.data || [];
-          console.log('📋 Total Microsoft To Do tasks:', todoTasks.length);
           
           const todoDueToday = todoTasks.filter(task => {
             if (!task.due_date) return false;
             const dueDate = new Date(task.due_date);
-            const isDueToday = dueDate >= today && dueDate < tomorrow;
-            if (isDueToday) {
-              console.log('✅ Microsoft task due today:', task.title, 'due:', dueDate);
-            }
-            return isDueToday;
+            return dueDate >= today && dueDate < tomorrow;
           });
           
-          console.log('✅ Microsoft tasks due today:', todoDueToday.length);
           todayCount += todoDueToday.length;
         } catch (error) {
-          console.error('❌ Failed to load Microsoft To Do tasks:', error);
+          console.error('Failed to load Microsoft To Do tasks:', error);
         }
       }
 
-      console.log('🎯 Total tasks due today:', todayCount);
       setTasksDueToday(todayCount);
     } catch (error) {
-      console.error('❌ Failed to load tasks due today:', error);
+      console.error('Failed to load tasks due today:', error);
     }
   };
 
@@ -279,6 +257,20 @@ export default function Dashboard() {
 
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
+  // Show loading briefly to avoid glitches
+  if (isLoading) {
+    return (
+      <div 
+        className="h-full relative overflow-hidden bg-cover bg-center bg-no-repeat flex items-center justify-center"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), url('${wallpaperUrl}')`
+        }}
+      >
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className="h-full relative overflow-hidden bg-cover bg-center bg-no-repeat"
@@ -286,6 +278,12 @@ export default function Dashboard() {
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), url('${wallpaperUrl}')`
       }}
     >
+      <style>{`
+        .fbca-logo-taskbar {
+          filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
+        }
+      `}</style>
+
       {/* Edit Mode Indicator */}
       <AnimatePresence>
         {editMode && (
@@ -296,7 +294,6 @@ export default function Dashboard() {
             className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
           >
             <div className="bg-white/90 text-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium">
-              <Unlock className="w-4 h-4" />
               Edit Mode - Drag icons to rearrange
               <Button
                 size="sm"
@@ -357,55 +354,29 @@ export default function Dashboard() {
                           </span>
                         </motion.div>
                       ) : (
-                        app.path.startsWith("mailto:") ? (
-                          <a href={app.path} className="block h-full" target="_blank" rel="noopener noreferrer">
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
-                            >
-                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
-                                <app.icon className="w-8 h-8 text-white" />
-                                {app.id === 'myapprovals' && approvalsCount > 0 && (
-                                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {approvalsCount}
-                                  </Badge>
-                                )}
-                                {app.id === 'mytasks' && tasksDueToday > 0 && (
-                                  <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {tasksDueToday}
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                                {app.name}
-                              </span>
-                            </motion.div>
-                          </a>
-                        ) : (
-                          <Link to={createPageUrl(app.path)} className="block h-full">
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
-                            >
-                              <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
-                                <app.icon className="w-8 h-8 text-white" />
-                                {app.id === 'myapprovals' && approvalsCount > 0 && (
-                                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {approvalsCount}
-                                  </Badge>
-                                )}
-                                {app.id === 'mytasks' && tasksDueToday > 0 && (
-                                  <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
-                                    {tasksDueToday}
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
-                                {app.name}
-                              </span>
-                            </motion.div>
-                          </Link>
-                        )
+                        <Link to={createPageUrl(app.path)} className="block h-full">
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
+                          >
+                            <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-2xl flex items-center justify-center relative`}>
+                              <app.icon className="w-8 h-8 text-white" />
+                              {app.id === 'myapprovals' && approvalsCount > 0 && (
+                                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                  {approvalsCount}
+                                </Badge>
+                              )}
+                              {app.id === 'mytasks' && tasksDueToday > 0 && (
+                                <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[24px] h-6 flex items-center justify-center px-1.5">
+                                  {tasksDueToday}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-white text-sm font-medium text-center drop-shadow-lg leading-tight">
+                              {app.name}
+                            </span>
+                          </motion.div>
+                        </Link>
                       )}
                     </div>
                   )}
@@ -414,40 +385,6 @@ export default function Dashboard() {
             })
           )}
         </div>
-      </div>
-
-      {/* Desktop Shortcuts - Right Side */}
-      <div className="absolute right-8 top-8 space-y-4 z-40">
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Link to={createPageUrl("Documents")}>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
-            >
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl shadow-lg flex items-center justify-center">
-                <Folder className="w-7 h-7 text-white" />
-              </div>
-              <span className="text-white text-xs font-medium drop-shadow-lg">Documents</span>
-            </motion.div>
-          </Link>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all cursor-pointer"
-        >
-          <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl shadow-lg flex items-center justify-center">
-            <Trash2 className="w-7 h-7 text-white" />
-          </div>
-          <span className="text-white text-xs font-medium drop-shadow-lg">Trash</span>
-        </motion.div>
       </div>
     </div>
   );

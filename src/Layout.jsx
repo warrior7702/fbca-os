@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
+import toast from 'react-hot-toast'; // Added for toast notifications
 
 const apps = [
   {
@@ -498,25 +499,41 @@ export default function Layout({ children, currentPageName }) {
 
           {/* System Tray */}
           <div className="flex items-center gap-3">
-            {/* System Icons */}
+            {/* System Icons - Now clickable placeholders */}
             <div className="flex items-center gap-2">
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => toast.info('FBCA Network Helper - Coming Soon!')}
+                title="FBCA Network Helper"
               >
                 <Wifi className="w-4 h-4 text-white/80" />
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => toast.info('FBCA Media Player - Coming Soon!')}
+                title="FBCA Media Player"
               >
                 <Volume2 className="w-4 h-4 text-white/80" />
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => toast.info('Gud Deo - Coming Soon!')}
+                title="Gud Deo"
               >
                 <Battery className="w-4 h-4 text-white/80" />
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => toast.info('Purpose Printshot - Coming Soon!')}
+                title="Purpose Printshot"
+              >
+                <svg className="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
               </motion.div>
             </div>
 
