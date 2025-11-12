@@ -445,6 +445,12 @@ export default function CommunicationsRequestForm() {
         photoUrls = [formData.previous_event_photos_link];
       }
 
+      // Email tracking variables
+      let emailSent = false;
+      let emailSentAt = null;
+      let emailError = null;
+
+      // Create request FIRST with email_sent: false
       const request = await base44.entities.WorkflowRequest.create({
         request_number: requestNumber,
         type: "manual_form",
@@ -458,6 +464,9 @@ export default function CommunicationsRequestForm() {
         pco_event_id: formData.pco_event_id || null,
         pco_event_name: formData.pco_event_name || null,
         pco_event_date: formData.pco_event_date || formData.event_date || null,
+        email_sent: false, // Initialize as false
+        email_sent_at: null,
+        email_error: null,
         goal_review_data: {
           is_event_related: formData.is_event_related,
           event_source: formData.event_source,
@@ -481,8 +490,10 @@ export default function CommunicationsRequestForm() {
 
       console.log('✅ Request created:', request.id);
 
-      // NEW EMAIL TEMPLATE
+      // NOW send the email and track result
       try {
+        console.log('📧 Attempting to send intake email to:', formData.requester_email);
+        
         const baseUrl = window.location.origin;
         const intakeLink = `${baseUrl}/workflowdetail?id=${request.id}`;
         
@@ -532,13 +543,35 @@ Looking forward to making your project a success!
 FBC Arlington`
         });
 
-        console.log('✅ Email sent to:', formData.requester_email);
-      } catch (emailError) {
-        console.error('Email send failed (non-critical):', emailError);
+        // Email sent successfully!
+        emailSent = true;
+        emailSentAt = new Date().toISOString();
+        console.log('✅ Intake email sent successfully to:', formData.requester_email);
+
+      } catch (emailErr) {
+        // Email failed - capture error
+        emailError = emailErr.message || 'Failed to send email';
+        console.error('❌ Failed to send intake email:', emailError);
+        console.error('Email error details:', emailErr);
+      }
+
+      // Update request with email status
+      await base44.entities.WorkflowRequest.update(request.id, {
+        email_sent: emailSent,
+        email_sent_at: emailSentAt,
+        email_error: emailError
+      });
+
+      console.log('📊 Email tracking updated:', { emailSent, emailSentAt, emailError });
+
+      // Show appropriate message to user
+      if (emailSent) {
+        toast.success("Request submitted! Check your email for next steps.");
+      } else {
+        toast.warning("Request submitted, but email notification failed. Please check the request details.");
       }
 
       setSubmitted(true);
-      toast.success("Request submitted successfully! Check your email for next steps.");
 
       setTimeout(() => {
         navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
@@ -581,7 +614,7 @@ FBC Arlington`
                 Request Submitted! 🎉
               </h2>
               <p className="text-slate-600 mb-6">
-                Your communications action plan has been received. We'll review it and reach out within 1-2 business days.
+                Check your email for a link to complete the intake interview. The interview takes about 5 minutes.
               </p>
               <div className="p-4 bg-green-50 rounded-lg border border-green-200 mb-6">
                 <p className="text-sm text-green-800">
