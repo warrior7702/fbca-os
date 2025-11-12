@@ -309,27 +309,22 @@ IMPORTANT:
 - Flow naturally - don't rigidly follow the list`;
       }
 
-      const response = await base44.integrations.Core.InvokeLLM({
-        prompt: prompt,
-        add_context_from_internet: false
-      });
-
-      const response = await base44.integrations.Core.InvokeLLM({
+      const llmResponse = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
         add_context_from_internet: false
       });
 
       const aiMessage = {
         role: 'assistant',
-        content: response,
+        content: llmResponse,
         timestamp: new Date().toISOString()
       };
 
       const updatedMessages = [...newMessages, aiMessage];
       setChatMessages(updatedMessages);
 
-      const isDone = response.toLowerCase().includes('ready for project review') || 
-                     response.toLowerCase().includes('information complete') ||
+      const isDone = llmResponse.toLowerCase().includes('ready for project review') || 
+                     llmResponse.toLowerCase().includes('information complete') ||
                      messageCount >= 12; // Force completion after 12 user messages
 
       let extractedData = {};
