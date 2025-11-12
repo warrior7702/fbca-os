@@ -124,6 +124,12 @@ export default function CronStatus() {
     }
   };
 
+  // Format date in local timezone with clear format
+  const formatLocalTime = (dateString) => {
+    const date = new Date(dateString);
+    return format(date, 'MMM d, yyyy h:mm:ss a');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -143,7 +149,7 @@ export default function CronStatus() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Cron Status Monitor</h1>
-              <p className="text-slate-600">Mystery Resource Auto-Sync Logs</p>
+              <p className="text-slate-600">Mystery Resource Auto-Sync Logs (Local Time)</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -230,7 +236,7 @@ export default function CronStatus() {
                   </p>
                   {stats.last_run && (
                     <p className="text-xs text-slate-400 mt-1">
-                      {format(new Date(stats.last_run), 'PPp')}
+                      {formatLocalTime(stats.last_run)}
                     </p>
                   )}
                 </div>
@@ -320,16 +326,16 @@ export default function CronStatus() {
                       <div className="flex items-center gap-3">
                         {getStatusIcon(log.status)}
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Badge className={getStatusColor(log.status)}>
                               {log.status.toUpperCase()}
                             </Badge>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-sm font-medium text-slate-700">
                               {formatDistanceToNow(new Date(log.created_date), { addSuffix: true })}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {format(new Date(log.created_date), 'PPp')}
+                          <p className="text-sm text-slate-600 mt-1 font-medium">
+                            {formatLocalTime(log.created_date)}
                           </p>
                         </div>
                       </div>
