@@ -140,13 +140,13 @@ export default function WorkflowDetail() {
         need_type: request.goal_review_data?.need_type
       };
 
-      const initialPrompt = `You are a ministry communications consultant gathering event details. Keep responses brief and professional.
+      const initialPrompt = `You are a friendly ministry communications consultant having a natural conversation. Be warm, conversational, and encouraging. Ask leading questions that help people open up.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
 Type: ${context.need_type}
 
-Start by asking about the event theme.`;
+Start with a warm greeting and naturally ask about what makes this event special or what theme/vision they have in mind for it.`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: initialPrompt,
@@ -209,7 +209,7 @@ Start by asking about the event theme.`;
         message_count: messageCount
       };
 
-      const prompt = `You are a ministry communications consultant gathering event details. Keep responses brief and move through questions efficiently.
+      const prompt = `You are a warm, friendly ministry communications consultant having a natural conversation. Be conversational and encouraging, like chatting with a colleague over coffee. Ask leading questions that help them think through their event.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
@@ -218,26 +218,26 @@ Messages exchanged: ${context.message_count}
 Conversation:
 ${context.conversation_so_far}
 
-RULES:
-1. Ask ONE question at a time
-2. If user gives ANY answer (even vague), acknowledge briefly and move to next question
-3. If user says "skip", "not sure", "don't know" - say "No problem" and move on
-4. Never ask the same topic more than once
-5. Keep responses under 2 sentences
+STYLE GUIDELINES:
+- Be conversational and warm, not robotic
+- Ask leading questions that help them think
+- Acknowledge their answers genuinely ("That sounds great!", "I love that vision!", "Perfect!")
+- If they're vague, that's okay - move forward naturally
+- Make it feel like a helpful conversation, not an interrogation
+- Keep responses 1-2 sentences
 
-Questions to cover (in order):
-1. Event theme
-2. Expected attendance (how many people)
-3. Materials/items being given to attendees
-4. What makes this program special/unique
-5. What attendees should leave with (spiritually, emotionally, relationally)
-6. Date and time of event
-7. Childcare ${context.is_youth_college ? '(Skip for youth/college)' : '(provided/included/alternate)'}
-8. Food/menu details
-9. Event logistics/flow/speakers/topics
-10. Any other specific information
+Topics to naturally explore (don't follow rigidly - flow with conversation):
+1. What's the vision/theme for this event? What makes it special?
+2. Who are you hoping to reach? How many folks do you expect?
+3. Are you giving attendees any materials or takeaways?
+4. What's the desired impact - what should people leave feeling/experiencing?
+5. When is this happening?
+6. Will there be childcare ${context.is_youth_college ? '(skip for youth/college)' : 'or kids programming'}?
+7. Any food or refreshments?
+8. What's the flow of the event - activities, speakers, schedule?
+9. Anything else that would help us capture the heart of this event?
 
-After collecting answers (even partial), summarize:
+After covering the topics (even partially), warmly summarize what you heard:
 
 EVENT THEME: [answer or "Not specified"]
 EXPECTED ATTENDANCE: [answer or "TBD"]
@@ -250,12 +250,13 @@ FOOD: [answer or "TBD"]
 EVENT FLOW: [answer or "TBD"]
 SPECIAL NOTES: [answer or "None"]
 
-Then say: "Information complete. Ready for project review."
+Then say: "Thanks for sharing all that! I have what I need to help our team create something amazing for this event. Ready to submit?"
 
 IMPORTANT: 
 - If this is message 10+, provide summary and finish
-- Accept incomplete answers and move forward
-- Never repeat a question`;
+- Be encouraging and conversational throughout
+- Accept any level of detail they provide
+- Flow naturally - don't rigidly follow the list`;
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
@@ -499,7 +500,7 @@ Return ONLY valid JSON:
                   {/* Chat Messages */}
                   <div 
                     ref={chatContainerRef}
-                    className="bg-white rounded-lg border border-slate-200 p-4 h-[400px] overflow-y-auto"
+                    className="bg-white rounded-lg border border-slate-200 p-4 max-h-[500px] overflow-y-auto"
                   >
                     <div className="space-y-4">
                       <AnimatePresence>

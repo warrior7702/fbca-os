@@ -124,15 +124,25 @@ export default function WorkflowHub() {
     return requests.filter(req => req.status === status);
   };
 
-  const KanbanCard = ({ request }) => (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      whileHover={{ scale: 1.02 }}
-      onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`)}
-    >
+  const KanbanCard = ({ request }) => {
+    // Admin/super_user clicking on project_review goes to ProjectReview page
+    const handleClick = () => {
+      if (isAdmin && request.status === 'project_review') {
+        navigate(createPageUrl('ProjectReview') + `?id=${request.id}`);
+      } else {
+        navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
+      }
+    };
+
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        whileHover={{ scale: 1.02 }}
+        onClick={handleClick}
+      >
       <Card className="cursor-pointer hover:shadow-lg transition-all mb-3">
         <CardContent className="p-4">
           <div className="space-y-2">
@@ -165,16 +175,26 @@ export default function WorkflowHub() {
     </motion.div>
   );
 
-  const RequestCard = ({ request }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.01 }}
-    >
-      <Card 
-        className="cursor-pointer hover:shadow-lg transition-all"
-        onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`)}
+  const RequestCard = ({ request }) => {
+    // Admin/super_user clicking on project_review goes to ProjectReview page
+    const handleClick = () => {
+      if (isAdmin && request.status === 'project_review') {
+        navigate(createPageUrl('ProjectReview') + `?id=${request.id}`);
+      } else {
+        navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
+      }
+    };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ scale: 1.01 }}
       >
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-all"
+          onClick={handleClick}
+        >
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-2">
