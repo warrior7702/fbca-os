@@ -136,14 +136,16 @@ export default function Settings() {
       setRoleTitle(currentUser.role_title || "");
       setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow");
       
-      // Check if user logged in via SSO (they'll have microsoft_sso_id or similar)
+      // Check if user logged in via SSO (email domain + has Microsoft token from SSO)
       const loggedInViaSSO = currentUser.email?.includes('@fbcarlington.org') && 
                              !!currentUser.microsoft_access_token;
       setIsSSOUser(loggedInViaSSO);
       
-      console.log('🔐 SSO User:', loggedInViaSSO);
-      console.log('📧 Email:', currentUser.email);
-      console.log('🔑 Has Microsoft Token:', !!currentUser.microsoft_access_token);
+      console.log('🔐 User loaded:', {
+        email: currentUser.email,
+        isSSOUser: loggedInViaSSO,
+        hasMicrosoftToken: !!currentUser.microsoft_access_token
+      });
       
     } catch (error) {
       console.error("Error loading user:", error);
@@ -356,6 +358,12 @@ export default function Settings() {
   };
 
   const handleConnectMicrosoft = () => {
+    // Show message if they're an SSO user
+    if (isSSOUser) {
+      toast.info("Already connected via SSO! Try logging out and back in if you need to refresh permissions.");
+      return;
+    }
+    
     const vercelUrl = "https://pco-webhook.vercel.app";
     const appUrl = window.location.origin;
     const settingsUrl = `${appUrl}/Settings`;
@@ -484,19 +492,40 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-4">
-            {/* SSO Info Banner */}
+            {/* SSO Info Banner - Updated */}
             {isSSOUser && (
-              <Card className="border-2 border-green-200 bg-green-50">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-semibold text-green-900 mb-1">✅ Microsoft SSO Active</h3>
-                      <p className="text-sm text-green-800 mb-2">
-                        You're signed in via Microsoft Single Sign-On! Your Microsoft 365 integration is automatically connected through your SSO login.
+              <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-green-100 rounded-xl">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-green-900 mb-2 text-lg">🎉 All Set! Microsoft SSO Active</h3>
+                      <p className="text-sm text-green-800 mb-3 leading-relaxed">
+                        You're signed in via Microsoft Single Sign-On with <strong>full Microsoft 365 access</strong>! 
+                        Everything is automatically connected and ready to use.
                       </p>
-                      <p className="text-xs text-green-700">
-                        📧 Email, Calendar, OneDrive, and To Do are ready to use - no additional setup needed!
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>📧 Email & Inbox</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>📅 Calendar</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>📁 OneDrive Files</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>✅ Microsoft To Do</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-green-600 mt-3 italic">
+                        No additional setup needed - you're ready to go!
                       </p>
                     </div>
                   </div>
@@ -504,6 +533,7 @@ export default function Settings() {
               </Card>
             )}
 
+            {/* Only show this for non-SSO users who connected manually */}
             {user?.microsoft_access_token && !isSSOUser && (
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -511,29 +541,16 @@ export default function Settings() {
                     <Mail className="w-5 h-5 text-blue-600" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-1">New: Microsoft To Do Support</h3>
+                    <h3 className="font-semibold text-slate-900 mb-1">Microsoft 365 Connected</h3>
                     <p className="text-sm text-slate-600 mb-2">
-                      We've added Microsoft To Do integration! If you're getting permission errors, 
-                      disconnect and reconnect Microsoft 365 to grant Tasks access.
+                      You've manually connected Microsoft 365. All features are working!
                     </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        handleDisconnectMicrosoft();
-                        setTimeout(() => {
-                          handleConnectMicrosoft();
-                        }, 500);
-                      }}
-                    >
-                      Reconnect Microsoft 365
-                    </Button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Email Polling Service - NEW */}
+            {/* Email Polling Service */}
             {(user?.role === 'admin' || user?.role === 'super_user') && (
               <EmailPollingService user={user} />
             )}
@@ -559,7 +576,7 @@ export default function Settings() {
                 color="purple"
               />
 
-              {/* Microsoft 365 Card with SSO awareness */}
+              {/* Microsoft 365 Card - Updated */}
               <Card className={`border-2 ${user?.microsoft_access_token ? 'border-green-300' : 'border-slate-200'}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -569,18 +586,18 @@ export default function Settings() {
                       </div>
                       <div>
                         <CardTitle className="text-lg">Microsoft 365</CardTitle>
-                        <p className="text-sm text-slate-500 mt-1">Access email, calendar, and Office apps</p>
-                        {isSSOUser && (
-                          <p className="text-xs text-green-600 mt-1 font-medium">
-                            🔐 Connected via SSO
-                          </p>
-                        )}
+                        <p className="text-sm text-slate-500 mt-1">
+                          {isSSOUser 
+                            ? '✅ Auto-connected via SSO - Email, Calendar, Files, To Do' 
+                            : 'Access email, calendar, and Office apps'
+                          }
+                        </p>
                       </div>
                     </div>
                     {user?.microsoft_access_token ? (
                       <Badge className="bg-green-100 text-green-700 border-green-300">
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        Connected
+                        {isSSOUser ? 'SSO Connected' : 'Connected'}
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-slate-500">
@@ -595,7 +612,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-green-600">
                         <CheckCircle className="w-4 h-4" />
-                        <span>{isSSOUser ? 'Connected via SSO login' : 'Active connection'}</span>
+                        <span>{isSSOUser ? '🔐 Full access via SSO login' : 'Active connection'}</span>
                       </div>
                       {isSSOUser ? (
                         <Button 
@@ -617,12 +634,19 @@ export default function Settings() {
                       )}
                     </div>
                   ) : (
-                    <Button 
-                      onClick={handleConnectMicrosoft}
-                      className="w-full"
-                    >
-                      Connect Microsoft 365
-                    </Button>
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={handleConnectMicrosoft}
+                        className="w-full"
+                      >
+                        Connect Microsoft 365
+                      </Button>
+                      {!isSSOUser && (
+                        <p className="text-xs text-slate-500 text-center">
+                          💡 Tip: Login with Microsoft SSO for automatic connection!
+                        </p>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
