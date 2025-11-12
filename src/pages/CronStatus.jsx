@@ -124,10 +124,13 @@ export default function CronStatus() {
     }
   };
 
-  // Format date in local timezone with clear format
+  // Format date with timezone info
   const formatLocalTime = (dateString) => {
     const date = new Date(dateString);
-    return format(date, 'MMM d, yyyy h:mm:ss a');
+    const localTime = format(date, 'MMM d, h:mm:ss a');
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzAbbr = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+    return `${localTime} ${tzAbbr}`;
   };
 
   if (loading) {
