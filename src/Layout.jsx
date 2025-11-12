@@ -236,11 +236,7 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <style>{`
-        .fbca-logo-taskbar {
-          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.1));
-        }
-      `}</style>
+
 
       {/* Main Content */}
       <main className="h-screen pb-16">
@@ -302,13 +298,22 @@ export default function Layout({ children, currentPageName }) {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-9 h-9 flex items-center justify-center cursor-pointer"
+                className="w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 transition-all group"
               >
-                <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/f6f1f08a0_image.png"
-                  alt="FBCA"
-                  className="w-full h-full object-contain opacity-90 hover:opacity-100 transition-opacity fbca-logo-taskbar"
-                />
+                <svg 
+                  className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 12h7" />
+                  <path d="M14 12h7" />
+                  <path d="M12 3v7" />
+                  <path d="M12 14v7" />
+                </svg>
               </motion.div>
             </Link>
 
