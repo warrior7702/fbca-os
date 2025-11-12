@@ -581,13 +581,21 @@ Return ONLY valid JSON:
                             key={idx}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                           >
+                            {message.role === 'assistant' && (
+                              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <Sparkles className="w-4 h-4 text-purple-600" />
+                              </div>
+                            )}
                             <div className={`max-w-[75%] rounded-lg px-4 py-2.5 ${
                               message.role === 'user' 
                                 ? 'bg-slate-900 text-white' 
                                 : 'bg-slate-100 text-slate-900'
                             }`}>
+                              {message.role === 'assistant' && (
+                                <p className="text-xs font-semibold text-purple-600 mb-1">Lync</p>
+                              )}
                               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                             </div>
                           </motion.div>
