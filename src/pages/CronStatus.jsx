@@ -238,7 +238,7 @@ export default function CronStatus() {
                     {stats.last_run ? formatDistanceToNow(new Date(stats.last_run), { addSuffix: true }) : 'Never'}
                   </p>
                   {stats.last_run && (
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-400 mt-1 font-mono">
                       {formatLocalTime(stats.last_run)}
                     </p>
                   )}
