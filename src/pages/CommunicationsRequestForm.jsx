@@ -501,46 +501,182 @@ export default function CommunicationsRequestForm() {
           from_name: 'FBC Arlington Communications',
           to: formData.requester_email,
           subject: `📋 Action Required: Complete Communications Intake for ${finalProjectName}`,
-          body: `Hi ${formData.requester_name},
-
-Thank you for requesting communications support! We're excited to help you create an amazing experience.
-
-📅 PROJECT: ${finalProjectName}
-🏢 MINISTRY: ${formData.ministry_department}
-📋 REQUEST #: ${requestNumber}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✨ NEXT STEP: Complete Your AI-Powered Intake
-
-We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan.
-
-👉 Click here to start your intake:
-${intakeLink}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-What to expect:
-• Quick Q&A about your event (5 minutes)
-• Questions about theme, audience, goals, and logistics
-• No need to prepare - just answer naturally
-• You can skip questions if unsure
-
-After you complete the intake:
-✅ Our communications team will review your responses
-✅ We'll create a detailed project plan
-✅ Tasks will be assigned to our design & marketing team
-✅ You'll be able to track progress in real-time
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Questions? Reply to this email or contact:
-📧 communications@fbcarlington.org
-
-Looking forward to making your project a success!
-
-— Communications Team
-FBC Arlington`
+          body: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communications Intake Request</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f7f8fa; line-height: 1.6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f7f8fa;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        
+        <!-- Main Container -->
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">
+          
+          <!-- Header with Gradient -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); padding: 40px 30px; text-align: center;">
+              <div style="background-color: rgba(255, 255, 255, 0.15); width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 40px;">📋</span>
+              </div>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Request</h1>
+              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Action Required</p>
+            </td>
+          </tr>
+          
+          <!-- Welcome Message -->
+          <tr>
+            <td style="padding: 40px 30px 30px;">
+              <p style="margin: 0 0 20px; color: #1e293b; font-size: 16px; line-height: 1.6;">
+                Hi <strong>${formData.requester_name}</strong>,
+              </p>
+              <p style="margin: 0 0 30px; color: #475569; font-size: 15px; line-height: 1.6;">
+                Thank you for requesting communications support! We're excited to help you create an amazing experience.
+              </p>
+              
+              <!-- Request Details Card -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 30px;">
+                <tr>
+                  <td>
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">📅 Project</span>
+                          <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${finalProjectName}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🏢 Ministry</span>
+                          <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${formData.ministry_department}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">📋 Request #</span>
+                          <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600; font-family: 'Courier New', monospace;">${requestNumber}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Next Step Section -->
+              <div style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; text-align: center;">
+                <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your AI-Powered Intake</h2>
+                <p style="margin: 0 0 24px; color: rgba(255, 255, 255, 0.95); font-size: 14px; line-height: 1.6;">
+                  We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan.
+                </p>
+                <a href="${intakeLink}" style="display: inline-block; background-color: #ffffff; color: #7c3aed; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                  Start Your Intake Interview →
+                </a>
+              </div>
+              
+              <!-- What to Expect -->
+              <div style="margin-bottom: 30px;">
+                <h3 style="margin: 0 0 16px; color: #1e293b; font-size: 17px; font-weight: 700;">What to expect:</h3>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 18px; margin-right: 12px;">✓</span>
+                      <span style="color: #475569; font-size: 14px;">Quick Q&A about your event (5 minutes)</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 18px; margin-right: 12px;">✓</span>
+                      <span style="color: #475569; font-size: 14px;">Questions about theme, audience, goals, and logistics</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 18px; margin-right: 12px;">✓</span>
+                      <span style="color: #475569; font-size: 14px;">No need to prepare - just answer naturally</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 18px; margin-right: 12px;">✓</span>
+                      <span style="color: #475569; font-size: 14px;">You can skip questions if unsure</span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- After Completion -->
+              <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                <h3 style="margin: 0 0 12px; color: #166534; font-size: 16px; font-weight: 700;">After you complete the intake:</h3>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 6px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 16px; margin-right: 10px;">✅</span>
+                      <span style="color: #166534; font-size: 14px;">Our communications team will review your responses</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 16px; margin-right: 10px;">✅</span>
+                      <span style="color: #166534; font-size: 14px;">We'll create a detailed project plan</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 16px; margin-right: 10px;">✅</span>
+                      <span style="color: #166534; font-size: 14px;">Tasks will be assigned to our design & marketing team</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; vertical-align: top;">
+                      <span style="color: #22c55e; font-size: 16px; margin-right: 10px;">✅</span>
+                      <span style="color: #166534; font-size: 14px;">You'll be able to track progress in real-time</span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 8px; color: #64748b; font-size: 14px;">
+                Questions? Contact us at
+              </p>
+              <p style="margin: 0 0 20px;">
+                <a href="mailto:communications@fbcarlington.org" style="color: #7c3aed; text-decoration: none; font-weight: 600; font-size: 15px;">
+                  📧 communications@fbcarlington.org
+                </a>
+              </p>
+              <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+                Looking forward to making your project a success!<br>
+                <strong style="color: #64748b;">— Communications Team, FBC Arlington</strong>
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+        
+        <!-- Unsubscribe Footer -->
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <tr>
+            <td style="text-align: center; padding: 0 20px;">
+              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
+                This is an automated notification from FBC Arlington Communications Team.
+              </p>
+            </td>
+          </tr>
+        </table>
+        
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
         });
 
         // Email sent successfully!
