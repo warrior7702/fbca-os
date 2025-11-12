@@ -137,16 +137,40 @@ export default function WorkflowDetail() {
         event_date: request.pco_event_date || request.goal_review_data?.event_date,
         is_youth_college: request.ministry_department?.toLowerCase().includes('youth') || 
                           request.ministry_department?.toLowerCase().includes('college'),
-        need_type: request.goal_review_data?.need_type
+        need_type: request.goal_review_data?.need_type,
+        has_ministry: !!request.ministry_department,
+        has_need_type: !!request.goal_review_data?.need_type
       };
 
-      const initialPrompt = `You are a friendly ministry communications consultant having a natural conversation. Be warm, conversational, and encouraging. Ask leading questions that help people open up.
+      // If ministry or need_type is missing, ask for them first
+      let initialPrompt = '';
+      
+      if (!context.has_ministry || !context.has_need_type) {
+        initialPrompt = `You are a friendly ministry communications consultant. Start with a warm greeting.
+
+Event: ${context.event_name}
+${context.ministry ? `Ministry: ${context.ministry}` : ''}
+${context.need_type ? `Type: ${context.need_type}` : ''}
+
+Missing info:
+${!context.has_ministry ? '- Ministry/Department' : ''}
+${!context.has_need_type ? '- What they need (Graphics, Marketing, or Both)' : ''}
+
+Start warmly and ask for the missing information naturally. For example:
+"Hi! I'm excited to help with ${context.event_name}! 
+
+${!context.has_ministry ? 'First, which ministry or department is this for? (e.g., College Ministry, Youth Ministry, Pastoral Care, etc.)' : ''}
+
+${!context.has_need_type ? 'Also, what type of help do you need - Graphics design, Marketing/promotion, or Both?' : ''}"`;
+      } else {
+        initialPrompt = `You are a friendly ministry communications consultant having a natural conversation. Be warm, conversational, and encouraging. Ask leading questions that help people open up.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
 Type: ${context.need_type}
 
 Start with a warm greeting and naturally ask about what makes this event special or what theme/vision they have in mind for it.`;
+      }
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: initialPrompt,
@@ -209,7 +233,33 @@ Start with a warm greeting and naturally ask about what makes this event special
         message_count: messageCount
       };
 
-      const prompt = `You are a warm, friendly ministry communications consultant having a natural conversation. Be conversational and encouraging, like chatting with a colleague over coffee. Ask leading questions that help them think through their event.
+      // Check if we still need ministry or need_type
+      const needsMinistry = !request.ministry_department;
+      const needsNeedType = !request.goal_review_data?.need_type;
+
+      let prompt = '';
+      
+      if (needsMinistry || needsNeedType) {
+        prompt = `You are a warm ministry communications consultant. We're missing some basic info:
+
+Event: ${context.event_name}
+${request.ministry_department ? `Ministry: ${request.ministry_department}` : ''}
+${request.goal_review_data?.need_type ? `Need: ${request.goal_review_data.need_type}` : ''}
+
+Conversation:
+${context.conversation_so_far}
+
+MISSING INFO TO GATHER:
+${needsMinistry ? '- Which ministry/department? (e.g., College Ministry, Youth, Pastoral Care, etc.)' : ''}
+${needsNeedType ? '- What do they need? (Graphics design, Marketing/promotion, or Both graphics and marketing)' : ''}
+
+If they've now provided the missing info, acknowledge it warmly and extract it. Then move to asking about the event's vision/theme.
+
+If info is still missing, gently ask for it in a natural way.
+
+Once you have ministry and need type, continue with the normal interview flow asking about theme, audience, etc.`;
+      } else {
+        prompt = `You are a warm, friendly ministry communications consultant having a natural conversation. Be conversational and encouraging, like chatting with a colleague over coffee. Ask leading questions that help them think through their event.
 
 Event: ${context.event_name}
 Ministry: ${context.ministry}
@@ -257,6 +307,12 @@ IMPORTANT:
 - Be encouraging and conversational throughout
 - Accept any level of detail they provide
 - Flow naturally - don't rigidly follow the list`;
+      }
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: prompt,
+        add_context_from_internet: false
+      });
 
       const response = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
@@ -294,7 +350,9 @@ Return ONLY valid JSON:
   "childcare_details": "info or null",
   "food_menu": "details or null",
   "event_flow": "logistics or null",
-  "special_notes": "additional info or null"
+  "special_notes": "additional info or null",
+  "ministry_department": "ministry name or null",
+  "need_type": "graphics, marketing, or both - or null"
 }`;
 
           const extractedResponse = await base44.integrations.Core.InvokeLLM({
@@ -311,7 +369,9 @@ Return ONLY valid JSON:
                 childcare_details: { type: ["string", "null"] },
                 food_menu: { type: ["string", "null"] },
                 event_flow: { type: ["string", "null"] },
-                special_notes: { type: ["string", "null"] }
+                special_notes: { type: ["string", "null"] },
+                ministry_department: { type: ["string", "null"] },
+                need_type: { type: ["string", "null"] }
               }
             }
           });
@@ -322,7 +382,8 @@ Return ONLY valid JSON:
         }
       }
 
-      await base44.entities.WorkflowRequest.update(requestId, {
+      // Update both goal_review_data AND root-level fields if extracted
+      const updateData = {
         goal_review_data: {
           ...request.goal_review_data,
           chat_history: updatedMessages,
@@ -330,7 +391,17 @@ Return ONLY valid JSON:
           completed_at: isDone ? new Date().toISOString() : null,
           ...extractedData
         }
-      });
+      };
+
+      // If ministry_department or need_type were extracted, update root level too
+      if (extractedData.ministry_department) {
+        updateData.ministry_department = extractedData.ministry_department;
+      }
+      if (extractedData.need_type) {
+        updateData.goal_review_data.need_type = extractedData.need_type;
+      }
+
+      await base44.entities.WorkflowRequest.update(requestId, updateData);
 
       if (isDone) {
         setGoalReviewComplete(true);

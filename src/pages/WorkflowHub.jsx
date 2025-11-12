@@ -10,7 +10,7 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
-  Calendar,
+  Calendar as CalendarIcon,
   AlertCircle,
   Clock,
   CheckCircle2,
@@ -43,7 +43,7 @@ export default function WorkflowHub() {
   const [myRequests, setMyRequests] = useState([]);
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
-  const [viewMode, setViewMode] = useState("kanban");
+  const [viewMode, setViewMode] = useState("kanban"); // "kanban" or "calendar"
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -124,6 +124,23 @@ export default function WorkflowHub() {
     return requests.filter(req => req.status === status);
   };
 
+  const handleDelete = async (e, requestId) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!confirm('Are you sure you want to delete this request? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await base44.entities.WorkflowRequest.delete(requestId);
+      toast.success('Request deleted');
+      loadData();
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete request');
+    }
+  };
+
   const KanbanCard = ({ request }) => {
     // Admin/super_user clicking on project_review goes to ProjectReview page
     const handleClick = () => {
@@ -141,18 +158,29 @@ export default function WorkflowHub() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.8 }}
         whileHover={{ scale: 1.02 }}
-        onClick={handleClick}
       >
-      <Card className="cursor-pointer hover:shadow-lg transition-all mb-3">
-        <CardContent className="p-4">
+      <Card className="cursor-pointer hover:shadow-lg transition-all mb-3 group relative">
+        <CardContent className="p-4" onClick={handleClick}>
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-semibold text-sm text-slate-900 line-clamp-2">
                 {request.title}
               </h3>
-              <Badge variant="outline" className={getPriorityColor(request.priority)}>
-                {request.priority}
-              </Badge>
+              <div className="flex items-center gap-1">
+                <Badge variant="outline" className={getPriorityColor(request.priority)}>
+                  {request.priority}
+                </Badge>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => handleDelete(e, request.id)}
+                  >
+                    <XCircle className="w-4 h-4 text-red-500" />
+                  </Button>
+                )}
+              </div>
             </div>
             
             <p className="text-xs text-slate-500">
@@ -166,7 +194,7 @@ export default function WorkflowHub() {
             )}
             
             <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Calendar className="w-3 h-3" />
+              <CalendarIcon className="w-3 h-3" />
               {format(new Date(request.created_date), 'MMM d')}
             </div>
           </div>
@@ -193,7 +221,7 @@ export default function WorkflowHub() {
         whileHover={{ scale: 1.01 }}
       >
         <Card 
-          className="cursor-pointer hover:shadow-lg transition-all"
+          className="cursor-pointer hover:shadow-lg transition-all group"
           onClick={handleClick}
         >
         <CardContent className="p-5">
@@ -217,10 +245,21 @@ export default function WorkflowHub() {
               </div>
               
               <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Calendar className="w-3 h-3" />
+                <CalendarIcon className="w-3 h-3" />
                 Created {format(new Date(request.created_date), 'MMM d, yyyy')}
               </div>
             </div>
+            
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => handleDelete(e, request.id)}
+              >
+                <XCircle className="w-5 h-5 text-red-500" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -404,8 +443,50 @@ export default function WorkflowHub() {
           </div>
         )}
 
+        {/* View Toggle - Board/Calendar */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 mb-6">
+            <Button
+              variant={viewMode === "kanban" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("kanban")}
+              className="gap-2"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Kanban View
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("calendar")}
+              className="gap-2"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              Calendar View
+            </Button>
+          </div>
+        )}
+
         {isAdmin && viewMode === "kanban" ? (
           <KanbanView requests={uniqueRequests} />
+        ) : isAdmin && viewMode === "calendar" ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                Calendar View Coming Soon
+              </h3>
+              <p className="text-slate-600 mb-4">
+                Interactive calendar with drag-and-drop task scheduling will be available soon
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setViewMode("kanban")}
+              >
+                Back to Kanban View
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid gap-4">
             {uniqueRequests.length === 0 ? (
