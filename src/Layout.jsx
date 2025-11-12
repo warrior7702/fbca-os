@@ -296,29 +296,21 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-2">
             <Link to={createPageUrl("Dashboard")}>
               <motion.div
-                whileHover={{ scale: 1.08 }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer relative overflow-hidden group bg-gradient-to-br from-blue-500/10 to-purple-500/10"
+                className="w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 transition-colors group"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 via-purple-400/30 to-pink-400/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <svg 
-                  className="w-7 h-7 relative z-10" 
-                  viewBox="0 0 32 32" 
+                  className="w-6 h-6" 
+                  viewBox="0 0 24 24" 
                   fill="none"
                 >
-                  <defs>
-                    <linearGradient id="dashCrossGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: '#3b82f6' }} />
-                      <stop offset="50%" style={{ stopColor: '#8b5cf6' }} />
-                      <stop offset="100%" style={{ stopColor: '#ec4899' }} />
-                    </linearGradient>
-                  </defs>
-                  <g className="drop-shadow-[0_0_8px_rgba(139,92,246,0.3)]">
-                    <line x1="6" y1="16" x2="14" y2="16" stroke="url(#dashCrossGrad)" strokeWidth="3.5" strokeLinecap="round" />
-                    <line x1="18" y1="16" x2="26" y2="16" stroke="url(#dashCrossGrad)" strokeWidth="3.5" strokeLinecap="round" />
-                    <line x1="16" y1="6" x2="16" y2="14" stroke="url(#dashCrossGrad)" strokeWidth="3.5" strokeLinecap="round" />
-                    <line x1="16" y1="18" x2="16" y2="26" stroke="url(#dashCrossGrad)" strokeWidth="3.5" strokeLinecap="round" />
-                  </g>
+                  <path d="M4 12h6.5M13.5 12H20M12 4v6.5M12 13.5V20" 
+                    stroke="#60a5fa" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    className="group-hover:stroke-blue-400 transition-colors"
+                  />
                 </svg>
               </motion.div>
             </Link>
