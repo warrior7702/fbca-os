@@ -721,6 +721,10 @@ export default function Settings() {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2">
+                      <Button onClick={() => navigate(createPageUrl('EmailTemplateEditor'))} variant="outline">
+                        <Mail className="w-4 h-4 mr-2" />
+                        Email Templates
+                      </Button>
                       <Button onClick={() => navigate(createPageUrl('PCOAPITester'))} variant="outline">
                         <Bug className="w-4 h-4 mr-2" />
                         API Tester
