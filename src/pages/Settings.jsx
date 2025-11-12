@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -892,10 +891,30 @@ export default function Settings() {
                     User Management
                   </CardTitle>
                   <CardDescription>
-                    Manage user roles and permissions. Changes save automatically.
+                    View all users and their current roles
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900 mb-1">
+                          How to Change User Roles
+                        </p>
+                        <p className="text-sm text-amber-800 mb-2">
+                          For security reasons, user roles can only be changed through the Base44 Dashboard:
+                        </p>
+                        <ol className="text-sm text-amber-800 space-y-1 ml-4 list-decimal">
+                          <li>Go to your <strong>Base44 Dashboard</strong></li>
+                          <li>Navigate to <strong>Data → Users</strong></li>
+                          <li>Find the user and edit their <strong>role</strong> field</li>
+                          <li>Save changes</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+
                   <Input
                     type="text"
                     placeholder="Search by name or email..."
@@ -914,7 +933,7 @@ export default function Settings() {
                         Showing {filteredUsers.length} of {allUsers.length} users
                       </p>
                       {filteredUsers.map((u) => (
-                        <Card key={u.id} className="hover:shadow-md transition-shadow">
+                        <Card key={u.id}>
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
@@ -931,37 +950,20 @@ export default function Settings() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Select
-                                  value={u.role || 'user'}
-                                  onValueChange={(value) => handleChangeUserRole(u.id, value)}
-                                  disabled={u._updating}
-                                >
-                                  <SelectTrigger className="w-40">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="user">
-                                      User
-                                    </SelectItem>
-                                    <SelectItem value="admin">
-                                      Admin
-                                    </SelectItem>
-                                    <SelectItem value="super_user">
-                                      Super User
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {u._updating && (
-                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                                )}
-                                {!u._updating && u.role === 'super_user' && (
-                                  <Crown className="w-5 h-5 text-purple-500" />
-                                )}
-                                {!u._updating && u.role === 'admin' && (
-                                  <Crown className="w-5 h-5 text-orange-500" />
-                                )}
-                              </div>
+                              <Badge 
+                                variant="outline"
+                                className={
+                                  u.role === 'super_user' 
+                                    ? 'bg-purple-50 text-purple-700 border-purple-300'
+                                    : u.role === 'admin'
+                                    ? 'bg-orange-50 text-orange-700 border-orange-300'
+                                    : 'bg-slate-50 text-slate-700 border-slate-300'
+                                }
+                              >
+                                {u.role === 'super_user' && <Crown className="w-3 h-3 mr-1" />}
+                                {u.role === 'admin' && <Crown className="w-3 h-3 mr-1" />}
+                                {u.role === 'super_user' ? 'Super User' : u.role === 'admin' ? 'Admin' : 'User'}
+                              </Badge>
                             </div>
                           </CardContent>
                         </Card>
