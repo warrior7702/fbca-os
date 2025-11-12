@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -25,9 +26,12 @@ import {
   Sparkles,
   Plus,
   Upload,
-  X
+  X,
+  Camera,
+  Trash2,
+  Edit2
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, subDays, addDays } from "date-fns";
 import { toast } from "sonner";
 
 export default function ProjectReview() {
@@ -40,6 +44,8 @@ export default function ProjectReview() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedMaterials, setUploadedMaterials] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [editingTask, setEditingTask] = useState(null);
 
   // Project details form
   const [projectDetails, setProjectDetails] = useState({
@@ -102,6 +108,18 @@ export default function ProjectReview() {
         
         // Load uploaded materials
         setUploadedMaterials(projectData.uploaded_materials || []);
+
+        // Load or auto-generate tasks
+        if (projectData.tasks && projectData.tasks.length > 0) {
+          setTasks(projectData.tasks);
+        } else {
+          // Auto-generate tasks based on event date
+          const eventDate = foundRequest.pco_event_date || goalData.event_date;
+          if (eventDate) {
+            const autoTasks = generateAutoTasks(eventDate, foundRequest.title);
+            setTasks(autoTasks);
+          }
+        }
       } else {
         toast.error('Request not found');
         navigate(createPageUrl('WorkflowHub'));
@@ -112,6 +130,129 @@ export default function ProjectReview() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateAutoTasks = (eventDate, projectName) => {
+    const eventDateObj = new Date(eventDate);
+    
+    // Find the Sunday before the event
+    const sundayBefore = new Date(eventDateObj);
+    while (sundayBefore.getDay() !== 0) {
+      sundayBefore.setDate(sundayBefore.getDate() - 1);
+    }
+    
+    return [
+      {
+        id: `task-${Date.now()}-1`,
+        name: `Graphics for ${projectName}`,
+        type: 'graphics',
+        due_date: subDays(eventDateObj, 14).toISOString(),
+        assigned_to: 'Shelby Meeks',
+        status: 'not_started',
+        description: 'Create all graphic design assets for this event'
+      },
+      {
+        id: `task-${Date.now()}-2`,
+        name: 'Pulpit Announcement',
+        type: 'pulpit_announcement',
+        due_date: sundayBefore.toISOString(),
+        assigned_to: 'Kyle Judkins',
+        status: 'not_started',
+        description: 'Prepare and deliver pulpit announcement'
+      },
+      {
+        id: `task-${Date.now()}-3`,
+        name: 'Social Media Reel #1',
+        type: 'social_media',
+        due_date: subDays(eventDateObj, 10).toISOString(),
+        assigned_to: 'Kyle Judkins',
+        status: 'not_started',
+        description: 'Create first promotional reel for social media'
+      },
+      {
+        id: `task-${Date.now()}-4`,
+        name: 'Social Media Reel #2',
+        type: 'social_media',
+        due_date: subDays(eventDateObj, 5).toISOString(),
+        assigned_to: 'Kyle Judkins',
+        status: 'not_started',
+        description: 'Create second promotional reel for social media'
+      },
+      {
+        id: `task-${Date.now()}-5`,
+        name: 'Digital Signs Go Live',
+        type: 'digital_signs',
+        due_date: subDays(eventDateObj, 14).toISOString(),
+        assigned_to: 'Kyle Judkins',
+        status: 'not_started',
+        description: 'Launch digital signage campaign'
+      }
+    ];
+  };
+
+  const addPhotographerTask = () => {
+    const eventDate = request.pco_event_date || request.goal_review_data?.event_date;
+    if (!eventDate) {
+      toast.error('Event date required to add photographer task');
+      return;
+    }
+
+    const newTask = {
+      id: `task-${Date.now()}-photographer`,
+      name: 'Event Photography',
+      type: 'photography',
+      due_date: new Date(eventDate).toISOString(),
+      assigned_to: 'Volunteer Photographer',
+      status: 'not_started',
+      description: 'Capture photos during the event'
+    };
+
+    const updatedTasks = [...tasks, newTask];
+    setTasks(updatedTasks);
+    toast.success('Photographer task added');
+  };
+
+  const updateTaskDate = (taskId, newDate) => {
+    const updatedTasks = tasks.map(task => 
+      task.id === taskId ? { ...task, due_date: newDate } : task
+    );
+    setTasks(updatedTasks);
+  };
+
+  const updateTaskStatus = (taskId) => {
+    const statusFlow = ['not_started', 'in_progress', 'completed'];
+    const updatedTasks = tasks.map(task => {
+      if (task.id === taskId) {
+        const currentIndex = statusFlow.indexOf(task.status);
+        const nextStatus = statusFlow[(currentIndex + 1) % statusFlow.length];
+        return { ...task, status: nextStatus };
+      }
+      return task;
+    });
+    setTasks(updatedTasks);
+  };
+
+  const deleteTask = (taskId) => {
+    setTasks(tasks.filter(task => task.id !== taskId));
+    toast.success('Task deleted');
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      not_started: 'bg-slate-200 text-slate-700',
+      in_progress: 'bg-blue-100 text-blue-700',
+      completed: 'bg-green-100 text-green-700'
+    };
+    return colors[status] || colors.not_started;
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      not_started: 'Not Started',
+      in_progress: 'In Progress',
+      completed: 'Completed'
+    };
+    return labels[status] || 'Not Started';
   };
 
   const handleFileUpload = async (e) => {
@@ -180,6 +321,7 @@ export default function ProjectReview() {
         project_review_data: {
           ...request.project_review_data,
           ...projectDetails,
+          tasks: tasks,
           reviewed_at: new Date().toISOString()
         }
       });
@@ -196,19 +338,55 @@ export default function ProjectReview() {
   const handleFinalize = async () => {
     setSaving(true);
     try {
+      // Create tickets for each task
+      const ticketPromises = tasks.map(async (task) => {
+        const ticketNumber = `TKT-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5)}`;
+        
+        return base44.entities.Ticket.create({
+          ticket_number: ticketNumber,
+          subject: task.name,
+          description: task.description || `Task for ${request.title}`,
+          status: 'open',
+          priority: 'medium',
+          category: task.type === 'graphics' ? 'marketing' : 
+                   task.type === 'social_media' ? 'marketing' :
+                   task.type === 'photography' ? 'av_production' : 'other',
+          requester_email: request.requestor_email,
+          requester_name: request.requestor_name,
+          assigned_to_name: task.assigned_to,
+          source: 'communications_workflow',
+          related_event_id: request.pco_event_id,
+          tags: [request.ministry_department, 'communications', task.type],
+          comments: [{
+            author_email: request.requestor_email,
+            author_name: request.requestor_name,
+            content: `Auto-created from Communications Request: ${request.request_number}`,
+            is_internal: false,
+            timestamp: new Date().toISOString()
+          }]
+        });
+      });
+
+      await Promise.all(ticketPromises);
+
+      // Update workflow request status
       await base44.entities.WorkflowRequest.update(requestId, {
         status: 'campaign_running',
         project_review_data: {
           ...request.project_review_data,
           ...projectDetails,
-          reviewed_at: new Date().toISOString()
+          tasks: tasks,
+          reviewed_at: new Date().toISOString(),
+          tickets_created: true,
+          tickets_created_at: new Date().toISOString()
         }
       });
-      toast.success('Project finalized and campaign started');
+
+      toast.success(`✅ Project finalized! ${tasks.length} support tickets created for your team.`);
       navigate(createPageUrl('WorkflowHub'));
     } catch (error) {
       console.error('Error finalizing:', error);
-      toast.error('Failed to finalize');
+      toast.error('Failed to finalize project');
     } finally {
       setSaving(false);
     }
@@ -745,13 +923,13 @@ export default function ProjectReview() {
 
           {/* Timeline & Tasks Tab */}
           <TabsContent value="timeline" className="space-y-6">
-            {/* Auto-Assignment Section */}
+            {/* Auto-Assignment Info */}
             <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
               <div className="flex items-start gap-3 mb-4">
                 <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-green-900 text-lg mb-2">AUTO-ASSIGNMENT ENABLED</h3>
-                  <p className="text-sm text-green-800 mb-4">Tasks are automatically assigned to your team based on their roles.</p>
+                  <h3 className="font-bold text-green-900 text-lg mb-2">AUTO-GENERATED TASKS</h3>
+                  <p className="text-sm text-green-800 mb-4">Tasks have been automatically created and assigned based on your event date. You can move dates and edit assignments as needed.</p>
                   
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="flex items-center gap-2">
@@ -764,109 +942,127 @@ export default function ProjectReview() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-green-700">•</span>
-                      <span className="text-green-900">Video Content → <strong>Addyson Mitchell</strong></span>
+                      <span className="text-green-900">Pulpit Announcement → <strong>Kyle Judkins</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-green-700">•</span>
-                      <span className="text-green-900">Photography → <strong>Volunteer Photographer</strong> (backup: Addyson)</span>
+                      <span className="text-green-900">Digital Signs → <strong>Kyle Judkins</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-green-700">•</span>
-                      <span className="text-green-900">AV/Lighting → <strong>Zack Barton</strong> (backup: Kyle)</span>
+                      <span className="text-green-900">Photography (optional) → <strong>Volunteer Photographer</strong></span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Project Timeline */}
+            {/* Project Tasks */}
             <Card>
               <CardHeader className="border-b bg-slate-50">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
                       <CalendarIcon className="w-5 h-5 text-purple-600" />
-                      Project Timeline
+                      Project Tasks
                     </CardTitle>
                     <p className="text-sm text-slate-600 mt-1">
-                      Showing Nov 8 - Nov 25, 2025
-                      {projectDetails.event_date && (
-                        <span className="ml-2">
-                          • Event Date: <strong>{format(new Date(projectDetails.event_date), 'MMMM d, yyyy')}</strong>
-                        </span>
-                      )}
+                      {tasks.length} task{tasks.length !== 1 ? 's' : ''} • Click task to cycle status • Adjust dates as needed
                     </p>
                   </div>
-                  {projectDetails.event_date && (
-                    <Badge className="bg-purple-100 text-purple-700">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {(() => {
-                        const eventDate = new Date(projectDetails.event_date);
-                        const today = new Date();
-                        const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
-                        return daysUntil > 0 ? `${daysUntil} days until event` : 'Event passed';
-                      })()}
-                    </Badge>
-                  )}
+                  <Button
+                    onClick={addPhotographerTask}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Add Photographer
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                {/* Add Task Input */}
-                <div className="mb-6">
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="Add custom task..."
-                      className="flex-1"
-                    />
-                    <Button className="bg-slate-900 hover:bg-slate-800">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Task
-                    </Button>
-                  </div>
-                  
-                  {/* Quick Add Common Tasks */}
-                  <div className="mt-4">
-                    <p className="text-xs font-semibold text-slate-600 mb-2">Quick Add Common Tasks:</p>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button variant="outline" size="sm" className="text-xs">
-                        <Plus className="w-3 h-3 mr-1" />
-                        Photographer (Event Day)
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-xs">
-                        <Plus className="w-3 h-3 mr-1" />
-                        Social Media Reel
-                      </Button>
+                <div className="space-y-3">
+                  {tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="border-2 border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors bg-white"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <button
+                              onClick={() => updateTaskStatus(task.id)}
+                              className="transition-all hover:scale-110"
+                            >
+                              <Badge className={getStatusColor(task.status)}>
+                                {getStatusLabel(task.status)}
+                              </Badge>
+                            </button>
+                            <h3 className="font-semibold text-slate-900">{task.name}</h3>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-sm text-slate-600">
+                            <div className="flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              <span>{task.assigned_to}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <CalendarIcon className="w-4 h-4" />
+                              <input
+                                type="date"
+                                value={task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : ''}
+                                onChange={(e) => updateTaskDate(task.id, new Date(e.target.value).toISOString())}
+                                className="border border-slate-300 rounded px-2 py-1 text-sm"
+                              />
+                            </div>
+                          </div>
+                          
+                          {task.description && (
+                            <p className="text-sm text-slate-600 mt-2">{task.description}</p>
+                          )}
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Coming Soon Calendar Placeholder */}
-                <div className="border-2 border-dashed border-slate-200 rounded-lg p-12 text-center">
-                  <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Interactive Calendar Coming Soon</p>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Full calendar view with drag-and-drop task scheduling, color-coded tasks, and timeline visualization
-                  </p>
-                  
-                  {/* Instructions Preview */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-2xl mx-auto mt-6">
-                    <div className="flex items-start gap-2 mb-3">
-                      <span className="text-blue-600 text-lg">💡</span>
-                      <h4 className="font-semibold text-blue-900 text-sm">How to use (when ready):</h4>
-                    </div>
-                    <ul className="space-y-1.5 text-xs text-blue-800">
-                      <li>• <strong>Calendar auto-adjusts</strong> to show from your first task to the event date</li>
-                      <li>• <strong>Drag and drop</strong> your project's tasks to move them to different dates</li>
-                      <li>• <strong>Click</strong> on a task to cycle through: Not Started → In Progress → Complete</li>
-                      <li>• <strong>Hover</strong> over a task and click the trash icon to delete it</li>
-                      <li>• <strong>Solid colored tasks</strong> are your project's tasks - fully editable</li>
-                      <li>• <strong>Grey dashed tasks</strong> are from other projects - shown for workload visibility</li>
-                      <li>• <strong>Use this view</strong> to avoid scheduling conflicts and balance the team's workload</li>
-                    </ul>
+                {tasks.length === 0 && (
+                  <div className="text-center py-12">
+                    <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-600 mb-2">No tasks yet</p>
+                    <p className="text-sm text-slate-500">Tasks will be auto-generated when event date is set</p>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Finalize Notice */}
+            {tasks.length > 0 && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-blue-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-bold text-blue-900 text-lg mb-2">Ready to Launch?</h3>
+                    <p className="text-sm text-blue-800 mb-4">
+                      When you click "Finalize & Start Campaign", these {tasks.length} tasks will be automatically created as support tickets in your ticketing system, assigned to the team members shown above.
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Each ticket will include the task details, due dates, and be linked back to this communications request for tracking.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
