@@ -19,18 +19,47 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify cron secret for security
+    // Auth check: Accept EITHER cron secret OR valid user authentication
     const cronSecret = Deno.env.get('CRON_SECRET');
-    const providedSecret = req.headers.get('x-cron-secret') || req.headers.get('authorization')?.replace('Bearer ', '');
+    const providedSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('authorization');
     
-    // Vercel Cron sends authorization header, manual calls use x-cron-secret
-    if (cronSecret && providedSecret !== cronSecret) {
-      console.error('❌ Invalid cron secret');
+    let isAuthorized = false;
+    let triggerType = 'unknown';
+    
+    // Check if this is a cron call (has CRON_SECRET)
+    if (cronSecret && providedSecret === cronSecret) {
+      isAuthorized = true;
+      triggerType = 'cron-secret';
+      console.log('✅ Authorized via CRON_SECRET');
+    }
+    // Check if this is a cron call via Authorization header (Vercel style)
+    else if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+      isAuthorized = true;
+      triggerType = 'cron-bearer';
+      console.log('✅ Authorized via Bearer CRON_SECRET');
+    }
+    // Check if this is a manual call with valid user authentication
+    else if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const user = await base44.auth.me();
+        if (user) {
+          isAuthorized = true;
+          triggerType = `manual-user:${user.email}`;
+          console.log('✅ Authorized via user authentication:', user.email);
+        }
+      } catch (authError) {
+        console.error('❌ User authentication failed:', authError.message);
+      }
+    }
+    
+    if (!isAuthorized) {
+      console.error('❌ Unauthorized: No valid cron secret or user authentication');
       
       if (logId) {
         await base44.asServiceRole.entities.CronExecutionLog.update(logId, {
           status: 'failed',
-          error_message: 'Invalid cron secret - Unauthorized',
+          error_message: 'Unauthorized - Invalid cron secret or user authentication',
           execution_time_ms: Date.now() - startTime
         });
       }
@@ -39,7 +68,8 @@ Deno.serve(async (req) => {
     }
 
     console.log('⏰ Scheduled Mystery Resource sync started...');
-    console.log('🔍 Triggered by:', req.headers.get('user-agent') || 'unknown');
+    console.log('🔍 Triggered by:', triggerType);
+    console.log('🔍 User agent:', req.headers.get('user-agent') || 'unknown');
     
     // Get all users with PCO access
     const users = await base44.asServiceRole.entities.User.filter({
@@ -54,6 +84,7 @@ Deno.serve(async (req) => {
       if (logId) {
         await base44.asServiceRole.entities.CronExecutionLog.update(logId, {
           status: 'success',
+          trigger_source: triggerType,
           synced_by_email: 'none',
           events_checked: 0,
           mystery_resources_found: 0,
@@ -99,6 +130,7 @@ Deno.serve(async (req) => {
       if (logId) {
         await base44.asServiceRole.entities.CronExecutionLog.update(logId, {
           status: 'success',
+          trigger_source: triggerType,
           synced_by_email: syncUser.email,
           events_checked: result.events_checked || 0,
           mystery_resources_found: result.found || 0,
@@ -114,7 +146,8 @@ Deno.serve(async (req) => {
         sync_result: result,
         synced_by: syncUser.email,
         timestamp: new Date().toISOString(),
-        log_id: logId
+        log_id: logId,
+        triggered_by: triggerType
       });
     } else {
       console.error('❌ Sync failed:', result);
@@ -123,6 +156,7 @@ Deno.serve(async (req) => {
       if (logId) {
         await base44.asServiceRole.entities.CronExecutionLog.update(logId, {
           status: 'failed',
+          trigger_source: triggerType,
           synced_by_email: syncUser.email,
           error_message: result.error || 'Sync failed',
           execution_time_ms: Date.now() - startTime,
