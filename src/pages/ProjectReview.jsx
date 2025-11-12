@@ -21,7 +21,9 @@ import {
   Image,
   Play,
   Clock,
-  Building2
+  Building2,
+  Sparkles,
+  Plus
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
