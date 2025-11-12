@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
-import { Calendar, Briefcase } from "lucide-react"; // CheckSquare was moved from here, but still needed.
-import { CheckSquare } from "lucide-react"; // Explicitly import CheckSquare for ClickUp
+import { Calendar, Briefcase } from "lucide-react";
+import { CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -185,28 +185,50 @@ export default function Settings() {
     try {
       console.log('🔄 Changing role for user:', userId, 'to:', newRole);
       
+      // Show loading state
+      setAllUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, _updating: true } : u
+      ));
+      
       const response = await base44.functions.invoke('setUserRole', {
         user_id: userId,
         role: newRole
       });
       
-      console.log('✅ Role change response:', response.data);
+      console.log('✅ Role change response:', response);
       
-      toast.success(`User role updated to ${newRole}`);
-      
-      // Reload users list
-      await loadAllUsers();
-      
-      // If we just changed our own role, reload the page
-      if (userId === user.id) {
-        toast.success('Your role was updated! Refreshing...');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+      if (response.data.success) {
+        toast.success(`User role updated to ${newRole}`);
+        
+        // Update the local state immediately
+        setAllUsers(prev => prev.map(u => 
+          u.id === userId ? { ...u, role: newRole, _updating: false } : u
+        ));
+        
+        // If we just changed our own role, reload the page
+        if (userId === user.id) {
+          toast.success('Your role was updated! Refreshing...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      } else {
+        throw new Error(response.data.error || 'Failed to update role');
       }
     } catch (error) {
       console.error("❌ Error changing user role:", error);
-      toast.error("Failed to change user role: " + (error.message || 'Unknown error'));
+      
+      // Show detailed error
+      const errorMsg = error.response?.data?.error || error.message || 'Unknown error';
+      toast.error(`Failed to change role: ${errorMsg}`);
+      
+      // Remove loading state
+      setAllUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, _updating: false } : u
+      ));
+      
+      // Reload to get correct state
+      await loadAllUsers();
     }
   };
 
@@ -895,32 +917,30 @@ export default function Settings() {
                                 <Select
                                   value={u.role || 'user'}
                                   onValueChange={(value) => handleChangeUserRole(u.id, value)}
+                                  disabled={u._updating}
                                 >
                                   <SelectTrigger className="w-40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="user">
-                                      <span className="flex items-center gap-2">
-                                        User
-                                      </span>
+                                      User
                                     </SelectItem>
                                     <SelectItem value="admin">
-                                      <span className="flex items-center gap-2">
-                                        Admin
-                                      </span>
+                                      Admin
                                     </SelectItem>
                                     <SelectItem value="super_user">
-                                      <span className="flex items-center gap-2">
-                                        Super User
-                                      </span>
+                                      Super User
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>
-                                {u.role === 'super_user' && (
+                                {u._updating && (
+                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                )}
+                                {!u._updating && u.role === 'super_user' && (
                                   <Crown className="w-5 h-5 text-purple-500" />
                                 )}
-                                {u.role === 'admin' && (
+                                {!u._updating && u.role === 'admin' && (
                                   <Crown className="w-5 h-5 text-orange-500" />
                                 )}
                               </div>
