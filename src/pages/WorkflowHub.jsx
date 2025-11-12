@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 const statusStages = [
-  { value: "request", label: "Request", color: "bg-blue-100 text-blue-700" },
   { value: "minister_goal_review", label: "Minister Review", color: "bg-purple-100 text-purple-700" },
   { value: "project_review", label: "Project Review", color: "bg-orange-100 text-orange-700" },
   { value: "campaign_running", label: "Campaign Running", color: "bg-green-100 text-green-700" },
@@ -45,6 +44,7 @@ export default function WorkflowHub() {
   const [allRequests, setAllRequests] = useState([]);
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" or "calendar"
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -313,11 +313,17 @@ export default function WorkflowHub() {
 
   const displayRequests = isAdmin ? allRequests : [...myRequests, ...assignedToMe];
   const uniqueRequests = Array.from(new Map(displayRequests.map(r => [r.id, r])).values());
+  
+  // Filter out completed requests unless showing archived
+  const filteredRequests = showArchived 
+    ? uniqueRequests.filter(r => r.status === 'completed')
+    : uniqueRequests.filter(r => r.status !== 'completed');
 
   const stats = {
     total: uniqueRequests.length,
-    pending: uniqueRequests.filter(r => r.status === 'minister_goal_review').length,
-    active: uniqueRequests.filter(r => ['project_review', 'campaign_running'].includes(r.status)).length,
+    minister_review: uniqueRequests.filter(r => r.status === 'minister_goal_review').length,
+    project_review: uniqueRequests.filter(r => r.status === 'project_review').length,
+    campaign_running: uniqueRequests.filter(r => r.status === 'campaign_running').length,
     completed: uniqueRequests.filter(r => r.status === 'completed').length
   };
 
@@ -392,51 +398,78 @@ export default function WorkflowHub() {
         </div>
 
         {isAdmin && (
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <Card>
+          <div className="grid grid-cols-5 gap-4 mb-6">
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => setShowArchived(false)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-600">Total</p>
                     <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
                   </div>
-                  <MessageSquare className="w-8 h-8 text-purple-500" />
+                  <MessageSquare className="w-8 h-8 text-slate-500" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => setShowArchived(false)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Pending Review</p>
-                    <p className="text-2xl font-bold text-purple-700">{stats.pending}</p>
+                    <p className="text-sm text-slate-600">Minister Review</p>
+                    <p className="text-2xl font-bold text-purple-700">{stats.minister_review}</p>
                   </div>
                   <Clock className="w-8 h-8 text-purple-500" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => setShowArchived(false)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">In Progress</p>
-                    <p className="text-2xl font-bold text-orange-700">{stats.active}</p>
+                    <p className="text-sm text-slate-600">Project Review</p>
+                    <p className="text-2xl font-bold text-orange-700">{stats.project_review}</p>
                   </div>
                   <TrendingUp className="w-8 h-8 text-orange-500" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => setShowArchived(false)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600">Campaign Running</p>
+                    <p className="text-2xl font-bold text-green-700">{stats.campaign_running}</p>
+                  </div>
+                  <Sparkles className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-2 border-slate-300"
+              onClick={() => setShowArchived(!showArchived)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-600">Completed</p>
-                    <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
+                    <p className="text-2xl font-bold text-slate-700">{stats.completed}</p>
                   </div>
-                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+                  <CheckCircle2 className="w-8 h-8 text-slate-500" />
                 </div>
               </CardContent>
             </Card>
@@ -444,7 +477,7 @@ export default function WorkflowHub() {
         )}
 
         {/* View Toggle - Board/Calendar */}
-        {isAdmin && (
+        {isAdmin && !showArchived && (
           <div className="flex items-center gap-2 mb-6">
             <Button
               variant={viewMode === "kanban" ? "default" : "outline"}
@@ -467,8 +500,40 @@ export default function WorkflowHub() {
           </div>
         )}
 
-        {isAdmin && viewMode === "kanban" ? (
-          <KanbanView requests={uniqueRequests} />
+        {showArchived ? (
+          <Card>
+            <CardHeader className="border-b bg-slate-50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-medium flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-slate-600" />
+                  Completed Plans (Archive)
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowArchived(false)}
+                >
+                  ← Back to Active Plans
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid gap-4">
+                {filteredRequests.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-600">No completed plans yet</p>
+                  </div>
+                ) : (
+                  filteredRequests.map(request => (
+                    <RequestCard key={request.id} request={request} />
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : isAdmin && viewMode === "kanban" ? (
+          <KanbanView requests={filteredRequests} />
         ) : isAdmin && viewMode === "calendar" ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -489,7 +554,7 @@ export default function WorkflowHub() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {uniqueRequests.length === 0 ? (
+            {filteredRequests.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center">
                   <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -509,7 +574,7 @@ export default function WorkflowHub() {
                 </CardContent>
               </Card>
             ) : (
-              uniqueRequests.map(request => (
+              filteredRequests.map(request => (
                 <RequestCard key={request.id} request={request} />
               ))
             )}
