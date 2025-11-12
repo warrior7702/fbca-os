@@ -34,6 +34,7 @@ import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
 import WorkflowDetail from './pages/WorkflowDetail';
 import ProjectReview from './pages/ProjectReview';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
+import CronStatus from './pages/CronStatus';
 import Layout from './Layout.jsx';
 
 
@@ -74,6 +75,7 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "ProjectReview": ProjectReview,
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
+    "CronStatus": CronStatus,
 }
 
 export const pagesConfig = {
