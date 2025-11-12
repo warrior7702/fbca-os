@@ -49,7 +49,7 @@ export default function EmailTemplateEditor() {
                 <span style="font-size: 40px;">📋</span>
               </div>
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Review and Planning</h1>
-              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Action Required</p>
+              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;"></p>
             </td>
           </tr>
           
