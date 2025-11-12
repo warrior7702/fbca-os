@@ -173,7 +173,8 @@ export default function WorkflowHub() {
         </CardContent>
       </Card>
     </motion.div>
-  );
+    );
+  };
 
   const RequestCard = ({ request }) => {
     // Admin/super_user clicking on project_review goes to ProjectReview page
