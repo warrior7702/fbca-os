@@ -97,12 +97,13 @@ Deno.serve(async (req) => {
           const resourceDetails = included.find(r => r.type === 'Resource' && r.id === resourceId);
           const resourceName = resourceDetails?.attributes?.name || '';
 
-          // Check if this is the Mystery Resource and is pending
+          // Check if this is the Mystery Resource
           if (resourceName.toLowerCase().includes('mystery resource')) {
             const approvalStatus = request.attributes?.approval_status;
             
-            // Only process pending requests
-            if (approvalStatus === 'P' || !approvalStatus) {
+            // Process BOTH pending AND recently approved requests
+            // This catches the race condition where someone approves before the cron runs
+            if (approvalStatus === 'P' || approvalStatus === 'A' || !approvalStatus) {
               console.log('🔮 Found Mystery Resource request:', request.id, 'for event:', eventId);
               
               // Fetch event details
