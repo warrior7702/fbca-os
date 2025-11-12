@@ -119,6 +119,12 @@ Deno.serve(async (req) => {
       }
     });
 
+    // Handle non-JSON responses (like deployment pages)
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Function call failed (${response.status}): ${errorText.substring(0, 200)}`);
+    }
+
     const result = await response.json();
 
     if (response.ok) {
