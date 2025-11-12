@@ -23,7 +23,9 @@ import {
   Clock,
   Building2,
   Sparkles,
-  Plus
+  Plus,
+  Upload,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -36,6 +38,8 @@ export default function ProjectReview() {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedMaterials, setUploadedMaterials] = useState([]);
 
   // Project details form
   const [projectDetails, setProjectDetails] = useState({
@@ -46,13 +50,13 @@ export default function ProjectReview() {
     registration_link: '',
     target_audience: '',
     key_message: '',
-    event_theme: '', // NEW
-    materials_for_attendees: '', // NEW
-    what_makes_special: '', // NEW
-    desired_impact: '', // NEW
-    childcare_details: '', // NEW
-    food_menu: '', // NEW
-    event_flow: '', // NEW
+    event_theme: '',
+    materials_for_attendees: '',
+    what_makes_special: '',
+    desired_impact: '',
+    childcare_details: '',
+    food_menu: '',
+    event_flow: '',
     design_items: [],
     expected_attendance: '',
     special_notes: ''
@@ -74,25 +78,30 @@ export default function ProjectReview() {
 
         // Pre-populate from goal review data
         const goalData = foundRequest.goal_review_data || {};
+        const projectData = foundRequest.project_review_data || {};
+        
         setProjectDetails({
           project_name: foundRequest.title || '',
           ministry_area: foundRequest.ministry_department || '',
           request_type: goalData.need_type || '',
           event_date: foundRequest.pco_event_date || goalData.event_date || '',
-          event_theme: goalData.event_theme || '', // NEW
+          event_theme: goalData.event_theme || '',
           expected_attendance: goalData.expected_attendance || '',
-          materials_for_attendees: goalData.materials_for_attendees || '', // NEW
-          what_makes_special: goalData.what_makes_special || '', // NEW
-          desired_impact: goalData.desired_impact || '', // NEW
-          childcare_details: goalData.childcare_details || '', // NEW
-          food_menu: goalData.food_menu || '', // NEW
-          event_flow: goalData.event_flow || '', // NEW
+          materials_for_attendees: goalData.materials_for_attendees || '',
+          what_makes_special: goalData.what_makes_special || '',
+          desired_impact: goalData.desired_impact || '',
+          childcare_details: goalData.childcare_details || '',
+          food_menu: goalData.food_menu || '',
+          event_flow: goalData.event_flow || '',
           special_notes: goalData.special_notes || '',
           registration_link: goalData.registration_link || '',
           target_audience: goalData.target_audience || '',
           key_message: goalData.key_message || '',
           design_items: goalData.deliverables || [],
         });
+        
+        // Load uploaded materials
+        setUploadedMaterials(projectData.uploaded_materials || []);
       } else {
         toast.error('Request not found');
         navigate(createPageUrl('WorkflowHub'));
@@ -105,11 +114,71 @@ export default function ProjectReview() {
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploadedFiles = [];
+      
+      for (const file of files) {
+        const result = await base44.integrations.Core.UploadFile({ file });
+        uploadedFiles.push({
+          name: file.name,
+          url: result.file_url,
+          uploaded_at: new Date().toISOString(),
+          uploaded_by: request.requestor_name
+        });
+      }
+
+      const newMaterials = [...uploadedMaterials, ...uploadedFiles];
+      setUploadedMaterials(newMaterials);
+
+      // Save to database
+      await base44.entities.WorkflowRequest.update(requestId, {
+        project_review_data: {
+          ...request.project_review_data,
+          uploaded_materials: newMaterials
+        }
+      });
+
+      toast.success(`${uploadedFiles.length} file(s) uploaded!`);
+      await loadRequest();
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setUploading(false);
+      e.target.value = ''; // Reset input
+    }
+  };
+
+  const handleRemoveMaterial = async (index) => {
+    const newMaterials = uploadedMaterials.filter((_, idx) => idx !== index);
+    setUploadedMaterials(newMaterials);
+
+    try {
+      await base44.entities.WorkflowRequest.update(requestId, {
+        project_review_data: {
+          ...request.project_review_data,
+          uploaded_materials: newMaterials
+        }
+      });
+      toast.success('Material removed');
+      await loadRequest();
+    } catch (error) {
+      console.error('Error removing material:', error);
+      toast.error('Failed to remove material');
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       await base44.entities.WorkflowRequest.update(requestId, {
         project_review_data: {
+          ...request.project_review_data,
           ...projectDetails,
           reviewed_at: new Date().toISOString()
         }
@@ -130,6 +199,7 @@ export default function ProjectReview() {
       await base44.entities.WorkflowRequest.update(requestId, {
         status: 'campaign_running',
         project_review_data: {
+          ...request.project_review_data,
           ...projectDetails,
           reviewed_at: new Date().toISOString()
         }
@@ -485,102 +555,189 @@ export default function ProjectReview() {
                   Linked Materials
                 </CardTitle>
                 <p className="text-sm text-slate-600 mt-1">
-                  Add existing logos, photos, brand assets, or documents that should be used for this project
+                  Upload logos, photos, brand assets, or documents for this project
                 </p>
               </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                {!request.goal_review_data?.graphics_folder_link && 
-                 !request.goal_review_data?.marketing_assets_link && 
-                 !request.goal_review_data?.previous_event_photos ? (
-                  <div className="text-center py-12">
-                    <div className="mb-6">
-                      <LinkIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-600 mb-6">
-                        No materials linked yet. Add existing logos, brand guidelines, photos, or other assets that should be used for this project.
+              <CardContent className="p-6 space-y-6">
+                {/* Upload Section */}
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 bg-slate-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 mb-1">Upload Materials</h3>
+                      <p className="text-sm text-slate-600">
+                        Upload logos, photos, brand guidelines, or other assets
                       </p>
                     </div>
-                    
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-left max-w-xl mx-auto">
-                      <div className="flex items-start gap-2 mb-3">
-                        <span className="text-amber-600 text-lg">💡</span>
-                        <h3 className="font-semibold text-amber-900">Helpful Materials to Include:</h3>
-                      </div>
-                      <ul className="space-y-2 text-sm text-amber-800">
-                        <li>• Ministry/Event logos (current versions)</li>
-                        <li>• Previous event photos for reference</li>
-                        <li>• Brand guidelines or style guides</li>
-                        <li>• Approved color palettes or fonts</li>
-                        <li>• Existing copy, scripts, or promotional text</li>
-                        <li>• Contact information for key stakeholders</li>
-                      </ul>
+                    <label htmlFor="file-upload">
+                      <Button
+                        type="button"
+                        disabled={uploading}
+                        className="bg-purple-600 hover:bg-purple-700"
+                        onClick={() => document.getElementById('file-upload').click()}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Files
+                          </>
+                        )}
+                      </Button>
+                    </label>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-amber-600 text-lg">💡</span>
+                      <h4 className="font-semibold text-amber-900 text-sm">Helpful Materials:</h4>
+                    </div>
+                    <ul className="space-y-1 text-xs text-amber-800">
+                      <li>• Ministry/Event logos (current versions)</li>
+                      <li>• Previous event photos for reference</li>
+                      <li>• Brand guidelines or style guides</li>
+                      <li>• Approved color palettes or fonts</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Uploaded Files */}
+                {uploadedMaterials.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-3">Uploaded Files</h3>
+                    <div className="space-y-2">
+                      {uploadedMaterials.map((material, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Image className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-slate-900 truncate">{material.name}</p>
+                              <p className="text-xs text-slate-500">
+                                Uploaded {format(new Date(material.uploaded_at), 'MMM d, yyyy')}
+                                {material.uploaded_by && ` by ${material.uploaded_by}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={material.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                            >
+                              View
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleRemoveMaterial(idx)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <>
-                    {request.goal_review_data?.graphics_folder_link && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                        <LinkIcon className="w-5 h-5 text-purple-600" />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-slate-700 mb-1">Graphics Folder</p>
-                          <a 
-                            href={request.goal_review_data.graphics_folder_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline break-all"
-                          >
-                            {request.goal_review_data.graphics_folder_link}
-                          </a>
-                        </div>
-                      </div>
-                    )}
+                )}
 
-                    {request.goal_review_data?.marketing_assets_link && (
-                      <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                        <LinkIcon className="w-5 h-5 text-purple-600" />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-slate-700 mb-1">Marketing Assets</p>
-                          <a 
-                            href={request.goal_review_data.marketing_assets_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline break-all"
-                          >
-                            {request.goal_review_data.marketing_assets_link}
-                          </a>
+                {/* Existing Links from Intake */}
+                {(request.goal_review_data?.graphics_folder_link || 
+                  request.goal_review_data?.marketing_assets_link || 
+                  request.goal_review_data?.previous_event_photos) && (
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-3">Links from Intake Form</h3>
+                    <div className="space-y-3">
+                      {request.goal_review_data?.graphics_folder_link && (
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <LinkIcon className="w-5 h-5 text-purple-600" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-700 mb-1">Graphics Folder</p>
+                            <a 
+                              href={request.goal_review_data.graphics_folder_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline break-all"
+                            >
+                              {request.goal_review_data.graphics_folder_link}
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {request.goal_review_data?.previous_event_photos && (
-                      <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                        <p className="text-xs font-semibold text-slate-700 mb-3">Previous Event Photos</p>
-                        <div className="flex gap-2 flex-wrap">
-                          {Array.isArray(request.goal_review_data.previous_event_photos) 
-                            ? request.goal_review_data.previous_event_photos.map((url, idx) => (
-                              <a 
-                                key={idx}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                Photo {idx + 1}
-                              </a>
-                            ))
-                            : (
-                              <a 
-                                href={request.goal_review_data.previous_event_photos}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                View Photos
-                              </a>
-                            )}
+                      {request.goal_review_data?.marketing_assets_link && (
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <LinkIcon className="w-5 h-5 text-purple-600" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-700 mb-1">Marketing Assets</p>
+                            <a 
+                              href={request.goal_review_data.marketing_assets_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline break-all"
+                            >
+                              {request.goal_review_data.marketing_assets_link}
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </>
+                      )}
+
+                      {request.goal_review_data?.previous_event_photos && (
+                        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-700 mb-3">Previous Event Photos</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {Array.isArray(request.goal_review_data.previous_event_photos) 
+                              ? request.goal_review_data.previous_event_photos.map((url, idx) => (
+                                <a 
+                                  key={idx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:underline"
+                                >
+                                  Photo {idx + 1}
+                                </a>
+                              ))
+                              : (
+                                <a 
+                                  href={request.goal_review_data.previous_event_photos}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:underline"
+                                >
+                                  View Photos
+                                </a>
+                              )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State - only show if no uploaded materials AND no links */}
+                {uploadedMaterials.length === 0 && 
+                 !request.goal_review_data?.graphics_folder_link && 
+                 !request.goal_review_data?.marketing_assets_link && 
+                 !request.goal_review_data?.previous_event_photos && (
+                  <div className="text-center py-8">
+                    <LinkIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-600">
+                      No materials uploaded yet. Use the upload button above to add files.
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
