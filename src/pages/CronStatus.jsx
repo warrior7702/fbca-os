@@ -337,7 +337,7 @@ export default function CronStatus() {
                               {formatDistanceToNow(new Date(log.created_date), { addSuffix: true })}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-600 mt-1 font-medium">
+                          <p className="text-xs text-slate-500 mt-1 font-mono">
                             {formatLocalTime(log.created_date)}
                           </p>
                         </div>
