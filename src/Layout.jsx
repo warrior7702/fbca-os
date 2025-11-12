@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -239,7 +238,17 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-slate-100">
       <style>{`
         .fbca-logo-taskbar {
-          filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
+          filter: 
+            drop-shadow(0 1px 2px rgba(255, 255, 255, 0.3))
+            drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4))
+            drop-shadow(0 0 12px rgba(255, 255, 255, 0.1));
+          transition: filter 0.2s ease;
+        }
+        .fbca-logo-taskbar:hover {
+          filter: 
+            drop-shadow(0 1px 3px rgba(255, 255, 255, 0.4))
+            drop-shadow(0 3px 12px rgba(0, 0, 0, 0.5))
+            drop-shadow(0 0 16px rgba(255, 255, 255, 0.2));
         }
       `}</style>
 
