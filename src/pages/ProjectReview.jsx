@@ -29,9 +29,24 @@ import {
   X,
   Camera,
   Trash2,
-  Edit2
+  Edit2,
+  ChevronLeft, // Added
+  ChevronRight // Added
 } from "lucide-react";
-import { format, subDays, addDays } from "date-fns";
+import { 
+  format, 
+  subDays, 
+  addDays, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  addMonths, 
+  subMonths, 
+  isSameMonth, 
+  isSameDay, 
+  eachDayOfInterval 
+} from "date-fns"; // Added date-fns imports
 import { toast } from "sonner";
 
 export default function ProjectReview() {
@@ -45,7 +60,8 @@ export default function ProjectReview() {
   const [uploading, setUploading] = useState(false);
   const [uploadedMaterials, setUploadedMaterials] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [editingTask, setEditingTask] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date()); // Added
+  const [draggedTask, setDraggedTask] = useState(null); // Added
 
   // Project details form
   const [projectDetails, setProjectDetails] = useState({
@@ -118,6 +134,9 @@ export default function ProjectReview() {
           if (eventDate) {
             const autoTasks = generateAutoTasks(eventDate, foundRequest.title);
             setTasks(autoTasks);
+            
+            // Set calendar to event month
+            setCurrentMonth(new Date(eventDate));
           }
         }
       } else {
@@ -149,7 +168,8 @@ export default function ProjectReview() {
         due_date: subDays(eventDateObj, 14).toISOString(),
         assigned_to: 'Shelby Meeks',
         status: 'not_started',
-        description: 'Create all graphic design assets for this event'
+        description: 'Create all graphic design assets for this event',
+        color: 'pink' // Added color
       },
       {
         id: `task-${Date.now()}-2`,
@@ -158,7 +178,8 @@ export default function ProjectReview() {
         due_date: sundayBefore.toISOString(),
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
-        description: 'Prepare and deliver pulpit announcement'
+        description: 'Prepare and deliver pulpit announcement',
+        color: 'pink' // Added color
       },
       {
         id: `task-${Date.now()}-3`,
@@ -167,7 +188,8 @@ export default function ProjectReview() {
         due_date: subDays(eventDateObj, 10).toISOString(),
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
-        description: 'Create first promotional reel for social media'
+        description: 'Create first promotional reel for social media',
+        color: 'orange' // Added color
       },
       {
         id: `task-${Date.now()}-4`,
@@ -176,7 +198,8 @@ export default function ProjectReview() {
         due_date: subDays(eventDateObj, 5).toISOString(),
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
-        description: 'Create second promotional reel for social media'
+        description: 'Create second promotional reel for social media',
+        color: 'orange' // Added color
       },
       {
         id: `task-${Date.now()}-5`,
@@ -185,7 +208,8 @@ export default function ProjectReview() {
         due_date: subDays(eventDateObj, 14).toISOString(),
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
-        description: 'Launch digital signage campaign'
+        description: 'Launch digital signage campaign',
+        color: 'blue' // Added color
       }
     ];
   };
@@ -204,7 +228,8 @@ export default function ProjectReview() {
       due_date: new Date(eventDate).toISOString(),
       assigned_to: 'Volunteer Photographer',
       status: 'not_started',
-      description: 'Capture photos during the event'
+      description: 'Capture photos during the event',
+      color: 'purple' // Added color
     };
 
     const updatedTasks = [...tasks, newTask];
@@ -212,9 +237,32 @@ export default function ProjectReview() {
     toast.success('Photographer task added');
   };
 
+  const addSocialMediaReel = () => { // Added function
+    const eventDate = request.pco_event_date || request.goal_review_data?.event_date;
+    if (!eventDate) {
+      toast.error('Event date required to add task');
+      return;
+    }
+
+    const newTask = {
+      id: `task-${Date.now()}-reel-${Math.random()}`,
+      name: 'Social Media Reel',
+      type: 'social_media',
+      due_date: subDays(new Date(eventDate), 7).toISOString(),
+      assigned_to: 'Kyle Judkins',
+      status: 'not_started',
+      description: 'Create promotional reel for social media',
+      color: 'orange'
+    };
+
+    const updatedTasks = [...tasks, newTask];
+    setTasks(updatedTasks);
+    toast.success('Social Media Reel task added');
+  };
+
   const updateTaskDate = (taskId, newDate) => {
     const updatedTasks = tasks.map(task => 
-      task.id === taskId ? { ...task, due_date: newDate } : task
+      task.id === taskId ? { ...task, due_date: new Date(newDate).toISOString() } : task
     );
     setTasks(updatedTasks);
   };
@@ -237,22 +285,14 @@ export default function ProjectReview() {
     toast.success('Task deleted');
   };
 
-  const getStatusColor = (status) => {
+  const getTaskColor = (task) => { // Modified from getStatusColor
     const colors = {
-      not_started: 'bg-slate-200 text-slate-700',
-      in_progress: 'bg-blue-100 text-blue-700',
-      completed: 'bg-green-100 text-green-700'
+      pink: 'border-pink-300 bg-pink-50 text-pink-700',
+      blue: 'border-blue-300 bg-blue-50 text-blue-700',
+      orange: 'border-orange-300 bg-orange-50 text-orange-700',
+      purple: 'border-purple-300 bg-purple-50 text-purple-700'
     };
-    return colors[status] || colors.not_started;
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      not_started: 'Not Started',
-      in_progress: 'In Progress',
-      completed: 'Completed'
-    };
-    return labels[status] || 'Not Started';
+    return colors[task.color] || 'border-slate-300 bg-slate-50 text-slate-700';
   };
 
   const handleFileUpload = async (e) => {
@@ -392,6 +432,128 @@ export default function ProjectReview() {
     }
   };
 
+  // Calendar rendering logic - Added function
+  const renderCalendar = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+    const weeks = [];
+    let week = [];
+
+    dateRange.forEach((day, i) => {
+      week.push(day);
+      if ((i + 1) % 7 === 0) {
+        weeks.push(week);
+        week = [];
+      }
+    });
+
+    const eventDate = request?.pco_event_date || request?.goal_review_data?.event_date;
+
+    return (
+      <div className="bg-purple-50 rounded-lg p-4">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-900">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-center text-sm font-semibold text-slate-600 py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="space-y-2">
+          {weeks.map((week, weekIdx) => (
+            <div key={weekIdx} className="grid grid-cols-7 gap-2">
+              {week.map((day, dayIdx) => {
+                const isCurrentMonth = isSameMonth(day, monthStart);
+                const isEventDay = eventDate && isSameDay(day, new Date(eventDate));
+                const dayTasks = tasks.filter(task => 
+                  isSameDay(new Date(task.due_date), day)
+                );
+
+                return (
+                  <div
+                    key={dayIdx}
+                    className={`min-h-[100px] border-2 rounded-lg p-2 transition-colors ${
+                      isCurrentMonth ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100'
+                    } ${isEventDay ? 'border-purple-500 bg-purple-100 ring-2 ring-purple-300' : ''}`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedTask) {
+                        updateTaskDate(draggedTask.id, day.toISOString());
+                        setDraggedTask(null);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-sm font-semibold ${
+                        isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
+                      }`}>
+                        {format(day, 'd')}
+                      </span>
+                      {isEventDay && (
+                        <Badge className="bg-purple-600 text-white text-xs">EVENT</Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {dayTasks.map(task => (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={() => setDraggedTask(task)}
+                          onDragEnd={() => setDraggedTask(null)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateTaskStatus(task.id);
+                          }}
+                          className={`text-xs p-1.5 rounded border-2 cursor-move hover:shadow-md transition-all ${getTaskColor(task)} ${
+                            task.status === 'completed' ? 'opacity-60 line-through' : ''
+                          }`}
+                        >
+                          <div className="font-medium truncate">{task.name}</div>
+                          <div className="text-[10px] opacity-75 truncate">{task.assigned_to}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -403,6 +565,8 @@ export default function ProjectReview() {
   if (!request) {
     return null;
   }
+
+  const eventDate = request.pco_event_date || request.goal_review_data?.event_date;
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-slate-100 overflow-auto">
@@ -925,124 +1089,97 @@ export default function ProjectReview() {
           <TabsContent value="timeline" className="space-y-6">
             {/* Auto-Assignment Info */}
             <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-              <div className="flex items-start gap-3 mb-4">
+              <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-green-900 text-lg mb-2">AUTO-GENERATED TASKS</h3>
-                  <p className="text-sm text-green-800 mb-4">Tasks have been automatically created and assigned based on your event date. You can move dates and edit assignments as needed.</p>
+                  <h3 className="font-bold text-green-900 text-lg mb-2">AUTO-ASSIGNMENT ENABLED</h3>
+                  <p className="text-sm text-green-800 mb-3">
+                    Tasks are automatically assigned to your team based on their roles:
+                  </p>
                   
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700">•</span>
-                      <span className="text-green-900">Graphics/Design → <strong>Shelby Meeks</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700">•</span>
-                      <span className="text-green-900">Social Media Reels → <strong>Kyle Judkins</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700">•</span>
-                      <span className="text-green-900">Pulpit Announcement → <strong>Kyle Judkins</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700">•</span>
-                      <span className="text-green-900">Digital Signs → <strong>Kyle Judkins</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700">•</span>
-                      <span className="text-green-900">Photography (optional) → <strong>Volunteer Photographer</strong></span>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-green-800">
+                    <div>• Graphics/Design → <strong>Shelby Meeks</strong></div>
+                    <div>• Social Media Reels → <strong>Kyle Judkins</strong></div>
+                    <div>• Pulpit Announcement → <strong>Kyle Judkins</strong></div>
+                    <div>• Digital Signs → <strong>Kyle Judkins</strong></div>
+                    <div>• Photography (optional) → <strong>Volunteer Photographer</strong></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Project Tasks */}
+            {/* Project Timeline */}
             <Card>
               <CardHeader className="border-b bg-slate-50">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
                       <CalendarIcon className="w-5 h-5 text-purple-600" />
-                      Project Tasks
+                      Project Timeline
                     </CardTitle>
                     <p className="text-sm text-slate-600 mt-1">
-                      {tasks.length} task{tasks.length !== 1 ? 's' : ''} • Click task to cycle status • Adjust dates as needed
+                      {eventDate ? (
+                        <>
+                          Event Date: <strong>{format(new Date(eventDate), 'MMMM d, yyyy')}</strong>
+                        </>
+                      ) : (
+                        'Set event date to see timeline'
+                      )}
                     </p>
                   </div>
-                  <Button
-                    onClick={addPhotographerTask}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Add Photographer
-                  </Button>
+                  {eventDate && (
+                    <Badge className="bg-purple-100 text-purple-700">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {(() => {
+                        const today = new Date();
+                        const event = new Date(eventDate);
+                        const daysUntil = Math.ceil((event - today) / (1000 * 60 * 60 * 24));
+                        return daysUntil > 0 ? `${daysUntil} days until event` : 'Event passed';
+                      })()}
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="border-2 border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors bg-white"
+              <CardContent className="p-6 space-y-6">
+                {/* Quick Add Common Tasks */}
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-3">Quick Add Common Tasks:</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      onClick={addPhotographerTask}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <button
-                              onClick={() => updateTaskStatus(task.id)}
-                              className="transition-all hover:scale-110"
-                            >
-                              <Badge className={getStatusColor(task.status)}>
-                                {getStatusLabel(task.status)}
-                              </Badge>
-                            </button>
-                            <h3 className="font-semibold text-slate-900">{task.name}</h3>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-slate-600">
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              <span>{task.assigned_to}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <CalendarIcon className="w-4 h-4" />
-                              <input
-                                type="date"
-                                value={task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : ''}
-                                onChange={(e) => updateTaskDate(task.id, new Date(e.target.value).toISOString())}
-                                className="border border-slate-300 rounded px-2 py-1 text-sm"
-                              />
-                            </div>
-                          </div>
-                          
-                          {task.description && (
-                            <p className="text-sm text-slate-600 mt-2">{task.description}</p>
-                          )}
-                        </div>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => deleteTask(task.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                      <Plus className="w-3 h-3" />
+                      Photographer (Event Day)
+                    </Button>
+                    <Button
+                      onClick={addSocialMediaReel} // New button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Social Media Reel
+                    </Button>
+                  </div>
                 </div>
 
-                {tasks.length === 0 && (
-                  <div className="text-center py-12">
-                    <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600 mb-2">No tasks yet</p>
-                    <p className="text-sm text-slate-500">Tasks will be auto-generated when event date is set</p>
-                  </div>
-                )}
+                {/* Calendar */}
+                {renderCalendar()}
+
+                {/* Instructions */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 text-sm mb-3">How to use:</h4>
+                  <ul className="space-y-1.5 text-xs text-blue-800">
+                    <li>• <strong>Calendar auto-adjusts</strong> to show from your first task to the event date</li>
+                    <li>• <strong>Drag and drop</strong> your project's tasks to move them to different dates</li>
+                    <li>• <strong>Click</strong> on a task to cycle through: Not Started → In Progress → Complete</li>
+                    <li>• <strong>Solid colored tasks</strong> are your project's tasks - fully editable</li>
+                    <li>• <strong>Use this view</strong> to avoid scheduling conflicts and balance the team's workload</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
 
