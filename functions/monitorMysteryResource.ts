@@ -4,16 +4,40 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     
-    // Check if user is authenticated and has PCO access
-    const user = await base44.auth.me();
-    if (!user || !user.pco_access_token) {
-      return Response.json({ error: 'PCO not connected' }, { status: 401 });
-    }
-
     console.log('🔍 Starting Mystery Resource monitor...');
-    console.log('👤 User:', user.email);
-
-    const token = user.pco_access_token;
+    
+    // Try to get authenticated user first (for manual triggers)
+    let user = null;
+    let token = null;
+    
+    try {
+      user = await base44.auth.me();
+      if (user?.pco_access_token) {
+        token = user.pco_access_token;
+        console.log('👤 Using user token:', user.email);
+      }
+    } catch (authError) {
+      console.log('⚙️ No user auth, will use service role');
+    }
+    
+    // If no user token, get PCO token from admin/super_user in database
+    if (!token) {
+      const users = await base44.asServiceRole.entities.User.filter({
+        pco_access_token: { $exists: true, $ne: null }
+      });
+      
+      const adminUser = users.find(u => u.role === 'super_user' || u.role === 'admin') || users[0];
+      
+      if (!adminUser?.pco_access_token) {
+        return Response.json({ 
+          error: 'No PCO access available - no users with PCO tokens found' 
+        }, { status: 401 });
+      }
+      
+      token = adminUser.pco_access_token;
+      user = adminUser;
+      console.log('🔑 Using service role with admin user token:', adminUser.email);
+    }
     // Add baseUrl to be used in the email template
     const baseUrl = Deno.env.get('BASE44_APP_URL') || 'https://workflow-hub-6a5c78c9.base44.app';
 
