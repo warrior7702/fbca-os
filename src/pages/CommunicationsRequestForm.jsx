@@ -62,6 +62,7 @@ export default function CommunicationsRequestForm() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState({ hour: "12", minute: "00", period: "PM" });
   const [photoUploadMethod, setPhotoUploadMethod] = useState("upload");
+  const [validationErrors, setValidationErrors] = useState({});
   const abortControllerRef = useRef(null);
   const searchCacheRef = useRef(new Map());
   const navigate = useNavigate();
@@ -400,6 +401,7 @@ export default function CommunicationsRequestForm() {
     }));
     setEventSearchQuery("");
     setPcoEvents([]);
+    setValidationErrors(prev => ({ ...prev, event_name: undefined, event_date: undefined })); // Clear validation for these fields
   };
 
   const handleFileUpload = (e) => {
@@ -415,14 +417,50 @@ export default function CommunicationsRequestForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.project_name && !formData.manual_event_name) {
-      toast.error("Please provide a project/event name");
-      return;
+    // Clear previous errors
+    const errors = {};
+    
+    // Validate required fields
+    if (!formData.is_event_related) {
+      errors.is_event_related = "Please answer if this is event-related";
     }
-    if (!formData.ministry_department || !formData.need_type || !formData.event_date) {
+
+    if (formData.is_event_related === "yes") {
+      if (!formData.pco_event_id && !formData.manual_event_name) {
+        errors.event_name = "Please provide an event name or select from PCO";
+      }
+    } else if (formData.is_event_related === "no") {
+      if (!formData.project_name) {
+        errors.event_name = "Please provide a project name";
+      }
+    }
+    
+    if (!formData.ministry_department) {
+      errors.ministry_department = "Please select a ministry";
+    }
+    if (!formData.need_type) {
+      errors.need_type = "Please select what you need";
+    }
+    if (!formData.event_date) {
+      errors.event_date = "Please select an event date";
+    }
+    
+    // If there are errors, show them and stop
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       toast.error("Please fill out all required fields");
+      
+      // Scroll to first error
+      const firstErrorElement = document.querySelector('[data-validation-error="true"]');
+      if (firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
       return;
     }
+    
+    // Clear validation errors if everything is valid
+    setValidationErrors({});
 
     setSubmitting(true);
 
@@ -822,14 +860,29 @@ export default function CommunicationsRequestForm() {
               </div>
 
               {/* Event Related Question */}
-              <div className="space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <Label className="text-sm font-semibold text-blue-900">
+              <div 
+                className={`space-y-2 p-4 rounded-lg border-2 ${
+                  validationErrors.is_event_related 
+                    ? 'bg-red-50 border-red-300' 
+                    : 'bg-blue-50 border-blue-200'
+                }`}
+                data-validation-error={!!validationErrors.is_event_related}
+              >
+                <Label className={`text-sm font-semibold ${
+                  validationErrors.is_event_related ? 'text-red-900' : 'text-blue-900'
+                }`}>
                   Is this related to an event? <span className="text-red-500">*</span>
                 </Label>
+                {validationErrors.is_event_related && (
+                  <p className="text-sm text-red-600 font-medium">
+                    ⚠️ {validationErrors.is_event_related}
+                  </p>
+                )}
                 <RadioGroup
                   value={formData.is_event_related}
                   onValueChange={(value) => {
                     handleChange("is_event_related", value);
+                    setValidationErrors(prev => ({ ...prev, is_event_related: undefined }));
                     if (value === "no") {
                       handleChange("event_source", "");
                       handleChange("pco_event_id", "");
@@ -955,18 +1008,29 @@ export default function CommunicationsRequestForm() {
                     </div>
 
                     {/* Manual Event Name */}
-                    <div className="space-y-1.5">
+                    <div 
+                      className="space-y-1.5"
+                      data-validation-error={!!validationErrors.event_name}
+                    >
                       <Label htmlFor="manual_event_name" className="text-sm font-medium">
                         Event Name {!formData.pco_event_id && <span className="text-red-500">*</span>}
                       </Label>
                       <Input
                         id="manual_event_name"
                         value={formData.manual_event_name}
-                        onChange={(e) => handleChange("manual_event_name", e.target.value)}
+                        onChange={(e) => {
+                          handleChange("manual_event_name", e.target.value);
+                          setValidationErrors(prev => ({ ...prev, event_name: undefined }));
+                        }}
                         placeholder="Enter event name if not found above"
                         required={formData.is_event_related === "yes" && !formData.pco_event_id}
-                        className="h-10"
+                        className={`h-10 ${validationErrors.event_name ? 'border-red-500' : ''}`}
                       />
+                      {validationErrors.event_name && (
+                        <p className="text-sm text-red-600 font-medium">
+                          ⚠️ {validationErrors.event_name}
+                        </p>
+                      )}
                       <p className="text-xs text-slate-500">
                         Type the event name if you can't find it in the search
                       </p>
@@ -984,18 +1048,29 @@ export default function CommunicationsRequestForm() {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-green-300"
                   >
-                    <div className="space-y-1.5">
+                    <div 
+                      className="space-y-1.5"
+                      data-validation-error={!!validationErrors.event_name}
+                    >
                       <Label htmlFor="project_name" className="text-sm font-medium">
                         Project/Initiative Name <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="project_name"
                         value={formData.project_name}
-                        onChange={(e) => handleChange("project_name", e.target.value)}
+                        onChange={(e) => {
+                          handleChange("project_name", e.target.value);
+                          setValidationErrors(prev => ({ ...prev, event_name: undefined }));
+                        }}
                         placeholder="e.g., Fall Outreach Campaign"
                         required={formData.is_event_related === "no"}
-                        className="h-10"
+                        className={`h-10 ${validationErrors.event_name ? 'border-red-500' : ''}`}
                       />
+                      {validationErrors.event_name && (
+                        <p className="text-sm text-red-600 font-medium">
+                          ⚠️ {validationErrors.event_name}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-1.5">
@@ -1022,16 +1097,22 @@ export default function CommunicationsRequestForm() {
                   className="space-y-4 pt-4 border-t"
                 >
                   {/* Ministry */}
-                  <div className="space-y-1.5">
+                  <div 
+                    className="space-y-1.5"
+                    data-validation-error={!!validationErrors.ministry_department}
+                  >
                     <Label htmlFor="ministry_department" className="text-sm font-medium">
                       Ministry <span className="text-red-500">*</span>
                     </Label>
                     <Select
                       value={formData.ministry_department}
-                      onValueChange={(value) => handleChange("ministry_department", value)}
+                      onValueChange={(value) => {
+                        handleChange("ministry_department", value);
+                        setValidationErrors(prev => ({ ...prev, ministry_department: undefined }));
+                      }}
                       required
                     >
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className={`h-10 ${validationErrors.ministry_department ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1040,16 +1121,38 @@ export default function CommunicationsRequestForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {validationErrors.ministry_department && (
+                      <p className="text-sm text-red-600 font-medium">
+                        ⚠️ {validationErrors.ministry_department}
+                      </p>
+                    )}
                   </div>
 
                   {/* What do you need? */}
-                  <div className="space-y-2 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <Label className="text-sm font-semibold text-orange-900">
+                  <div 
+                    className={`space-y-2 p-4 rounded-lg border-2 ${
+                      validationErrors.need_type 
+                        ? 'bg-red-50 border-red-300' 
+                        : 'bg-orange-50 border-orange-200'
+                    }`}
+                    data-validation-error={!!validationErrors.need_type}
+                  >
+                    <Label className={`text-sm font-semibold ${
+                      validationErrors.need_type ? 'text-red-900' : 'text-orange-900'
+                    }`}>
                       What do you need? <span className="text-red-500">*</span>
                     </Label>
+                    {validationErrors.need_type && (
+                      <p className="text-sm text-red-600 font-medium">
+                        ⚠️ {validationErrors.need_type}
+                      </p>
+                    )}
                     <RadioGroup
                       value={formData.need_type}
-                      onValueChange={(value) => handleChange("need_type", value)}
+                      onValueChange={(value) => {
+                        handleChange("need_type", value);
+                        setValidationErrors(prev => ({ ...prev, need_type: undefined }));
+                      }}
                       className="flex flex-col gap-3"
                     >
                       <div className="flex items-center space-x-2">
@@ -1077,17 +1180,27 @@ export default function CommunicationsRequestForm() {
                   </div>
 
                   {/* Beautiful Date & Time Picker */}
-                  <div className="space-y-2">
+                  <div 
+                    className="space-y-2"
+                    data-validation-error={!!validationErrors.event_date}
+                  >
                     <Label className="text-sm font-medium">
                       Event Date & Time <span className="text-red-500">*</span>
                     </Label>
+                    {validationErrors.event_date && (
+                      <p className="text-sm text-red-600 font-medium">
+                        ⚠️ {validationErrors.event_date}
+                      </p>
+                    )}
                     
                     <div className="grid grid-cols-2 gap-3">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className={`justify-start text-left font-normal h-10 ${!selectedDate && "text-muted-foreground"}`}
+                            className={`justify-start text-left font-normal h-10 ${
+                              !selectedDate && "text-muted-foreground"
+                            } ${validationErrors.event_date ? 'border-red-500' : ''}`}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Pick a date"}
@@ -1097,7 +1210,10 @@ export default function CommunicationsRequestForm() {
                           <Calendar
                             mode="single"
                             selected={selectedDate}
-                            onSelect={setSelectedDate}
+                            onSelect={(date) => {
+                              setSelectedDate(date);
+                              setValidationErrors(prev => ({ ...prev, event_date: undefined }));
+                            }}
                             disabled={(date) => date < new Date()}
                             initialFocus
                           />
@@ -1387,3 +1503,4 @@ export default function CommunicationsRequestForm() {
     </div>
   );
 }
+```
