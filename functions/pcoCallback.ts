@@ -1,9 +1,8 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
     const startTime = Date.now();
     
-    // Get base URL
     const baseUrl = Deno.env.get('BASE44_APP_URL') || '';
     
     console.log('========================================');
@@ -20,11 +19,10 @@ Deno.serve(async (req) => {
         console.log('📝 State (user_id):', state || 'MISSING');
         console.log('❌ Error param:', error || 'none');
 
-        // Helper to build redirect URL - NO HASH ROUTING
+        // Helper to build redirect URL
         const buildRedirectUrl = (params) => {
             const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-            // Use regular routing, not hash-based
-            return `${redirectBase}/Settings?${params}`;
+            return `${redirectBase}/settings?${params}`;
         };
 
         // Handle PCO OAuth error
@@ -128,7 +126,7 @@ Deno.serve(async (req) => {
         console.log('✅ User updated successfully');
         console.log('⏱️ Total time:', elapsed, 'ms');
 
-        // Redirect to Settings with success - NO HASH
+        // Redirect to Settings with success
         const successUrl = buildRedirectUrl(`tab=integrations&connected=pco&t=${Date.now()}`);
         console.log('🎉 Success! Redirecting to:', successUrl);
         console.log('========================================');
@@ -146,7 +144,6 @@ Deno.serve(async (req) => {
         
         const url = new URL(req.url);
         const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-        // NO HASH - use regular routing
-        return Response.redirect(`${redirectBase}/Settings?tab=integrations&error=callback_failed`, 302);
+        return Response.redirect(`${redirectBase}/settings?tab=integrations&error=callback_failed`, 302);
     }
 });

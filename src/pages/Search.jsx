@@ -24,7 +24,12 @@ import {
   Phone,
   MessageSquare,
   CheckSquare,
-  Settings
+  Settings,
+  Video, // Added for My Meetings
+  ClipboardCheck, // Added for Approvals
+  Calendar as CalendarIcon, // Renamed to avoid conflict with standard Calendar component
+  Building2, // Added for My Department
+  Ticket // Added for Support Requests
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,12 +40,17 @@ import { Link } from "react-router-dom";
 
 const appModules = [
   { name: "Dashboard", path: "Dashboard", icon: LayoutDashboard, description: "Your main hub", color: "text-blue-500" },
-  { name: "My Tasks", path: "MyTasks", icon: CheckSquare, description: "ClickUp tasks, calendar, and emails", color: "text-indigo-500" },
-  { name: "Marketing", path: "Marketing", icon: Megaphone, description: "Campaign requests and assets", color: "text-purple-500" },
-  { name: "Food Service", path: "FoodService", icon: UtensilsCrossed, description: "Catering orders and menu planning", color: "text-green-500" },
-  { name: "Staff Directory", path: "StaffDirectory", icon: Users, description: "Contact information for all FBCA staff", color: "text-teal-500" },
-  { name: "Settings", path: "Settings", icon: Settings, description: "Manage preferences and integrations", color: "text-slate-500" },
-  { name: "Documents", path: "Documents", icon: Folder, description: "Browse OneDrive files", color: "text-blue-500" }
+  { name: "Tasks", path: "MyTasks", icon: CheckSquare, description: "ClickUp tasks, calendar, and emails", color: "text-indigo-500" },
+  { name: "My Meetings", path: "MyMeetings", icon: Video, description: "Calendar meetings and schedule", color: "text-purple-500" },
+  { name: "Approvals", path: "MyApprovals", icon: ClipboardCheck, description: "Pending approval requests", color: "text-orange-500" },
+  { name: "Church Calendar", path: "Calendar", icon: CalendarIcon, description: "Church-wide calendar view", color: "text-blue-600" },
+  { name: "Communications Requests", path: "WorkflowHub", icon: MessageSquare, description: "Communications workflow and requests", color: "text-purple-500" },
+  { name: "Hospitality", path: "FoodService", icon: UtensilsCrossed, description: "Catering orders and menu planning", color: "text-green-500" },
+  { name: "Directory", path: "StaffDirectory", icon: Users, description: "Contact information for all FBCA staff", color: "text-teal-500" },
+  { name: "My Department", path: "MyDepartment", icon: Building2, description: "Department-specific view", color: "text-violet-500" },
+  { name: "Documents", path: "Documents", icon: Folder, description: "Browse OneDrive files", color: "text-blue-500" },
+  { name: "Support Requests", path: "Ticketing", icon: Ticket, description: "Submit and track support tickets", color: "text-amber-500" },
+  { name: "Settings", path: "Settings", icon: Settings, description: "Manage preferences and integrations", color: "text-slate-500" }
 ];
 
 export default function Search() {
@@ -53,6 +63,8 @@ export default function Search() {
   const [modules, setModules] = useState([]);
   const [people, setPeople] = useState([]);
   const [localStaff, setLocalStaff] = useState([]);
+  const [workflowRequests, setWorkflowRequests] = useState([]); // New state for workflow requests
+  const [tickets, setTickets] = useState([]); // New state for support tickets
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -81,7 +93,7 @@ export default function Search() {
   // Relevance calculation
   const calculateRelevance = (item, searchQuery) => {
     const lowerQuery = searchQuery.toLowerCase();
-    const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || item.full_name?.toLowerCase() || '';
+    const lowerName = item.name?.toLowerCase() || item.displayName?.toLowerCase() || item.full_name?.toLowerCase() || item.title?.toLowerCase() || item.subject?.toLowerCase() || '';
     
     if (lowerName === lowerQuery) return 1000;
     if (lowerName.startsWith(lowerQuery)) return 500;
@@ -95,6 +107,8 @@ export default function Search() {
       setModules([]);
       setPeople([]);
       setLocalStaff([]);
+      setWorkflowRequests([]); // Clear workflow requests
+      setTickets([]); // Clear tickets
       setHasSearched(false);
       return;
     }
@@ -116,14 +130,15 @@ export default function Search() {
     
     setModules(matchedModules);
 
-    // Search files, people, and local staff
+    // Search files, people, local staff, workflow requests, and tickets
     try {
+      const lowerQuery = searchQuery.toLowerCase();
+
       // Get local staff first
       const staffResponse = await base44.entities.StaffContact.filter({});
-      console.log('Total staff loaded:', staffResponse?.length || 0);
+      //console.log('Total staff loaded:', staffResponse?.length || 0);
 
       // Filter local staff
-      const lowerQuery = searchQuery.toLowerCase();
       const matchedStaff = (staffResponse || [])
         .filter(person => {
           const fullNameMatch = person.full_name?.toLowerCase().includes(lowerQuery);
@@ -144,8 +159,44 @@ export default function Search() {
         }))
         .sort((a, b) => b.relevance - a.relevance);
       
-      console.log('Matched staff:', matchedStaff.map(s => s.full_name));
+      //console.log('Matched staff:', matchedStaff.map(s => s.full_name));
       setLocalStaff(matchedStaff);
+
+      // Search workflow requests
+      const workflowResponse = await base44.entities.WorkflowRequest.filter({});
+      const matchedWorkflows = (workflowResponse || [])
+        .filter(req => {
+          return req.title?.toLowerCase().includes(lowerQuery) ||
+                 req.request_number?.toLowerCase().includes(lowerQuery) ||
+                 req.description?.toLowerCase().includes(lowerQuery) ||
+                 req.requestor_name?.toLowerCase().includes(lowerQuery);
+        })
+        .map(req => ({
+          ...req,
+          relevance: calculateRelevance(req, searchQuery)
+        }))
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, 10); // Limit to top 10 results for brevity
+      
+      setWorkflowRequests(matchedWorkflows);
+
+      // Search support tickets
+      const ticketsResponse = await base44.entities.Ticket.filter({});
+      const matchedTickets = (ticketsResponse || [])
+        .filter(ticket => {
+          return ticket.subject?.toLowerCase().includes(lowerQuery) ||
+                 ticket.ticket_number?.toLowerCase().includes(lowerQuery) ||
+                 ticket.description?.toLowerCase().includes(lowerQuery) ||
+                 ticket.requestor_name?.toLowerCase().includes(lowerQuery); // Assuming requestor_name exists on Ticket
+        })
+        .map(ticket => ({
+          ...ticket,
+          relevance: calculateRelevance(ticket, searchQuery)
+        }))
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, 10); // Limit to top 10 results for brevity
+      
+      setTickets(matchedTickets);
 
       // Search files and Microsoft people in parallel
       const [filesResponse, peopleResponse] = await Promise.all([
@@ -191,7 +242,7 @@ export default function Search() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const totalResults = modules.length + files.length + people.length + localStaff.length;
+  const totalResults = modules.length + files.length + people.length + localStaff.length + workflowRequests.length + tickets.length;
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6 overflow-auto">
@@ -206,7 +257,7 @@ export default function Search() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Search</h1>
-            <p className="text-slate-600 text-sm">Search across files and modules</p>
+            <p className="text-slate-600 text-sm">Search across files, modules, staff, and more</p>
           </div>
         </div>
 
@@ -222,7 +273,7 @@ export default function Search() {
             <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
               type="text"
-              placeholder="Search files, documents, modules, ClickUp tasks, and team members..." // Updated placeholder
+              placeholder="Search files, staff, work orders, tickets, and more..." // Updated placeholder
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-12 h-14 text-lg"
@@ -394,6 +445,86 @@ export default function Search() {
               </div>
             )}
 
+            {/* Communications Requests */}
+            {workflowRequests.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Communications Requests ({workflowRequests.length})
+                </h2>
+                <div className="space-y-2">
+                  {workflowRequests.map((req) => (
+                    <motion.div
+                      key={req.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={() => navigate(createPageUrl('WorkflowHub') + `?id=${req.id}`)} // Assuming a detail page for workflow requests
+                      className="cursor-pointer"
+                    >
+                      <Card className="hover:shadow-lg transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">{req.title}</p>
+                              <p className="text-sm text-slate-600 mt-1">{req.request_number}</p>
+                              <div className="flex gap-2 mt-2">
+                                {req.status && <Badge variant="outline">{req.status}</Badge>}
+                                {req.ministry_department && (
+                                  <Badge variant="secondary">{req.ministry_department}</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Support Tickets */}
+            {tickets.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Ticket className="w-5 h-5" />
+                  Support Requests ({tickets.length})
+                </h2>
+                <div className="space-y-2">
+                  {tickets.map((ticket) => (
+                    <motion.div
+                      key={ticket.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={() => navigate(createPageUrl('Ticketing') + `?id=${ticket.id}`)} // Assuming a detail page for tickets
+                      className="cursor-pointer"
+                    >
+                      <Card className="hover:shadow-lg transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">{ticket.subject}</p>
+                              <p className="text-sm text-slate-600 mt-1">{ticket.ticket_number}</p>
+                              <div className="flex gap-2 mt-2">
+                                {ticket.status && <Badge variant="outline">{ticket.status}</Badge>}
+                                {ticket.priority && (
+                                  <Badge className={
+                                    ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                    ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-slate-100 text-slate-700'
+                                  }>{ticket.priority}</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Modules */}
             {modules.length > 0 && (
               <div>
@@ -497,7 +628,7 @@ export default function Search() {
           <div className="text-center py-20">
             <SearchIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">Start typing to search</p>
-            <p className="text-sm text-slate-400 mt-2">Search files, modules, and team members</p>
+            <p className="text-sm text-slate-400 mt-2">Search files, modules, staff, work orders, and support requests</p>
           </div>
         )}
       </div>
