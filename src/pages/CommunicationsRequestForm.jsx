@@ -500,13 +500,13 @@ export default function CommunicationsRequestForm() {
         await base44.integrations.Core.SendEmail({
           from_name: 'FBC Arlington Communications',
           to: formData.requester_email,
-          subject: `📋 Action Required: Complete Communications Intake for ${finalProjectName}`,
+          subject: `📋 Communications Review and Planning: ${finalProjectName}`,
           body: `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Communications Intake Request</title>
+  <title>Communications Review and Planning</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f7f8fa; line-height: 1.6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f7f8fa;">
@@ -522,7 +522,7 @@ export default function CommunicationsRequestForm() {
               <div style="background-color: rgba(255, 255, 255, 0.15); width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
                 <span style="font-size: 40px;">📋</span>
               </div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Request</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Review and Planning</h1>
               <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Action Required</p>
             </td>
           </tr>
@@ -534,7 +534,7 @@ export default function CommunicationsRequestForm() {
                 Hi <strong>${formData.requester_name}</strong>,
               </p>
               <p style="margin: 0 0 30px; color: #475569; font-size: 15px; line-height: 1.6;">
-                Thank you for requesting communications support! We're excited to help you create an amazing experience.
+                Lets take some time to learn more about your Communications needs
               </p>
               
               <!-- Request Details Card -->
@@ -567,12 +567,12 @@ export default function CommunicationsRequestForm() {
               
               <!-- Next Step Section -->
               <div style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; text-align: center;">
-                <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your AI-Powered Intake</h2>
+                <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your Minister Goal Review</h2>
                 <p style="margin: 0 0 24px; color: rgba(255, 255, 255, 0.95); font-size: 14px; line-height: 1.6;">
-                  We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan.
+                  We've streamlined our process with a quick 5-minute interview that will gather all the details we need to create the perfect communications plan.
                 </p>
                 <a href="${intakeLink}" style="display: inline-block; background-color: #ffffff; color: #7c3aed; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-                  Start Your Intake Interview →
+                  Start Your Goal Review →
                 </a>
               </div>
               
@@ -648,8 +648,8 @@ export default function CommunicationsRequestForm() {
                 Questions? Contact us at
               </p>
               <p style="margin: 0 0 20px;">
-                <a href="mailto:communications@fbcarlington.org" style="color: #7c3aed; text-decoration: none; font-weight: 600; font-size: 15px;">
-                  📧 communications@fbcarlington.org
+                <a href="mailto:kyle.judkins@fbca.org" style="color: #7c3aed; text-decoration: none; font-weight: 600; font-size: 15px;">
+                  📧 kyle.judkins@fbca.org
                 </a>
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">

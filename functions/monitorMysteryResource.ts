@@ -255,13 +255,13 @@ Deno.serve(async (req) => {
             const emailResult = await base44.asServiceRole.integrations.Core.SendEmail({
               from_name: 'FBC Arlington Communications',
               to: mysteryReq.owner_email,
-              subject: `📋 Action Required: Complete Communications Intake for ${mysteryReq.event_name}`,
+              subject: `📋 Communications Review and Planning: ${mysteryReq.event_name}`,
               body: `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Communications Intake Request</title>
+  <title>Communications Review and Planning</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f7f8fa; line-height: 1.6;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f7f8fa;">
@@ -277,7 +277,7 @@ Deno.serve(async (req) => {
               <div style="background-color: rgba(255, 255, 255, 0.15); width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
                 <span style="font-size: 40px;">📋</span>
               </div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Request</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communications Review and Planning</h1>
               <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Action Required</p>
             </td>
           </tr>
@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
                 Hi <strong>${mysteryReq.owner_name}</strong>,
               </p>
               <p style="margin: 0 0 30px; color: #475569; font-size: 15px; line-height: 1.6;">
-                Thank you for requesting communications support for your event! We're excited to help you create an amazing experience.
+                Lets take some time to learn more about your Communications needs
               </p>
               
               <!-- Request Details Card -->
@@ -299,14 +299,14 @@ Deno.serve(async (req) => {
                     <table role="presentation" style="width: 100%; border-collapse: collapse;">
                       <tr>
                         <td style="padding: 8px 0;">
-                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">📅 Event</span>
+                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">📅 Project</span>
                           <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${mysteryReq.event_name}</p>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding: 8px 0;">
-                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🗓️ Date</span>
-                          <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${mysteryReq.event_start ? new Date(mysteryReq.event_start).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'TBD'}</p>
+                          <span style="color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🏢 Ministry</span>
+                          <p style="margin: 4px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">TBD</p>
                         </td>
                       </tr>
                       <tr>
@@ -322,12 +322,12 @@ Deno.serve(async (req) => {
               
               <!-- Next Step Section -->
               <div style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; text-align: center;">
-                <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your AI-Powered Intake</h2>
+                <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your Minister Goal Review</h2>
                 <p style="margin: 0 0 24px; color: rgba(255, 255, 255, 0.95); font-size: 14px; line-height: 1.6;">
-                  We've streamlined our process with a quick 5-minute AI interview that will gather all the details we need to create the perfect communications plan.
+                  We've streamlined our process with a quick 5-minute interview that will gather all the details we need to create the perfect communications plan.
                 </p>
                 <a href="${intakeLink}" style="display: inline-block; background-color: #ffffff; color: #7c3aed; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-                  Start Your Intake Interview →
+                  Start Your Goal Review →
                 </a>
               </div>
               
@@ -403,12 +403,12 @@ Deno.serve(async (req) => {
                 Questions? Contact us at
               </p>
               <p style="margin: 0 0 20px;">
-                <a href="mailto:communications@fbcarlington.org" style="color: #7c3aed; text-decoration: none; font-weight: 600; font-size: 15px;">
-                  📧 communications@fbcarlington.org
+                <a href="mailto:kyle.judkins@fbca.org" style="color: #7c3aed; text-decoration: none; font-weight: 600; font-size: 15px;">
+                  📧 kyle.judkins@fbca.org
                 </a>
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">
-                Looking forward to making your event a success!<br>
+                Looking forward to making your project a success!<br>
                 <strong style="color: #64748b;">— Communications Team, FBC Arlington</strong>
               </p>
             </td>
