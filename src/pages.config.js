@@ -33,7 +33,6 @@ import TestMysterySync from './pages/TestMysterySync';
 import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
 import WorkflowDetail from './pages/WorkflowDetail';
 import ProjectReview from './pages/ProjectReview';
-import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import Layout from './Layout.jsx';
 
 
@@ -73,7 +72,6 @@ export const PAGES = {
     "CommunicationsRequestForm": CommunicationsRequestForm,
     "WorkflowDetail": WorkflowDetail,
     "ProjectReview": ProjectReview,
-    "DiagnoseMysteryResource": DiagnoseMysteryResource,
 }
 
 export const pagesConfig = {
