@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
         // Helper to build redirect URL
         const buildRedirectUrl = (params) => {
             const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-            return `${redirectBase}/Settings?${params}`;
+            return `${redirectBase}/settings?${params}`;
         };
 
         // Handle PCO OAuth error
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         console.log('✅ User updated successfully');
         console.log('⏱️ Total time:', elapsed, 'ms');
 
-        // Redirect to Settings with success
+        // Redirect to settings with success (lowercase!)
         const successUrl = buildRedirectUrl(`tab=integrations&connected=pco&t=${Date.now()}`);
         console.log('🎉 Success! Redirecting to:', successUrl);
         console.log('========================================');
@@ -144,6 +144,6 @@ Deno.serve(async (req) => {
         
         const url = new URL(req.url);
         const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-        return Response.redirect(`${redirectBase}/Settings?tab=integrations&error=callback_failed`, 302);
+        return Response.redirect(`${redirectBase}/settings?tab=integrations&error=callback_failed`, 302);
     }
 });
