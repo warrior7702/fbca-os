@@ -628,7 +628,7 @@ export default function ProjectReview() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-purple-600" />
+                      <CalendarIcon className="w-5 h-5 text-purple-600" />
                       Project Timeline
                     </CardTitle>
                     <p className="text-sm text-slate-600 mt-1">
@@ -685,7 +685,7 @@ export default function ProjectReview() {
 
                 {/* Coming Soon Calendar Placeholder */}
                 <div className="border-2 border-dashed border-slate-200 rounded-lg p-12 text-center">
-                  <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-sm font-semibold text-slate-700 mb-2">Interactive Calendar Coming Soon</p>
                   <p className="text-xs text-slate-500 mb-4">
                     Full calendar view with drag-and-drop task scheduling, color-coded tasks, and timeline visualization
