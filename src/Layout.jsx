@@ -296,23 +296,60 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-2">
             <Link to={createPageUrl("Dashboard")}>
               <motion.div
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 transition-all group"
+                className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer relative overflow-hidden group"
               >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <svg 
-                  className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
+                  className="w-7 h-7 relative z-10" 
+                  viewBox="0 0 32 32" 
+                  fill="none"
                 >
-                  <path d="M3 12h7" />
-                  <path d="M14 12h7" />
-                  <path d="M12 3v7" />
-                  <path d="M12 14v7" />
+                  <defs>
+                    <linearGradient id="crossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#60a5fa" />
+                      <stop offset="50%" stopColor="#a78bfa" />
+                      <stop offset="100%" stopColor="#f472b6" />
+                    </linearGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <g className="group-hover:drop-shadow-lg transition-all duration-300" filter="url(#glow)">
+                    <path 
+                      d="M 6 16 L 14 16 Q 14 16 14 16 L 14 16" 
+                      stroke="url(#crossGradient)" 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round"
+                      className="opacity-90 group-hover:opacity-100 transition-opacity"
+                    />
+                    <path 
+                      d="M 18 16 L 26 16" 
+                      stroke="url(#crossGradient)" 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round"
+                      className="opacity-90 group-hover:opacity-100 transition-opacity"
+                    />
+                    <path 
+                      d="M 16 6 L 16 14" 
+                      stroke="url(#crossGradient)" 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round"
+                      className="opacity-90 group-hover:opacity-100 transition-opacity"
+                    />
+                    <path 
+                      d="M 16 18 L 16 26" 
+                      stroke="url(#crossGradient)" 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round"
+                      className="opacity-90 group-hover:opacity-100 transition-opacity"
+                    />
+                  </g>
                 </svg>
               </motion.div>
             </Link>
