@@ -13,7 +13,10 @@ import {
   Building2,
   MessageSquare,
   Ticket,
-  Folder
+  Folder,
+  Mail,
+  Briefcase,
+  FileSpreadsheet
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -32,6 +35,9 @@ const defaultApps = [
   { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
   { id: "documents", name: "Documents", icon: Folder, color: "from-sky-500 to-blue-500", path: "Documents" },
   { id: "support", name: "Support Requests", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
+  { id: "inboxhelper", name: "Inbox Helper", icon: Mail, color: "from-red-500 to-pink-500", path: "InboxHelper" },
+  { id: "planningtool", name: "Planning Tool", icon: Briefcase, color: "from-indigo-500 to-purple-500", path: "PlanningTool" },
+  { id: "sharepoint", name: "SharePoint", icon: FileSpreadsheet, color: "from-green-600 to-emerald-600", path: "SharePoint" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" }
 ];
 
@@ -52,12 +58,15 @@ const getDefaultPositions = () => {
     mymeetings: { row: 0, col: 1 },
     myapprovals: { row: 0, col: 2 },
     calendar: { row: 0, col: 3 },
+    mydepartment: { row: 0, col: 4 },
     communications: { row: 1, col: 0 },
     foodservice: { row: 1, col: 1 },
-    staffdir: { row: 1, col: 2 },
-    mydepartment: { row: 1, col: 3 },
+    support: { row: 1, col: 2 },
+    staffdir: { row: 1, col: 3 },
     documents: { row: 2, col: 0 },
-    support: { row: 2, col: 1 },
+    inboxhelper: { row: 2, col: 1 },
+    planningtool: { row: 2, col: 2 },
+    sharepoint: { row: 2, col: 3 },
     settings: { row: 5, col: 0 }
   };
 };
@@ -255,9 +264,25 @@ export default function Dashboard() {
     return defaultApps.find(app => app.id === appId);
   };
 
+  const handleAppClick = (app) => {
+    if (editMode) return;
+    
+    // Placeholders that don't have pages yet
+    if (app.id === 'planningtool') {
+      toast.info('Planning Tool - Coming Soon!');
+      return;
+    }
+    if (app.id === 'sharepoint') {
+      toast.info('SharePoint - Coming Soon!');
+      return;
+    }
+    
+    // Navigate to actual pages
+    navigate(createPageUrl(app.path));
+  };
+
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
-  // Show loading briefly to avoid glitches
   if (isLoading) {
     return (
       <div 
@@ -354,7 +379,7 @@ export default function Dashboard() {
                           </span>
                         </motion.div>
                       ) : (
-                        <Link to={createPageUrl(app.path)} className="block h-full">
+                        <div onClick={() => handleAppClick(app)} className="block h-full cursor-pointer">
                           <motion.div
                             whileHover={{ scale: 1.05 }}
                             className="flex flex-col items-center justify-center gap-3 h-full p-4 rounded-lg bg-white/10 backdrop-blur-sm transition-all"
@@ -376,7 +401,7 @@ export default function Dashboard() {
                               {app.name}
                             </span>
                           </motion.div>
-                        </Link>
+                        </div>
                       )}
                     </div>
                   )}
