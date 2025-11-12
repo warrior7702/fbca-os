@@ -35,6 +35,7 @@ import WorkflowDetail from './pages/WorkflowDetail';
 import ProjectReview from './pages/ProjectReview';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import CronStatus from './pages/CronStatus';
+import EmailTemplateEditor from './pages/EmailTemplateEditor';
 import Layout from './Layout.jsx';
 
 
@@ -76,6 +77,7 @@ export const PAGES = {
     "ProjectReview": ProjectReview,
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
     "CronStatus": CronStatus,
+    "EmailTemplateEditor": EmailTemplateEditor,
 }
 
 export const pagesConfig = {
