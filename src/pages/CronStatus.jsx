@@ -13,7 +13,8 @@ import {
   Activity,
   Zap,
   TrendingUp,
-  Calendar
+  Calendar,
+  PlayCircle
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import { motion } from "framer-motion";
 
 export default function CronStatus() {
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({
     total_executions: 0,
@@ -76,6 +78,34 @@ export default function CronStatus() {
     }
   };
 
+  const handleManualTrigger = async () => {
+    setTriggering(true);
+    try {
+      toast.info('🔄 Triggering sync manually...');
+      
+      const result = await base44.functions.invoke('scheduledMysteryResourceSync');
+      
+      console.log('Manual trigger result:', result);
+      
+      if (result.data.success) {
+        toast.success(`✅ Sync completed! Created ${result.data.sync_result?.new_requests_created || 0} requests, sent ${result.data.sync_result?.emails_sent || 0} emails`);
+      } else {
+        toast.error('Sync failed: ' + (result.data.error || 'Unknown error'));
+      }
+      
+      // Reload logs after a short delay
+      setTimeout(() => {
+        loadLogs();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Manual trigger error:', error);
+      toast.error('Failed to trigger sync: ' + error.message);
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'success': return <CheckCircle2 className="w-4 h-4 text-green-600" />;
@@ -116,10 +146,29 @@ export default function CronStatus() {
               <p className="text-slate-600">Mystery Resource Auto-Sync Logs</p>
             </div>
           </div>
-          <Button onClick={loadLogs} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleManualTrigger} 
+              disabled={triggering}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {triggering ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="w-4 h-4 mr-2" />
+                  Trigger Now
+                </>
+              )}
+            </Button>
+            <Button onClick={loadLogs} variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -236,13 +285,14 @@ export default function CronStatus() {
                     </ul>
                   </div>
                   <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-200">
-                    <p className="text-xs font-semibold text-yellow-900 mb-1">Next Steps:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs text-yellow-800">
-                      <li>Check if CRON_SECRET is set in environment variables</li>
-                      <li>Verify Vercel cron is configured to call scheduledMysteryResourceSync</li>
-                      <li>Check Vercel deployment logs for cron execution attempts</li>
-                      <li>Wait 5-10 minutes for next scheduled run</li>
-                    </ol>
+                    <p className="text-xs font-semibold text-yellow-900 mb-2">🧪 TEST IT NOW:</p>
+                    <p className="text-xs text-yellow-800 mb-3">
+                      Click the <strong>"Trigger Now"</strong> button above to manually run the sync and see if it works!
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      If manual trigger works but automatic doesn't → cron schedule issue<br/>
+                      If manual trigger fails → function/code issue
+                    </p>
                   </div>
                 </div>
               </div>
