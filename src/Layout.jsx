@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -22,8 +21,7 @@ import {
   MessageSquare,
   UtensilsCrossed,
   Users,
-  Ticket,
-  FileSpreadsheet // Added new import
+  Ticket
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,7 +42,13 @@ const apps = [
     name: "Tasks",
     path: "MyTasks",
     icon: ListChecks,
-    color: "text-blue-500"
+    color: "text-indigo-500"
+  },
+  {
+    name: "Meetings",
+    path: "MyMeetings",
+    icon: CalendarIcon,
+    color: "text-purple-500"
   },
   {
     name: "Approvals",
@@ -53,28 +57,46 @@ const apps = [
     color: "text-orange-500"
   },
   {
-    name: "My Department",
-    path: "MyDepartment",
-    icon: Building2,
-    color: "text-violet-500"
-  },
-  {
     name: "Church Calendar",
     path: "Calendar",
     icon: CalendarIcon,
     color: "text-blue-600"
   },
   {
+    name: "My Department",
+    path: "MyDepartment",
+    icon: Building2,
+    color: "text-violet-500"
+  },
+  {
+    name: "Communications",
+    path: "WorkflowHub",
+    icon: MessageSquare,
+    color: "text-purple-500"
+  },
+  {
+    name: "Hospitality",
+    path: "FoodService",
+    icon: UtensilsCrossed,
+    color: "text-green-500"
+  },
+  {
+    name: "Directory",
+    path: "StaffDirectory",
+    icon: Users,
+    color: "text-teal-500"
+  },
+  {
     name: "Documents",
     path: "Documents",
     icon: Folder,
-    color: "text-sky-500"
+    color: "text-blue-500"
   },
   {
-    name: "SharePoint",
-    path: "SharePoint",
-    icon: FileSpreadsheet,
-    color: "text-green-600"
+    name: "Support",
+    path: "Ticketing",
+    icon: Ticket,
+    color: "text-amber-500"
   }
 ];
 
