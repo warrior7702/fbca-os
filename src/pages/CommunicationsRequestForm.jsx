@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -401,7 +400,7 @@ export default function CommunicationsRequestForm() {
     }));
     setEventSearchQuery("");
     setPcoEvents([]);
-    setValidationErrors(prev => ({ ...prev, event_name: undefined, event_date: undefined })); // Clear validation for these fields
+    setValidationErrors(prev => ({ ...prev, event_name: undefined, event_date: undefined }));
   };
 
   const handleFileUpload = (e) => {
@@ -502,7 +501,7 @@ export default function CommunicationsRequestForm() {
         pco_event_id: formData.pco_event_id || null,
         pco_event_name: formData.pco_event_name || null,
         pco_event_date: formData.pco_event_date || formData.event_date || null,
-        email_sent: false, // Initialize as false
+        email_sent: false,
         email_sent_at: null,
         email_error: null,
         goal_review_data: {
@@ -551,10 +550,8 @@ export default function CommunicationsRequestForm() {
     <tr>
       <td align="center" style="padding: 40px 20px;">
         
-        <!-- Main Container -->
         <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">
           
-          <!-- Header with Gradient -->
           <tr>
             <td style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); padding: 40px 30px; text-align: center;">
               <div style="background-color: rgba(255, 255, 255, 0.15); width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
@@ -565,7 +562,6 @@ export default function CommunicationsRequestForm() {
             </td>
           </tr>
           
-          <!-- Welcome Message -->
           <tr>
             <td style="padding: 40px 30px 30px;">
               <p style="margin: 0 0 20px; color: #1e293b; font-size: 16px; line-height: 1.6;">
@@ -575,7 +571,6 @@ export default function CommunicationsRequestForm() {
                 Lets take some time to learn more about your Communications needs
               </p>
               
-              <!-- Request Details Card -->
               <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 30px;">
                 <tr>
                   <td>
@@ -603,7 +598,6 @@ export default function CommunicationsRequestForm() {
                 </tr>
               </table>
               
-              <!-- Next Step Section -->
               <div style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; text-align: center;">
                 <h2 style="margin: 0 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">✨ Next Step: Complete Your Minister Goal Review</h2>
                 <p style="margin: 0 0 24px; color: rgba(255, 255, 255, 0.95); font-size: 14px; line-height: 1.6;">
@@ -614,7 +608,6 @@ export default function CommunicationsRequestForm() {
                 </a>
               </div>
               
-              <!-- What to Expect -->
               <div style="margin-bottom: 30px;">
                 <h3 style="margin: 0 0 16px; color: #1e293b; font-size: 17px; font-weight: 700;">What to expect:</h3>
                 <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -645,7 +638,6 @@ export default function CommunicationsRequestForm() {
                 </table>
               </div>
               
-              <!-- After Completion -->
               <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
                 <h3 style="margin: 0 0 12px; color: #166534; font-size: 16px; font-weight: 700;">After you complete the intake:</h3>
                 <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -679,7 +671,6 @@ export default function CommunicationsRequestForm() {
             </td>
           </tr>
           
-          <!-- Footer -->
           <tr>
             <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 14px;">
@@ -699,7 +690,6 @@ export default function CommunicationsRequestForm() {
           
         </table>
         
-        <!-- Unsubscribe Footer -->
         <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; margin-top: 20px;">
           <tr>
             <td style="text-align: center; padding: 0 20px;">
@@ -717,19 +707,16 @@ export default function CommunicationsRequestForm() {
 </html>`
         });
 
-        // Email sent successfully!
         emailSent = true;
         emailSentAt = new Date().toISOString();
         console.log('✅ Intake email sent successfully to:', formData.requester_email);
 
       } catch (emailErr) {
-        // Email failed - capture error
         emailError = emailErr.message || 'Failed to send email';
         console.error('❌ Failed to send intake email:', emailError);
         console.error('Email error details:', emailErr);
       }
 
-      // Update request with email status
       await base44.entities.WorkflowRequest.update(request.id, {
         email_sent: emailSent,
         email_sent_at: emailSentAt,
@@ -738,7 +725,6 @@ export default function CommunicationsRequestForm() {
 
       console.log('📊 Email tracking updated:', { emailSent, emailSentAt, emailError });
 
-      // Show appropriate message to user
       if (emailSent) {
         toast.success("Request submitted! Check your email for next steps.");
       } else {
@@ -805,7 +791,6 @@ export default function CommunicationsRequestForm() {
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
       <div className="max-w-3xl mx-auto p-6 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg mb-4">
             <MessageSquare className="w-7 h-7 text-white" />
@@ -818,7 +803,6 @@ export default function CommunicationsRequestForm() {
           </p>
         </div>
 
-        {/* Form */}
         <Card className="border-2 border-purple-200 shadow-xl">
           <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200 py-4">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -829,7 +813,6 @@ export default function CommunicationsRequestForm() {
 
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Name & Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="requester_name" className="text-sm font-medium">
@@ -859,7 +842,6 @@ export default function CommunicationsRequestForm() {
                 </div>
               </div>
 
-              {/* Event Related Question */}
               <div 
                 className={`space-y-2 p-4 rounded-lg border-2 ${
                   validationErrors.is_event_related 
@@ -910,7 +892,6 @@ export default function CommunicationsRequestForm() {
                 </RadioGroup>
               </div>
 
-              {/* BRANCH: Existing Event */}
               <AnimatePresence>
                 {formData.is_event_related === "yes" && (
                   <motion.div
@@ -919,7 +900,6 @@ export default function CommunicationsRequestForm() {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 pl-4 border-l-4 border-blue-300"
                   >
-                    {/* PCO Event Search - Simplified */}
                     <div className="space-y-3">
                       <Label className="text-sm font-medium">
                         Search PCO Calendar Event
@@ -1007,7 +987,6 @@ export default function CommunicationsRequestForm() {
                       )}
                     </div>
 
-                    {/* Manual Event Name */}
                     <div 
                       className="space-y-1.5"
                       data-validation-error={!!validationErrors.event_name}
@@ -1039,7 +1018,6 @@ export default function CommunicationsRequestForm() {
                 )}
               </AnimatePresence>
 
-              {/* BRANCH: New Initiative */}
               <AnimatePresence>
                 {formData.is_event_related === "no" && (
                   <motion.div
@@ -1089,14 +1067,12 @@ export default function CommunicationsRequestForm() {
                 )}
               </AnimatePresence>
 
-              {/* SECOND BRANCH: What do you need? */}
               {formData.is_event_related && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="space-y-4 pt-4 border-t"
                 >
-                  {/* Ministry */}
                   <div 
                     className="space-y-1.5"
                     data-validation-error={!!validationErrors.ministry_department}
@@ -1128,7 +1104,6 @@ export default function CommunicationsRequestForm() {
                     )}
                   </div>
 
-                  {/* What do you need? */}
                   <div 
                     className={`space-y-2 p-4 rounded-lg border-2 ${
                       validationErrors.need_type 
@@ -1179,7 +1154,6 @@ export default function CommunicationsRequestForm() {
                     </RadioGroup>
                   </div>
 
-                  {/* Beautiful Date & Time Picker */}
                   <div 
                     className="space-y-2"
                     data-validation-error={!!validationErrors.event_date}
@@ -1290,7 +1264,6 @@ export default function CommunicationsRequestForm() {
                     )}
                   </div>
 
-                  {/* GRAPHICS FIELDS */}
                   <AnimatePresence>
                     {(formData.need_type === "graphics" || formData.need_type === "both") && (
                       <motion.div
@@ -1333,7 +1306,6 @@ export default function CommunicationsRequestForm() {
                           </div>
                         </div>
 
-                        {/* Previous Event Photos - Upload or Link */}
                         <div className="space-y-3">
                           <Label className="text-sm font-medium">
                             Previous Event Photos (Optional)
@@ -1383,7 +1355,6 @@ export default function CommunicationsRequestForm() {
                           )}
                         </div>
 
-                        {/* Link to Graphics Folder */}
                         <div className="space-y-2">
                           <Label htmlFor="graphics_folder_link" className="text-sm font-medium">
                             Link to Graphics Folder (Optional)
@@ -1403,7 +1374,6 @@ export default function CommunicationsRequestForm() {
                     )}
                   </AnimatePresence>
 
-                  {/* MARKETING FIELDS */}
                   <AnimatePresence>
                     {(formData.need_type === "marketing" || formData.need_type === "both") && (
                       <motion.div
@@ -1442,7 +1412,6 @@ export default function CommunicationsRequestForm() {
                           </div>
                         </div>
 
-                        {/* Link to Marketing Assets */}
                         <div className="space-y-2">
                           <Label htmlFor="marketing_assets_link" className="text-sm font-medium">
                             Link to Marketing Assets (Optional)
@@ -1459,7 +1428,6 @@ export default function CommunicationsRequestForm() {
                     )}
                   </AnimatePresence>
 
-                  {/* Submit Button */}
                   {formData.need_type && (
                     <motion.div
                       initial={{ opacity: 0 }}
@@ -1490,7 +1458,6 @@ export default function CommunicationsRequestForm() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-xs text-slate-600">
             Questions? Contact{" "}
@@ -1503,4 +1470,3 @@ export default function CommunicationsRequestForm() {
     </div>
   );
 }
-```
