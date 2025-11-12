@@ -45,9 +45,14 @@ export default function DiagnoseMysteryResource() {
     try {
       console.log('🔍 Starting diagnostic...');
 
-      const token = user.pco_access_token;
+      // Get fresh token via function
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      const token = tokenResponse.data.access_token;
+
+      console.log('✅ Got PCO token');
 
       // Step 1: Fetch all upcoming events
+      console.log('📅 Fetching events...');
       const eventsResponse = await fetch(
         'https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at',
         {
@@ -59,7 +64,9 @@ export default function DiagnoseMysteryResource() {
       );
 
       if (!eventsResponse.ok) {
-        throw new Error(`PCO API error: ${eventsResponse.status}`);
+        const errorText = await eventsResponse.text();
+        console.error('PCO API error:', eventsResponse.status, errorText);
+        throw new Error(`PCO API error: ${eventsResponse.status} - ${errorText}`);
       }
 
       const eventsData = await eventsResponse.json();
@@ -202,6 +209,7 @@ export default function DiagnoseMysteryResource() {
       }
 
       // Step 3: Check existing workflow requests
+      console.log('📋 Checking existing workflow requests...');
       const existingRequests = await base44.entities.WorkflowRequest.filter({
         type: 'mystery_resource'
       }, '-created_date', 20);
@@ -215,9 +223,9 @@ export default function DiagnoseMysteryResource() {
       toast.success('Diagnostic complete!');
 
     } catch (error) {
-      console.error('Diagnostic error:', error);
-      setError(error.message);
-      toast.error('Diagnostic failed');
+      console.error('❌ Diagnostic error:', error);
+      setError(error.message || 'Unknown error occurred');
+      toast.error('Diagnostic failed: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -312,9 +320,10 @@ export default function DiagnoseMysteryResource() {
             <CardContent className="p-4">
               <div className="flex items-start gap-2">
                 <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold text-red-900">Error</p>
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
+                  <p className="text-xs text-red-600 mt-2">Check browser console (F12) for more details</p>
                 </div>
               </div>
             </CardContent>
