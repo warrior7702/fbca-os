@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
-import { Calendar, CheckSquare, Briefcase } from "lucide-react";
+import { Calendar, Briefcase } from "lucide-react"; // CheckSquare was moved from here, but still needed.
+import { CheckSquare } from "lucide-react"; // Explicitly import CheckSquare for ClickUp
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -29,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import EmailPollingService from "../components/settings/EmailPollingService";
+import { Badge } from "@/components/ui/badge";
 
 const wallpapers = [
   {
@@ -67,6 +69,7 @@ export default function Settings() {
   const [selectedWallpaper, setSelectedWallpaper] = useState("cross_white_glow");
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [isSSOUser, setIsSSOUser] = useState(false);
 
   // Admin section states
   const [cardholders, setCardholders] = useState([]);
@@ -132,6 +135,16 @@ export default function Settings() {
       setDepartment(currentUser.department || "");
       setRoleTitle(currentUser.role_title || "");
       setSelectedWallpaper(currentUser.wallpaper || "cross_white_glow");
+      
+      // Check if user logged in via SSO (they'll have microsoft_sso_id or similar)
+      const loggedInViaSSO = currentUser.email?.includes('@fbcarlington.org') && 
+                             !!currentUser.microsoft_access_token;
+      setIsSSOUser(loggedInViaSSO);
+      
+      console.log('🔐 SSO User:', loggedInViaSSO);
+      console.log('📧 Email:', currentUser.email);
+      console.log('🔑 Has Microsoft Token:', !!currentUser.microsoft_access_token);
+      
     } catch (error) {
       console.error("Error loading user:", error);
       toast.error("Failed to load settings");
@@ -352,6 +365,11 @@ export default function Settings() {
   };
 
   const handleDisconnectMicrosoft = async () => {
+    if (isSSOUser) {
+      toast.error("Cannot disconnect Microsoft 365 - you're logged in via Microsoft SSO. Disconnecting would log you out!");
+      return;
+    }
+    
     try {
       await base44.auth.updateMe({
         microsoft_access_token: null,
@@ -466,7 +484,27 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-4">
-            {user?.microsoft_access_token && (
+            {/* SSO Info Banner */}
+            {isSSOUser && (
+              <Card className="border-2 border-green-200 bg-green-50">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-green-900 mb-1">✅ Microsoft SSO Active</h3>
+                      <p className="text-sm text-green-800 mb-2">
+                        You're signed in via Microsoft Single Sign-On! Your Microsoft 365 integration is automatically connected through your SSO login.
+                      </p>
+                      <p className="text-xs text-green-700">
+                        📧 Email, Calendar, OneDrive, and To Do are ready to use - no additional setup needed!
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {user?.microsoft_access_token && !isSSOUser && (
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
@@ -521,15 +559,73 @@ export default function Settings() {
                 color="purple"
               />
 
-              <ConnectionStatusCard
-                title="Microsoft 365"
-                icon={Briefcase}
-                isConnected={!!user?.microsoft_access_token}
-                onConnect={handleConnectMicrosoft}
-                onDisconnect={handleDisconnectMicrosoft}
-                description="Access email, calendar, and Office apps"
-                color="orange"
-              />
+              {/* Microsoft 365 Card with SSO awareness */}
+              <Card className={`border-2 ${user?.microsoft_access_token ? 'border-green-300' : 'border-slate-200'}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-xl bg-orange-50 border-orange-200 text-orange-700">
+                        <Briefcase className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Microsoft 365</CardTitle>
+                        <p className="text-sm text-slate-500 mt-1">Access email, calendar, and Office apps</p>
+                        {isSSOUser && (
+                          <p className="text-xs text-green-600 mt-1 font-medium">
+                            🔐 Connected via SSO
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {user?.microsoft_access_token ? (
+                      <Badge className="bg-green-100 text-green-700 border-green-300">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-slate-500">
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Not Connected
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {user?.microsoft_access_token ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-green-600">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{isSSOUser ? 'Connected via SSO login' : 'Active connection'}</span>
+                      </div>
+                      {isSSOUser ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          disabled
+                          className="opacity-50 cursor-not-allowed"
+                        >
+                          Auto-Connected
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleDisconnectMicrosoft}
+                        >
+                          Disconnect
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={handleConnectMicrosoft}
+                      className="w-full"
+                    >
+                      Connect Microsoft 365
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             {user?.pco_access_token && (
