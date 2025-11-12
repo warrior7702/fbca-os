@@ -1,4 +1,3 @@
-
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
@@ -214,9 +213,13 @@ Deno.serve(async (req) => {
       console.log(`   Event: ${mysteryReq.event_name}`);
       console.log(`   Owner: ${mysteryReq.owner_name} (${mysteryReq.owner_email})`);
 
+      let commRequest = null;
+      let emailSent = false;
+      let emailError = null;
+
       try {
         // Create communication request 
-        const commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
+        commRequest = await base44.asServiceRole.entities.WorkflowRequest.create({
           request_number: requestNumber,
           type: 'mystery_resource',
           status: 'minister_goal_review', // Move directly to goal review
@@ -229,6 +232,9 @@ Deno.serve(async (req) => {
           pco_event_name: mysteryReq.event_name,
           pco_event_date: mysteryReq.event_start,
           pco_resource_request_id: mysteryReq.request_id,
+          email_sent: false, // Initialize as false
+          email_sent_at: null,
+          email_error: null,
           conversation_history: [{
             timestamp: new Date().toISOString(),
             author: 'System',
@@ -241,10 +247,9 @@ Deno.serve(async (req) => {
         console.log(`✅ Created request: ${commRequest.id}`);
 
         // Send email notification to event owner if we have their email
-        // NEW EMAIL TEMPLATE
         if (mysteryReq.owner_email) {
           try {
-            console.log('📧 Sending email to:', mysteryReq.owner_email);
+            console.log('📧 Attempting to send email to:', mysteryReq.owner_email);
             const intakeLink = `${baseUrl}/workflowdetail?id=${commRequest.id}`;
             
             const emailResult = await base44.asServiceRole.integrations.Core.SendEmail({
@@ -293,31 +298,62 @@ Looking forward to making your event a success!
 FBC Arlington`
             });
 
+            emailSent = true;
             console.log('✅ Email sent successfully to:', mysteryReq.owner_email);
+            
             emailResults.push({
               request_id: commRequest.id,
               email_sent: true,
-              recipient: mysteryReq.owner_email
+              recipient: mysteryReq.owner_email,
+              timestamp: new Date().toISOString()
             });
+
+            // Update the workflow request with email success
+            await base44.asServiceRole.entities.WorkflowRequest.update(commRequest.id, {
+              email_sent: true,
+              email_sent_at: new Date().toISOString(),
+              email_error: null
+            });
+
           } catch (emailError) {
-            console.error('❌ Failed to send email:', emailError.message);
+            const errorMessage = emailError.message || 'Unknown email error';
+            console.error('❌ Failed to send email:', errorMessage);
+            console.error('Email error details:', emailError);
+            
             emailResults.push({
               request_id: commRequest.id,
               email_sent: false,
-              error: emailError.message
+              error: errorMessage,
+              recipient: mysteryReq.owner_email
             });
-            // Continue - email failure shouldn't block request creation
+
+            // Update the workflow request with email failure details
+            await base44.asServiceRole.entities.WorkflowRequest.update(commRequest.id, {
+              email_sent: false,
+              email_sent_at: null,
+              email_error: `Failed to send email: ${errorMessage}`
+            });
           }
         } else {
-          console.warn('⚠️ No owner email found, skipping email notification');
+          const errorMessage = 'No owner email found in PCO';
+          console.warn('⚠️', errorMessage);
+          
           emailResults.push({
             request_id: commRequest.id,
             email_sent: false,
-            error: 'No owner email found'
+            error: errorMessage
+          });
+
+          // Update the workflow request with no email reason
+          await base44.asServiceRole.entities.WorkflowRequest.update(commRequest.id, {
+            email_sent: false,
+            email_sent_at: null,
+            email_error: errorMessage
           });
         }
       } catch (createError) {
         console.error('❌ Failed to create request:', createError.message);
+        console.error('Creation error details:', createError);
         // Continue to next request
       }
     }
