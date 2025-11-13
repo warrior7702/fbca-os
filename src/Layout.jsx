@@ -24,7 +24,8 @@ import {
   Ticket,
   FileSpreadsheet,
   Menu,
-  X
+  X,
+  Printer
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,6 +84,37 @@ const apps = [
     path: "SharePoint",
     icon: FileSpreadsheet,
     color: "text-green-600"
+  }
+];
+
+const systemApps = [
+  {
+    name: "Media Player",
+    path: "MediaPlayer",
+    icon: Play,
+    color: "text-green-500",
+    action: null
+  },
+  {
+    name: "Network Helper",
+    path: null,
+    icon: Wifi,
+    color: "text-blue-500",
+    action: () => toast.info('FBCA Network Helper - Coming Soon!')
+  },
+  {
+    name: "Gud Deo",
+    path: null,
+    icon: Battery,
+    color: "text-yellow-500",
+    action: () => toast.info('Gud Deo - Coming Soon!')
+  },
+  {
+    name: "Printshot",
+    path: null,
+    icon: Printer,
+    color: "text-purple-500",
+    action: () => toast.info('Purpose Printshot - Coming Soon!')
   }
 ];
 
@@ -244,6 +276,15 @@ export default function Layout({ children, currentPageName }) {
     sessionStorage.setItem('lightBubbleDismissed', 'true');
   };
 
+  const handleSystemAppClick = (app) => {
+    setMobileMenuOpen(false);
+    if (app.path) {
+      navigate(createPageUrl(app.path));
+    } else if (app.action) {
+      app.action();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Main Content */}
@@ -347,10 +388,12 @@ export default function Layout({ children, currentPageName }) {
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72">
+              <SheetContent side="left" className="w-72 overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>Apps</SheetTitle>
                 </SheetHeader>
+                
+                {/* Main Apps */}
                 <div className="mt-6 space-y-2">
                   {apps.map((app) => (
                     <Link 
@@ -365,6 +408,28 @@ export default function Layout({ children, currentPageName }) {
                         <span className="font-medium text-slate-900">{app.name}</span>
                       </div>
                     </Link>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="my-4 border-t border-slate-200" />
+
+                {/* System Apps */}
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 mb-2">
+                    System Tools
+                  </p>
+                  {systemApps.map((app) => (
+                    <div
+                      key={app.name}
+                      onClick={() => handleSystemAppClick(app)}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
+                        <app.icon className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="font-medium text-slate-900">{app.name}</span>
+                    </div>
                   ))}
                 </div>
               </SheetContent>
@@ -524,9 +589,7 @@ export default function Layout({ children, currentPageName }) {
                 onClick={() => toast.info('Purpose Printshot - Coming Soon!')}
                 title="Purpose Printshot"
               >
-                <svg className="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
+                <Printer className="w-4 h-4 text-white/80" />
               </motion.div>
             </div>
 
