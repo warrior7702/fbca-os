@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +43,7 @@ export default function WorkflowHub() {
   const [myRequests, setMyRequests] = useState([]);
   const [assignedToMe, setAssignedToMe] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
-  const [viewMode, setViewMode] = useState("kanban"); // "kanban" or "calendar"
+  const [viewMode, setViewMode] = useState("kanban");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
@@ -125,7 +126,7 @@ export default function WorkflowHub() {
   };
 
   const handleDelete = async (e, requestId) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
     
     if (!confirm('Are you sure you want to delete this request? This cannot be undone.')) {
       return;
@@ -142,10 +143,11 @@ export default function WorkflowHub() {
   };
 
   const KanbanCard = ({ request }) => {
-    // Admin/super_user clicking on project_review goes to ProjectReview page
     const handleClick = () => {
       if (isAdmin && request.status === 'project_review') {
         navigate(createPageUrl('ProjectReview') + `?id=${request.id}`);
+      } else if (request.status === 'campaign_running') {
+        navigate(createPageUrl('CampaignRunning') + `?id=${request.id}`);
       } else {
         navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
       }
@@ -205,10 +207,11 @@ export default function WorkflowHub() {
   };
 
   const RequestCard = ({ request }) => {
-    // Admin/super_user clicking on project_review goes to ProjectReview page
     const handleClick = () => {
       if (isAdmin && request.status === 'project_review') {
         navigate(createPageUrl('ProjectReview') + `?id=${request.id}`);
+      } else if (request.status === 'campaign_running') {
+        navigate(createPageUrl('CampaignRunning') + `?id=${request.id}`);
       } else {
         navigate(createPageUrl('WorkflowDetail') + `?id=${request.id}`);
       }
@@ -314,7 +317,6 @@ export default function WorkflowHub() {
   const displayRequests = isAdmin ? allRequests : [...myRequests, ...assignedToMe];
   const uniqueRequests = Array.from(new Map(displayRequests.map(r => [r.id, r])).values());
   
-  // Filter out completed requests unless showing archived
   const filteredRequests = showArchived 
     ? uniqueRequests.filter(r => r.status === 'completed')
     : uniqueRequests.filter(r => r.status !== 'completed');
@@ -476,7 +478,6 @@ export default function WorkflowHub() {
           </div>
         )}
 
-        {/* View Toggle - Board/Calendar */}
         {isAdmin && !showArchived && (
           <div className="flex items-center gap-2 mb-6">
             <Button
