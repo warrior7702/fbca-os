@@ -19,41 +19,53 @@ Deno.serve(async (req) => {
             }, { status: 403 });
         }
 
-        console.log('🔑 Getting Microsoft access token...');
-        console.log('   User email domain:', user.email?.split('@')[1]);
+        console.log('🔑 ========== TOKEN ACQUISITION ==========');
+        console.log('   User email:', user.email);
+        console.log('   Email domain:', user.email?.split('@')[1]);
         console.log('   Has manual token:', !!user.microsoft_access_token);
 
-        // IMPORTANT: Try SSO token FIRST (for users logged in via Microsoft SSO)
+        // Try SSO token FIRST
         let accessToken = null;
         let tokenSource = null;
         
+        console.log('🔐 Step 1: Attempting SSO token...');
         try {
-            console.log('🔐 Attempting SSO token...');
             accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
             if (accessToken) {
                 tokenSource = 'SSO';
-                console.log('✅ Using SSO token (length:', accessToken.length, ')');
+                console.log('✅ SSO token retrieved!');
+                console.log('   Token length:', accessToken.length);
+                console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
+                console.log('   Token has dots (JWT):', accessToken.includes('.'));
+                console.log('   Token parts count:', accessToken.split('.').length);
             } else {
-                console.log('ℹ️ SSO token returned null');
+                console.log('⚠️ SSO token returned null/undefined');
             }
         } catch (ssoError) {
-            console.log('⚠️ SSO error:', ssoError.message);
+            console.log('❌ SSO error:', ssoError.message);
+            console.log('   Error type:', ssoError.constructor.name);
+            console.log('   Error stack:', ssoError.stack);
         }
         
-        // Only use manual token if SSO failed AND user has one
+        // Fall back to manual token
         if (!accessToken && user.microsoft_access_token) {
-            accessToken = user.microsoft_access_token;
             tokenSource = 'Manual';
-            console.log('⚠️ Falling back to manual token (length:', accessToken.length, ')');
+            accessToken = user.microsoft_access_token;
+            console.log('⚠️ Using manual token as fallback');
+            console.log('   Token length:', accessToken.length);
+            console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
+            console.log('   Token has dots (JWT):', accessToken.includes('.'));
+            console.log('   Token parts count:', accessToken.split('.').length);
             
-            // Validate token format
-            if (!accessToken.includes('.')) {
-                console.error('❌ Token appears malformed (no JWT structure)');
+            // Validate manual token format
+            if (!accessToken.includes('.') || accessToken.split('.').length !== 3) {
+                console.error('❌ Manual token is malformed (not a valid JWT)');
                 return Response.json({
                     success: false,
                     error: 'Microsoft token is corrupted',
-                    details: 'Your manually connected Microsoft token is invalid. Please disconnect and reconnect Microsoft 365 in Settings, or use Microsoft SSO login.',
+                    details: 'Your manually connected Microsoft token is invalid. Please remove it and use SSO instead.',
                     needsReconnection: true,
+                    tokenSource: 'Manual (Corrupted)',
                     users: []
                 }, { status: 400 });
             }
@@ -61,11 +73,6 @@ Deno.serve(async (req) => {
         
         if (!accessToken) {
             console.error('❌ No Microsoft access token available');
-            console.log('🔍 Debug info:');
-            console.log('  - User email domain:', user.email?.split('@')[1]);
-            console.log('  - Has microsoft_access_token:', !!user.microsoft_access_token);
-            console.log('  - SSO available:', false);
-            
             return Response.json({
                 success: false,
                 error: 'Microsoft 365 not connected',
@@ -75,11 +82,15 @@ Deno.serve(async (req) => {
             }, { status: 400 });
         }
 
-        console.log(`🔑 Using token from: ${tokenSource}`);
+        console.log(`✅ Using token from: ${tokenSource}`);
+        console.log('🔑 ========== END TOKEN ACQUISITION ==========\n');
 
         // Call Microsoft Graph API
         console.log('📡 Calling Microsoft Graph API...');
         const graphUrl = 'https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,jobTitle,officeLocation,companyName,employeeId&$top=999';
+        
+        console.log('🔗 URL:', graphUrl);
+        console.log('🔑 Auth header format: Bearer [token]');
         
         const response = await fetch(graphUrl, {
             headers: {
@@ -92,25 +103,40 @@ Deno.serve(async (req) => {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('❌ Graph API error:', response.status, errorText);
+            console.error('❌ ========== GRAPH API ERROR ==========');
+            console.error('Status:', response.status);
+            console.error('Response:', errorText);
+            console.error('Token source:', tokenSource);
+            console.error('Token length:', accessToken.length);
+            console.error('Token format valid:', accessToken.includes('.') && accessToken.split('.').length === 3);
             
             if (response.status === 401) {
+                // Parse error details
+                let errorObj = {};
+                try {
+                    errorObj = JSON.parse(errorText);
+                } catch (e) {
+                    // Ignore parse errors
+                }
+                
                 if (tokenSource === 'Manual') {
                     return Response.json({
                         success: false,
-                        error: 'Microsoft token expired or invalid',
-                        details: 'Your manually connected Microsoft token is no longer valid. Please disconnect and reconnect Microsoft 365 in Settings, or use Microsoft SSO login.',
+                        error: 'Manual Microsoft token is invalid',
+                        details: 'Your manually connected Microsoft token cannot be used. Remove it and use SSO instead.',
                         needsReconnection: true,
                         tokenSource: tokenSource,
+                        graphError: errorObj.error?.message || errorText,
                         users: []
                     }, { status: 401 });
                 } else {
                     return Response.json({
                         success: false,
-                        error: 'SSO token expired',
-                        details: 'Your SSO session expired. Please log out and log back in.',
+                        error: 'SSO token was rejected by Microsoft',
+                        details: 'Your SSO session may have expired. Please log out and log back in.',
                         needsRelogin: true,
                         tokenSource: tokenSource,
+                        graphError: errorObj.error?.message || errorText,
                         users: []
                     }, { status: 401 });
                 }
@@ -120,7 +146,7 @@ Deno.serve(async (req) => {
                 return Response.json({
                     success: false,
                     error: 'Insufficient permissions',
-                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions to scan all users.',
+                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions.',
                     needsPermissions: true,
                     users: []
                 }, { status: 403 });
@@ -164,7 +190,7 @@ Deno.serve(async (req) => {
             }
         });
 
-        console.log('📊 Stats:', stats);
+        console.log('📊 Department stats:', JSON.stringify(stats, null, 2));
 
         // Get Base44 users for comparison
         console.log('📊 Loading Base44 users...');
@@ -201,7 +227,7 @@ Deno.serve(async (req) => {
             needsSync: comparisonData.filter(u => u.needsSync).length
         };
 
-        console.log('🔄 Sync stats:', syncStats);
+        console.log('🔄 Sync stats:', JSON.stringify(syncStats, null, 2));
         console.log('✅ ========== SCAN COMPLETE ==========');
 
         return Response.json({
@@ -214,14 +240,16 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('❌ ========== ERROR ==========');
-        console.error('Error:', error.message);
-        console.error('Stack:', error.stack);
+        console.error('❌ ========== FATAL ERROR ==========');
+        console.error('Error type:', error.constructor.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
         
         return Response.json({
             success: false,
             error: 'Failed to scan departments',
             details: error.message,
+            errorType: error.constructor.name,
             users: []
         }, { status: 500 });
     }
