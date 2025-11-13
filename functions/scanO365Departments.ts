@@ -21,8 +21,7 @@ Deno.serve(async (req) => {
 
         console.log('🔑 ========== TOKEN ACQUISITION ==========');
         console.log('   User email:', user.email);
-        console.log('   Email domain:', user.email?.split('@')[1]);
-        console.log('   Has manual token:', !!user.microsoft_access_token);
+        console.log('   User ID:', user.id);
 
         // Try SSO token FIRST
         let accessToken = null;
@@ -30,32 +29,56 @@ Deno.serve(async (req) => {
         
         console.log('🔐 Step 1: Attempting SSO token...');
         try {
-            accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
-            if (accessToken) {
-                tokenSource = 'SSO';
-                console.log('✅ SSO token retrieved!');
-                console.log('   Token length:', accessToken.length);
-                console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
-                console.log('   Token has dots (JWT):', accessToken.includes('.'));
-                console.log('   Token parts count:', accessToken.split('.').length);
+            const ssoToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+            console.log('📦 Raw SSO response type:', typeof ssoToken);
+            console.log('📦 Raw SSO response is null?:', ssoToken === null);
+            console.log('📦 Raw SSO response is undefined?:', ssoToken === undefined);
+            
+            if (ssoToken) {
+                console.log('📦 Token length:', ssoToken.length);
+                console.log('📦 First 50 chars:', ssoToken.substring(0, 50));
+                console.log('📦 Last 50 chars:', ssoToken.substring(ssoToken.length - 50));
+                console.log('📦 Has spaces?:', ssoToken.includes(' '));
+                console.log('📦 Has newlines?:', ssoToken.includes('\n'));
+                console.log('📦 Has Bearer prefix?:', ssoToken.startsWith('Bearer '));
+                console.log('📦 Token parts:', ssoToken.split('.').length);
+                
+                // Try to clean the token
+                let cleanToken = ssoToken.trim();
+                
+                // Remove Bearer prefix if present
+                if (cleanToken.startsWith('Bearer ')) {
+                    cleanToken = cleanToken.substring(7);
+                    console.log('✂️ Removed Bearer prefix');
+                }
+                
+                // Remove any whitespace
+                cleanToken = cleanToken.replace(/\s/g, '');
+                console.log('🧹 Cleaned token length:', cleanToken.length);
+                console.log('🧹 Cleaned token parts:', cleanToken.split('.').length);
+                
+                // Validate it's a proper JWT
+                if (cleanToken.split('.').length === 3) {
+                    accessToken = cleanToken;
+                    tokenSource = 'SSO';
+                    console.log('✅ SSO token validated and cleaned!');
+                } else {
+                    console.log('❌ Token structure invalid after cleaning');
+                }
             } else {
                 console.log('⚠️ SSO token returned null/undefined');
             }
         } catch (ssoError) {
             console.log('❌ SSO error:', ssoError.message);
             console.log('   Error type:', ssoError.constructor.name);
-            console.log('   Error stack:', ssoError.stack);
         }
         
         // Fall back to manual token
         if (!accessToken && user.microsoft_access_token) {
             tokenSource = 'Manual';
-            accessToken = user.microsoft_access_token;
+            accessToken = user.microsoft_access_token.trim();
             console.log('⚠️ Using manual token as fallback');
             console.log('   Token length:', accessToken.length);
-            console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
-            console.log('   Token has dots (JWT):', accessToken.includes('.'));
-            console.log('   Token parts count:', accessToken.split('.').length);
             
             // Validate manual token format
             if (!accessToken.includes('.') || accessToken.split('.').length !== 3) {
@@ -83,14 +106,13 @@ Deno.serve(async (req) => {
         }
 
         console.log(`✅ Using token from: ${tokenSource}`);
+        console.log('🔑 Final token length:', accessToken.length);
+        console.log('🔑 Final token structure valid:', accessToken.split('.').length === 3);
         console.log('🔑 ========== END TOKEN ACQUISITION ==========\n');
 
         // Call Microsoft Graph API
         console.log('📡 Calling Microsoft Graph API...');
         const graphUrl = 'https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,jobTitle,officeLocation,companyName,employeeId&$top=999';
-        
-        console.log('🔗 URL:', graphUrl);
-        console.log('🔑 Auth header format: Bearer [token]');
         
         const response = await fetch(graphUrl, {
             headers: {
@@ -110,8 +132,17 @@ Deno.serve(async (req) => {
             console.error('Token length:', accessToken.length);
             console.error('Token format valid:', accessToken.includes('.') && accessToken.split('.').length === 3);
             
+            // Try to decode JWT header for debugging
+            try {
+                const parts = accessToken.split('.');
+                console.error('JWT parts lengths:', parts.map(p => p.length));
+                const header = JSON.parse(atob(parts[0]));
+                console.error('JWT header:', JSON.stringify(header));
+            } catch (decodeError) {
+                console.error('Failed to decode JWT header:', decodeError.message);
+            }
+            
             if (response.status === 401) {
-                // Parse error details
                 let errorObj = {};
                 try {
                     errorObj = JSON.parse(errorText);
@@ -119,27 +150,18 @@ Deno.serve(async (req) => {
                     // Ignore parse errors
                 }
                 
-                if (tokenSource === 'Manual') {
-                    return Response.json({
-                        success: false,
-                        error: 'Manual Microsoft token is invalid',
-                        details: 'Your manually connected Microsoft token cannot be used. Remove it and use SSO instead.',
-                        needsReconnection: true,
-                        tokenSource: tokenSource,
-                        graphError: errorObj.error?.message || errorText,
-                        users: []
-                    }, { status: 401 });
-                } else {
-                    return Response.json({
-                        success: false,
-                        error: 'SSO token was rejected by Microsoft',
-                        details: 'Your SSO session may have expired. Please log out and log back in.',
-                        needsRelogin: true,
-                        tokenSource: tokenSource,
-                        graphError: errorObj.error?.message || errorText,
-                        users: []
-                    }, { status: 401 });
-                }
+                return Response.json({
+                    success: false,
+                    error: tokenSource === 'SSO' ? 'SSO token was rejected by Microsoft' : 'Manual Microsoft token is invalid',
+                    details: tokenSource === 'SSO' 
+                        ? 'Your SSO token cannot be decoded by Microsoft. This may be a configuration issue with the SSO provider.'
+                        : 'Your manually connected Microsoft token is invalid.',
+                    needsRelogin: tokenSource === 'SSO',
+                    needsReconnection: tokenSource === 'Manual',
+                    tokenSource: tokenSource,
+                    graphError: errorObj.error?.message || errorText,
+                    users: []
+                }, { status: 401 });
             }
             
             if (response.status === 403) {
