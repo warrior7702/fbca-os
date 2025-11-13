@@ -247,7 +247,8 @@ export default function Calendar() {
           }
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {/* Room Search */}
               <div className="relative w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
@@ -257,6 +258,42 @@ export default function Calendar() {
                   className="pl-9 h-10"
                 />
               </div>
+
+              {/* Resource Category Dropdown */}
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-52">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Resources">
+                    {selectedCategory === "all" ? "All Resources" : selectedCategory}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Resources</SelectItem>
+                  {resourceCategories.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Tag Filter */}
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-48">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Tags">
+                    {selectedTag === "all" ? "All Tags" : selectedTag}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tags</SelectItem>
+                  {eventTags.map(tag => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <Button
                 onClick={handleSync}
@@ -279,69 +316,6 @@ export default function Calendar() {
             </div>
           }
         />
-
-        {/* Filter Buttons */}
-        <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
-          {/* Resource Category Filters */}
-          <div>
-            <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
-              <Filter className="w-3 h-3" />
-              Filter by Resource Type:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedCategory === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory("all")}
-                className={selectedCategory === "all" ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
-              >
-                All Resources
-              </Button>
-              {resourceCategories.map(category => (
-                <Button
-                  key={category}
-                  variant={selectedCategory === category ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category)}
-                  className={selectedCategory === category ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
-                >
-                  {category}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tag Filters */}
-          {eventTags.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
-                <Filter className="w-3 h-3" />
-                Filter by Tag:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedTag === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedTag("all")}
-                  className={selectedTag === "all" ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
-                >
-                  All Tags
-                </Button>
-                {eventTags.map(tag => (
-                  <Button
-                    key={tag}
-                    variant={selectedTag === tag ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedTag(tag)}
-                    className={selectedTag === tag ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
-                  >
-                    {tag}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
         {events.length === 0 ? (
           <div className="text-center py-20">
