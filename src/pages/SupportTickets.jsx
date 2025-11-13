@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -300,12 +301,22 @@ export default function SupportTickets() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="access">Access</SelectItem>
-                  <SelectItem value="facility">Facility</SelectItem>
+                  <SelectItem value="technical">Technical/IT</SelectItem>
+                  <SelectItem value="access">Access/Keys</SelectItem>
+                  <SelectItem value="facility">Facility Maintenance</SelectItem>
+                  <SelectItem value="facility_cleaning">Cleaning</SelectItem>
                   <SelectItem value="av_production">AV/Production</SelectItem>
+                  <SelectItem value="worship_production">Worship Production</SelectItem>
                   <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="graphics">Graphics Design</SelectItem>
+                  <SelectItem value="social_media">Social Media</SelectItem>
+                  <SelectItem value="communications">Communications</SelectItem>
+                  <SelectItem value="event_setup">Event Setup</SelectItem>
+                  <SelectItem value="room_setup">Room Setup</SelectItem>
                   <SelectItem value="catering">Catering</SelectItem>
+                  <SelectItem value="hospitality">Hospitality</SelectItem>
+                  <SelectItem value="security">Security</SelectItem>
+                  <SelectItem value="transportation">Transportation</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>

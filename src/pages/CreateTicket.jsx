@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -45,9 +46,23 @@ export default function CreateTicket() {
 
   // Public users only see basic categories
   const availableCategories = [
-    { value: 'facility', label: 'Maintenance' },
+    { value: 'facility', label: 'Facility Maintenance' },
     { value: 'facility_cleaning', label: 'Cleaning' },
-    { value: 'technical', label: 'IT Support' }
+    { value: 'technical', label: 'IT Support' },
+    { value: 'access', label: 'Access/Keys' },
+    { value: 'av_production', label: 'AV/Production' },
+    { value: 'worship_production', label: 'Worship Production' },
+    { value: 'marketing', label: 'Marketing' },
+    { value: 'graphics', label: 'Graphics Design' },
+    { value: 'social_media', label: 'Social Media' },
+    { value: 'communications', label: 'Communications' },
+    { value: 'event_setup', label: 'Event Setup' },
+    { value: 'room_setup', label: 'Room Setup' },
+    { value: 'catering', label: 'Catering' },
+    { value: 'hospitality', label: 'Hospitality' },
+    { value: 'security', label: 'Security' },
+    { value: 'transportation', label: 'Transportation' },
+    { value: 'other', label: 'Other' }
   ];
 
   const generateTicketNumber = () => {
