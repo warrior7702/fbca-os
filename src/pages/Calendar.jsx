@@ -83,7 +83,7 @@ export default function Calendar() {
       setEvents(eventsData);
       setLastSync(new Date());
 
-      // Extract unique rooms and resource categories - DEBUGGING
+      // Extract unique rooms and resource categories
       const roomsSet = new Set();
       const categoriesSet = new Set();
       
@@ -92,26 +92,24 @@ export default function Calendar() {
       eventsData.forEach(event => {
         if (event.resources && Array.isArray(event.resources)) {
           event.resources.forEach(resource => {
-            // Log EVERY resource to see what fields are available
-            if (resource.kind !== 'Room') {
-              console.log('📦 Resource:', {
-                name: resource.name,
-                kind: resource.kind,
-                category: resource.category,
-                approval_group_name: resource.approval_group_name,
-                allFields: Object.keys(resource)
-              });
-            }
-            
             if (resource.kind === 'Room') {
               roomsSet.add(resource.name);
             } else {
-              // Try BOTH category and approval_group_name
-              const categoryName = resource.category || resource.approval_group_name || resource.kind;
+              // ✅ FIX: Use resource NAME when category is "Uncategorized"
+              let categoryName;
               
-              if (categoryName && categoryName !== 'Uncategorized') {
+              if (resource.category && resource.category !== 'Uncategorized') {
+                categoryName = resource.category;
+              } else if (resource.approval_group_name) {
+                categoryName = resource.approval_group_name;
+              } else {
+                // If category is "Uncategorized" or missing, use the resource NAME
+                categoryName = resource.name;
+              }
+              
+              if (categoryName) {
                 categoriesSet.add(categoryName);
-                console.log('✅ Added category:', categoryName);
+                console.log('✅ Added category:', categoryName, 'from resource:', resource.name);
               }
             }
           });
@@ -165,15 +163,16 @@ export default function Calendar() {
         r.name.toLowerCase().includes(roomSearch.toLowerCase())
       );
     
-    // Check BOTH category and approval_group_name
+    // ✅ FIX: Match against resource NAME when needed
     const categoryMatch = selectedCategory === "all" || 
-      (event.resources && event.resources.some(r => 
-        r.kind !== 'Room' && (
-          r.category === selectedCategory || 
-          r.approval_group_name === selectedCategory ||
-          r.kind === selectedCategory
-        )
-      ));
+      (event.resources && event.resources.some(r => {
+        if (r.kind === 'Room') return false;
+        
+        // Check category, approval_group_name, OR resource name itself
+        return r.category === selectedCategory || 
+               r.approval_group_name === selectedCategory ||
+               r.name === selectedCategory;
+      }));
     
     const tagMatch = selectedTag === "all" || 
       (event.tags && event.tags.includes(selectedTag));
@@ -458,7 +457,7 @@ export default function Calendar() {
                       <div className="flex flex-wrap gap-1 mb-2">
                         {event.resources.map(resource => (
                           <Badge key={resource.id} variant="secondary" className="text-xs">
-                            {resource.name} {(resource.category || resource.approval_group_name) && `(${resource.category || resource.approval_group_name})`}
+                            {resource.name}
                           </Badge>
                         ))}
                       </div>
@@ -557,12 +556,6 @@ export default function Calendar() {
                                     <p className="font-medium text-slate-900">{resource.name}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <span className="text-xs text-slate-500">{resource.kind}</span>
-                                      {(resource.category || resource.approval_group_name) && (
-                                        <>
-                                          <span className="text-xs text-slate-400">•</span>
-                                          <span className="text-xs text-blue-600">{resource.category || resource.approval_group_name}</span>
-                                        </>
-                                      )}
                                       {resource.approval_status && (
                                         <>
                                           <span className="text-xs text-slate-400">•</span>
@@ -639,12 +632,6 @@ export default function Calendar() {
                                     <p className="font-medium text-slate-900">{resource.name}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <span className="text-xs text-slate-500">{resource.kind}</span>
-                                      {(resource.category || resource.approval_group_name) && (
-                                        <>
-                                          <span className="text-xs text-slate-400">•</span>
-                                          <span className="text-xs text-green-600">{resource.category || resource.approval_group_name}</span>
-                                        </>
-                                      )}
                                       {resource.approval_status && (
                                         <>
                                           <span className="text-xs text-slate-400">•</span>
