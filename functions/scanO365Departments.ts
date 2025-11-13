@@ -21,63 +21,16 @@ Deno.serve(async (req) => {
 
         console.log('🔑 ========== TOKEN ACQUISITION ==========');
         console.log('   User email:', user.email);
-        console.log('   User ID:', user.id);
+        console.log('   Has manual token:', !!user.microsoft_access_token);
 
-        // Try SSO token FIRST
+        // Use MANUAL token FIRST (it has the permissions!)
         let accessToken = null;
         let tokenSource = null;
         
-        console.log('🔐 Step 1: Attempting SSO token...');
-        try {
-            const ssoToken = await base44.asServiceRole.sso.getAccessToken(user.id);
-            console.log('📦 Raw SSO response type:', typeof ssoToken);
-            console.log('📦 Raw SSO response is null?:', ssoToken === null);
-            console.log('📦 Raw SSO response is undefined?:', ssoToken === undefined);
-            
-            if (ssoToken) {
-                console.log('📦 Token length:', ssoToken.length);
-                console.log('📦 First 50 chars:', ssoToken.substring(0, 50));
-                console.log('📦 Last 50 chars:', ssoToken.substring(ssoToken.length - 50));
-                console.log('📦 Has spaces?:', ssoToken.includes(' '));
-                console.log('📦 Has newlines?:', ssoToken.includes('\n'));
-                console.log('📦 Has Bearer prefix?:', ssoToken.startsWith('Bearer '));
-                console.log('📦 Token parts:', ssoToken.split('.').length);
-                
-                // Try to clean the token
-                let cleanToken = ssoToken.trim();
-                
-                // Remove Bearer prefix if present
-                if (cleanToken.startsWith('Bearer ')) {
-                    cleanToken = cleanToken.substring(7);
-                    console.log('✂️ Removed Bearer prefix');
-                }
-                
-                // Remove any whitespace
-                cleanToken = cleanToken.replace(/\s/g, '');
-                console.log('🧹 Cleaned token length:', cleanToken.length);
-                console.log('🧹 Cleaned token parts:', cleanToken.split('.').length);
-                
-                // Validate it's a proper JWT
-                if (cleanToken.split('.').length === 3) {
-                    accessToken = cleanToken;
-                    tokenSource = 'SSO';
-                    console.log('✅ SSO token validated and cleaned!');
-                } else {
-                    console.log('❌ Token structure invalid after cleaning');
-                }
-            } else {
-                console.log('⚠️ SSO token returned null/undefined');
-            }
-        } catch (ssoError) {
-            console.log('❌ SSO error:', ssoError.message);
-            console.log('   Error type:', ssoError.constructor.name);
-        }
-        
-        // Fall back to manual token
-        if (!accessToken && user.microsoft_access_token) {
+        if (user.microsoft_access_token) {
             tokenSource = 'Manual';
             accessToken = user.microsoft_access_token.trim();
-            console.log('⚠️ Using manual token as fallback');
+            console.log('✅ Using manual token (has Graph API permissions)');
             console.log('   Token length:', accessToken.length);
             
             // Validate manual token format
@@ -86,11 +39,47 @@ Deno.serve(async (req) => {
                 return Response.json({
                     success: false,
                     error: 'Microsoft token is corrupted',
-                    details: 'Your manually connected Microsoft token is invalid. Please remove it and use SSO instead.',
+                    details: 'Your manually connected Microsoft token is invalid. Please reconnect in Settings.',
                     needsReconnection: true,
                     tokenSource: 'Manual (Corrupted)',
                     users: []
                 }, { status: 400 });
+            }
+        } else {
+            // Fallback to SSO only if no manual token
+            console.log('⚠️ No manual token, trying SSO...');
+            try {
+                const ssoToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+                if (ssoToken) {
+                    console.log('📦 Raw SSO response received');
+                    
+                    // Clean the token
+                    let cleanToken = ssoToken.trim();
+                    
+                    // Remove Bearer prefix if present
+                    if (cleanToken.startsWith('Bearer ')) {
+                        cleanToken = cleanToken.substring(7);
+                        console.log('✂️ Removed Bearer prefix');
+                    }
+                    
+                    // Remove any whitespace
+                    cleanToken = cleanToken.replace(/\s/g, '');
+                    console.log('🧹 Cleaned token length:', cleanToken.length);
+                    console.log('🧹 Cleaned token parts:', cleanToken.split('.').length);
+                    
+                    // Validate it's a proper JWT
+                    if (cleanToken.split('.').length === 3) {
+                        accessToken = cleanToken;
+                        tokenSource = 'SSO';
+                        console.log('✅ SSO token validated and cleaned!');
+                    } else {
+                        console.log('❌ Token structure invalid after cleaning');
+                    }
+                } else {
+                    console.log('⚠️ SSO token returned null/undefined');
+                }
+            } catch (ssoError) {
+                console.log('❌ SSO error:', ssoError.message);
             }
         }
         
@@ -99,7 +88,7 @@ Deno.serve(async (req) => {
             return Response.json({
                 success: false,
                 error: 'Microsoft 365 not connected',
-                details: 'Please log in with Microsoft SSO, or connect Microsoft 365 manually in Settings.',
+                details: 'Please connect Microsoft 365 in Settings → Integrations.',
                 needsConnection: true,
                 users: []
             }, { status: 400 });
@@ -132,16 +121,6 @@ Deno.serve(async (req) => {
             console.error('Token length:', accessToken.length);
             console.error('Token format valid:', accessToken.includes('.') && accessToken.split('.').length === 3);
             
-            // Try to decode JWT header for debugging
-            try {
-                const parts = accessToken.split('.');
-                console.error('JWT parts lengths:', parts.map(p => p.length));
-                const header = JSON.parse(atob(parts[0]));
-                console.error('JWT header:', JSON.stringify(header));
-            } catch (decodeError) {
-                console.error('Failed to decode JWT header:', decodeError.message);
-            }
-            
             if (response.status === 401) {
                 let errorObj = {};
                 try {
@@ -154,8 +133,8 @@ Deno.serve(async (req) => {
                     success: false,
                     error: tokenSource === 'SSO' ? 'SSO token was rejected by Microsoft' : 'Manual Microsoft token is invalid',
                     details: tokenSource === 'SSO' 
-                        ? 'Your SSO token cannot be decoded by Microsoft. This may be a configuration issue with the SSO provider.'
-                        : 'Your manually connected Microsoft token is invalid.',
+                        ? 'Your SSO session may have expired. Please log out and log back in.'
+                        : 'Your manually connected Microsoft token is invalid. Please reconnect in Settings.',
                     needsRelogin: tokenSource === 'SSO',
                     needsReconnection: tokenSource === 'Manual',
                     tokenSource: tokenSource,
@@ -168,8 +147,11 @@ Deno.serve(async (req) => {
                 return Response.json({
                     success: false,
                     error: 'Insufficient permissions',
-                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions.',
+                    details: tokenSource === 'SSO' 
+                        ? 'SSO login does not have directory read permissions. Please use the manual Microsoft connection in Settings.'
+                        : 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions.',
                     needsPermissions: true,
+                    tokenSource: tokenSource,
                     users: []
                 }, { status: 403 });
             }
