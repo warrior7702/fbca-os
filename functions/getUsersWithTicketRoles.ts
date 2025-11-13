@@ -81,53 +81,66 @@ Deno.serve(async (req) => {
 
         console.log(`✅ Retrieved ${allUsers.length} users from Microsoft`);
 
-        // Parse and categorize users based on extension attributes
-        // extensionAttribute1 = OSTicketRole → "worker" or "viewer"
-        // extensionAttribute2 = OSDept → department code
+        // Parse and categorize users based on BOTH extension attributes
+        // extensionAttribute1 = OSTicketRole → "worker" (can be assigned) or "viewer" (read-only)
+        // extensionAttribute2 = OSDept → "Admin", "Kitchen", "Comms", etc. (department for ticket routing)
         const workers = [];
         const viewers = [];
         const uncategorized = [];
         const departmentStats = {};
+        const roleStats = { worker: 0, viewer: 0, noRole: 0 };
+        const departmentList = new Set();
 
         allUsers.forEach(u => {
             const extAttrs = u.onPremisesExtensionAttributes || {};
-            const osTicketRole = extAttrs.extensionAttribute1; // OSTicketRole: "worker" or "viewer"
-            const osDept = extAttrs.extensionAttribute2; // OSDept: department code
+            const osTicketRole = extAttrs.extensionAttribute1?.toLowerCase(); // "worker" or "viewer"
+            const osDept = extAttrs.extensionAttribute2; // "Admin", "Kitchen", "Comms", etc.
 
             const userInfo = {
                 id: u.id,
                 displayName: u.displayName,
                 email: u.mail || u.userPrincipalName,
-                department: u.department,
+                department: u.department, // O365 department field (might be different)
                 jobTitle: u.jobTitle,
                 osTicketRole: osTicketRole || null,
                 osDept: osDept || null,
+                hasTicketRole: !!osTicketRole,
+                hasDepartment: !!osDept,
                 hasExtensionData: !!(osTicketRole || osDept)
             };
 
-            // Categorize by role
+            // Track role stats
             if (osTicketRole === 'worker') {
+                roleStats.worker++;
                 workers.push(userInfo);
             } else if (osTicketRole === 'viewer') {
+                roleStats.viewer++;
                 viewers.push(userInfo);
             } else {
+                roleStats.noRole++;
                 uncategorized.push(userInfo);
             }
 
-            // Track department stats
+            // Track department stats (independent of role)
             if (osDept) {
+                departmentList.add(osDept);
+                
                 if (!departmentStats[osDept]) {
                     departmentStats[osDept] = {
                         workers: 0,
                         viewers: 0,
+                        noRole: 0,
                         total: 0
                     };
                 }
                 departmentStats[osDept].total++;
+                
                 if (osTicketRole === 'worker') {
                     departmentStats[osDept].workers++;
                 } else if (osTicketRole === 'viewer') {
                     departmentStats[osDept].viewers++;
+                } else {
+                    departmentStats[osDept].noRole++;
                 }
             }
         });
@@ -141,28 +154,39 @@ Deno.serve(async (req) => {
                 const ext = u.onPremisesExtensionAttributes || {};
                 return !!(ext.extensionAttribute1 || ext.extensionAttribute2);
             }).length,
-            departments: Object.keys(departmentStats).length
+            withTicketRole: roleStats.worker + roleStats.viewer,
+            withDepartment: Array.from(departmentList).length > 0 ? 
+                Object.values(departmentStats).reduce((sum, dept) => sum + dept.total, 0) : 0,
+            departments: Array.from(departmentList).sort()
         };
 
         console.log('📊 Stats:', JSON.stringify(stats, null, 2));
+        console.log('📊 Role breakdown:', JSON.stringify(roleStats, null, 2));
+        console.log('📊 Departments found:', Array.from(departmentList).sort());
 
         return Response.json({
             success: true,
             tokenSource: tokenSource,
             stats: stats,
+            roleStats: roleStats,
             workers: workers,
             viewers: viewers,
             uncategorized: uncategorized,
             departmentStats: departmentStats,
-            allUsers: allUsers.map(u => ({
-                id: u.id,
-                displayName: u.displayName,
-                email: u.mail || u.userPrincipalName,
-                department: u.department,
-                jobTitle: u.jobTitle,
-                osTicketRole: u.onPremisesExtensionAttributes?.extensionAttribute1 || null,
-                osDept: u.onPremisesExtensionAttributes?.extensionAttribute2 || null
-            }))
+            departmentList: Array.from(departmentList).sort(),
+            allUsers: allUsers.map(u => {
+                const ext = u.onPremisesExtensionAttributes || {};
+                return {
+                    id: u.id,
+                    displayName: u.displayName,
+                    email: u.mail || u.userPrincipalName,
+                    department: u.department,
+                    jobTitle: u.jobTitle,
+                    osTicketRole: ext.extensionAttribute1?.toLowerCase() || null,
+                    osDept: ext.extensionAttribute2 || null,
+                    rawExtensionAttributes: ext // Include raw data for debugging
+                };
+            })
         });
 
     } catch (error) {
