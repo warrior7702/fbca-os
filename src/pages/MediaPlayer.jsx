@@ -19,13 +19,15 @@ import {
   ChevronRight,
   Clock,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  Youtube
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 export default function MediaPlayer() {
   const navigate = useNavigate();
@@ -34,6 +36,7 @@ export default function MediaPlayer() {
   
   const [loading, setLoading] = useState(true);
   const [resiData, setResiData] = useState({ collections: [], featured: null });
+  const [youtubeVideos, setYoutubeVideos] = useState([]);
   const [podcasts, setPodcasts] = useState([]);
   const [isLive, setIsLive] = useState(false);
   const [checkingLive, setCheckingLive] = useState(true);
@@ -49,28 +52,24 @@ export default function MediaPlayer() {
   const checkLiveStatus = async () => {
     setCheckingLive(true);
     try {
-      // Check if the live stream is actually broadcasting
-      // We'll check the current day/time against service times
       const now = new Date();
-      const day = now.getDay(); // 0 = Sunday
+      const day = now.getDay();
       const hour = now.getHours();
       const minute = now.getMinutes();
       const currentMinutes = hour * 60 + minute;
 
-      // Sunday services: 9:00 AM (540) and 10:45 AM (645)
-      // Wednesday service: 6:30 PM (1110)
-      const sundayMorning1Start = 540 - 15; // Start 15 min before
-      const sundayMorning1End = 540 + 75; // End 75 min after
+      const sundayMorning1Start = 540 - 15;
+      const sundayMorning1End = 540 + 75;
       const sundayMorning2Start = 645 - 15;
       const sundayMorning2End = 645 + 75;
       const wednesdayEveningStart = 1110 - 15;
       const wednesdayEveningEnd = 1110 + 90;
 
       let live = false;
-      if (day === 0) { // Sunday
+      if (day === 0) {
         live = (currentMinutes >= sundayMorning1Start && currentMinutes <= sundayMorning1End) ||
                (currentMinutes >= sundayMorning2Start && currentMinutes <= sundayMorning2End);
-      } else if (day === 3) { // Wednesday
+      } else if (day === 3) {
         live = currentMinutes >= wednesdayEveningStart && currentMinutes <= wednesdayEveningEnd;
       }
 
@@ -86,17 +85,22 @@ export default function MediaPlayer() {
   const loadMediaData = async () => {
     setLoading(true);
     try {
-      const [resiResponse, podcastsResponse] = await Promise.all([
-        base44.functions.invoke('getResiMedia'),
-        base44.functions.invoke('getFBCAPodcasts')
+      const [resiResponse, youtubeResponse, podcastsResponse] = await Promise.all([
+        base44.functions.invoke('getResiMedia').catch(() => ({ data: { success: false } })),
+        base44.functions.invoke('getYouTubeVideos').catch(() => ({ data: { success: false } })),
+        base44.functions.invoke('getFBCAPodcasts').catch(() => ({ data: { success: false } }))
       ]);
 
       if (resiResponse.data.success) {
         setResiData(resiResponse.data);
       }
 
+      if (youtubeResponse.data.success) {
+        setYoutubeVideos(youtubeResponse.data.videos || []);
+      }
+
       if (podcastsResponse.data.success) {
-        setPodcasts(podcastsResponse.data.podcasts);
+        setPodcasts(podcastsResponse.data.podcasts || []);
       }
     } catch (error) {
       console.error('Error loading media:', error);
@@ -115,6 +119,13 @@ export default function MediaPlayer() {
       description: 'Watch live now',
       badge: isLive ? 'LIVE' : null,
       badgeAnimate: isLive
+    },
+    {
+      id: 'youtube',
+      title: 'YouTube',
+      icon: Youtube,
+      color: 'from-red-600 to-red-500',
+      description: 'Latest videos'
     },
     {
       id: 'sermons',
@@ -136,24 +147,15 @@ export default function MediaPlayer() {
       icon: Film,
       color: 'from-green-500 to-emerald-500',
       description: 'Past services'
-    },
-    {
-      id: 'archived',
-      title: 'Full Archive',
-      icon: Archive,
-      color: 'from-orange-500 to-red-500',
-      description: 'All content'
     }
   ];
 
   const renderHome = () => {
-    const contemporaryCollection = resiData.collections.find(c => 
-      c.name.toLowerCase().includes('contemporary')
-    );
+    // Featured video - prioritize YouTube, then Resi
+    const featuredVideo = youtubeVideos[0] || resiData.featured;
     const sermonsCollection = resiData.collections.find(c => 
       c.name.toLowerCase().includes('sermon')
     );
-    const featuredVideo = contemporaryCollection?.videos[0] || resiData.featured;
 
     return (
       <div className="space-y-6">
@@ -175,16 +177,16 @@ export default function MediaPlayer() {
                 <div className="flex items-center gap-2 mb-3">
                   <Badge className="bg-red-600 text-white border-0">
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
-                    LATEST WORSHIP
+                    LATEST
                   </Badge>
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-white mb-2 drop-shadow-lg">
                   {featuredVideo.title}
                 </h2>
-                {featuredVideo.date && (
+                {featuredVideo.publishedAt && (
                   <p className="text-white/90 mb-4 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    {featuredVideo.date}
+                    {format(new Date(featuredVideo.publishedAt), 'MMMM d, yyyy')}
                   </p>
                 )}
                 <div className="flex gap-3">
@@ -197,7 +199,7 @@ export default function MediaPlayer() {
                     Watch Now
                   </Button>
                   <Button
-                    onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=videos')}
+                    onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=youtube')}
                     size="lg"
                     variant="outline"
                     className="border-white text-white hover:bg-white/20 backdrop-blur-sm"
@@ -239,6 +241,61 @@ export default function MediaPlayer() {
             </motion.div>
           ))}
         </div>
+
+        {/* Latest YouTube Videos */}
+        {youtubeVideos.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Youtube className="w-5 h-5 text-red-600" />
+                Latest from YouTube
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=youtube')}
+              >
+                View All <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                {youtubeVideos.slice(0, 3).map((video) => (
+                  <motion.div
+                    key={video.id}
+                    whileHover={{ scale: 1.03 }}
+                    className="cursor-pointer"
+                    onClick={() => window.open(video.videoUrl, '_blank')}
+                  >
+                    <Card className="overflow-hidden border-2 border-transparent hover:border-red-300 transition-all">
+                      <div className="relative">
+                        <img
+                          src={video.thumbnail}
+                          alt={video.title}
+                          className="w-full h-40 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                        <Badge className="absolute top-2 left-2 bg-red-600 text-white">
+                          YouTube
+                        </Badge>
+                        <div className="absolute bottom-2 left-2 right-2">
+                          {video.publishedAt && (
+                            <p className="text-xs text-white/90">
+                              {format(new Date(video.publishedAt), 'MMM d, yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <CardContent className="p-3">
+                        <h3 className="font-semibold text-sm line-clamp-2">{video.title}</h3>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Latest Sermons Row */}
         {sermonsCollection && sermonsCollection.videos.length > 0 && (
@@ -348,7 +405,6 @@ export default function MediaPlayer() {
 
   const renderLiveStream = () => (
     <div className="space-y-6">
-      {/* Live Stream Embed */}
       <Card className="overflow-hidden shadow-2xl">
         <div className="bg-gradient-to-br from-red-600 to-pink-600 p-6 text-white">
           <div className="flex items-center gap-3 mb-2">
@@ -374,7 +430,6 @@ export default function MediaPlayer() {
           </p>
         </div>
         
-        {/* Embed FBCA Live Page in iframe */}
         <div className="relative aspect-video bg-slate-900">
           <iframe
             src="https://www.fbca.org/watch-listen/live/"
@@ -412,15 +467,15 @@ export default function MediaPlayer() {
           
           <div className="border-t pt-4">
             <p className="text-sm text-slate-600 mb-3">
-              Can't watch live? Check out our archived services and sermons below.
+              Can't watch live? Check out our archived services and sermons.
             </p>
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=videos')}
+                onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=youtube')}
               >
-                <Film className="w-4 h-4 mr-2" />
-                Past Services
+                <Youtube className="w-4 h-4 mr-2" />
+                YouTube
               </Button>
               <Button
                 size="sm"
@@ -431,6 +486,71 @@ export default function MediaPlayer() {
                 Sermons
               </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderYouTube = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="border-b bg-gradient-to-r from-red-50 to-pink-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 mb-2">
+                <Youtube className="w-6 h-6 text-red-600" />
+                FBCA YouTube Channel
+              </CardTitle>
+              <p className="text-sm text-slate-600">{youtubeVideos.length} recent videos</p>
+            </div>
+            <Button
+              onClick={() => window.open('https://youtube.com/@firstbaptistarlington', '_blank')}
+              variant="outline"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open YouTube
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {youtubeVideos.map((video, idx) => (
+              <motion.div
+                key={video.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                whileHover={{ scale: 1.03 }}
+                className="cursor-pointer"
+                onClick={() => window.open(video.videoUrl, '_blank')}
+              >
+                <Card className="overflow-hidden border-2 border-transparent hover:border-red-300 hover:shadow-xl transition-all">
+                  <div className="relative">
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    <div className="absolute top-3 left-3">
+                      <Badge className="bg-red-600 text-white">YouTube</Badge>
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3">
+                      {video.publishedAt && (
+                        <div className="flex items-center text-white text-sm gap-1">
+                          <Calendar className="w-4 h-4" />
+                          {format(new Date(video.publishedAt), 'MMM d, yyyy')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-slate-900 line-clamp-2">{video.title}</h3>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -455,57 +575,73 @@ export default function MediaPlayer() {
                 </CardTitle>
                 <p className="text-sm text-slate-600">{sermons.length} messages available</p>
               </div>
-              <Button
-                onClick={() => window.open('https://sites.resi.io/fbcamedia/explore/' + sermonsCollection?.id, '_blank')}
-                variant="outline"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View on Resi
-              </Button>
+              {sermonsCollection && (
+                <Button
+                  onClick={() => window.open(sermonsCollection.url, '_blank')}
+                  variant="outline"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View on Resi
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sermons.map((sermon, idx) => (
-                <motion.div
-                  key={sermon.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  whileHover={{ scale: 1.03 }}
-                  className="cursor-pointer"
-                  onClick={() => window.open(sermon.videoUrl, '_blank')}
+            {sermons.length === 0 ? (
+              <div className="text-center py-12">
+                <Mic2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">No Sermons Found</h3>
+                <p className="text-slate-600 mb-4">Check out our YouTube channel for the latest messages</p>
+                <Button
+                  onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=youtube')}
                 >
-                  <Card className="overflow-hidden border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition-all">
-                    <div className="relative">
-                      <img
-                        src={sermon.thumbnail}
-                        alt={sermon.title}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                      <div className="absolute top-3 left-3">
-                        <Badge className="bg-blue-600 text-white">Sermon</Badge>
-                      </div>
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                        {sermon.date && (
-                          <div className="flex items-center text-white text-sm gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {sermon.date}
+                  <Youtube className="w-4 h-4 mr-2" />
+                  Go to YouTube
+                </Button>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sermons.map((sermon, idx) => (
+                  <motion.div
+                    key={sermon.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    whileHover={{ scale: 1.03 }}
+                    className="cursor-pointer"
+                    onClick={() => window.open(sermon.videoUrl, '_blank')}
+                  >
+                    <Card className="overflow-hidden border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition-all">
+                      <div className="relative">
+                        <img
+                          src={sermon.thumbnail}
+                          alt={sermon.title}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                        <div className="absolute top-3 left-3">
+                          <Badge className="bg-blue-600 text-white">Sermon</Badge>
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                          {sermon.date && (
+                            <div className="flex items-center text-white text-sm gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {sermon.date}
+                            </div>
+                          )}
+                          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                            <Play className="w-5 h-5 text-white fill-current ml-0.5" />
                           </div>
-                        )}
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                          <Play className="w-5 h-5 text-white fill-current ml-0.5" />
                         </div>
                       </div>
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-slate-900 line-clamp-2">{sermon.title}</h3>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold text-slate-900 line-clamp-2">{sermon.title}</h3>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -565,130 +701,84 @@ export default function MediaPlayer() {
 
     return (
       <div className="space-y-6">
-        {videoCollections.map((collection) => (
-          <Card key={collection.id}>
-            <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 mb-2">
-                    <Film className="w-6 h-6 text-green-600" />
-                    {collection.name}
-                  </CardTitle>
-                  <p className="text-sm text-slate-600">{collection.videos.length} services</p>
-                </div>
-                <Button
-                  onClick={() => window.open(collection.url, '_blank')}
-                  variant="outline"
-                  size="sm"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View All
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {collection.videos.map((video, idx) => (
-                  <motion.div
-                    key={video.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    whileHover={{ scale: 1.03 }}
-                    className="cursor-pointer"
-                    onClick={() => window.open(video.videoUrl, '_blank')}
-                  >
-                    <Card className="overflow-hidden border-2 border-transparent hover:border-green-300 hover:shadow-lg transition-all">
-                      <div className="relative">
-                        <img
-                          src={video.thumbnail}
-                          alt={video.title}
-                          className="w-full h-40 object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        {video.date && (
-                          <Badge className="absolute bottom-2 left-2 bg-white/90 text-slate-900 text-xs">
-                            {video.date}
-                          </Badge>
-                        )}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
-                          <div className="w-12 h-12 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center">
-                            <Play className="w-6 h-6 text-white fill-current ml-0.5" />
-                          </div>
-                        </div>
-                      </div>
-                      <CardContent className="p-3">
-                        <h3 className="font-medium text-sm line-clamp-2">{video.title}</h3>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
+        {videoCollections.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Film className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">No Worship Services Found</h3>
+              <p className="text-slate-600 mb-4">Check out our YouTube channel for full worship services</p>
+              <Button
+                onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=youtube')}
+              >
+                <Youtube className="w-4 h-4 mr-2" />
+                Go to YouTube
+              </Button>
             </CardContent>
           </Card>
-        ))}
-      </div>
-    );
-  };
-
-  const renderArchived = () => {
-    const allCollections = resiData.collections;
-
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-red-50">
-            <CardTitle className="flex items-center gap-2">
-              <Archive className="w-6 h-6 text-orange-600" />
-              Complete Video Archive
-            </CardTitle>
-            <p className="text-sm text-slate-600 mt-2">
-              Browse all {allCollections.reduce((sum, col) => sum + col.videos.length, 0)} videos
-            </p>
-          </CardHeader>
-          <CardContent className="p-6">
-            {allCollections.map((collection) => (
-              <div key={collection.id} className="mb-10 last:mb-0">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-slate-900">{collection.name}</h3>
+        ) : (
+          videoCollections.map((collection) => (
+            <Card key={collection.id}>
+              <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 mb-2">
+                      <Film className="w-6 h-6 text-green-600" />
+                      {collection.name}
+                    </CardTitle>
+                    <p className="text-sm text-slate-600">{collection.videos.length} services</p>
+                  </div>
                   <Button
                     onClick={() => window.open(collection.url, '_blank')}
                     variant="outline"
                     size="sm"
                   >
-                    View on Resi
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View All
                   </Button>
                 </div>
-                <div className="grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {collection.videos.map((video) => (
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {collection.videos.map((video, idx) => (
                     <motion.div
                       key={video.id}
-                      whileHover={{ scale: 1.05 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.03 }}
+                      whileHover={{ scale: 1.03 }}
                       className="cursor-pointer"
                       onClick={() => window.open(video.videoUrl, '_blank')}
                     >
-                      <Card className="overflow-hidden hover:shadow-lg transition-all">
+                      <Card className="overflow-hidden border-2 border-transparent hover:border-green-300 hover:shadow-lg transition-all">
                         <div className="relative">
                           <img
                             src={video.thumbnail}
                             alt={video.title}
-                            className="w-full h-32 object-cover"
+                            className="w-full h-40 object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-all flex items-center justify-center">
-                            <Play className="w-8 h-8 text-white opacity-0 hover:opacity-100 transition-opacity fill-current" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                          {video.date && (
+                            <Badge className="absolute bottom-2 left-2 bg-white/90 text-slate-900 text-xs">
+                              {video.date}
+                            </Badge>
+                          )}
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
+                            <div className="w-12 h-12 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center">
+                              <Play className="w-6 h-6 text-white fill-current ml-0.5" />
+                            </div>
                           </div>
                         </div>
-                        <CardContent className="p-2">
-                          <h4 className="font-medium text-xs line-clamp-2">{video.title}</h4>
+                        <CardContent className="p-3">
+                          <h3 className="font-medium text-sm line-clamp-2">{video.title}</h3>
                         </CardContent>
                       </Card>
                     </motion.div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     );
   };
@@ -706,14 +796,14 @@ export default function MediaPlayer() {
     switch (section) {
       case 'livestream':
         return renderLiveStream();
+      case 'youtube':
+        return renderYouTube();
       case 'sermons':
         return renderSermons();
       case 'podcasts':
         return renderPodcasts();
       case 'videos':
         return renderVideos();
-      case 'archived':
-        return renderArchived();
       default:
         return renderHome();
     }
@@ -724,7 +814,6 @@ export default function MediaPlayer() {
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-3 sm:p-6 pb-24">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -778,7 +867,6 @@ export default function MediaPlayer() {
           )}
         </motion.div>
 
-        {/* Content */}
         <AnimatePresence mode="wait">
           <motion.div
             key={section}
