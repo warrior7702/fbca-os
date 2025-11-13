@@ -15,7 +15,8 @@ import {
     Shield,
     UserCheck,
     UserX,
-    RefreshCw
+    RefreshCw,
+    Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,7 @@ export default function TicketRoleVerification() {
                             <Shield className="w-7 h-7 text-blue-600" />
                             Ticket Role Verification
                         </h1>
-                        <p className="text-slate-600">Verify extension attributes for ticketing system</p>
+                        <p className="text-slate-600">Verify extension attributes: worker (assignable) vs viewer (read-only)</p>
                     </div>
                     <Button
                         onClick={fetchUserData}
@@ -125,8 +126,12 @@ export default function TicketRoleVerification() {
                                 Ready to Verify Extension Attributes
                             </h3>
                             <p className="text-slate-600 mb-6">
-                                Click "Fetch Data" to load users with extensionAttribute1 (OSTicketRole) and extensionAttribute2 (OSDept)
+                                Click "Fetch Data" to load users with:
                             </p>
+                            <div className="text-sm text-slate-600 max-w-md mx-auto">
+                                <p className="mb-2">• <strong>extensionAttribute1</strong> (OSTicketRole): "worker" or "viewer"</p>
+                                <p>• <strong>extensionAttribute2</strong> (OSDept): department code</p>
+                            </div>
                         </CardContent>
                     </Card>
                 ) : (
@@ -150,6 +155,7 @@ export default function TicketRoleVerification() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Workers</p>
+                                            <p className="text-xs text-slate-500">(Can be assigned)</p>
                                             <p className="text-2xl font-bold text-green-700">{data.stats.workers}</p>
                                         </div>
                                         <UserCheck className="w-8 h-8 text-green-500" />
@@ -161,10 +167,11 @@ export default function TicketRoleVerification() {
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm text-slate-600">Requesters</p>
-                                            <p className="text-2xl font-bold text-blue-700">{data.stats.requesters}</p>
+                                            <p className="text-sm text-slate-600">Viewers</p>
+                                            <p className="text-xs text-slate-500">(Read-only)</p>
+                                            <p className="text-2xl font-bold text-blue-700">{data.stats.viewers}</p>
                                         </div>
-                                        <Users className="w-8 h-8 text-blue-500" />
+                                        <Eye className="w-8 h-8 text-blue-500" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -174,6 +181,7 @@ export default function TicketRoleVerification() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Uncategorized</p>
+                                            <p className="text-xs text-slate-500">(No role set)</p>
                                             <p className="text-2xl font-bold text-orange-700">{data.stats.uncategorized}</p>
                                         </div>
                                         <UserX className="w-8 h-8 text-orange-500" />
@@ -221,9 +229,9 @@ export default function TicketRoleVerification() {
                                                 <div key={dept} className="p-3 bg-slate-50 rounded-lg border">
                                                     <p className="font-semibold text-slate-900">{dept}</p>
                                                     <div className="text-xs text-slate-600 mt-1 space-y-0.5">
-                                                        <p>Workers: {stats.workers}</p>
-                                                        <p>Requesters: {stats.requesters}</p>
-                                                        <p>Total: {stats.total}</p>
+                                                        <p>✅ Workers: {stats.workers}</p>
+                                                        <p>👁️ Viewers: {stats.viewers}</p>
+                                                        <p className="font-semibold">Total: {stats.total}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -252,8 +260,8 @@ export default function TicketRoleVerification() {
                                 <TabsTrigger value="workers">
                                     Workers ({data.stats.workers})
                                 </TabsTrigger>
-                                <TabsTrigger value="requesters">
-                                    Requesters ({data.stats.requesters})
+                                <TabsTrigger value="viewers">
+                                    Viewers ({data.stats.viewers})
                                 </TabsTrigger>
                                 <TabsTrigger value="uncategorized">
                                     Uncategorized ({data.stats.uncategorized})
@@ -267,8 +275,8 @@ export default function TicketRoleVerification() {
                                 <UserList users={filterUsers(data.workers)} />
                             </TabsContent>
 
-                            <TabsContent value="requesters" className="mt-4">
-                                <UserList users={filterUsers(data.requesters)} />
+                            <TabsContent value="viewers" className="mt-4">
+                                <UserList users={filterUsers(data.viewers)} />
                             </TabsContent>
 
                             <TabsContent value="uncategorized" className="mt-4">
@@ -324,7 +332,7 @@ function UserList({ users }) {
                                             ? 'bg-green-100 text-green-700' 
                                             : 'bg-blue-100 text-blue-700'
                                     }>
-                                        {user.osTicketRole}
+                                        {user.osTicketRole === 'worker' ? '✅ Worker' : '👁️ Viewer'}
                                     </Badge>
                                 )}
                                 {user.osDept && (
