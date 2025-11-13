@@ -82,15 +82,17 @@ Deno.serve(async (req) => {
         console.log(`✅ Retrieved ${allUsers.length} users from Microsoft`);
 
         // Parse and categorize users based on extension attributes
+        // extensionAttribute1 = OSTicketRole → "worker" or "viewer"
+        // extensionAttribute2 = OSDept → department code
         const workers = [];
-        const requesters = [];
+        const viewers = [];
         const uncategorized = [];
         const departmentStats = {};
 
         allUsers.forEach(u => {
             const extAttrs = u.onPremisesExtensionAttributes || {};
-            const osTicketRole = extAttrs.extensionAttribute1; // OSTicketRole
-            const osDept = extAttrs.extensionAttribute2; // OSDept
+            const osTicketRole = extAttrs.extensionAttribute1; // OSTicketRole: "worker" or "viewer"
+            const osDept = extAttrs.extensionAttribute2; // OSDept: department code
 
             const userInfo = {
                 id: u.id,
@@ -106,8 +108,8 @@ Deno.serve(async (req) => {
             // Categorize by role
             if (osTicketRole === 'worker') {
                 workers.push(userInfo);
-            } else if (osTicketRole === 'requester') {
-                requesters.push(userInfo);
+            } else if (osTicketRole === 'viewer') {
+                viewers.push(userInfo);
             } else {
                 uncategorized.push(userInfo);
             }
@@ -117,15 +119,15 @@ Deno.serve(async (req) => {
                 if (!departmentStats[osDept]) {
                     departmentStats[osDept] = {
                         workers: 0,
-                        requesters: 0,
+                        viewers: 0,
                         total: 0
                     };
                 }
                 departmentStats[osDept].total++;
                 if (osTicketRole === 'worker') {
                     departmentStats[osDept].workers++;
-                } else if (osTicketRole === 'requester') {
-                    departmentStats[osDept].requesters++;
+                } else if (osTicketRole === 'viewer') {
+                    departmentStats[osDept].viewers++;
                 }
             }
         });
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
         const stats = {
             total: allUsers.length,
             workers: workers.length,
-            requesters: requesters.length,
+            viewers: viewers.length,
             uncategorized: uncategorized.length,
             withExtensionData: allUsers.filter(u => {
                 const ext = u.onPremisesExtensionAttributes || {};
@@ -149,7 +151,7 @@ Deno.serve(async (req) => {
             tokenSource: tokenSource,
             stats: stats,
             workers: workers,
-            requesters: requesters,
+            viewers: viewers,
             uncategorized: uncategorized,
             departmentStats: departmentStats,
             allUsers: allUsers.map(u => ({
