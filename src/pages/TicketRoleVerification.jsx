@@ -17,7 +17,9 @@ import {
     UserX,
     RefreshCw,
     Eye,
-    Info
+    Info,
+    Server,
+    Cloud
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -108,7 +110,7 @@ export default function TicketRoleVerification() {
                             <Shield className="w-7 h-7 text-blue-600" />
                             Ticket Role Verification
                         </h1>
-                        <p className="text-slate-600">Verify Entra ID extension attributes for ticketing system</p>
+                        <p className="text-slate-600">Verify Hybrid AD extension attributes (synced to Entra ID)</p>
                     </div>
                     <Button
                         onClick={fetchUserData}
@@ -124,9 +126,16 @@ export default function TicketRoleVerification() {
                 <Alert className="mb-6 border-blue-200 bg-blue-50">
                     <Info className="w-4 h-4 text-blue-600" />
                     <AlertDescription className="text-sm text-blue-900">
-                        <div className="space-y-1">
-                            <p><strong>extensionAttribute1 (OSTicketRole):</strong> "worker" = can be assigned tickets | "viewer" = read-only access</p>
-                            <p><strong>extensionAttribute2 (OSDept):</strong> Department classification (Admin, Kitchen, Comms, etc.)</p>
+                        <div className="space-y-2">
+                            <p className="font-semibold flex items-center gap-2">
+                                <Server className="w-4 h-4" />
+                                Hybrid AD Setup (On-Premises → Azure AD Connect → Entra ID)
+                            </p>
+                            <div className="space-y-1 ml-6">
+                                <p><strong>extensionAttribute1 (OSTicketRole):</strong> "worker" = assignable | "viewer" = read-only</p>
+                                <p><strong>extensionAttribute2 (OSDept):</strong> Department classification (Admin, Kitchen, Comms, etc.)</p>
+                                <p className="text-xs mt-2 text-blue-700">Set in on-prem AD Attribute Editor → Synced to Entra ID → Accessible via Graph API</p>
+                            </div>
                         </div>
                     </AlertDescription>
                 </Alert>
@@ -140,6 +149,9 @@ export default function TicketRoleVerification() {
                             </h3>
                             <p className="text-slate-600 mb-6">
                                 Click "Fetch Data" to load users from Microsoft Entra ID
+                            </p>
+                            <p className="text-sm text-slate-500">
+                                This will pull onPremisesExtensionAttributes synced from your local AD
                             </p>
                         </CardContent>
                     </Card>
@@ -212,18 +224,34 @@ export default function TicketRoleVerification() {
                             </Card>
                         </div>
 
-                        {/* Token Source Info */}
-                        <Card className="mb-6 border-green-300 bg-green-50">
-                            <CardContent className="p-4">
-                                <div className="flex items-center gap-3">
-                                    <CheckCircle className="w-5 h-5 text-green-600" />
-                                    <div>
-                                        <p className="font-semibold text-green-900">Using {data.tokenSource} Token</p>
-                                        <p className="text-sm text-green-700">Successfully retrieved onPremisesExtensionAttributes from Microsoft Graph</p>
+                        {/* Token & Setup Info */}
+                        <div className="grid md:grid-cols-2 gap-4 mb-6">
+                            <Card className="border-green-300 bg-green-50">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle className="w-5 h-5 text-green-600" />
+                                        <div>
+                                            <p className="font-semibold text-green-900">Using {data.tokenSource} Token</p>
+                                            <p className="text-sm text-green-700">Successfully retrieved onPremisesExtensionAttributes</p>
+                                        </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+
+                            {data.setupInfo && (
+                                <Card className="border-blue-300 bg-blue-50">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <Server className="w-5 h-5 text-blue-600" />
+                                            <div>
+                                                <p className="font-semibold text-blue-900">{data.setupInfo.type}</p>
+                                                <p className="text-sm text-blue-700">{data.setupInfo.syncedFrom}</p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
 
                         {/* Department List (OSDept values) */}
                         {data.departmentList && data.departmentList.length > 0 && (
@@ -237,7 +265,8 @@ export default function TicketRoleVerification() {
                                 <CardContent>
                                     <div className="flex flex-wrap gap-2">
                                         {data.departmentList.map((dept) => (
-                                            <Badge key={dept} variant="outline" className="text-xs px-3 py-1">
+                                            <Badge key={dept} variant="outline" className="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 border-purple-300">
+                                                <Building2 className="w-3 h-3 mr-1" />
                                                 {dept}
                                             </Badge>
                                         ))}
@@ -257,8 +286,11 @@ export default function TicketRoleVerification() {
                                         {Object.entries(data.departmentStats)
                                             .sort(([a], [b]) => a.localeCompare(b))
                                             .map(([dept, stats]) => (
-                                                <div key={dept} className="p-3 bg-slate-50 rounded-lg border">
-                                                    <p className="font-semibold text-slate-900 mb-2">{dept}</p>
+                                                <div key={dept} className="p-3 bg-slate-50 rounded-lg border hover:shadow-md transition-shadow">
+                                                    <p className="font-semibold text-slate-900 mb-2 flex items-center gap-1">
+                                                        <Building2 className="w-4 h-4 text-purple-600" />
+                                                        {dept}
+                                                    </p>
                                                     <div className="text-xs text-slate-600 space-y-1">
                                                         <div className="flex items-center justify-between">
                                                             <span className="flex items-center gap-1">
