@@ -16,7 +16,8 @@ import {
   CheckCircle,
   XCircle,
   ArrowRight,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Bug
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,17 +25,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 
 export default function DepartmentTest() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [testingAuth, setTestingAuth] = useState(false);
   const [o365Data, setO365Data] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
@@ -54,9 +50,6 @@ export default function DepartmentTest() {
         navigate(createPageUrl('Dashboard'));
         return;
       }
-
-      // Automatically scan O365 on load
-      await scanO365();
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -66,11 +59,34 @@ export default function DepartmentTest() {
     }
   };
 
+  const testAuth = async () => {
+    setTestingAuth(true);
+    try {
+      console.log('🧪 Testing authentication...');
+      const response = await base44.functions.invoke('testAuth');
+      console.log('📥 Test response:', response.data);
+      
+      if (response.data?.success) {
+        toast.success('✅ Authentication test passed!');
+        console.log('✅ User info:', response.data.user);
+      } else {
+        toast.error('❌ Authentication test failed');
+      }
+    } catch (error) {
+      console.error('❌ Test error:', error);
+      toast.error('Authentication test failed: ' + error.message);
+    } finally {
+      setTestingAuth(false);
+    }
+  };
+
   const scanO365 = async () => {
     setScanning(true);
     setConnectionError(null);
     try {
+      console.log('🔍 Scanning O365...');
       const response = await base44.functions.invoke('scanO365Departments');
+      console.log('📥 Scan response:', response.data);
       
       if (response.data?.success) {
         setO365Data(response.data);
@@ -105,11 +121,17 @@ export default function DepartmentTest() {
         toast.error(response.data?.error || 'Failed to scan O365');
       }
     } catch (error) {
-      console.error('Error scanning O365:', error);
+      console.error('❌ Error scanning O365:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status
+      });
+      
       setConnectionError({
         type: 'error',
         message: 'Failed to scan Microsoft 365',
-        details: error.message
+        details: error.message + (error.response?.status ? ` (HTTP ${error.response.status})` : '')
       });
       toast.error('Failed to scan Microsoft 365');
     } finally {
@@ -173,15 +195,44 @@ export default function DepartmentTest() {
             </h1>
             <p className="text-slate-600">Scan Microsoft 365 for department assignments</p>
           </div>
-          <Button
-            onClick={scanO365}
-            disabled={scanning}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
-            {scanning ? 'Scanning...' : 'Refresh'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={testAuth}
+              disabled={testingAuth}
+              variant="outline"
+              size="sm"
+            >
+              <Bug className={`w-4 h-4 mr-2 ${testingAuth ? 'animate-spin' : ''}`} />
+              {testingAuth ? 'Testing...' : 'Test Auth'}
+            </Button>
+            <Button
+              onClick={scanO365}
+              disabled={scanning}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
+              {scanning ? 'Scanning...' : 'Scan O365'}
+            </Button>
+          </div>
         </div>
+
+        {/* Troubleshooting Info */}
+        <Card className="mb-6 border-purple-300 bg-purple-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Bug className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-purple-900 mb-2">Troubleshooting</h3>
+                <div className="text-sm text-purple-800 space-y-1">
+                  <p>• <strong>Test Auth</strong> - Verify function authentication works</p>
+                  <p>• <strong>Scan O365</strong> - Scan Microsoft 365 for departments</p>
+                  <p>• Check browser console for detailed logs</p>
+                  <p className="mt-2 text-xs">If you get a 401 error, the function may not be deployed. Check Base44 Dashboard → Code → Functions.</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Connection Error */}
         {connectionError && (
@@ -216,16 +267,6 @@ export default function DepartmentTest() {
                       Reconnect Microsoft 365
                     </Button>
                   )}
-                  {connectionError.type === 'permissions' && (
-                    <div className="text-sm text-red-800 mt-2">
-                      <p className="font-semibold mb-1">To fix this:</p>
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>Go to Settings → Integrations</li>
-                        <li>Disconnect Microsoft 365</li>
-                        <li>Reconnect and grant "Read all users' full profiles" permission</li>
-                      </ol>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -240,13 +281,8 @@ export default function DepartmentTest() {
                 Ready to Scan
               </h3>
               <p className="text-slate-600 mb-6">
-                Click "Refresh" to scan Microsoft 365 for department data
+                Click "Test Auth" first to verify authentication, then click "Scan O365"
               </p>
-              {!currentUser?.microsoft_access_token && (
-                <div className="text-sm text-orange-600 bg-orange-50 border border-orange-200 rounded-lg p-3 inline-block">
-                  ⚠️ Microsoft 365 not connected. Connect it in Settings first.
-                </div>
-              )}
             </CardContent>
           </Card>
         ) : (
@@ -309,26 +345,6 @@ export default function DepartmentTest() {
               </Card>
             </div>
 
-            {/* Sync Status Banner */}
-            {o365Data.syncStats.needsSync > 0 && (
-              <Card className="mb-6 border-orange-300 bg-orange-50">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-orange-900 mb-1">
-                        {o365Data.syncStats.needsSync} users need department sync
-                      </h3>
-                      <p className="text-sm text-orange-800">
-                        These users have department data in Microsoft 365 but it hasn't synced to Base44 yet. 
-                        They'll sync automatically on their next login.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Department List */}
             <Card className="mb-6">
               <CardHeader>
@@ -344,9 +360,6 @@ export default function DepartmentTest() {
                       {dept} ({o365Data.stats.departments[dept] || 0})
                     </Badge>
                   ))}
-                  {o365Data.uniqueDepartments.length === 0 && (
-                    <p className="text-sm text-slate-500">No departments found</p>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -357,7 +370,7 @@ export default function DepartmentTest() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
-                    placeholder="Search by name, email, department, or title..."
+                    placeholder="Search by name, email, department..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
@@ -391,87 +404,53 @@ export default function DepartmentTest() {
                             )}
                             {department}
                           </CardTitle>
-                          <Badge variant="outline" className={department === '(No Department)' ? 'border-red-300 text-red-700' : ''}>
+                          <Badge variant="outline">
                             {deptUsers.length} {deptUsers.length === 1 ? 'user' : 'users'}
                           </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="p-0">
                         <div className="divide-y">
-                          {deptUsers.map((user, idx) => (
-                            <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
+                          {deptUsers.slice(0, 10).map((user, idx) => (
+                            <div key={idx} className="p-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-slate-900">{user.displayName}</p>
-                                    {user.base44Role === 'admin' && (
-                                      <Badge className="bg-orange-100 text-orange-700 text-xs">Admin</Badge>
-                                    )}
-                                    {user.base44Role === 'super_user' && (
-                                      <Badge className="bg-purple-100 text-purple-700 text-xs">Super Admin</Badge>
-                                    )}
-                                  </div>
+                                  <p className="font-semibold text-slate-900">{user.displayName}</p>
                                   <p className="text-sm text-slate-600">{user.email}</p>
                                   {user.o365JobTitle && (
                                     <p className="text-sm text-slate-500 mt-1">{user.o365JobTitle}</p>
                                   )}
-                                  
-                                  {/* Sync Status */}
-                                  <div className="flex items-center gap-2 mt-2">
-                                    {user.inBase44 ? (
-                                      user.departmentMatch ? (
-                                        <Badge className="bg-green-100 text-green-700 text-xs flex items-center gap-1">
-                                          <CheckCircle className="w-3 h-3" />
-                                          Synced
-                                        </Badge>
-                                      ) : (
-                                        <Badge className="bg-orange-100 text-orange-700 text-xs flex items-center gap-1">
-                                          <RefreshCw className="w-3 h-3" />
-                                          Needs Sync
-                                        </Badge>
-                                      )
-                                    ) : (
-                                      <Badge className="bg-slate-100 text-slate-700 text-xs flex items-center gap-1">
-                                        <Database className="w-3 h-3" />
-                                        Not in Base44
-                                      </Badge>
-                                    )}
-                                  </div>
                                 </div>
-                                <div className="text-right text-xs text-slate-500">
-                                  {user.o365Department && (
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <Cloud className="w-3 h-3" />
-                                      <span>O365: {user.o365Department}</span>
-                                    </div>
-                                  )}
-                                  {user.inBase44 && user.base44Department && (
-                                    <div className="flex items-center gap-1">
-                                      <Database className="w-3 h-3" />
-                                      <span>Base44: {user.base44Department}</span>
-                                    </div>
-                                  )}
-                                </div>
+                                {user.inBase44 ? (
+                                  user.departmentMatch ? (
+                                    <Badge className="bg-green-100 text-green-700 text-xs">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Synced
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                      Needs Sync
+                                    </Badge>
+                                  )
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    Not in Base44
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           ))}
+                          {deptUsers.length > 10 && (
+                            <div className="p-4 text-center text-sm text-slate-500">
+                              +{deptUsers.length - 10} more users
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
                   </motion.div>
                 ))}
             </div>
-
-            {/* No Results */}
-            {Object.keys(departmentGroups).length === 0 && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Search className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No Results</h3>
-                  <p className="text-slate-600">Try adjusting your search</p>
-                </CardContent>
-              </Card>
-            )}
           </>
         )}
       </div>
