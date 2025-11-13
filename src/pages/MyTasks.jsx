@@ -437,7 +437,7 @@ export default function MyTasks() {
                   My Schedule
                 </CardTitle>
                 <p className="text-slate-600 text-sm mt-1">
-                  Upcoming events with your door codes • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
+                  Upcoming events • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
