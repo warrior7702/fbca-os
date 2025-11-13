@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -30,23 +29,10 @@ import {
   Camera,
   Trash2,
   Edit2,
-  ChevronLeft, // Added
-  ChevronRight // Added
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
-import { 
-  format, 
-  subDays, 
-  addDays, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  addMonths, 
-  subMonths, 
-  isSameMonth, 
-  isSameDay, 
-  eachDayOfInterval 
-} from "date-fns"; // Added date-fns imports
+import { format, subDays, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, isSameDay, eachDayOfInterval } from "date-fns";
 import { toast } from "sonner";
 
 export default function ProjectReview() {
@@ -60,8 +46,8 @@ export default function ProjectReview() {
   const [uploading, setUploading] = useState(false);
   const [uploadedMaterials, setUploadedMaterials] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [currentMonth, setCurrentMonth] = useState(new Date()); // Added
-  const [draggedTask, setDraggedTask] = useState(null); // Added
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [draggedTask, setDraggedTask] = useState(null);
 
   // Project details form
   const [projectDetails, setProjectDetails] = useState({
@@ -127,7 +113,23 @@ export default function ProjectReview() {
 
         // Load or auto-generate tasks
         if (projectData.tasks && projectData.tasks.length > 0) {
-          setTasks(projectData.tasks);
+          // Remove duplicate photographer tasks (keep only first one)
+          const seenPhotographer = false;
+          const cleanedTasks = [];
+          let hasPhotographer = false;
+          
+          for (const task of projectData.tasks) {
+            if (task.type === 'photography') {
+              if (!hasPhotographer) {
+                cleanedTasks.push(task);
+                hasPhotographer = true;
+              }
+            } else {
+              cleanedTasks.push(task);
+            }
+          }
+          
+          setTasks(cleanedTasks);
         } else {
           // Auto-generate tasks based on event date
           const eventDate = foundRequest.pco_event_date || goalData.event_date;
@@ -169,7 +171,7 @@ export default function ProjectReview() {
         assigned_to: 'Shelby Meeks',
         status: 'not_started',
         description: 'Create all graphic design assets for this event',
-        color: 'pink' // Added color
+        color: 'pink'
       },
       {
         id: `task-${Date.now()}-2`,
@@ -179,7 +181,7 @@ export default function ProjectReview() {
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
         description: 'Prepare and deliver pulpit announcement',
-        color: 'pink' // Added color
+        color: 'pink'
       },
       {
         id: `task-${Date.now()}-3`,
@@ -189,7 +191,7 @@ export default function ProjectReview() {
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
         description: 'Create first promotional reel for social media',
-        color: 'orange' // Added color
+        color: 'orange'
       },
       {
         id: `task-${Date.now()}-4`,
@@ -199,7 +201,7 @@ export default function ProjectReview() {
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
         description: 'Create second promotional reel for social media',
-        color: 'orange' // Added color
+        color: 'orange'
       },
       {
         id: `task-${Date.now()}-5`,
@@ -209,7 +211,7 @@ export default function ProjectReview() {
         assigned_to: 'Kyle Judkins',
         status: 'not_started',
         description: 'Launch digital signage campaign',
-        color: 'blue' // Added color
+        color: 'blue'
       }
     ];
   };
@@ -221,6 +223,13 @@ export default function ProjectReview() {
       return;
     }
 
+    // Check if photographer task already exists
+    const hasPhotographer = tasks.some(task => task.type === 'photography');
+    if (hasPhotographer) {
+      toast.error('Photographer task already added');
+      return;
+    }
+
     const newTask = {
       id: `task-${Date.now()}-photographer`,
       name: 'Event Photography',
@@ -229,7 +238,7 @@ export default function ProjectReview() {
       assigned_to: 'Volunteer Photographer',
       status: 'not_started',
       description: 'Capture photos during the event',
-      color: 'purple' // Added color
+      color: 'purple'
     };
 
     const updatedTasks = [...tasks, newTask];
@@ -237,7 +246,7 @@ export default function ProjectReview() {
     toast.success('Photographer task added');
   };
 
-  const addSocialMediaReel = () => { // Added function
+  const addSocialMediaReel = () => {
     const eventDate = request.pco_event_date || request.goal_review_data?.event_date;
     if (!eventDate) {
       toast.error('Event date required to add task');
@@ -285,7 +294,7 @@ export default function ProjectReview() {
     toast.success('Task deleted');
   };
 
-  const getTaskColor = (task) => { // Modified from getStatusColor
+  const getTaskColor = (task) => {
     const colors = {
       pink: 'border-pink-300 bg-pink-50 text-pink-700',
       blue: 'border-blue-300 bg-blue-50 text-blue-700',
@@ -316,7 +325,6 @@ export default function ProjectReview() {
       const newMaterials = [...uploadedMaterials, ...uploadedFiles];
       setUploadedMaterials(newMaterials);
 
-      // Save to database
       await base44.entities.WorkflowRequest.update(requestId, {
         project_review_data: {
           ...request.project_review_data,
@@ -331,7 +339,7 @@ export default function ProjectReview() {
       toast.error('Failed to upload files');
     } finally {
       setUploading(false);
-      e.target.value = ''; // Reset input
+      e.target.value = '';
     }
   };
 
@@ -378,7 +386,6 @@ export default function ProjectReview() {
   const handleFinalize = async () => {
     setSaving(true);
     try {
-      // Create tickets for each task
       const ticketPromises = tasks.map(async (task) => {
         const ticketNumber = `TKT-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5)}`;
         
@@ -409,7 +416,6 @@ export default function ProjectReview() {
 
       await Promise.all(ticketPromises);
 
-      // Update workflow request status
       await base44.entities.WorkflowRequest.update(requestId, {
         status: 'campaign_running',
         project_review_data: {
@@ -432,7 +438,7 @@ export default function ProjectReview() {
     }
   };
 
-  // Calendar rendering logic - Added function
+  // Calendar rendering logic
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -508,7 +514,7 @@ export default function ProjectReview() {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (draggedTask) {
-                        updateTaskDate(draggedTask.id, day.toISOString());
+                        updateTaskDate(draggedTask.id, day);
                         setDraggedTask(null);
                       }
                     }}
@@ -901,7 +907,6 @@ export default function ProjectReview() {
                 </p>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                {/* Upload Section */}
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 bg-slate-50">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -954,7 +959,6 @@ export default function ProjectReview() {
                   </div>
                 </div>
 
-                {/* Uploaded Files */}
                 {uploadedMaterials.length > 0 && (
                   <div>
                     <h3 className="font-semibold text-slate-900 mb-3">Uploaded Files</h3>
@@ -995,7 +999,6 @@ export default function ProjectReview() {
                   </div>
                 )}
 
-                {/* Existing Links from Intake */}
                 {(request.goal_review_data?.graphics_folder_link || 
                   request.goal_review_data?.marketing_assets_link || 
                   request.goal_review_data?.previous_event_photos) && (
@@ -1069,7 +1072,6 @@ export default function ProjectReview() {
                   </div>
                 )}
 
-                {/* Empty State - only show if no uploaded materials AND no links */}
                 {uploadedMaterials.length === 0 && 
                  !request.goal_review_data?.graphics_folder_link && 
                  !request.goal_review_data?.marketing_assets_link && 
@@ -1087,27 +1089,6 @@ export default function ProjectReview() {
 
           {/* Timeline & Tasks Tab */}
           <TabsContent value="timeline" className="space-y-6">
-            {/* Auto-Assignment Info */}
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-bold text-green-900 text-lg mb-2">AUTO-ASSIGNMENT ENABLED</h3>
-                  <p className="text-sm text-green-800 mb-3">
-                    Tasks are automatically assigned to your team based on their roles:
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm text-green-800">
-                    <div>• Graphics/Design → <strong>Shelby Meeks</strong></div>
-                    <div>• Social Media Reels → <strong>Kyle Judkins</strong></div>
-                    <div>• Pulpit Announcement → <strong>Kyle Judkins</strong></div>
-                    <div>• Digital Signs → <strong>Kyle Judkins</strong></div>
-                    <div>• Photography (optional) → <strong>Volunteer Photographer</strong></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Project Timeline */}
             <Card>
               <CardHeader className="border-b bg-slate-50">
@@ -1155,7 +1136,7 @@ export default function ProjectReview() {
                       Photographer (Event Day)
                     </Button>
                     <Button
-                      onClick={addSocialMediaReel} // New button
+                      onClick={addSocialMediaReel}
                       variant="outline"
                       size="sm"
                       className="gap-2"
