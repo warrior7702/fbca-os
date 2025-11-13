@@ -39,6 +39,7 @@ import EmailTemplateEditor from './pages/EmailTemplateEditor';
 import CampaignRunning from './pages/CampaignRunning';
 import TicketDetail from './pages/TicketDetail';
 import TicketAnalytics from './pages/TicketAnalytics';
+import MediaPlayer from './pages/MediaPlayer';
 import Layout from './Layout.jsx';
 
 
@@ -84,6 +85,7 @@ export const PAGES = {
     "CampaignRunning": CampaignRunning,
     "TicketDetail": TicketDetail,
     "TicketAnalytics": TicketAnalytics,
+    "MediaPlayer": MediaPlayer,
 }
 
 export const pagesConfig = {

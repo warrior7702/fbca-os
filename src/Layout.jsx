@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -501,14 +502,15 @@ export default function Layout({ children, currentPageName }) {
               >
                 <Wifi className="w-4 h-4 text-white/80" />
               </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                onClick={() => toast.info('FBCA Media Player - Coming Soon!')}
-                title="FBCA Media Player"
-              >
-                <Volume2 className="w-4 h-4 text-white/80" />
-              </motion.div>
+              <Link to={createPageUrl('MediaPlayer')}>
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="FBCA Media Player"
+                >
+                  <Volume2 className="w-4 h-4 text-white/80" />
+                </motion.div>
+              </Link>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
