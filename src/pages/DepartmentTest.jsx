@@ -15,7 +15,8 @@ import {
   Database,
   CheckCircle,
   XCircle,
-  ArrowRight
+  ArrowRight,
+  Link as LinkIcon
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export default function DepartmentTest() {
   const [o365Data, setO365Data] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState("o365");
+  const [connectionError, setConnectionError] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -67,6 +68,7 @@ export default function DepartmentTest() {
 
   const scanO365 = async () => {
     setScanning(true);
+    setConnectionError(null);
     try {
       const response = await base44.functions.invoke('scanO365Departments');
       
@@ -74,10 +76,41 @@ export default function DepartmentTest() {
         setO365Data(response.data);
         toast.success(`Scanned ${response.data.users.length} users from Microsoft 365`);
       } else {
+        // Handle specific error types
+        if (response.data?.needsConnection) {
+          setConnectionError({
+            type: 'connection',
+            message: response.data.error,
+            details: response.data.details
+          });
+        } else if (response.data?.needsReconnection) {
+          setConnectionError({
+            type: 'reconnection',
+            message: response.data.error,
+            details: response.data.details
+          });
+        } else if (response.data?.needsPermissions) {
+          setConnectionError({
+            type: 'permissions',
+            message: response.data.error,
+            details: response.data.details
+          });
+        } else {
+          setConnectionError({
+            type: 'error',
+            message: response.data?.error || 'Failed to scan O365',
+            details: response.data?.details
+          });
+        }
         toast.error(response.data?.error || 'Failed to scan O365');
       }
     } catch (error) {
       console.error('Error scanning O365:', error);
+      setConnectionError({
+        type: 'error',
+        message: 'Failed to scan Microsoft 365',
+        details: error.message
+      });
       toast.error('Failed to scan Microsoft 365');
     } finally {
       setScanning(false);
@@ -150,6 +183,55 @@ export default function DepartmentTest() {
           </Button>
         </div>
 
+        {/* Connection Error */}
+        {connectionError && (
+          <Card className="mb-6 border-red-300 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-red-900 mb-1">
+                    {connectionError.message}
+                  </h3>
+                  <p className="text-sm text-red-800 mb-3">
+                    {connectionError.details}
+                  </p>
+                  {connectionError.type === 'connection' && (
+                    <Button 
+                      onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Connect Microsoft 365
+                    </Button>
+                  )}
+                  {connectionError.type === 'reconnection' && (
+                    <Button 
+                      onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reconnect Microsoft 365
+                    </Button>
+                  )}
+                  {connectionError.type === 'permissions' && (
+                    <div className="text-sm text-red-800 mt-2">
+                      <p className="font-semibold mb-1">To fix this:</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Go to Settings → Integrations</li>
+                        <li>Disconnect Microsoft 365</li>
+                        <li>Reconnect and grant "Read all users' full profiles" permission</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {!o365Data ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -160,6 +242,11 @@ export default function DepartmentTest() {
               <p className="text-slate-600 mb-6">
                 Click "Refresh" to scan Microsoft 365 for department data
               </p>
+              {!currentUser?.microsoft_access_token && (
+                <div className="text-sm text-orange-600 bg-orange-50 border border-orange-200 rounded-lg p-3 inline-block">
+                  ⚠️ Microsoft 365 not connected. Connect it in Settings first.
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -247,14 +334,14 @@ export default function DepartmentTest() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-blue-600" />
-                  Unique Departments
+                  Unique Departments ({o365Data.uniqueDepartments.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {o365Data.uniqueDepartments.map((dept) => (
                     <Badge key={dept} variant="outline" className="text-sm">
-                      {dept}
+                      {dept} ({o365Data.stats.departments[dept] || 0})
                     </Badge>
                   ))}
                   {o365Data.uniqueDepartments.length === 0 && (

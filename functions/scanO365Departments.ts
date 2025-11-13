@@ -5,23 +5,47 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
         
-        if (!user || (user.role !== 'admin' && user.role !== 'super_user')) {
+        if (!user) {
             return Response.json({ 
-                error: 'Unauthorized - Admin access required' 
+                error: 'Unauthorized - Please log in' 
+            }, { status: 401 });
+        }
+
+        if (user.role !== 'admin' && user.role !== 'super_user') {
+            return Response.json({ 
+                error: 'Forbidden - Admin access required' 
             }, { status: 403 });
         }
 
         console.log('🔍 ========== SCANNING O365 DEPARTMENTS ==========');
-        console.log('👤 Admin user:', user.email);
+        console.log('👤 Admin user:', user.email, '| Role:', user.role);
 
-        // Get Microsoft Graph access token via SSO
-        const accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+        // Try to get Microsoft access token
+        let accessToken = null;
+        
+        // Try SSO token first (for users logged in via Microsoft SSO)
+        try {
+            accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+            if (accessToken) {
+                console.log('✅ Using SSO token');
+            }
+        } catch (ssoError) {
+            console.log('ℹ️ No SSO token available:', ssoError.message);
+        }
+        
+        // Fall back to manually connected Microsoft token
+        if (!accessToken && user.microsoft_access_token) {
+            accessToken = user.microsoft_access_token;
+            console.log('✅ Using manually connected Microsoft token');
+        }
         
         if (!accessToken) {
             console.error('❌ No Microsoft access token available');
             return Response.json({
                 success: false,
-                error: 'Microsoft 365 not connected. Please connect Microsoft in Settings.',
+                error: 'Microsoft 365 not connected',
+                details: 'Please connect Microsoft 365 in Settings, or log in via Microsoft SSO.',
+                needsConnection: true,
                 users: []
             }, { status: 400 });
         }
@@ -42,6 +66,28 @@ Deno.serve(async (req) => {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ Microsoft Graph API error:', response.status, errorText);
+            
+            // Handle specific error cases
+            if (response.status === 401) {
+                return Response.json({
+                    success: false,
+                    error: 'Microsoft token expired or invalid',
+                    details: 'Please reconnect Microsoft 365 in Settings.',
+                    needsReconnection: true,
+                    users: []
+                }, { status: 401 });
+            }
+            
+            if (response.status === 403) {
+                return Response.json({
+                    success: false,
+                    error: 'Insufficient permissions',
+                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions to scan all users.',
+                    needsPermissions: true,
+                    users: []
+                }, { status: 403 });
+            }
+            
             return Response.json({
                 success: false,
                 error: `Microsoft Graph API error: ${response.status}`,
