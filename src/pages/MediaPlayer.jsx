@@ -35,10 +35,53 @@ export default function MediaPlayer() {
   const [loading, setLoading] = useState(true);
   const [resiData, setResiData] = useState({ collections: [], featured: null });
   const [podcasts, setPodcasts] = useState([]);
+  const [isLive, setIsLive] = useState(false);
+  const [checkingLive, setCheckingLive] = useState(true);
 
   useEffect(() => {
     loadMediaData();
+    checkLiveStatus();
+    // Check live status every 2 minutes
+    const liveCheckInterval = setInterval(checkLiveStatus, 120000);
+    return () => clearInterval(liveCheckInterval);
   }, []);
+
+  const checkLiveStatus = async () => {
+    setCheckingLive(true);
+    try {
+      // Check if the live stream is actually broadcasting
+      // We'll check the current day/time against service times
+      const now = new Date();
+      const day = now.getDay(); // 0 = Sunday
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const currentMinutes = hour * 60 + minute;
+
+      // Sunday services: 9:00 AM (540) and 10:45 AM (645)
+      // Wednesday service: 6:30 PM (1110)
+      const sundayMorning1Start = 540 - 15; // Start 15 min before
+      const sundayMorning1End = 540 + 75; // End 75 min after
+      const sundayMorning2Start = 645 - 15;
+      const sundayMorning2End = 645 + 75;
+      const wednesdayEveningStart = 1110 - 15;
+      const wednesdayEveningEnd = 1110 + 90;
+
+      let live = false;
+      if (day === 0) { // Sunday
+        live = (currentMinutes >= sundayMorning1Start && currentMinutes <= sundayMorning1End) ||
+               (currentMinutes >= sundayMorning2Start && currentMinutes <= sundayMorning2End);
+      } else if (day === 3) { // Wednesday
+        live = currentMinutes >= wednesdayEveningStart && currentMinutes <= wednesdayEveningEnd;
+      }
+
+      setIsLive(live);
+    } catch (error) {
+      console.error('Error checking live status:', error);
+      setIsLive(false);
+    } finally {
+      setCheckingLive(false);
+    }
+  };
 
   const loadMediaData = async () => {
     setLoading(true);
@@ -70,7 +113,8 @@ export default function MediaPlayer() {
       icon: Radio,
       color: 'from-red-500 to-pink-500',
       description: 'Watch live now',
-      badge: 'LIVE'
+      badge: isLive ? 'LIVE' : null,
+      badgeAnimate: isLive
     },
     {
       id: 'sermons',
@@ -186,7 +230,9 @@ export default function MediaPlayer() {
                   <h3 className="font-semibold text-slate-900 mb-1 text-sm">{section.title}</h3>
                   <p className="text-xs text-slate-500">{section.description}</p>
                   {section.badge && (
-                    <Badge className="mt-2 bg-red-100 text-red-700 text-xs">{section.badge}</Badge>
+                    <Badge className={`mt-2 text-xs ${section.badgeAnimate ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-red-100 text-red-700'}`}>
+                      {section.badge}
+                    </Badge>
                   )}
                 </CardContent>
               </Card>
@@ -306,10 +352,26 @@ export default function MediaPlayer() {
       <Card className="overflow-hidden shadow-2xl">
         <div className="bg-gradient-to-br from-red-600 to-pink-600 p-6 text-white">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
-            <h2 className="text-2xl font-bold">Live Stream</h2>
+            {isLive && (
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [1, 0.5, 1]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="w-3 h-3 bg-white rounded-full"
+              />
+            )}
+            {!isLive && <div className="w-3 h-3 bg-white/50 rounded-full" />}
+            <h2 className="text-2xl font-bold">{isLive ? 'Live Now' : 'Live Stream'}</h2>
           </div>
-          <p className="text-white/90">Watch FBCA services live</p>
+          <p className="text-white/90">
+            {isLive ? 'Service is currently live!' : 'Watch FBCA services live'}
+          </p>
         </div>
         
         {/* Embed FBCA Live Page in iframe */}
@@ -687,7 +749,7 @@ export default function MediaPlayer() {
               {currentSection ? (
                 <currentSection.icon className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
               ) : (
-                <Volume2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
+                <Music className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
               )}
               {section === 'home' ? 'FBCA Media' : currentSection?.title}
             </h1>
@@ -700,10 +762,17 @@ export default function MediaPlayer() {
           {section === 'home' && (
             <Button
               onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=livestream')}
-              className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700"
+              className={`bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 ${isLive ? 'animate-pulse' : ''}`}
             >
+              {isLive && (
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-2 h-2 bg-white rounded-full mr-2"
+                />
+              )}
               <Radio className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Watch Live</span>
+              <span className="hidden sm:inline">{isLive ? 'Live Now!' : 'Watch Live'}</span>
               <span className="sm:hidden">Live</span>
             </Button>
           )}
