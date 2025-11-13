@@ -15,8 +15,7 @@ import {
     Shield,
     UserCheck,
     UserX,
-    RefreshCw,
-    Eye
+    RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -118,22 +117,6 @@ export default function TicketRoleVerification() {
                     </Button>
                 </div>
 
-                {/* Info Card */}
-                <Card className="mb-6 border-blue-200 bg-blue-50">
-                    <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                            <div className="text-sm text-blue-900">
-                                <p className="font-semibold mb-1">Extension Attribute Values:</p>
-                                <ul className="space-y-1">
-                                    <li>• <strong>extensionAttribute1 (OSTicketRole):</strong> "worker" or "view"</li>
-                                    <li>• <strong>extensionAttribute2 (OSDept):</strong> Department identifier (e.g., IT, Facilities)</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
                 {!data ? (
                     <Card>
                         <CardContent className="p-12 text-center">
@@ -178,10 +161,10 @@ export default function TicketRoleVerification() {
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm text-slate-600">View Only</p>
-                                            <p className="text-2xl font-bold text-blue-700">{data.stats.viewers}</p>
+                                            <p className="text-sm text-slate-600">Requesters</p>
+                                            <p className="text-2xl font-bold text-blue-700">{data.stats.requesters}</p>
                                         </div>
-                                        <Eye className="w-8 h-8 text-blue-500" />
+                                        <Users className="w-8 h-8 text-blue-500" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -239,7 +222,7 @@ export default function TicketRoleVerification() {
                                                     <p className="font-semibold text-slate-900">{dept}</p>
                                                     <div className="text-xs text-slate-600 mt-1 space-y-0.5">
                                                         <p>Workers: {stats.workers}</p>
-                                                        <p>View Only: {stats.viewers}</p>
+                                                        <p>Requesters: {stats.requesters}</p>
                                                         <p>Total: {stats.total}</p>
                                                     </div>
                                                 </div>
@@ -269,8 +252,8 @@ export default function TicketRoleVerification() {
                                 <TabsTrigger value="workers">
                                     Workers ({data.stats.workers})
                                 </TabsTrigger>
-                                <TabsTrigger value="viewers">
-                                    View Only ({data.stats.viewers})
+                                <TabsTrigger value="requesters">
+                                    Requesters ({data.stats.requesters})
                                 </TabsTrigger>
                                 <TabsTrigger value="uncategorized">
                                     Uncategorized ({data.stats.uncategorized})
@@ -284,8 +267,8 @@ export default function TicketRoleVerification() {
                                 <UserList users={filterUsers(data.workers)} />
                             </TabsContent>
 
-                            <TabsContent value="viewers" className="mt-4">
-                                <UserList users={filterUsers(data.viewers)} />
+                            <TabsContent value="requesters" className="mt-4">
+                                <UserList users={filterUsers(data.requesters)} />
                             </TabsContent>
 
                             <TabsContent value="uncategorized" className="mt-4">

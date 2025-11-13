@@ -82,15 +82,14 @@ Deno.serve(async (req) => {
         console.log(`✅ Retrieved ${allUsers.length} users from Microsoft`);
 
         // Parse and categorize users based on extension attributes
-        // OSTicketRole values: "worker" or "view"
         const workers = [];
-        const viewers = [];
+        const requesters = [];
         const uncategorized = [];
         const departmentStats = {};
 
         allUsers.forEach(u => {
             const extAttrs = u.onPremisesExtensionAttributes || {};
-            const osTicketRole = extAttrs.extensionAttribute1; // OSTicketRole: "worker" or "view"
+            const osTicketRole = extAttrs.extensionAttribute1; // OSTicketRole
             const osDept = extAttrs.extensionAttribute2; // OSDept
 
             const userInfo = {
@@ -107,8 +106,8 @@ Deno.serve(async (req) => {
             // Categorize by role
             if (osTicketRole === 'worker') {
                 workers.push(userInfo);
-            } else if (osTicketRole === 'view') {
-                viewers.push(userInfo);
+            } else if (osTicketRole === 'requester') {
+                requesters.push(userInfo);
             } else {
                 uncategorized.push(userInfo);
             }
@@ -118,15 +117,15 @@ Deno.serve(async (req) => {
                 if (!departmentStats[osDept]) {
                     departmentStats[osDept] = {
                         workers: 0,
-                        viewers: 0,
+                        requesters: 0,
                         total: 0
                     };
                 }
                 departmentStats[osDept].total++;
                 if (osTicketRole === 'worker') {
                     departmentStats[osDept].workers++;
-                } else if (osTicketRole === 'view') {
-                    departmentStats[osDept].viewers++;
+                } else if (osTicketRole === 'requester') {
+                    departmentStats[osDept].requesters++;
                 }
             }
         });
@@ -134,7 +133,7 @@ Deno.serve(async (req) => {
         const stats = {
             total: allUsers.length,
             workers: workers.length,
-            viewers: viewers.length,
+            requesters: requesters.length,
             uncategorized: uncategorized.length,
             withExtensionData: allUsers.filter(u => {
                 const ext = u.onPremisesExtensionAttributes || {};
@@ -150,7 +149,7 @@ Deno.serve(async (req) => {
             tokenSource: tokenSource,
             stats: stats,
             workers: workers,
-            viewers: viewers,
+            requesters: requesters,
             uncategorized: uncategorized,
             departmentStats: departmentStats,
             allUsers: allUsers.map(u => ({
