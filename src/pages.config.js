@@ -37,6 +37,8 @@ import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import CronStatus from './pages/CronStatus';
 import EmailTemplateEditor from './pages/EmailTemplateEditor';
 import CampaignRunning from './pages/CampaignRunning';
+import TicketDetail from './pages/TicketDetail';
+import TicketAnalytics from './pages/TicketAnalytics';
 import Layout from './Layout.jsx';
 
 
@@ -80,6 +82,8 @@ export const PAGES = {
     "CronStatus": CronStatus,
     "EmailTemplateEditor": EmailTemplateEditor,
     "CampaignRunning": CampaignRunning,
+    "TicketDetail": TicketDetail,
+    "TicketAnalytics": TicketAnalytics,
 }
 
 export const pagesConfig = {

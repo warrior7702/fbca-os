@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
   Ticket,
@@ -17,7 +17,8 @@ import {
   Crown,
   MessageSquare,
   Calendar,
-  User as UserIcon
+  User as UserIcon,
+  BarChart3
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,9 @@ import { format } from "date-fns";
 
 export default function SupportTickets() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ticketId = searchParams.get('id');
+  
   const [user, setUser] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +50,13 @@ export default function SupportTickets() {
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   useEffect(() => {
+    // If there's a ticket ID in URL, navigate to detail page
+    if (ticketId) {
+      navigate(createPageUrl('TicketDetail') + `?id=${ticketId}`);
+      return;
+    }
     loadData();
-  }, []);
+  }, [ticketId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -162,13 +171,25 @@ export default function SupportTickets() {
             </div>
           </div>
 
-          <Button
-            onClick={() => navigate(createPageUrl('CreateTicket'))}
-            className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Ticket
-          </Button>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button
+                onClick={() => navigate(createPageUrl('TicketAnalytics'))}
+                variant="outline"
+                className="gap-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Analytics
+              </Button>
+            )}
+            <Button
+              onClick={() => navigate(createPageUrl('CreateTicket'))}
+              className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Ticket
+            </Button>
+          </div>
         </div>
 
         {isAdmin && (
@@ -302,11 +323,7 @@ export default function SupportTickets() {
             >
               <Card 
                 className="cursor-pointer hover:shadow-lg transition-all"
-                onClick={() => {
-                  const params = new URLSearchParams(window.location.search);
-                  params.set('id', ticket.id);
-                  navigate(createPageUrl('SupportTickets') + '?' + params.toString());
-                }}
+                onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
