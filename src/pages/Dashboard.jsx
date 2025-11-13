@@ -16,7 +16,8 @@ import {
   Folder,
   Mail,
   Briefcase,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Trophy
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
   { id: "myapprovals", name: "Approvals", icon: ClipboardCheck, color: "from-orange-500 to-red-500", path: "MyApprovals", showBadge: true },
+  { id: "achievements", name: "Achievements", icon: Trophy, color: "from-amber-500 to-yellow-500", path: "Achievements" },
   { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" },
   { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-purple-500 to-pink-500", path: "MyMeetings" },
   { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
@@ -56,14 +58,15 @@ const getDefaultPositions = () => {
   return {
     mytasks: { row: 0, col: 0 },
     myapprovals: { row: 0, col: 1 },
-    calendar: { row: 0, col: 2 },
-    mymeetings: { row: 0, col: 3 },
-    mydepartment: { row: 0, col: 4 },
-    communications: { row: 1, col: 0 },
-    foodservice: { row: 1, col: 1 },
-    support: { row: 1, col: 2 },
-    staffdir: { row: 1, col: 3 },
-    documents: { row: 1, col: 4 },
+    achievements: { row: 0, col: 2 },
+    calendar: { row: 0, col: 3 },
+    mymeetings: { row: 0, col: 4 },
+    mydepartment: { row: 1, col: 0 },
+    communications: { row: 1, col: 1 },
+    foodservice: { row: 1, col: 2 },
+    support: { row: 1, col: 3 },
+    staffdir: { row: 1, col: 4 },
+    documents: { row: 2, col: 0 },
     inboxhelper: { row: 2, col: 1 },
     planningtool: { row: 2, col: 2 },
     sharepoint: { row: 2, col: 3 },
