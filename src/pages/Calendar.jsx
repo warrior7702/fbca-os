@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
@@ -262,7 +263,9 @@ export default function Calendar() {
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-52">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Resource Category" />
+                  <SelectValue>
+                    {selectedCategory === "all" ? "All Resources" : selectedCategory}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Resources</SelectItem>
@@ -278,7 +281,9 @@ export default function Calendar() {
               <Select value={selectedTag} onValueChange={setSelectedTag}>
                 <SelectTrigger className="w-48">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Tag" />
+                  <SelectValue>
+                    {selectedTag === "all" ? "All Tags" : selectedTag}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tags</SelectItem>
