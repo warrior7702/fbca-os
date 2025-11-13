@@ -1,95 +1,96 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
-    console.log('🚀 ========== FUNCTION STARTED ==========');
-    console.log('📥 Request method:', req.method);
-    console.log('📥 Request URL:', req.url);
+    console.log('🚀 ========== DEPARTMENT SCAN STARTED ==========');
     
     try {
-        console.log('🔧 Creating Base44 client from request...');
         const base44 = createClientFromRequest(req);
-        console.log('✅ Base44 client created');
+        const user = await base44.auth.me();
         
-        console.log('👤 Fetching current user...');
-        let user;
-        try {
-            user = await base44.auth.me();
-            console.log('✅ User fetched:', user?.email, '| Role:', user?.role);
-        } catch (authError) {
-            console.error('❌ Auth error:', authError.message);
-            return Response.json({ 
-                error: 'Authentication failed',
-                details: authError.message,
-                hint: 'Please make sure you are logged in'
-            }, { status: 401 });
-        }
+        console.log('✅ User authenticated:', user?.email, '| Role:', user?.role);
         
         if (!user) {
-            console.error('❌ No user found');
-            return Response.json({ 
-                error: 'Unauthorized - Please log in' 
-            }, { status: 401 });
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         if (user.role !== 'admin' && user.role !== 'super_user') {
-            console.error('❌ User is not admin:', user.role);
             return Response.json({ 
                 error: 'Forbidden - Admin access required' 
             }, { status: 403 });
         }
 
-        console.log('🔍 ========== SCANNING O365 DEPARTMENTS ==========');
-        console.log('👤 Admin user:', user.email, '| Role:', user.role);
-        console.log('🔐 User has microsoft_access_token:', !!user.microsoft_access_token);
+        console.log('🔑 ========== TOKEN ACQUISITION ==========');
+        console.log('   User email:', user.email);
+        console.log('   Email domain:', user.email?.split('@')[1]);
+        console.log('   Has manual token:', !!user.microsoft_access_token);
 
-        // Try to get Microsoft access token
+        // Try SSO token FIRST
         let accessToken = null;
+        let tokenSource = null;
         
-        // Try SSO token first (for users logged in via Microsoft SSO)
-        console.log('🔑 Attempting to get SSO token...');
+        console.log('🔐 Step 1: Attempting SSO token...');
         try {
             accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
             if (accessToken) {
-                console.log('✅ Using SSO token (length:', accessToken.length, ')');
+                tokenSource = 'SSO';
+                console.log('✅ SSO token retrieved!');
+                console.log('   Token length:', accessToken.length);
+                console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
+                console.log('   Token has dots (JWT):', accessToken.includes('.'));
+                console.log('   Token parts count:', accessToken.split('.').length);
             } else {
-                console.log('ℹ️ SSO token returned null/empty');
+                console.log('⚠️ SSO token returned null/undefined');
             }
         } catch (ssoError) {
-            console.log('⚠️ SSO error:', ssoError.message);
+            console.log('❌ SSO error:', ssoError.message);
+            console.log('   Error type:', ssoError.constructor.name);
+            console.log('   Error stack:', ssoError.stack);
         }
         
-        // Fall back to manually connected Microsoft token
+        // Fall back to manual token
         if (!accessToken && user.microsoft_access_token) {
+            tokenSource = 'Manual';
             accessToken = user.microsoft_access_token;
-            console.log('✅ Using manually connected Microsoft token (length:', accessToken.length, ')');
+            console.log('⚠️ Using manual token as fallback');
+            console.log('   Token length:', accessToken.length);
+            console.log('   Token starts with:', accessToken.substring(0, 20) + '...');
+            console.log('   Token has dots (JWT):', accessToken.includes('.'));
+            console.log('   Token parts count:', accessToken.split('.').length);
+            
+            // Validate manual token format
+            if (!accessToken.includes('.') || accessToken.split('.').length !== 3) {
+                console.error('❌ Manual token is malformed (not a valid JWT)');
+                return Response.json({
+                    success: false,
+                    error: 'Microsoft token is corrupted',
+                    details: 'Your manually connected Microsoft token is invalid. Please remove it and use SSO instead.',
+                    needsReconnection: true,
+                    tokenSource: 'Manual (Corrupted)',
+                    users: []
+                }, { status: 400 });
+            }
         }
         
         if (!accessToken) {
             console.error('❌ No Microsoft access token available');
-            console.log('🔍 Debug info:');
-            console.log('  - User email domain:', user.email?.split('@')[1]);
-            console.log('  - Has microsoft_access_token:', !!user.microsoft_access_token);
-            console.log('  - Attempted SSO:', true);
-            
             return Response.json({
                 success: false,
                 error: 'Microsoft 365 not connected',
-                details: 'Please connect Microsoft 365 in Settings, or log in via Microsoft SSO.',
+                details: 'Please log in with Microsoft SSO, or connect Microsoft 365 manually in Settings.',
                 needsConnection: true,
-                users: [],
-                debug: {
-                    userEmail: user.email,
-                    hasMicrosoftToken: !!user.microsoft_access_token,
-                    attemptedSSO: true
-                }
+                users: []
             }, { status: 400 });
         }
 
-        // Call Microsoft Graph API to get all users
+        console.log(`✅ Using token from: ${tokenSource}`);
+        console.log('🔑 ========== END TOKEN ACQUISITION ==========\n');
+
+        // Call Microsoft Graph API
+        console.log('📡 Calling Microsoft Graph API...');
         const graphUrl = 'https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,jobTitle,officeLocation,companyName,employeeId&$top=999';
         
-        console.log('📡 Calling Microsoft Graph API...');
         console.log('🔗 URL:', graphUrl);
+        console.log('🔑 Auth header format: Bearer [token]');
         
         const response = await fetch(graphUrl, {
             headers: {
@@ -98,30 +99,54 @@ Deno.serve(async (req) => {
             }
         });
 
-        console.log('📥 Response status:', response.status);
+        console.log('📥 Graph API response status:', response.status);
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('❌ Microsoft Graph API error:', response.status, errorText);
+            console.error('❌ ========== GRAPH API ERROR ==========');
+            console.error('Status:', response.status);
+            console.error('Response:', errorText);
+            console.error('Token source:', tokenSource);
+            console.error('Token length:', accessToken.length);
+            console.error('Token format valid:', accessToken.includes('.') && accessToken.split('.').length === 3);
             
-            // Handle specific error cases
             if (response.status === 401) {
-                console.error('🔑 Token is invalid or expired');
-                return Response.json({
-                    success: false,
-                    error: 'Microsoft token expired or invalid',
-                    details: 'Please reconnect Microsoft 365 in Settings.',
-                    needsReconnection: true,
-                    users: []
-                }, { status: 401 });
+                // Parse error details
+                let errorObj = {};
+                try {
+                    errorObj = JSON.parse(errorText);
+                } catch (e) {
+                    // Ignore parse errors
+                }
+                
+                if (tokenSource === 'Manual') {
+                    return Response.json({
+                        success: false,
+                        error: 'Manual Microsoft token is invalid',
+                        details: 'Your manually connected Microsoft token cannot be used. Remove it and use SSO instead.',
+                        needsReconnection: true,
+                        tokenSource: tokenSource,
+                        graphError: errorObj.error?.message || errorText,
+                        users: []
+                    }, { status: 401 });
+                } else {
+                    return Response.json({
+                        success: false,
+                        error: 'SSO token was rejected by Microsoft',
+                        details: 'Your SSO session may have expired. Please log out and log back in.',
+                        needsRelogin: true,
+                        tokenSource: tokenSource,
+                        graphError: errorObj.error?.message || errorText,
+                        users: []
+                    }, { status: 401 });
+                }
             }
             
             if (response.status === 403) {
-                console.error('🚫 Insufficient permissions');
                 return Response.json({
                     success: false,
                     error: 'Insufficient permissions',
-                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions to scan all users.',
+                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions.',
                     needsPermissions: true,
                     users: []
                 }, { status: 403 });
@@ -129,7 +154,7 @@ Deno.serve(async (req) => {
             
             return Response.json({
                 success: false,
-                error: `Microsoft Graph API error: ${response.status}`,
+                error: `Graph API error: ${response.status}`,
                 details: errorText,
                 users: []
             }, { status: response.status });
@@ -138,9 +163,9 @@ Deno.serve(async (req) => {
         const data = await response.json();
         const o365Users = data.value || [];
 
-        console.log(`✅ Retrieved ${o365Users.length} users from Microsoft 365`);
+        console.log(`✅ Retrieved ${o365Users.length} users from O365`);
 
-        // Analyze department data
+        // Analyze departments
         const stats = {
             total: o365Users.length,
             withDepartment: 0,
@@ -165,27 +190,14 @@ Deno.serve(async (req) => {
             }
         });
 
-        console.log('\n📊 ========== O365 DEPARTMENT STATS ==========');
-        console.log(`Total Users: ${stats.total}`);
-        console.log(`✅ With Department: ${stats.withDepartment} (${Math.round(stats.withDepartment / stats.total * 100)}%)`);
-        console.log(`❌ Without Department: ${stats.withoutDepartment} (${Math.round(stats.withoutDepartment / stats.total * 100)}%)`);
-        console.log(`✅ With Job Title: ${stats.withJobTitle} (${Math.round(stats.withJobTitle / stats.total * 100)}%)`);
-        console.log(`❌ Without Job Title: ${stats.withoutJobTitle} (${Math.round(stats.withoutJobTitle / stats.total * 100)}%)`);
-        
-        console.log('\n📂 Departments Found:');
-        Object.entries(stats.departments)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([dept, count]) => {
-                console.log(`  - ${dept}: ${count} users`);
-            });
+        console.log('📊 Department stats:', JSON.stringify(stats, null, 2));
 
         // Get Base44 users for comparison
-        console.log('\n📊 Loading Base44 users for comparison...');
+        console.log('📊 Loading Base44 users...');
         const base44Users = await base44.asServiceRole.entities.User.list();
-        
-        console.log(`✅ Retrieved ${base44Users.length} users from Base44`);
+        console.log(`✅ Retrieved ${base44Users.length} Base44 users`);
 
-        // Compare and merge data
+        // Compare data
         const comparisonData = o365Users.map(o365User => {
             const base44User = base44Users.find(u => 
                 u.email?.toLowerCase() === o365User.mail?.toLowerCase() ||
@@ -215,30 +227,27 @@ Deno.serve(async (req) => {
             needsSync: comparisonData.filter(u => u.needsSync).length
         };
 
-        console.log('\n🔄 ========== SYNC STATUS ==========');
-        console.log(`✅ Users in both systems: ${syncStats.inBothSystems}`);
-        console.log(`⚠️  Users only in O365: ${syncStats.notInBase64}`);
-        console.log(`✅ Department data matches: ${syncStats.departmentMatches}`);
-        console.log(`🔄 Needs sync: ${syncStats.needsSync}`);
-        console.log('\n✅ ========== FUNCTION COMPLETE ==========');
+        console.log('🔄 Sync stats:', JSON.stringify(syncStats, null, 2));
+        console.log('✅ ========== SCAN COMPLETE ==========');
 
         return Response.json({
             success: true,
             stats: stats,
             syncStats: syncStats,
             users: comparisonData,
-            uniqueDepartments: Object.keys(stats.departments).sort()
+            uniqueDepartments: Object.keys(stats.departments).sort(),
+            tokenSource: tokenSource
         });
 
     } catch (error) {
-        console.error('\n❌ ========== SCAN ERROR ==========');
+        console.error('❌ ========== FATAL ERROR ==========');
         console.error('Error type:', error.constructor.name);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         
         return Response.json({
             success: false,
-            error: 'Failed to scan O365 departments',
+            error: 'Failed to scan departments',
             details: error.message,
             errorType: error.constructor.name,
             users: []

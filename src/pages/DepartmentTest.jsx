@@ -87,7 +87,8 @@ export default function DepartmentTest() {
     try {
       console.log('🔍 Starting department scan...');
       
-      const response = await base44.functions.invoke('scanDepartments');
+      // Use the EXISTING scanO365Departments function
+      const response = await base44.functions.invoke('scanO365Departments');
       console.log('📥 Scan response:', response.data);
       
       if (response.data?.success) {
@@ -258,12 +259,13 @@ export default function DepartmentTest() {
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="font-semibold text-green-900 mb-2">✅ Function Deployed & Working!</h3>
+                <h3 className="font-semibold text-green-900 mb-2">✅ Ready to Scan!</h3>
                 <div className="text-sm text-green-800 space-y-1">
                   <p>• Logged in as: <strong>{currentUser?.email}</strong></p>
                   <p>• Role: <strong>{currentUser?.role}</strong></p>
-                  <p>• Login method: <strong>Microsoft SSO</strong> (automatic Microsoft 365 access)</p>
+                  <p>• Login method: <strong>Microsoft SSO</strong></p>
                   <p className="mt-2">The function will use your SSO token for secure access.</p>
+                  <p className="text-xs mt-2">💡 After clicking "Scan O365", check the function logs in Base44 Dashboard → Code → Functions → scanO365Departments → Logs</p>
                 </div>
               </div>
             </div>
