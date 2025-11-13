@@ -41,6 +41,7 @@ import TicketDetail from './pages/TicketDetail';
 import TicketAnalytics from './pages/TicketAnalytics';
 import MediaPlayer from './pages/MediaPlayer';
 import Achievements from './pages/Achievements';
+import DepartmentTest from './pages/DepartmentTest';
 import Layout from './Layout.jsx';
 
 
@@ -88,6 +89,7 @@ export const PAGES = {
     "TicketAnalytics": TicketAnalytics,
     "MediaPlayer": MediaPlayer,
     "Achievements": Achievements,
+    "DepartmentTest": DepartmentTest,
 }
 
 export const pagesConfig = {
