@@ -9,72 +9,68 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Fetch FBCA podcasts page
-        const podcastUrl = 'https://www.fbca.org/podcasts/';
-        const response = await fetch(podcastUrl);
-        const html = await response.text();
-
-        // Parse podcasts from HTML
-        const podcasts = [];
-        
-        // Look for podcast sections - adjust regex based on actual HTML structure
-        const podcastRegex = /<div[^>]*class="[^"]*podcast[^"]*"[^>]*>.*?<img[^>]*src="([^"]*)".*?<h[23][^>]*>([^<]*)<\/h[23]>.*?<p[^>]*>([^<]*)<\/p>/gs;
-        
-        let match;
-        while ((match = podcastRegex.exec(html)) !== null) {
-            podcasts.push({
-                id: podcasts.length + 1,
-                thumbnail: match[1],
-                title: match[2].trim(),
-                description: match[3].trim(),
-                episodes: 0 // Will need to scrape individual podcast pages for episode counts
-            });
-        }
-
-        // Fallback: Try to find any images and titles if regex doesn't work
-        if (podcasts.length === 0) {
-            // Generic extraction - find headings and nearby images
-            const titleRegex = /<h[23][^>]*>([^<]*(?:podcast|sermon|message)[^<]*)<\/h[23]>/gi;
-            const titles = [...html.matchAll(titleRegex)];
-            
-            for (let i = 0; i < Math.min(titles.length, 5); i++) {
-                const title = titles[i][1];
-                // Try to find a nearby image
-                const section = html.slice(Math.max(0, titles[i].index - 500), titles[i].index + 500);
-                const imgMatch = section.match(/<img[^>]*src="([^"]*)"[^>]*>/);
-                
-                podcasts.push({
-                    id: i + 1,
-                    title: title.trim(),
-                    description: 'FBCA Podcast',
-                    thumbnail: imgMatch ? imgMatch[1] : 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80',
-                    episodes: 0
-                });
+        // FBCA has 6 Transistor.fm podcast feeds
+        const podcasts = [
+            {
+                id: 1,
+                title: 'FBCA Sermons',
+                description: 'Weekly messages from Pastor Dennis Wiles',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/podcasts2022.png',
+                feedUrl: 'https://fbcasermons.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/first-baptist-church-arlington-sermons/playlist',
+                episodes: 0
+            },
+            {
+                id: 2,
+                title: 'Tell Me More',
+                description: 'Your midweek spiritual boost - unpacking Sunday\'s sermon',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_TellMeMore.png',
+                feedUrl: 'https://tellmemore.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/tell-me-more/playlist',
+                episodes: 0
+            },
+            {
+                id: 3,
+                title: 'It Takes A Village',
+                description: 'Insights for parents guiding middle and high schoolers',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_ItTakesAVillage.png',
+                feedUrl: 'https://ittakesavillage.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/it-takes-a-village/playlist',
+                episodes: 0
+            },
+            {
+                id: 4,
+                title: 'Small Steps',
+                description: 'Faith-filled encouragement for young families',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_SmallSteps.png',
+                feedUrl: 'https://smallsteps.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/small-steps/playlist',
+                episodes: 0
+            },
+            {
+                id: 5,
+                title: 'Live Sent',
+                description: 'Living missionally in Arlington and beyond',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_LiveSent.png',
+                feedUrl: 'https://livesent.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/live-sent/playlist',
+                episodes: 0
+            },
+            {
+                id: 6,
+                title: 'Family Talk Box',
+                description: 'Building stronger family connections through conversation',
+                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_FamilyTalkBox.png',
+                feedUrl: 'https://familytalkbox.transistor.fm/',
+                embedUrl: 'https://share.transistor.fm/e/family-talk-box/playlist',
+                episodes: 0
             }
-        }
-
-        // If still no podcasts found, return default structure
-        if (podcasts.length === 0) {
-            return Response.json({
-                success: true,
-                podcasts: [
-                    {
-                        id: 1,
-                        title: 'FBCA Sermons',
-                        description: 'Weekly messages from First Baptist Church Arlington',
-                        thumbnail: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80',
-                        episodes: 0,
-                        url: podcastUrl
-                    }
-                ],
-                source: 'default'
-            });
-        }
+        ];
 
         return Response.json({
             success: true,
-            podcasts: podcasts.slice(0, 6), // Limit to 6 podcasts
-            source: 'scraped'
+            podcasts,
+            featured: podcasts.slice(0, 2) // FBCA Sermons and Tell Me More are featured
         });
 
     } catch (error) {
