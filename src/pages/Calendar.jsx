@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,13 +9,6 @@ import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -72,11 +64,9 @@ export default function Calendar() {
       const eventsData = eventsResponse.data.events;
       console.log('✅ Loaded', eventsData.length, 'events');
       
-      // Log stats if available
       if (eventsResponse.data.stats) {
         console.log('📊 Stats:', eventsResponse.data.stats);
         
-        // Show warning if many events are missing data
         if (eventsResponse.data.stats.events_without_names > 10) {
           toast.warning(`${eventsResponse.data.stats.events_without_names} events in PCO are missing names`);
         }
@@ -95,7 +85,6 @@ export default function Calendar() {
             if (resource.kind === 'Room') {
               roomsSet.add(resource.name);
             } else {
-              // Use the approval group category
               if (resource.category && resource.category !== 'Uncategorized') {
                 categoriesSet.add(resource.category);
               }
@@ -145,28 +134,25 @@ export default function Calendar() {
 
   // Filter events by room search, resource category, and tag
   const filteredEvents = events.filter(event => {
-    // Room search filter
     const roomMatch = !roomSearch || 
       event.resources?.some(r => 
         r.kind === 'Room' && 
         r.name.toLowerCase().includes(roomSearch.toLowerCase())
       );
     
-    // Resource category filter
     const categoryMatch = selectedCategory === "all" || 
       event.resources?.some(r => 
         r.kind !== 'Room' && 
         r.category === selectedCategory
       );
     
-    // Tag filter
     const tagMatch = selectedTag === "all" || 
       event.tags?.includes(selectedTag);
     
     return roomMatch && categoryMatch && tagMatch;
   });
 
-  console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Month: ${format(currentMonth, 'MMMM yyyy')}`);
+  console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Category: ${selectedCategory}, Tag: ${selectedTag}`);
 
   // Calendar grid generation
   const monthStart = startOfMonth(currentMonth);
@@ -208,7 +194,6 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
 
-  // Helper function to strip HTML tags from text
   const stripHtml = (html) => {
     if (!html) return '';
     const tmp = document.createElement('DIV');
@@ -247,8 +232,7 @@ export default function Calendar() {
           }
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <div className="flex gap-2 flex-wrap">
-              {/* Room Search */}
+            <div className="flex gap-2">
               <div className="relative w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
@@ -258,42 +242,6 @@ export default function Calendar() {
                   className="pl-9 h-10"
                 />
               </div>
-
-              {/* Resource Category Dropdown */}
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-52">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Resources">
-                    {selectedCategory === "all" ? "All Resources" : selectedCategory}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Resources</SelectItem>
-                  {resourceCategories.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Tag Filter */}
-              <Select value={selectedTag} onValueChange={setSelectedTag}>
-                <SelectTrigger className="w-48">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Tags">
-                    {selectedTag === "all" ? "All Tags" : selectedTag}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tags</SelectItem>
-                  {eventTags.map(tag => (
-                    <SelectItem key={tag} value={tag}>
-                      {tag}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
 
               <Button
                 onClick={handleSync}
@@ -326,97 +274,163 @@ export default function Calendar() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
+          <>
+            {/* Filter Buttons */}
+            <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+              {/* Resource Type Filter */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-700">Filter by Resource Type:</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => setSelectedCategory("all")}
+                    variant={selectedCategory === "all" ? "default" : "outline"}
+                    size="sm"
+                    className={selectedCategory === "all" ? "bg-blue-600 hover:bg-blue-700" : ""}
+                  >
+                    All Resources
+                  </Button>
+                  {resourceCategories.map(category => (
+                    <Button
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      variant={selectedCategory === category ? "default" : "outline"}
+                      size="sm"
+                      className={selectedCategory === category ? "bg-blue-600 hover:bg-blue-700" : ""}
+                    >
+                      {category}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tag Filter */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-700">Filter by Tag:</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => setSelectedTag("all")}
+                    variant={selectedTag === "all" ? "default" : "outline"}
+                    size="sm"
+                    className={selectedTag === "all" ? "bg-purple-600 hover:bg-purple-700" : ""}
+                  >
+                    All Tags
+                  </Button>
+                  {eventTags.map(tag => (
+                    <Button
+                      key={tag}
+                      onClick={() => setSelectedTag(tag)}
+                      variant={selectedTag === tag ? "default" : "outline"}
+                      size="sm"
+                      className={selectedTag === tag ? "bg-purple-600 hover:bg-purple-700" : ""}
+                    >
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Calendar */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <h2 className="text-2xl font-bold text-slate-900">
+                    {format(currentMonth, 'MMMM yyyy')}
+                  </h2>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                  onClick={() => setCurrentMonth(new Date())}
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <h2 className="text-2xl font-bold text-slate-900">
-                  {format(currentMonth, 'MMMM yyyy')}
-                </h2>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                >
-                  <ChevronRight className="w-4 h-4" />
+                  Today
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentMonth(new Date())}
-              >
-                Today
-              </Button>
+
+              <div className="grid grid-cols-7 gap-1">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
+                    {day}
+                  </div>
+                ))}
+
+                {calendarDays.map((day, index) => {
+                  const dayEvents = getEventsForDay(day);
+                  const isCurrentMonth = isSameMonth(day, currentMonth);
+                  const isToday = isSameDay(day, new Date());
+
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.005 }}
+                      className={`min-h-32 border border-slate-200 p-2 ${
+                        !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
+                      } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
+                    >
+                      <div className={`text-sm font-semibold mb-1 ${
+                        isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
+                      }`}>
+                        {format(day, 'd')}
+                      </div>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 3).map((event, idx) => (
+                          <motion.div
+                            key={event.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                            }}
+                            className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
+                          >
+                            {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
+                          </motion.div>
+                        ))}
+                        {dayEvents.length > 3 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowAllDayEvents(day, dayEvents);
+                            }}
+                            className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
+                          >
+                            +{dayEvents.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
-                  {day}
-                </div>
-              ))}
-
-              {calendarDays.map((day, index) => {
-                const dayEvents = getEventsForDay(day);
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-                const isToday = isSameDay(day, new Date());
-
-                return (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.005 }}
-                    className={`min-h-32 border border-slate-200 p-2 ${
-                      !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
-                    } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
-                  >
-                    <div className={`text-sm font-semibold mb-1 ${
-                      isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
-                    }`}>
-                      {format(day, 'd')}
-                    </div>
-                    <div className="space-y-1">
-                      {dayEvents.slice(0, 3).map((event, idx) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEvent(event);
-                          }}
-                          className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
-                        >
-                          {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
-                        </motion.div>
-                      ))}
-                      {dayEvents.length > 3 && (
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShowAllDayEvents(day, dayEvents);
-                          }}
-                          className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
-                        >
-                          +{dayEvents.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -486,7 +500,6 @@ export default function Calendar() {
           </p>
           {selectedEvent && (
             <div className="space-y-6">
-              {/* Date & Time */}
               <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
                 <CalendarIcon className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
                 <div className="flex-1">
@@ -499,7 +512,6 @@ export default function Calendar() {
                 </div>
               </div>
 
-              {/* Summary - strip HTML */}
               {selectedEvent.summary && (
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-sm font-semibold text-blue-900 mb-2">Summary</p>
@@ -507,7 +519,6 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Description - strip HTML */}
               {selectedEvent.description && (
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
@@ -515,10 +526,8 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Resources - COLLAPSIBLE ROOMS AND RESOURCES WITH ANSWERS */}
               {selectedEvent.resources && selectedEvent.resources.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Rooms Section - Collapsible */}
                   {(() => {
                     const rooms = selectedEvent.resources.filter(r => r.kind === 'Room');
                     if (rooms.length === 0) return null;
@@ -579,7 +588,6 @@ export default function Calendar() {
                                   </div>
                                 </div>
                                 
-                                {/* Resource Answers */}
                                 {resource.answers && resource.answers.length > 0 && (
                                   <div className="mt-3 pt-3 border-t border-blue-100">
                                     <p className="text-xs font-semibold text-blue-600 mb-2">Details:</p>
@@ -601,7 +609,6 @@ export default function Calendar() {
                     );
                   })()}
 
-                  {/* Other Resources Section - Collapsible */}
                   {(() => {
                     const otherResources = selectedEvent.resources.filter(r => r.kind !== 'Room');
                     if (otherResources.length === 0) return null;
@@ -661,7 +668,6 @@ export default function Calendar() {
                                   </div>
                                 </div>
                                 
-                                {/* Resource Answers */}
                                 {resource.answers && resource.answers.length > 0 && (
                                   <div className="mt-3 pt-3 border-t border-green-100">
                                     <p className="text-xs font-semibold text-green-600 mb-2">Details:</p>
@@ -689,7 +695,6 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Tags */}
               {selectedEvent.tags && selectedEvent.tags.length > 0 ? (
                 <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                   <p className="text-sm font-semibold text-purple-900 mb-3">Tags</p>
@@ -707,7 +712,6 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Event Status */}
               <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
                 <div>
                   <span className="font-medium">Approval Status: </span>
@@ -731,7 +735,6 @@ export default function Calendar() {
                 )}
               </div>
 
-              {/* Debug Info */}
               <details className="p-3 bg-slate-100 rounded text-xs">
                 <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-900">
                   Debug Info
