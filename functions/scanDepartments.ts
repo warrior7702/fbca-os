@@ -20,33 +20,62 @@ Deno.serve(async (req) => {
         }
 
         console.log('🔑 Getting Microsoft access token...');
+        console.log('   User email domain:', user.email?.split('@')[1]);
+        console.log('   Has manual token:', !!user.microsoft_access_token);
 
-        // Try SSO token first
+        // IMPORTANT: Try SSO token FIRST (for users logged in via Microsoft SSO)
         let accessToken = null;
+        let tokenSource = null;
+        
         try {
+            console.log('🔐 Attempting SSO token...');
             accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
             if (accessToken) {
-                console.log('✅ Using SSO token');
+                tokenSource = 'SSO';
+                console.log('✅ Using SSO token (length:', accessToken.length, ')');
+            } else {
+                console.log('ℹ️ SSO token returned null');
             }
         } catch (ssoError) {
             console.log('⚠️ SSO error:', ssoError.message);
         }
         
-        // Fall back to manual token
+        // Only use manual token if SSO failed AND user has one
         if (!accessToken && user.microsoft_access_token) {
             accessToken = user.microsoft_access_token;
-            console.log('✅ Using manual token');
+            tokenSource = 'Manual';
+            console.log('⚠️ Falling back to manual token (length:', accessToken.length, ')');
+            
+            // Validate token format
+            if (!accessToken.includes('.')) {
+                console.error('❌ Token appears malformed (no JWT structure)');
+                return Response.json({
+                    success: false,
+                    error: 'Microsoft token is corrupted',
+                    details: 'Your manually connected Microsoft token is invalid. Please disconnect and reconnect Microsoft 365 in Settings, or use Microsoft SSO login.',
+                    needsReconnection: true,
+                    users: []
+                }, { status: 400 });
+            }
         }
         
         if (!accessToken) {
-            console.error('❌ No Microsoft access token');
+            console.error('❌ No Microsoft access token available');
+            console.log('🔍 Debug info:');
+            console.log('  - User email domain:', user.email?.split('@')[1]);
+            console.log('  - Has microsoft_access_token:', !!user.microsoft_access_token);
+            console.log('  - SSO available:', false);
+            
             return Response.json({
                 success: false,
                 error: 'Microsoft 365 not connected',
+                details: 'Please log in with Microsoft SSO, or connect Microsoft 365 manually in Settings.',
                 needsConnection: true,
                 users: []
             }, { status: 400 });
         }
+
+        console.log(`🔑 Using token from: ${tokenSource}`);
 
         // Call Microsoft Graph API
         console.log('📡 Calling Microsoft Graph API...');
@@ -66,18 +95,32 @@ Deno.serve(async (req) => {
             console.error('❌ Graph API error:', response.status, errorText);
             
             if (response.status === 401) {
-                return Response.json({
-                    success: false,
-                    error: 'Microsoft token expired',
-                    needsReconnection: true,
-                    users: []
-                }, { status: 401 });
+                if (tokenSource === 'Manual') {
+                    return Response.json({
+                        success: false,
+                        error: 'Microsoft token expired or invalid',
+                        details: 'Your manually connected Microsoft token is no longer valid. Please disconnect and reconnect Microsoft 365 in Settings, or use Microsoft SSO login.',
+                        needsReconnection: true,
+                        tokenSource: tokenSource,
+                        users: []
+                    }, { status: 401 });
+                } else {
+                    return Response.json({
+                        success: false,
+                        error: 'SSO token expired',
+                        details: 'Your SSO session expired. Please log out and log back in.',
+                        needsRelogin: true,
+                        tokenSource: tokenSource,
+                        users: []
+                    }, { status: 401 });
+                }
             }
             
             if (response.status === 403) {
                 return Response.json({
                     success: false,
                     error: 'Insufficient permissions',
+                    details: 'Your Microsoft account needs User.Read.All or Directory.Read.All permissions to scan all users.',
                     needsPermissions: true,
                     users: []
                 }, { status: 403 });
@@ -166,7 +209,8 @@ Deno.serve(async (req) => {
             stats: stats,
             syncStats: syncStats,
             users: comparisonData,
-            uniqueDepartments: Object.keys(stats.departments).sort()
+            uniqueDepartments: Object.keys(stats.departments).sort(),
+            tokenSource: tokenSource
         });
 
     } catch (error) {

@@ -17,7 +17,8 @@ import {
   XCircle,
   ArrowRight,
   Link as LinkIcon,
-  Bug
+  Bug,
+  LogOut
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,13 +87,13 @@ export default function DepartmentTest() {
     try {
       console.log('🔍 Starting department scan...');
       
-      // Use the NEW function name
       const response = await base44.functions.invoke('scanDepartments');
       console.log('📥 Scan response:', response.data);
       
       if (response.data?.success) {
         setO365Data(response.data);
-        toast.success(`✅ Scanned ${response.data.users.length} users from Microsoft 365`);
+        const tokenInfo = response.data.tokenSource === 'SSO' ? '(using SSO)' : '(using manual connection)';
+        toast.success(`✅ Scanned ${response.data.users.length} users ${tokenInfo}`);
       } else {
         // Handle specific error types
         if (response.data?.needsConnection) {
@@ -104,6 +105,13 @@ export default function DepartmentTest() {
         } else if (response.data?.needsReconnection) {
           setConnectionError({
             type: 'reconnection',
+            message: response.data.error,
+            details: response.data.details,
+            tokenSource: response.data.tokenSource
+          });
+        } else if (response.data?.needsRelogin) {
+          setConnectionError({
+            type: 'relogin',
             message: response.data.error,
             details: response.data.details
           });
@@ -139,6 +147,32 @@ export default function DepartmentTest() {
     } finally {
       setScanning(false);
     }
+  };
+
+  const handleDisconnectMicrosoft = async () => {
+    if (!confirm('This will disconnect your manual Microsoft connection. You\'ll still be logged in via SSO. Continue?')) {
+      return;
+    }
+    
+    try {
+      await base44.auth.updateMe({
+        microsoft_access_token: null,
+        microsoft_refresh_token: null,
+        microsoft_token_expires_at: null
+      });
+      toast.success('Manual Microsoft connection removed. Now using SSO only.');
+      loadData();
+      setConnectionError(null);
+    } catch (error) {
+      toast.error('Failed to disconnect');
+    }
+  };
+
+  const handleRelogin = () => {
+    toast.info('Logging out to refresh your session...');
+    setTimeout(() => {
+      base44.auth.logout();
+    }, 1000);
   };
 
   const filteredUsers = o365Data?.users?.filter(user => {
@@ -224,13 +258,12 @@ export default function DepartmentTest() {
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="font-semibold text-green-900 mb-2">✅ Authentication Working!</h3>
+                <h3 className="font-semibold text-green-900 mb-2">✅ Function Deployed & Working!</h3>
                 <div className="text-sm text-green-800 space-y-1">
-                  <p>• Test Auth passed - functions are deployed and accessible</p>
-                  <p>• You're logged in as: <strong>{currentUser?.email}</strong></p>
-                  <p>• Role: <strong className="text-green-900">{currentUser?.role}</strong></p>
-                  <p>• Microsoft Token: <strong className="text-green-900">Connected ✓</strong></p>
-                  <p className="mt-2 text-xs">Now using the <strong>NEW scanDepartments</strong> function to avoid any conflicts.</p>
+                  <p>• Logged in as: <strong>{currentUser?.email}</strong></p>
+                  <p>• Role: <strong>{currentUser?.role}</strong></p>
+                  <p>• Login method: <strong>Microsoft SSO</strong> (automatic Microsoft 365 access)</p>
+                  <p className="mt-2">The function will use your SSO token for secure access.</p>
                 </div>
               </div>
             </div>
@@ -250,6 +283,34 @@ export default function DepartmentTest() {
                   <p className="text-sm text-red-800 mb-3">
                     {connectionError.details}
                   </p>
+                  
+                  {connectionError.type === 'relogin' && (
+                    <Button 
+                      onClick={handleRelogin}
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Log Out & Back In
+                    </Button>
+                  )}
+                  
+                  {connectionError.type === 'reconnection' && connectionError.tokenSource === 'Manual' && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-red-700 mb-2">
+                        💡 <strong>Solution:</strong> Remove your corrupted manual connection and use SSO instead.
+                      </p>
+                      <Button 
+                        onClick={handleDisconnectMicrosoft}
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Remove Manual Connection (Use SSO)
+                      </Button>
+                    </div>
+                  )}
+                  
                   {connectionError.type === 'connection' && (
                     <Button 
                       onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
@@ -258,16 +319,6 @@ export default function DepartmentTest() {
                     >
                       <LinkIcon className="w-4 h-4 mr-2" />
                       Connect Microsoft 365
-                    </Button>
-                  )}
-                  {connectionError.type === 'reconnection' && (
-                    <Button 
-                      onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
-                      size="sm"
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Reconnect Microsoft 365
                     </Button>
                   )}
                 </div>
@@ -347,6 +398,20 @@ export default function DepartmentTest() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Token Source Info */}
+            {o365Data.tokenSource && (
+              <Card className="mb-6 border-blue-300 bg-blue-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-blue-800">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>
+                      Data retrieved using: <strong>{o365Data.tokenSource === 'SSO' ? 'Microsoft SSO' : 'Manual Connection'}</strong>
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Department List */}
             <Card className="mb-6">
