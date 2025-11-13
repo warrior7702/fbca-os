@@ -390,15 +390,17 @@ ${meetingNotes.transcript || 'No transcript available.'}
 
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {!user?.microsoft_access_token && <ConnectionWarning />}
 
         <AppHeader
           icon={Video}
           title="My Meetings"
           description={
-            <span className="flex items-center gap-2">
-              {meetings.length} meeting{meetings.length !== 1 ? 's' : ''} • Timezone: {timezone}
+            <span className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm">
+              <span>{meetings.length} meeting{meetings.length !== 1 ? 's' : ''}</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="text-xs">Timezone: {timezone}</span>
             </span>
           }
           iconColor="from-purple-500 to-pink-500"
@@ -406,18 +408,18 @@ ${meetingNotes.transcript || 'No transcript available.'}
             <Button
               onClick={handleSync}
               disabled={syncing}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
               size="sm"
             >
               {syncing ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
+                  <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
+                  <span className="hidden sm:inline">Syncing...</span>
                 </>
               ) : (
                 <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync Calendar
+                  <RefreshCw className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sync Calendar</span>
                 </>
               )}
             </Button>

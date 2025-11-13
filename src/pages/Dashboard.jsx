@@ -80,12 +80,22 @@ export default function Dashboard() {
   const [approvalsCount, setApprovalsCount] = useState(0);
   const [tasksDueToday, setTasksDueToday] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Detect mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
     loadUser();
     loadApprovals();
     loadTasksDueToday();
+
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
@@ -296,6 +306,49 @@ export default function Dashboard() {
     );
   }
 
+  // Mobile view - grid of apps
+  if (isMobile) {
+    return (
+      <div 
+        className="h-full relative overflow-auto bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('${wallpaperUrl}')`
+        }}
+      >
+        <div className="p-4 pb-20">
+          <div className="grid grid-cols-3 gap-4">
+            {defaultApps.map((app) => (
+              <motion.div
+                key={app.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleAppClick(app)}
+                className="flex flex-col items-center justify-center gap-2 cursor-pointer"
+              >
+                <div className={`w-16 h-16 bg-gradient-to-br ${app.color} rounded-2xl shadow-xl flex items-center justify-center relative`}>
+                  <app.icon className="w-8 h-8 text-white" />
+                  {app.id === 'myapprovals' && approvalsCount > 0 && (
+                    <Badge className="absolute -top-2 -right-2 bg-red-500 text-white border-2 border-white min-w-[20px] h-5 flex items-center justify-center px-1.5 text-xs">
+                      {approvalsCount}
+                    </Badge>
+                  )}
+                  {app.id === 'mytasks' && tasksDueToday > 0 && (
+                    <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white border-2 border-white min-w-[20px] h-5 flex items-center justify-center px-1.5 text-xs">
+                      {tasksDueToday}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-white text-xs font-medium text-center drop-shadow-lg leading-tight">
+                  {app.name}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop view - original grid layout
   return (
     <div 
       className="h-full relative overflow-hidden bg-cover bg-center bg-no-repeat"

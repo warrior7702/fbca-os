@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -312,42 +313,43 @@ export default function TicketDetail() {
 
   return (
     <div className="h-full bg-gradient-to-br from-amber-50 to-yellow-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(createPageUrl('SupportTickets'))}
+              className="flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <TicketIcon className="w-6 h-6 text-amber-600" />
-                <h1 className="text-2xl font-bold text-slate-900">{ticket.subject}</h1>
+                <TicketIcon className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 flex-shrink-0" />
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate">{ticket.subject}</h1>
               </div>
-              <p className="text-sm text-slate-600 font-mono">{ticket.ticket_number}</p>
+              <p className="text-xs sm:text-sm text-slate-600 font-mono">{ticket.ticket_number}</p>
             </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Content - 2/3 width */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Ticket Details */}
             <Card>
               <CardHeader>
-                <CardTitle>Description</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Description</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
+                <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
 
                 {/* Attachments */}
                 {ticket.attachments && ticket.attachments.length > 0 && (
                   <div>
-                    <p className="text-sm font-semibold text-slate-700 mb-2">Attachments</p>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-700 mb-2">Attachments</p>
                     <div className="space-y-2">
                       {ticket.attachments.map((file, idx) => (
                         <a
@@ -355,11 +357,11 @@ export default function TicketDetail() {
                           href={file.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                          className="flex items-center gap-2 text-xs sm:text-sm text-blue-600 hover:text-blue-700 hover:underline break-all"
                         >
-                          <Paperclip className="w-4 h-4" />
-                          {file.name}
-                          <ExternalLink className="w-3 h-3" />
+                          <Paperclip className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
                         </a>
                       ))}
                     </div>
@@ -381,7 +383,7 @@ export default function TicketDetail() {
                         variant="outline"
                         size="sm"
                         disabled={uploadingFiles}
-                        className="cursor-pointer"
+                        className="cursor-pointer w-full sm:w-auto"
                         asChild
                       >
                         <span>
@@ -408,13 +410,13 @@ export default function TicketDetail() {
             {ticket.suggested_solution && (
               <Card className="border-2 border-purple-200 bg-purple-50">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-900">
-                    <Sparkles className="w-5 h-5" />
+                  <CardTitle className="flex items-center gap-2 text-purple-900 text-base sm:text-lg">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                     AI Suggested Solution
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-slate-700 whitespace-pre-wrap">{ticket.suggested_solution}</p>
+                  <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{ticket.suggested_solution}</p>
                 </CardContent>
               </Card>
             )}
@@ -422,8 +424,8 @@ export default function TicketDetail() {
             {/* Comments */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                   Discussion ({ticket.comments?.length || 0})
                 </CardTitle>
               </CardHeader>
@@ -435,19 +437,19 @@ export default function TicketDetail() {
                         key={idx}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`p-4 rounded-lg ${
+                        className={`p-3 sm:p-4 rounded-lg ${
                           comment.is_internal 
                             ? 'bg-amber-50 border-2 border-amber-200' 
                             : 'bg-slate-50'
                         }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                            <User className="w-4 h-4 text-white" />
+                        <div className="flex items-start gap-2 sm:gap-3">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                            <User className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold text-slate-900">{comment.author_name}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <p className="font-semibold text-slate-900 text-sm sm:text-base">{comment.author_name}</p>
                               {comment.is_internal && (
                                 <Badge variant="outline" className="text-xs">Internal</Badge>
                               )}
@@ -455,7 +457,7 @@ export default function TicketDetail() {
                                 {formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}
                               </span>
                             </div>
-                            <p className="text-slate-700 whitespace-pre-wrap">{comment.content}</p>
+                            <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap break-words">{comment.content}</p>
                           </div>
                         </div>
                       </motion.div>
@@ -472,10 +474,11 @@ export default function TicketDetail() {
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder="Add a comment..."
                       rows={3}
+                      className="text-sm"
                     />
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       {isAdmin && (
-                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <label className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={isInternalComment}
@@ -489,7 +492,8 @@ export default function TicketDetail() {
                       <Button
                         onClick={handleAddComment}
                         disabled={!newComment.trim() || submittingComment}
-                        className="bg-amber-600 hover:bg-amber-700"
+                        className="bg-amber-600 hover:bg-amber-700 w-full sm:w-auto"
+                        size="sm"
                       >
                         {submittingComment ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -506,11 +510,11 @@ export default function TicketDetail() {
           </div>
 
           {/* Sidebar - 1/3 width */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Status & Priority */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Ticket Info</CardTitle>
+                <CardTitle className="text-sm sm:text-base">Ticket Info</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -597,7 +601,7 @@ export default function TicketDetail() {
             {/* Requester Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Requester</CardTitle>
+                <CardTitle className="text-sm sm:text-base">Requester</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -616,7 +620,7 @@ export default function TicketDetail() {
             {/* Location */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Location</CardTitle>
+                <CardTitle className="text-sm sm:text-base">Location</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div>
@@ -636,7 +640,7 @@ export default function TicketDetail() {
             {isAdmin && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Metrics</CardTitle>
+                  <CardTitle className="text-sm sm:text-base">Metrics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">

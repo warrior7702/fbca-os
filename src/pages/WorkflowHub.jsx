@@ -330,37 +330,38 @@ export default function WorkflowHub() {
   };
 
   return (
-    <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 p-6 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 p-3 sm:p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(createPageUrl('Dashboard'))}
+              className="flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <MessageSquare className="w-6 h-6 text-purple-600" />
+              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Communications Requests
                   {isAdmin && (
-                    <Crown className={`inline-block ml-2 w-5 h-5 ${user?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
+                    <Crown className={`inline-block ml-2 w-4 h-4 sm:w-5 sm:h-5 ${user?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
                   )}
                 </h1>
-                <p className="text-sm text-slate-600">
+                <p className="text-xs sm:text-sm text-slate-600">
                   {isAdmin ? 'All workflow requests' : 'Your requests and assignments'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {isAdmin && (
               <>
-                <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
+                <div className="hidden sm:flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
                   <Button
                     variant={viewMode === "kanban" ? "default" : "ghost"}
                     size="sm"
@@ -381,7 +382,8 @@ export default function WorkflowHub() {
                   onClick={handleSync}
                   disabled={syncing}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 hidden sm:flex"
+                  size="sm"
                 >
                   <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                   Sync PCO
@@ -391,27 +393,28 @@ export default function WorkflowHub() {
             
             <Button
               onClick={() => navigate(createPageUrl('CommunicationsRequestForm'))}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 flex-1 sm:flex-none"
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New Request
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">New Request</span>
             </Button>
           </div>
         </div>
 
         {isAdmin && (
-          <div className="grid grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <Card 
               className="cursor-pointer hover:shadow-lg transition-all"
               onClick={() => setShowArchived(false)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Total</p>
-                    <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Total</p>
+                    <p className="text-xl sm:text-2xl font-bold text-slate-900">{stats.total}</p>
                   </div>
-                  <MessageSquare className="w-8 h-8 text-slate-500" />
+                  <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-slate-500" />
                 </div>
               </CardContent>
             </Card>
@@ -420,13 +423,13 @@ export default function WorkflowHub() {
               className="cursor-pointer hover:shadow-lg transition-all"
               onClick={() => setShowArchived(false)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Minister Review</p>
-                    <p className="text-2xl font-bold text-purple-700">{stats.minister_review}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Minister Review</p>
+                    <p className="text-xl sm:text-2xl font-bold text-purple-700">{stats.minister_review}</p>
                   </div>
-                  <Clock className="w-8 h-8 text-purple-500" />
+                  <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
                 </div>
               </CardContent>
             </Card>
@@ -435,13 +438,13 @@ export default function WorkflowHub() {
               className="cursor-pointer hover:shadow-lg transition-all"
               onClick={() => setShowArchived(false)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Project Review</p>
-                    <p className="text-2xl font-bold text-orange-700">{stats.project_review}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Project Review</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-700">{stats.project_review}</p>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-orange-500" />
+                  <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
                 </div>
               </CardContent>
             </Card>
@@ -450,13 +453,13 @@ export default function WorkflowHub() {
               className="cursor-pointer hover:shadow-lg transition-all"
               onClick={() => setShowArchived(false)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Campaign Running</p>
-                    <p className="text-2xl font-bold text-green-700">{stats.campaign_running}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Campaign Running</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.campaign_running}</p>
                   </div>
-                  <Sparkles className="w-8 h-8 text-green-500" />
+                  <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                 </div>
               </CardContent>
             </Card>
@@ -465,13 +468,13 @@ export default function WorkflowHub() {
               className="cursor-pointer hover:shadow-lg transition-all border-2 border-slate-300"
               onClick={() => setShowArchived(!showArchived)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Completed</p>
-                    <p className="text-2xl font-bold text-slate-700">{stats.completed}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Completed</p>
+                    <p className="text-xl sm:text-2xl font-bold text-slate-700">{stats.completed}</p>
                   </div>
-                  <CheckCircle2 className="w-8 h-8 text-slate-500" />
+                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-slate-500" />
                 </div>
               </CardContent>
             </Card>
@@ -479,24 +482,24 @@ export default function WorkflowHub() {
         )}
 
         {isAdmin && !showArchived && (
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
             <Button
               variant={viewMode === "kanban" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("kanban")}
-              className="gap-2"
+              className="gap-2 flex-shrink-0"
             >
               <LayoutGrid className="w-4 h-4" />
-              Kanban View
+              <span className="hidden sm:inline">Kanban View</span>
             </Button>
             <Button
               variant={viewMode === "calendar" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("calendar")}
-              className="gap-2"
+              className="gap-2 flex-shrink-0"
             >
               <CalendarIcon className="w-4 h-4" />
-              Calendar View
+              <span className="hidden sm:inline">Calendar View</span>
             </Button>
           </div>
         )}

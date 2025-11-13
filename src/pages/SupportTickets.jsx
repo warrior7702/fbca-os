@@ -145,100 +145,103 @@ export default function SupportTickets() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-amber-50 to-yellow-50 p-6 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-amber-50 to-yellow-50 p-3 sm:p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(createPageUrl('Dashboard'))}
+              className="flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <Ticket className="w-6 h-6 text-amber-600" />
+              <Ticket className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Support Requests
                   {isAdmin && (
-                    <Crown className={`inline-block ml-2 w-5 h-5 ${user?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
+                    <Crown className={`inline-block ml-2 w-4 h-4 sm:w-5 sm:h-5 ${user?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
                   )}
                 </h1>
-                <p className="text-sm text-slate-600">
+                <p className="text-xs sm:text-sm text-slate-600">
                   {isAdmin ? 'All support tickets' : 'Your support requests'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             {isAdmin && (
               <Button
                 onClick={() => navigate(createPageUrl('TicketAnalytics'))}
                 variant="outline"
-                className="gap-2"
+                className="gap-2 flex-1 sm:flex-none"
+                size="sm"
               >
                 <BarChart3 className="w-4 h-4" />
-                Analytics
+                <span className="hidden sm:inline">Analytics</span>
               </Button>
             )}
             <Button
               onClick={() => navigate(createPageUrl('CreateTicket'))}
-              className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700"
+              className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 flex-1 sm:flex-none"
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New Ticket
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">New Ticket</span>
             </Button>
           </div>
         </div>
 
         {isAdmin && (
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Total</p>
-                    <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Total</p>
+                    <p className="text-xl sm:text-2xl font-bold text-slate-900">{stats.total}</p>
                   </div>
-                  <Ticket className="w-8 h-8 text-amber-500" />
+                  <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-amber-500" />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Open</p>
-                    <p className="text-2xl font-bold text-blue-700">{stats.open}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Open</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.open}</p>
                   </div>
-                  <Clock className="w-8 h-8 text-blue-500" />
+                  <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">In Progress</p>
-                    <p className="text-2xl font-bold text-purple-700">{stats.in_progress}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">In Progress</p>
+                    <p className="text-xl sm:text-2xl font-bold text-purple-700">{stats.in_progress}</p>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-purple-500" />
+                  <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Resolved</p>
-                    <p className="text-2xl font-bold text-green-700">{stats.resolved}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Resolved</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.resolved}</p>
                   </div>
-                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                 </div>
               </CardContent>
             </Card>
@@ -247,9 +250,9 @@ export default function SupportTickets() {
 
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-5 h-5" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
                 Filters
               </CardTitle>
               {hasFilters && (
@@ -261,15 +264,16 @@ export default function SupportTickets() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <Input
                 placeholder="Search tickets..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-sm"
               />
               
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -283,7 +287,7 @@ export default function SupportTickets() {
               </Select>
 
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="All Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -296,7 +300,7 @@ export default function SupportTickets() {
               </Select>
 
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>

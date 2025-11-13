@@ -358,7 +358,7 @@ export default function MyTasks() {
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {(!user?.clickup_access_token && !user?.microsoft_access_token) && <ConnectionWarning />}
 
         <AppHeader
@@ -367,21 +367,21 @@ export default function MyTasks() {
           description={`Welcome back, ${displayName}`}
           iconColor="from-blue-500 to-indigo-500"
           action={
-            <div className="flex gap-2">
-              <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm">
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                Calendar
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={() => setShowFullCalendar(true)} variant="outline" size="sm" className="flex-1 sm:flex-none">
+                <CalendarIcon className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Calendar</span>
               </Button>
-              <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white" size="sm">
+              <Button onClick={loadData} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 sm:flex-none" size="sm">
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
+                    <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Syncing...</span>
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync
+                    <RefreshCw className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Sync</span>
                   </>
                 )}
               </Button>
@@ -389,54 +389,54 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-5 h-5 text-indigo-600" />
-                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300">Today</Badge>
+                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 text-xs">Today</Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
-              <p className="text-sm text-slate-600">Tasks Due</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Tasks Due</p>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-5 h-5 text-green-600" />
-                <Badge className="bg-green-100 text-green-700 border-green-300">
+                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
                   {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday}
                 </Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{eventsToday}</p>
-              <p className="text-sm text-slate-600">Events Today</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{eventsToday}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Events Today</p>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
-                <TicketIcon className="w-5 h-5 text-purple-600" />
-                <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs">
                   {loadingTickets ? <Loader2 className="h-3 w-3 animate-spin" /> : supportTickets.length}
                 </Badge>
               </div>
-              <p className="text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-              <p className="text-sm text-slate-600">Support Tickets</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Support Tickets</p>
             </CardContent>
           </Card>
         </div>
 
         <Card className="border-2 border-green-200 bg-white">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  <CalendarIcon className="w-6 h-6 text-green-600" />
+                <CardTitle className="text-xl sm:text-2xl flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                   My Schedule
                 </CardTitle>
-                <p className="text-slate-600 text-sm mt-1">
+                <p className="text-slate-600 text-xs sm:text-sm mt-1">
                   Upcoming events • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -446,11 +446,11 @@ export default function MyTasks() {
             {loadingSchedule ? (
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
-                <p className="text-slate-600">Loading your schedule...</p>
+                <p className="text-slate-600 text-sm">Loading your schedule...</p>
               </div>
             ) : myScheduleEvents.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-slate-600">No upcoming events found</p>
+                <p className="text-slate-600 text-sm">No upcoming events found</p>
               </div>
             ) : (
               <ScheduleCalendar 

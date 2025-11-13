@@ -231,7 +231,7 @@ export default function Calendar() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full p-4">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-slate-600">Loading calendar...</p>
@@ -242,14 +242,14 @@ export default function Calendar() {
 
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-indigo-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {!user?.pco_access_token && <ConnectionWarning />}
 
         <AppHeader
           icon={CalendarIcon}
           title="Church Calendar"
           description={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
               <span>{filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}</span>
               {lastSync && (
                 <span className="text-xs text-slate-500">
@@ -261,18 +261,18 @@ export default function Calendar() {
           iconColor="from-blue-500 to-indigo-500"
           action={
             <div className="flex gap-2 flex-wrap">
-              <div className="relative w-56">
+              <div className="relative w-full sm:w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
                   placeholder="Search rooms..."
                   value={roomSearch}
                   onChange={(e) => setRoomSearch(e.target.value)}
-                  className="pl-9 h-10"
+                  className="pl-9 h-10 text-sm"
                 />
               </div>
 
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-52">
+                <SelectTrigger className="w-full sm:w-44">
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="All Resources" />
                 </SelectTrigger>
@@ -287,7 +287,7 @@ export default function Calendar() {
               </Select>
 
               <Select value={selectedTag} onValueChange={setSelectedTag}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-40">
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="All Tags" />
                 </SelectTrigger>
@@ -304,7 +304,7 @@ export default function Calendar() {
               <Button
                 onClick={handleSync}
                 disabled={syncing}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
                 size="sm"
               >
                 {syncing ? (
@@ -324,31 +324,33 @@ export default function Calendar() {
         />
 
         {events.length === 0 ? (
-          <div className="text-center py-20">
-            <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Events Found</h3>
-            <p className="text-slate-600">
+          <div className="text-center py-12 sm:py-20">
+            <CalendarIcon className="w-12 h-12 sm:w-16 sm:h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">No Events Found</h3>
+            <p className="text-sm sm:text-base text-slate-600">
               No upcoming events in Planning Center Calendar
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                  className="h-8 w-8 sm:h-10 sm:w-10"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <h2 className="text-2xl font-bold text-slate-900">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
                   {format(currentMonth, 'MMMM yyyy')}
                 </h2>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                  className="h-8 w-8 sm:h-10 sm:w-10"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -356,15 +358,17 @@ export default function Calendar() {
               <Button
                 variant="outline"
                 onClick={() => setCurrentMonth(new Date())}
+                size="sm"
               >
                 Today
               </Button>
             </div>
 
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
-                  {day}
+                <div key={day} className="text-center font-semibold text-slate-600 py-2 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">{day}</span>
+                  <span className="sm:hidden">{day[0]}</span>
                 </div>
               ))}
 
@@ -379,17 +383,17 @@ export default function Calendar() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.005 }}
-                    className={`min-h-32 border border-slate-200 p-2 ${
+                    className={`min-h-20 sm:min-h-32 border border-slate-200 p-1 sm:p-2 ${
                       !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
                     } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
                   >
-                    <div className={`text-sm font-semibold mb-1 ${
-                      isToday ? 'bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center' : ''
+                    <div className={`text-xs sm:text-sm font-semibold mb-1 ${
+                      isToday ? 'bg-blue-600 text-white w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs' : ''
                     }`}>
                       {format(day, 'd')}
                     </div>
                     <div className="space-y-1">
-                      {dayEvents.slice(0, 3).map((event, idx) => (
+                      {dayEvents.slice(0, 2).map((event, idx) => (
                         <motion.div
                           key={event.id}
                           initial={{ opacity: 0, x: -10 }}
@@ -399,20 +403,21 @@ export default function Calendar() {
                             e.stopPropagation();
                             setSelectedEvent(event);
                           }}
-                          className="text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
+                          className="text-[10px] sm:text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
                         >
-                          {format(parseISO(event.starts_at), 'h:mm a')} {event.name}
+                          <span className="hidden sm:inline">{format(parseISO(event.starts_at), 'h:mm a')} </span>
+                          {event.name}
                         </motion.div>
                       ))}
-                      {dayEvents.length > 3 && (
+                      {dayEvents.length > 2 && (
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
                             handleShowAllDayEvents(day, dayEvents);
                           }}
-                          className="text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
+                          className="text-[10px] sm:text-xs text-blue-600 font-medium pl-1 cursor-pointer hover:text-blue-800 hover:underline"
                         >
-                          +{dayEvents.length - 3} more
+                          +{dayEvents.length - 2} more
                         </div>
                       )}
                     </div>

@@ -22,7 +22,9 @@ import {
   UtensilsCrossed,
   Users,
   Ticket,
-  FileSpreadsheet // Added FileSpreadsheet icon
+  FileSpreadsheet,
+  Menu,
+  X
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,6 +39,13 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const apps = [
   {
@@ -90,6 +99,7 @@ export default function Layout({ children, currentPageName }) {
   const searchRef = useRef(null);
   const [hasConnectionAlert, setHasConnectionAlert] = useState(false);
   const [showLightBubble, setShowLightBubble] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -236,8 +246,6 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-100">
-
-
       {/* Main Content */}
       <main className="h-screen pb-16">
         {children}
@@ -251,7 +259,7 @@ export default function Layout({ children, currentPageName }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.8 }}
             transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="fixed bottom-24 right-6 z-[60] max-w-xs"
+            className="fixed bottom-20 md:bottom-24 right-4 md:right-6 z-[60] max-w-xs"
           >
             <div className="bg-white rounded-2xl shadow-2xl border-2 border-yellow-400 p-4 relative">
               <button
@@ -291,9 +299,9 @@ export default function Layout({ children, currentPageName }) {
         transition={{ type: "spring", stiffness: 200, damping: 30 }}
         className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 shadow-2xl z-50"
       >
-        <div className="h-full px-4 flex items-center justify-between">
+        <div className="h-full px-2 md:px-4 flex items-center justify-between">
           {/* Start Button & Quick Launch */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             <Link to={createPageUrl("Dashboard")}>
               <motion.div
                 whileHover={{ scale: 1.05 }}
@@ -308,11 +316,11 @@ export default function Layout({ children, currentPageName }) {
               </motion.div>
             </Link>
 
-            <div className="h-10 w-px bg-white/20 mx-1" />
+            <div className="h-10 w-px bg-white/20 mx-0.5 md:mx-1 hidden sm:block" />
 
-            {/* Quick Launch */}
-            <div className="flex items-center gap-1">
-              {apps.map((app) => {
+            {/* Quick Launch - Desktop/Tablet */}
+            <div className="hidden sm:flex items-center gap-1">
+              {apps.slice(0, 4).map((app) => {
                 const isActive = location.pathname === createPageUrl(app.path);
                 return (
                   <Link key={app.name} to={createPageUrl(app.path)}>
@@ -331,16 +339,46 @@ export default function Layout({ children, currentPageName }) {
                 );
               })}
             </div>
+
+            {/* Mobile Menu */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden text-white">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader>
+                  <SheetTitle>Apps</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-2">
+                  {apps.map((app) => (
+                    <Link 
+                      key={app.name} 
+                      to={createPageUrl(app.path)}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
+                        <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
+                          <app.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="font-medium text-slate-900">{app.name}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
 
           {/* Center - Smart Search */}
-          <div className="flex-1 max-w-md mx-8 relative" ref={searchRef}>
+          <div className="flex-1 max-w-md mx-2 md:mx-8 relative" ref={searchRef}>
             <form onSubmit={handleSearch}>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10" />
                 <input
                   type="text"
-                  placeholder="Search apps, files, and people..."
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
@@ -452,9 +490,9 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           {/* System Tray */}
-          <div className="flex items-center gap-3">
-            {/* System Icons */}
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-3">
+            {/* System Icons - Hidden on mobile */}
+            <div className="hidden lg:flex items-center gap-2">
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
@@ -491,7 +529,7 @@ export default function Layout({ children, currentPageName }) {
               </motion.div>
             </div>
 
-            <div className="h-8 w-px bg-white/20" />
+            <div className="h-8 w-px bg-white/20 hidden lg:block" />
 
             {/* AI Helper */}
             <Link to={createPageUrl('AIHelper')}>
@@ -518,12 +556,12 @@ export default function Layout({ children, currentPageName }) {
               </motion.div>
             </Link>
 
-            {/* Notifications */}
+            {/* Notifications - Hidden on small mobile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <motion.div
                   whileHover={{ scale: 1.1 }}
-                  className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  className="relative w-8 h-8 hidden xs:flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   <Bell className="w-4 h-4 text-white/80" />
                   {notifications > 0 && (
@@ -542,14 +580,14 @@ export default function Layout({ children, currentPageName }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <div className="h-8 w-px bg-white/20" />
+            <div className="h-8 w-px bg-white/20 hidden md:block" />
 
-            {/* Clock & Date */}
-            <div className="text-right cursor-pointer hover:bg-white/10 px-3 py-1 rounded transition-colors">
+            {/* Clock & Date - Simplified on mobile */}
+            <div className="text-right cursor-pointer hover:bg-white/10 px-2 md:px-3 py-1 rounded transition-colors">
               <div className="text-white text-sm font-medium leading-tight">
                 {format(currentTime, 'h:mm a')}
               </div>
-              <div className="text-white/60 text-xs leading-tight">
+              <div className="text-white/60 text-xs leading-tight hidden sm:block">
                 {format(currentTime, 'MMM d, yyyy')}
               </div>
             </div>
