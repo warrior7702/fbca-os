@@ -391,7 +391,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
   return (
     <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        <ConnectionWarning /> {/* Render ConnectionWarning always */}
+        {!user?.microsoft_access_token && <ConnectionWarning />}
 
         <AppHeader
           icon={Video}
