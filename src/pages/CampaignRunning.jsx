@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -140,14 +141,14 @@ export default function CampaignRunning() {
     return badges[status] || badges.open;
   };
 
-  const getTicketColor = (ticket) => {
-    const tags = ticket.tags || [];
-    if (tags.includes('graphics')) return 'border-pink-300 bg-pink-50 text-pink-700';
-    if (tags.includes('social_media')) return 'border-orange-300 bg-orange-50 text-orange-700';
-    if (tags.includes('digital_signs')) return 'border-blue-300 bg-blue-50 text-blue-700';
-    if (tags.includes('pulpit_announcement')) return 'border-pink-300 bg-pink-50 text-pink-700';
-    if (tags.includes('photography')) return 'border-purple-300 bg-purple-50 text-purple-700';
-    return 'border-slate-300 bg-slate-50 text-slate-700';
+  const getTaskColor = (task) => {
+    const colors = {
+      pink: 'border-pink-300 bg-pink-50 text-pink-700',
+      blue: 'border-blue-300 bg-blue-50 text-blue-700',
+      orange: 'border-orange-300 bg-orange-50 text-orange-700',
+      purple: 'border-purple-300 bg-purple-50 text-purple-700'
+    };
+    return colors[task.color] || 'border-slate-300 bg-slate-50 text-slate-700';
   };
 
   const renderCalendar = () => {
@@ -169,6 +170,7 @@ export default function CampaignRunning() {
     });
 
     const eventDate = request?.pco_event_date || request?.goal_review_data?.event_date;
+    const projectTasks = request?.project_review_data?.tasks || [];
 
     return (
       <div className="bg-purple-50 rounded-lg p-4">
@@ -208,8 +210,9 @@ export default function CampaignRunning() {
               {week.map((day, dayIdx) => {
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 const isEventDay = eventDate && isSameDay(day, new Date(eventDate));
-                const dayTickets = workOrders.filter(ticket => 
-                  ticket.created_date && isSameDay(new Date(ticket.created_date), day)
+                
+                const dayTasks = projectTasks.filter(task => 
+                  task.due_date && isSameDay(new Date(task.due_date), day)
                 );
 
                 return (
@@ -233,21 +236,30 @@ export default function CampaignRunning() {
                     </div>
 
                     <div className="space-y-1">
-                      {dayTickets.map(ticket => (
-                        <div
-                          key={ticket.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTaskComplete(ticket.id);
-                          }}
-                          className={`text-xs p-1.5 rounded border-2 cursor-pointer hover:shadow-md transition-all ${getTicketColor(ticket)} ${
-                            ticket.status === 'resolved' ? 'opacity-60 line-through' : ''
-                          }`}
-                        >
-                          <div className="font-medium truncate">{ticket.subject}</div>
-                          <div className="text-[10px] opacity-75 truncate">{ticket.assigned_to_name}</div>
-                        </div>
-                      ))}
+                      {dayTasks.map(task => {
+                        const matchingTicket = workOrders.find(t => 
+                          t.subject.toLowerCase().includes(task.name.toLowerCase().split(' ')[0])
+                        );
+                        const isComplete = matchingTicket?.status === 'resolved' || matchingTicket?.status === 'closed';
+                        
+                        return (
+                          <div
+                            key={task.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (matchingTicket) {
+                                toggleTaskComplete(matchingTicket.id);
+                              }
+                            }}
+                            className={`text-xs p-1.5 rounded border-2 cursor-pointer hover:shadow-md transition-all ${getTaskColor(task)} ${
+                              isComplete ? 'opacity-60 line-through' : ''
+                            }`}
+                          >
+                            <div className="font-medium truncate">{task.name}</div>
+                            <div className="text-[10px] opacity-75 truncate">{task.assigned_to}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -438,7 +450,7 @@ export default function CampaignRunning() {
                   <h4 className="font-semibold text-blue-900 text-sm mb-3">How to use:</h4>
                   <ul className="space-y-1.5 text-xs text-blue-800">
                     <li>• <strong>Click</strong> on any task to toggle completion status</li>
-                    <li>• <strong>View all tasks</strong> organized by their due dates</li>
+                    <li>• <strong>View all tasks</strong> organized by their original due dates</li>
                     <li>• <strong>Track progress</strong> with color-coded task types</li>
                     <li>• <strong>Event date</strong> is highlighted in purple</li>
                   </ul>
