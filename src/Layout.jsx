@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import {
   Wifi,
-  Volume2,
+  Play,
   Battery,
   Bell,
   Search,
@@ -508,7 +507,7 @@ export default function Layout({ children, currentPageName }) {
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="FBCA Media Player"
                 >
-                  <Volume2 className="w-4 h-4 text-white/80" />
+                  <Play className="w-4 h-4 text-white/80 fill-white/80" />
                 </motion.div>
               </Link>
               <motion.div
