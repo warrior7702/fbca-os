@@ -42,6 +42,7 @@ import TicketAnalytics from './pages/TicketAnalytics';
 import MediaPlayer from './pages/MediaPlayer';
 import Achievements from './pages/Achievements';
 import DepartmentTest from './pages/DepartmentTest';
+import TicketRoleVerification from './pages/TicketRoleVerification';
 import Layout from './Layout.jsx';
 
 
@@ -90,6 +91,7 @@ export const PAGES = {
     "MediaPlayer": MediaPlayer,
     "Achievements": Achievements,
     "DepartmentTest": DepartmentTest,
+    "TicketRoleVerification": TicketRoleVerification,
 }
 
 export const pagesConfig = {
