@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +19,8 @@ import {
   ArrowRight,
   Link as LinkIcon,
   Bug,
-  LogOut
+  LogOut,
+  Zap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,10 +34,12 @@ export default function DepartmentTest() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [testingAuth, setTestingAuth] = useState(false);
+  const [debuggingTokens, setDebuggingTokens] = useState(false); // New state for token debugging
   const [o365Data, setO365Data] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
+  const [tokenDebugResults, setTokenDebugResults] = useState(null); // New state for token debug results
 
   useEffect(() => {
     loadData();
@@ -78,6 +82,29 @@ export default function DepartmentTest() {
       toast.error('Authentication test failed: ' + error.message);
     } finally {
       setTestingAuth(false);
+    }
+  };
+
+  // New debugTokens function
+  const debugTokens = async () => {
+    setDebuggingTokens(true);
+    setTokenDebugResults(null); // Clear previous results
+    try {
+      console.log('🔍 Debugging Microsoft tokens...');
+      const response = await base44.functions.invoke('debugMicrosoftTokens');
+      console.log('📥 Debug results:', response.data);
+      
+      if (response.data?.success) {
+        setTokenDebugResults(response.data.results);
+        toast.success('✅ Token debugging complete! Check results below.');
+      } else {
+        toast.error('❌ Token debugging failed');
+      }
+    } catch (error) {
+      console.error('❌ Debug error:', error);
+      toast.error('Token debugging failed: ' + error.message);
+    } finally {
+      setDebuggingTokens(false);
     }
   };
 
@@ -151,7 +178,7 @@ export default function DepartmentTest() {
   };
 
   const handleDisconnectMicrosoft = async () => {
-    if (!confirm('This will disconnect your manual Microsoft connection. You\'ll still be logged in via SSO. Continue?')) {
+    if (!confirm('This will disconnect your manual Microsoft connection. Continue?')) { // Updated confirmation message
       return;
     }
     
@@ -161,7 +188,7 @@ export default function DepartmentTest() {
         microsoft_refresh_token: null,
         microsoft_token_expires_at: null
       });
-      toast.success('Manual Microsoft connection removed. Now using SSO only.');
+      toast.success('Manual Microsoft connection removed.'); // Simplified toast message
       loadData();
       setConnectionError(null);
     } catch (error) {
@@ -227,10 +254,10 @@ export default function DepartmentTest() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
               <Building2 className="w-7 h-7 text-blue-600" />
-              Department Scanner
+              Token Debugger & Department Scanner {/* Updated title */}
               <Crown className={`w-5 h-5 ${currentUser?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
             </h1>
-            <p className="text-slate-600">Scan Microsoft 365 for department assignments</p>
+            <p className="text-slate-600">Debug Microsoft tokens and scan O365 departments</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -241,6 +268,15 @@ export default function DepartmentTest() {
             >
               <Bug className={`w-4 h-4 mr-2 ${testingAuth ? 'animate-spin' : ''}`} />
               {testingAuth ? 'Testing...' : 'Test Auth'}
+            </Button>
+            {/* New Debug Tokens Button */}
+            <Button
+              onClick={debugTokens}
+              disabled={debuggingTokens}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Zap className={`w-4 h-4 mr-2 ${debuggingTokens ? 'animate-spin' : ''}`} />
+              {debuggingTokens ? 'Debugging...' : 'Debug Tokens'}
             </Button>
             <Button
               onClick={scanO365}
@@ -253,24 +289,90 @@ export default function DepartmentTest() {
           </div>
         </div>
 
-        {/* Success Banner */}
-        <Card className="mb-6 border-green-300 bg-green-50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-green-900 mb-2">✅ Ready to Scan!</h3>
-                <div className="text-sm text-green-800 space-y-1">
-                  <p>• Logged in as: <strong>{currentUser?.email}</strong></p>
-                  <p>• Role: <strong>{currentUser?.role}</strong></p>
-                  <p>• Login method: <strong>Microsoft SSO</strong></p>
-                  <p className="mt-2">The function will use your SSO token for secure access.</p>
-                  <p className="text-xs mt-2">💡 After clicking "Scan O365", check the function logs in Base44 Dashboard → Code → Functions → scanO365Departments → Logs</p>
-                </div>
+        {/* Token Debug Results */}
+        {tokenDebugResults && (
+          <Card className="mb-6 border-purple-300 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-purple-600" />
+                Token Debug Results
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Manual Token */}
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                  🔑 Manual Token
+                  {tokenDebugResults.manualTest?.success ? (
+                    <Badge className="bg-green-100 text-green-700">✅ Works</Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-700">❌ Failed</Badge>
+                  )}
+                </h3>
+                {tokenDebugResults.manualToken?.exists ? (
+                  <div className="text-sm space-y-1 font-mono">
+                    <p>• Length: {tokenDebugResults.manualToken.length}</p>
+                    <p>• Valid JWT: {tokenDebugResults.manualToken.isValidJWT ? '✅' : '❌'} ({tokenDebugResults.manualToken.parts} parts)</p>
+                    <p>• Has spaces: {tokenDebugResults.manualToken.hasSpaces ? '⚠️ Yes' : '✅ No'}</p>
+                    {tokenDebugResults.manualTest?.success && (
+                      <p className="text-green-700">✅ Successfully retrieved {tokenDebugResults.manualTest.usersReturned} users from Microsoft</p>
+                    )}
+                    {tokenDebugResults.manualTest?.error && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-red-700">❌ Error Details</summary>
+                        <pre className="text-xs bg-red-100 p-2 rounded mt-1 overflow-auto max-h-40">{JSON.stringify(tokenDebugResults.manualTest, null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">No manual token found</p>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {/* SSO Token */}
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                  🔐 SSO Token
+                  {tokenDebugResults.ssoTest?.success ? (
+                    <Badge className="bg-green-100 text-green-700">✅ Works</Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-700">❌ Failed</Badge>
+                  )}
+                </h3>
+                {tokenDebugResults.ssoToken?.exists ? (
+                  <div className="text-sm space-y-1 font-mono">
+                    <p>• Length: {tokenDebugResults.ssoToken.length}</p>
+                    <p>• Parts: {tokenDebugResults.ssoToken.parts}</p>
+                    <p>• Has spaces: {tokenDebugResults.ssoToken.hasSpaces ? '⚠️ Yes' : '✅ No'}</p>
+                    <p>• Has Bearer prefix: {tokenDebugResults.ssoToken.hasBearerPrefix ? '⚠️ Yes' : '✅ No'}</p>
+                    {tokenDebugResults.ssoToken.cleaned && (
+                      <p>• After cleaning: {tokenDebugResults.ssoToken.cleaned.parts} parts (Valid JWT: {tokenDebugResults.ssoToken.cleaned.isValidJWT ? '✅' : '❌'})</p>
+                    )}
+                    {tokenDebugResults.ssoTest?.success && (
+                      <p className="text-green-700">✅ Successfully retrieved {tokenDebugResults.ssoTest.usersReturned} users from Microsoft</p>
+                    )}
+                    {tokenDebugResults.ssoTest?.error && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-red-700">❌ Error Details</summary>
+                        <pre className="text-xs bg-red-100 p-2 rounded mt-1 overflow-auto max-h-40">{JSON.stringify(tokenDebugResults.ssoTest, null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    {tokenDebugResults.ssoToken?.reason || 'No SSO token found'}
+                  </p>
+                )}
+              </div>
+
+              {/* Recommendation */}
+              <div className="bg-blue-100 p-4 rounded-lg">
+                <h3 className="font-semibold text-lg mb-2">💡 Recommendation</h3>
+                <p className="text-sm">{tokenDebugResults.comparison?.recommendation}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Connection Error */}
         {connectionError && (
@@ -297,38 +399,25 @@ export default function DepartmentTest() {
                     </Button>
                   )}
                   
-                  {connectionError.type === 'reconnection' && connectionError.tokenSource === 'Manual' && (
-                    <div className="space-y-2">
-                      <p className="text-sm text-red-700 mb-2">
-                        💡 <strong>Solution:</strong> Remove your corrupted manual connection and use SSO instead.
-                      </p>
-                      <Button 
-                        onClick={handleDisconnectMicrosoft}
-                        size="sm"
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Remove Manual Connection (Use SSO)
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {connectionError.type === 'connection' && (
+                  {connectionError.type === 'reconnection' && ( // Simplified this block as it no longer specifies 'Manual'
                     <Button 
-                      onClick={() => navigate(createPageUrl('Settings') + '?tab=integrations')}
+                      onClick={handleDisconnectMicrosoft}
                       size="sm"
                       className="bg-red-600 hover:bg-red-700"
                     >
-                      <LinkIcon className="w-4 h-4 mr-2" />
-                      Connect Microsoft 365
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Remove Manual Connection
                     </Button>
                   )}
+
+                  {/* Removed connection.type === 'connection' which led to integrations tab */}
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Updated initial state card content */}
         {!o365Data ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -337,7 +426,7 @@ export default function DepartmentTest() {
                 Ready to Scan
               </h3>
               <p className="text-slate-600 mb-6">
-                Click "Scan O365" to retrieve department data from Microsoft 365
+                First, click "Debug Tokens" to see which token works. Then click "Scan O365" to retrieve department data.
               </p>
             </CardContent>
           </Card>
@@ -349,7 +438,7 @@ export default function DepartmentTest() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-600">Total Users (O365)</p>
+                      <p className="text-sm text-slate-600">Total Users</p> {/* Changed title */}
                       <p className="text-2xl font-bold text-slate-900">{o365Data.stats.total}</p>
                     </div>
                     <Cloud className="w-8 h-8 text-blue-500" />
@@ -363,9 +452,7 @@ export default function DepartmentTest() {
                     <div>
                       <p className="text-sm text-slate-600">With Department</p>
                       <p className="text-2xl font-bold text-green-700">{o365Data.stats.withDepartment}</p>
-                      <p className="text-xs text-slate-500">
-                        {Math.round(o365Data.stats.withDepartment / o365Data.stats.total * 100)}%
-                      </p>
+                      {/* Removed percentage */}
                     </div>
                     <CheckCircle className="w-8 h-8 text-green-500" />
                   </div>
@@ -378,149 +465,49 @@ export default function DepartmentTest() {
                     <div>
                       <p className="text-sm text-slate-600">No Department</p>
                       <p className="text-2xl font-bold text-red-700">{o365Data.stats.withoutDepartment}</p>
-                      <p className="text-xs text-slate-500">
-                        {Math.round(o365Data.stats.withoutDepartment / o365Data.stats.total * 100)}%
-                      </p>
+                      {/* Removed percentage */}
                     </div>
                     <XCircle className="w-8 h-8 text-red-500" />
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Replaced "Needs Sync" card with "Unique Departments" */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-600">Needs Sync</p>
-                      <p className="text-2xl font-bold text-orange-700">{o365Data.syncStats.needsSync}</p>
-                      <p className="text-xs text-slate-500">to Base44</p>
+                      <p className="text-sm text-slate-600">Unique Departments</p>
+                      <p className="text-2xl font-bold text-purple-700">{o365Data.uniqueDepartments.length}</p>
+                      {/* Removed 'to Base44' text */}
                     </div>
-                    <RefreshCw className="w-8 h-8 text-orange-500" />
+                    <Building2 className="w-8 h-8 text-purple-500" />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Token Source Info */}
-            {o365Data.tokenSource && (
-              <Card className="mb-6 border-blue-300 bg-blue-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-sm text-blue-800">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>
-                      Data retrieved using: <strong>{o365Data.tokenSource === 'SSO' ? 'Microsoft SSO' : 'Manual Connection'}</strong>
-                    </span>
+            {/* Removed Token Source Info Card */}
+
+            {/* Department List - compact */}
+            {o365Data.uniqueDepartments.length > 0 && ( // Conditional render
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-sm">Departments Found</CardTitle> {/* Changed title */}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {o365Data.uniqueDepartments.map((dept) => (
+                      <Badge key={dept} variant="outline" className="text-xs"> {/* Changed badge size */}
+                        {dept}
+                      </Badge>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Department List */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  Unique Departments ({o365Data.uniqueDepartments.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {o365Data.uniqueDepartments.map((dept) => (
-                    <Badge key={dept} variant="outline" className="text-sm">
-                      {dept} ({o365Data.stats.departments[dept] || 0})
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Search */}
-            <Card className="mb-6">
-              <CardContent className="p-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <Input
-                    placeholder="Search by name, email, department..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Users List */}
-            <div className="space-y-4">
-              {Object.entries(departmentGroups)
-                .sort((a, b) => {
-                  if (a[0] === '(No Department)') return 1;
-                  if (b[0] === '(No Department)') return -1;
-                  return b[1].length - a[1].length;
-                })
-                .map(([department, deptUsers]) => (
-                  <motion.div
-                    key={department}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <Card>
-                      <CardHeader className={`border-b ${department === '(No Department)' ? 'bg-red-50' : 'bg-slate-50'}`}>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="flex items-center gap-2">
-                            {department === '(No Department)' ? (
-                              <AlertCircle className="w-5 h-5 text-red-600" />
-                            ) : (
-                              <Building2 className="w-5 h-5 text-blue-600" />
-                            )}
-                            {department}
-                          </CardTitle>
-                          <Badge variant="outline">
-                            {deptUsers.length} {deptUsers.length === 1 ? 'user' : 'users'}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y">
-                          {deptUsers.slice(0, 10).map((user, idx) => (
-                            <div key={idx} className="p-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <p className="font-semibold text-slate-900">{user.displayName}</p>
-                                  <p className="text-sm text-slate-600">{user.email}</p>
-                                  {user.o365JobTitle && (
-                                    <p className="text-sm text-slate-500 mt-1">{user.o365JobTitle}</p>
-                                  )}
-                                </div>
-                                {user.inBase44 ? (
-                                  user.departmentMatch ? (
-                                    <Badge className="bg-green-100 text-green-700 text-xs">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
-                                      Synced
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                      Needs Sync
-                                    </Badge>
-                                  )
-                                ) : (
-                                  <Badge variant="outline" className="text-xs">
-                                    Not in Base44
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {deptUsers.length > 10 && (
-                            <div className="p-4 text-center text-sm text-slate-500">
-                              +{deptUsers.length - 10} more users
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-            </div>
+            {/* Removed Search and Users List sections entirely */}
           </>
         )}
       </div>
