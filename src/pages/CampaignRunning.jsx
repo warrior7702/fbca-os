@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -16,9 +15,11 @@ import {
   FileText,
   Link as LinkIcon,
   Briefcase,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, isSameDay, eachDayOfInterval } from "date-fns";
 import { toast } from "sonner";
 
 export default function CampaignRunning() {
@@ -29,6 +30,7 @@ export default function CampaignRunning() {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [workOrders, setWorkOrders] = useState([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     if (requestId) {
@@ -42,7 +44,14 @@ export default function CampaignRunning() {
     try {
       const req = await base44.entities.WorkflowRequest.filter({ id: requestId });
       if (req && req.length > 0) {
-        setRequest(req[0]);
+        const foundRequest = req[0];
+        setRequest(foundRequest);
+        
+        // Set calendar to event month
+        const eventDate = foundRequest.pco_event_date || foundRequest.goal_review_data?.event_date;
+        if (eventDate) {
+          setCurrentMonth(new Date(eventDate));
+        }
       } else {
         toast.error('Request not found');
         navigate(createPageUrl('WorkflowHub'));
@@ -129,6 +138,125 @@ export default function CampaignRunning() {
       'closed': { label: 'Complete', color: 'bg-green-100 text-green-700' }
     };
     return badges[status] || badges.open;
+  };
+
+  const getTicketColor = (ticket) => {
+    const tags = ticket.tags || [];
+    if (tags.includes('graphics')) return 'border-pink-300 bg-pink-50 text-pink-700';
+    if (tags.includes('social_media')) return 'border-orange-300 bg-orange-50 text-orange-700';
+    if (tags.includes('digital_signs')) return 'border-blue-300 bg-blue-50 text-blue-700';
+    if (tags.includes('pulpit_announcement')) return 'border-pink-300 bg-pink-50 text-pink-700';
+    if (tags.includes('photography')) return 'border-purple-300 bg-purple-50 text-purple-700';
+    return 'border-slate-300 bg-slate-50 text-slate-700';
+  };
+
+  const renderCalendar = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+    const weeks = [];
+    let week = [];
+
+    dateRange.forEach((day, i) => {
+      week.push(day);
+      if ((i + 1) % 7 === 0) {
+        weeks.push(week);
+        week = [];
+      }
+    });
+
+    const eventDate = request?.pco_event_date || request?.goal_review_data?.event_date;
+
+    return (
+      <div className="bg-purple-50 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-900">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-center text-sm font-semibold text-slate-600 py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          {weeks.map((week, weekIdx) => (
+            <div key={weekIdx} className="grid grid-cols-7 gap-2">
+              {week.map((day, dayIdx) => {
+                const isCurrentMonth = isSameMonth(day, monthStart);
+                const isEventDay = eventDate && isSameDay(day, new Date(eventDate));
+                const dayTickets = workOrders.filter(ticket => 
+                  ticket.created_date && isSameDay(new Date(ticket.created_date), day)
+                );
+
+                return (
+                  <div
+                    key={dayIdx}
+                    className={`min-h-[100px] border-2 rounded-lg p-2 transition-colors ${
+                      isCurrentMonth ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100'
+                    } ${isEventDay ? 'border-purple-500 bg-purple-100 ring-2 ring-purple-300' : ''}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-sm font-semibold ${
+                        isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
+                      }`}>
+                        {format(day, 'd')}
+                      </span>
+                      {isEventDay && (
+                        <Badge className="bg-purple-600 text-white text-[10px] px-1 py-0 truncate max-w-[80px]" title={request.title}>
+                          {request.title}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {dayTickets.map(ticket => (
+                        <div
+                          key={ticket.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTaskComplete(ticket.id);
+                          }}
+                          className={`text-xs p-1.5 rounded border-2 cursor-pointer hover:shadow-md transition-all ${getTicketColor(ticket)} ${
+                            ticket.status === 'resolved' ? 'opacity-60 line-through' : ''
+                          }`}
+                        >
+                          <div className="font-medium truncate">{ticket.subject}</div>
+                          <div className="text-[10px] opacity-75 truncate">{ticket.assigned_to_name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -297,9 +425,24 @@ export default function CampaignRunning() {
           {/* Project Calendar Tab */}
           <TabsContent value="calendar" className="space-y-4">
             <Card>
-              <CardContent className="p-12 text-center">
-                <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-600">Calendar view coming soon</p>
+              <CardHeader className="border-b bg-slate-50">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 text-purple-600" />
+                  Project Calendar
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                {renderCalendar()}
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                  <h4 className="font-semibold text-blue-900 text-sm mb-3">How to use:</h4>
+                  <ul className="space-y-1.5 text-xs text-blue-800">
+                    <li>• <strong>Click</strong> on any task to toggle completion status</li>
+                    <li>• <strong>View all tasks</strong> organized by their due dates</li>
+                    <li>• <strong>Track progress</strong> with color-coded task types</li>
+                    <li>• <strong>Event date</strong> is highlighted in purple</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
