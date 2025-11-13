@@ -16,13 +16,15 @@ import {
     UserCheck,
     UserX,
     RefreshCw,
-    Eye
+    Eye,
+    Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
 export default function TicketRoleVerification() {
@@ -106,7 +108,7 @@ export default function TicketRoleVerification() {
                             <Shield className="w-7 h-7 text-blue-600" />
                             Ticket Role Verification
                         </h1>
-                        <p className="text-slate-600">Verify extension attributes: worker (assignable) vs viewer (read-only)</p>
+                        <p className="text-slate-600">Verify Entra ID extension attributes for ticketing system</p>
                     </div>
                     <Button
                         onClick={fetchUserData}
@@ -118,6 +120,17 @@ export default function TicketRoleVerification() {
                     </Button>
                 </div>
 
+                {/* Info Alert */}
+                <Alert className="mb-6 border-blue-200 bg-blue-50">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    <AlertDescription className="text-sm text-blue-900">
+                        <div className="space-y-1">
+                            <p><strong>extensionAttribute1 (OSTicketRole):</strong> "worker" = can be assigned tickets | "viewer" = read-only access</p>
+                            <p><strong>extensionAttribute2 (OSDept):</strong> Department classification (Admin, Kitchen, Comms, etc.)</p>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+
                 {!data ? (
                     <Card>
                         <CardContent className="p-12 text-center">
@@ -126,12 +139,8 @@ export default function TicketRoleVerification() {
                                 Ready to Verify Extension Attributes
                             </h3>
                             <p className="text-slate-600 mb-6">
-                                Click "Fetch Data" to load users with:
+                                Click "Fetch Data" to load users from Microsoft Entra ID
                             </p>
-                            <div className="text-sm text-slate-600 max-w-md mx-auto">
-                                <p className="mb-2">• <strong>extensionAttribute1</strong> (OSTicketRole): "worker" or "viewer"</p>
-                                <p>• <strong>extensionAttribute2</strong> (OSDept): department code</p>
-                            </div>
                         </CardContent>
                     </Card>
                 ) : (
@@ -155,7 +164,7 @@ export default function TicketRoleVerification() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Workers</p>
-                                            <p className="text-xs text-slate-500">(Can be assigned)</p>
+                                            <p className="text-xs text-slate-500 mb-1">(Assignable)</p>
                                             <p className="text-2xl font-bold text-green-700">{data.stats.workers}</p>
                                         </div>
                                         <UserCheck className="w-8 h-8 text-green-500" />
@@ -168,7 +177,7 @@ export default function TicketRoleVerification() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Viewers</p>
-                                            <p className="text-xs text-slate-500">(Read-only)</p>
+                                            <p className="text-xs text-slate-500 mb-1">(Read-only)</p>
                                             <p className="text-2xl font-bold text-blue-700">{data.stats.viewers}</p>
                                         </div>
                                         <Eye className="w-8 h-8 text-blue-500" />
@@ -180,8 +189,8 @@ export default function TicketRoleVerification() {
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm text-slate-600">Uncategorized</p>
-                                            <p className="text-xs text-slate-500">(No role set)</p>
+                                            <p className="text-sm text-slate-600">No Role Set</p>
+                                            <p className="text-xs text-slate-500 mb-1">(extensionAttribute1)</p>
                                             <p className="text-2xl font-bold text-orange-700">{data.stats.uncategorized}</p>
                                         </div>
                                         <UserX className="w-8 h-8 text-orange-500" />
@@ -194,7 +203,8 @@ export default function TicketRoleVerification() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Departments</p>
-                                            <p className="text-2xl font-bold text-purple-700">{data.stats.departments}</p>
+                                            <p className="text-xs text-slate-500 mb-1">(extensionAttribute2)</p>
+                                            <p className="text-2xl font-bold text-purple-700">{data.stats.departments.length}</p>
                                         </div>
                                         <Building2 className="w-8 h-8 text-purple-500" />
                                     </div>
@@ -209,17 +219,38 @@ export default function TicketRoleVerification() {
                                     <CheckCircle className="w-5 h-5 text-green-600" />
                                     <div>
                                         <p className="font-semibold text-green-900">Using {data.tokenSource} Token</p>
-                                        <p className="text-sm text-green-700">Successfully retrieved extension attributes from Microsoft Graph</p>
+                                        <p className="text-sm text-green-700">Successfully retrieved onPremisesExtensionAttributes from Microsoft Graph</p>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Department Stats */}
+                        {/* Department List (OSDept values) */}
+                        {data.departmentList && data.departmentList.length > 0 && (
+                            <Card className="mb-6">
+                                <CardHeader>
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <Building2 className="w-4 h-4" />
+                                        Departments Found (extensionAttribute2 / OSDept)
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-wrap gap-2">
+                                        {data.departmentList.map((dept) => (
+                                            <Badge key={dept} variant="outline" className="text-xs px-3 py-1">
+                                                {dept}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Department Stats Breakdown */}
                         {Object.keys(data.departmentStats).length > 0 && (
                             <Card className="mb-6">
                                 <CardHeader>
-                                    <CardTitle className="text-sm">Department Breakdown (OSDept)</CardTitle>
+                                    <CardTitle className="text-sm">Department Breakdown (Workers vs Viewers per Department)</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -227,11 +258,35 @@ export default function TicketRoleVerification() {
                                             .sort(([a], [b]) => a.localeCompare(b))
                                             .map(([dept, stats]) => (
                                                 <div key={dept} className="p-3 bg-slate-50 rounded-lg border">
-                                                    <p className="font-semibold text-slate-900">{dept}</p>
-                                                    <div className="text-xs text-slate-600 mt-1 space-y-0.5">
-                                                        <p>✅ Workers: {stats.workers}</p>
-                                                        <p>👁️ Viewers: {stats.viewers}</p>
-                                                        <p className="font-semibold">Total: {stats.total}</p>
+                                                    <p className="font-semibold text-slate-900 mb-2">{dept}</p>
+                                                    <div className="text-xs text-slate-600 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="flex items-center gap-1">
+                                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                                Workers:
+                                                            </span>
+                                                            <span className="font-semibold">{stats.workers}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="flex items-center gap-1">
+                                                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                                Viewers:
+                                                            </span>
+                                                            <span className="font-semibold">{stats.viewers}</span>
+                                                        </div>
+                                                        {stats.noRole > 0 && (
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="flex items-center gap-1">
+                                                                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                                                    No role:
+                                                                </span>
+                                                                <span className="font-semibold">{stats.noRole}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center justify-between border-t pt-1 mt-1">
+                                                            <span>Total:</span>
+                                                            <span className="font-bold">{stats.total}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -258,16 +313,20 @@ export default function TicketRoleVerification() {
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
                             <TabsList className="grid w-full grid-cols-4">
                                 <TabsTrigger value="workers">
+                                    <UserCheck className="w-4 h-4 mr-2" />
                                     Workers ({data.stats.workers})
                                 </TabsTrigger>
                                 <TabsTrigger value="viewers">
+                                    <Eye className="w-4 h-4 mr-2" />
                                     Viewers ({data.stats.viewers})
                                 </TabsTrigger>
                                 <TabsTrigger value="uncategorized">
-                                    Uncategorized ({data.stats.uncategorized})
+                                    <UserX className="w-4 h-4 mr-2" />
+                                    No Role ({data.stats.uncategorized})
                                 </TabsTrigger>
                                 <TabsTrigger value="all">
-                                    All Users ({data.stats.total})
+                                    <Users className="w-4 h-4 mr-2" />
+                                    All ({data.stats.total})
                                 </TabsTrigger>
                             </TabsList>
 
@@ -311,38 +370,47 @@ function UserList({ users }) {
                 <Card key={user.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
                                     <span className="text-white text-sm font-bold">
                                         {user.displayName?.[0]?.toUpperCase() || 'U'}
                                     </span>
                                 </div>
-                                <div>
-                                    <p className="font-semibold text-slate-900">{user.displayName}</p>
-                                    <p className="text-sm text-slate-600">{user.email}</p>
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-slate-900 truncate">{user.displayName}</p>
+                                    <p className="text-sm text-slate-600 truncate">{user.email}</p>
                                     {user.jobTitle && (
-                                        <p className="text-xs text-slate-500">{user.jobTitle}</p>
+                                        <p className="text-xs text-slate-500 truncate">{user.jobTitle}</p>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {user.osTicketRole && (
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                                {user.osTicketRole ? (
                                     <Badge className={
                                         user.osTicketRole === 'worker' 
-                                            ? 'bg-green-100 text-green-700' 
-                                            : 'bg-blue-100 text-blue-700'
+                                            ? 'bg-green-100 text-green-700 border border-green-300' 
+                                            : 'bg-blue-100 text-blue-700 border border-blue-300'
                                     }>
-                                        {user.osTicketRole === 'worker' ? '✅ Worker' : '👁️ Viewer'}
+                                        {user.osTicketRole === 'worker' ? (
+                                            <><UserCheck className="w-3 h-3 mr-1" /> Worker</>
+                                        ) : (
+                                            <><Eye className="w-3 h-3 mr-1" /> Viewer</>
+                                        )}
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                        <UserX className="w-3 h-3 mr-1" />
+                                        No Role
                                     </Badge>
                                 )}
-                                {user.osDept && (
-                                    <Badge variant="outline" className="text-xs">
+                                {user.osDept ? (
+                                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+                                        <Building2 className="w-3 h-3 mr-1" />
                                         {user.osDept}
                                     </Badge>
-                                )}
-                                {!user.osTicketRole && !user.osDept && (
-                                    <Badge variant="outline" className="text-slate-500">
-                                        No extension data
+                                ) : (
+                                    <Badge variant="outline" className="text-slate-400">
+                                        No Dept
                                     </Badge>
                                 )}
                             </div>
