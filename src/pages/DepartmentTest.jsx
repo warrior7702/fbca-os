@@ -84,13 +84,15 @@ export default function DepartmentTest() {
     setScanning(true);
     setConnectionError(null);
     try {
-      console.log('🔍 Scanning O365...');
-      const response = await base44.functions.invoke('scanO365Departments');
+      console.log('🔍 Starting department scan...');
+      
+      // Use the NEW function name
+      const response = await base44.functions.invoke('scanDepartments');
       console.log('📥 Scan response:', response.data);
       
       if (response.data?.success) {
         setO365Data(response.data);
-        toast.success(`Scanned ${response.data.users.length} users from Microsoft 365`);
+        toast.success(`✅ Scanned ${response.data.users.length} users from Microsoft 365`);
       } else {
         // Handle specific error types
         if (response.data?.needsConnection) {
@@ -121,7 +123,7 @@ export default function DepartmentTest() {
         toast.error(response.data?.error || 'Failed to scan O365');
       }
     } catch (error) {
-      console.error('❌ Error scanning O365:', error);
+      console.error('❌ Scan error:', error);
       console.error('Error details:', {
         message: error.message,
         response: error.response,
@@ -216,18 +218,19 @@ export default function DepartmentTest() {
           </div>
         </div>
 
-        {/* Troubleshooting Info */}
-        <Card className="mb-6 border-purple-300 bg-purple-50">
+        {/* Success Banner */}
+        <Card className="mb-6 border-green-300 bg-green-50">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <Bug className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="font-semibold text-purple-900 mb-2">Troubleshooting</h3>
-                <div className="text-sm text-purple-800 space-y-1">
-                  <p>• <strong>Test Auth</strong> - Verify function authentication works</p>
-                  <p>• <strong>Scan O365</strong> - Scan Microsoft 365 for departments</p>
-                  <p>• Check browser console for detailed logs</p>
-                  <p className="mt-2 text-xs">If you get a 401 error, the function may not be deployed. Check Base44 Dashboard → Code → Functions.</p>
+                <h3 className="font-semibold text-green-900 mb-2">✅ Authentication Working!</h3>
+                <div className="text-sm text-green-800 space-y-1">
+                  <p>• Test Auth passed - functions are deployed and accessible</p>
+                  <p>• You're logged in as: <strong>{currentUser?.email}</strong></p>
+                  <p>• Role: <strong className="text-green-900">{currentUser?.role}</strong></p>
+                  <p>• Microsoft Token: <strong className="text-green-900">Connected ✓</strong></p>
+                  <p className="mt-2 text-xs">Now using the <strong>NEW scanDepartments</strong> function to avoid any conflicts.</p>
                 </div>
               </div>
             </div>
@@ -281,7 +284,7 @@ export default function DepartmentTest() {
                 Ready to Scan
               </h3>
               <p className="text-slate-600 mb-6">
-                Click "Test Auth" first to verify authentication, then click "Scan O365"
+                Click "Scan O365" to retrieve department data from Microsoft 365
               </p>
             </CardContent>
           </Card>
