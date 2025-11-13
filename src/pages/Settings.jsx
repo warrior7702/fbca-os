@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -871,7 +872,11 @@ export default function Settings() {
                         }
                       </CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <Button onClick={() => navigate(createPageUrl('DepartmentTest'))} variant="outline">
+                        <Database className="w-4 h-4 mr-2" />
+                        Departments
+                      </Button>
                       <Button onClick={() => navigate(createPageUrl('EmailTemplateEditor'))} variant="outline">
                         <Mail className="w-4 h-4 mr-2" />
                         Email Templates
