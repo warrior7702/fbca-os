@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -56,17 +57,24 @@ export default function CampaignRunning() {
 
   const loadWorkOrders = async () => {
     try {
-      const tickets = await base44.entities.Ticket.filter({
+      console.log('🔍 Loading work orders for request:', requestId);
+      
+      const allTickets = await base44.entities.Ticket.filter({
         source: 'communications_workflow'
       });
       
-      const relatedTickets = tickets.filter(t => 
-        t.comments?.some(c => c.content?.includes(requestId))
-      );
+      console.log('📊 Total workflow tickets:', allTickets.length);
       
+      const relatedTickets = allTickets.filter(t => {
+        const hasWorkflowTag = t.tags?.includes(`workflow:${requestId}`);
+        const hasRelatedEvent = t.related_event_id === requestId;
+        return hasWorkflowTag || hasRelatedEvent;
+      });
+      
+      console.log('✅ Found', relatedTickets.length, 'tickets for this request');
       setWorkOrders(relatedTickets);
     } catch (error) {
-      console.error('Error loading work orders:', error);
+      console.error('❌ Error loading work orders:', error);
     }
   };
 

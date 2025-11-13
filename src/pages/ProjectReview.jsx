@@ -386,10 +386,13 @@ export default function ProjectReview() {
   const handleFinalize = async () => {
     setSaving(true);
     try {
+      console.log('🚀 Starting finalization for request:', requestId);
+      console.log('📋 Creating tickets for', tasks.length, 'tasks');
+      
       const ticketPromises = tasks.map(async (task) => {
         const ticketNumber = `TKT-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5)}`;
         
-        return base44.entities.Ticket.create({
+        const ticketData = {
           ticket_number: ticketNumber,
           subject: task.name,
           description: task.description || `Task for ${request.title}`,
@@ -402,19 +405,23 @@ export default function ProjectReview() {
           requester_name: request.requestor_name,
           assigned_to_name: task.assigned_to,
           source: 'communications_workflow',
-          related_event_id: request.pco_event_id,
-          tags: [request.ministry_department, 'communications', task.type],
+          related_event_id: requestId, // Changed from request.pco_event_id to requestId
+          tags: [request.ministry_department, 'communications', task.type, `workflow:${requestId}`], // Added workflow tag
           comments: [{
             author_email: request.requestor_email,
             author_name: request.requestor_name,
-            content: `Auto-created from Communications Request: ${request.request_number}`,
+            content: `Auto-created from Communications Request: ${request.request_number} (ID: ${requestId})`, // Updated comment
             is_internal: false,
             timestamp: new Date().toISOString()
           }]
-        });
+        };
+        
+        console.log('✅ Creating ticket:', ticketNumber, 'for task:', task.name);
+        return base44.entities.Ticket.create(ticketData);
       });
 
-      await Promise.all(ticketPromises);
+      const createdTickets = await Promise.all(ticketPromises);
+      console.log('✅ All tickets created:', createdTickets.length);
 
       await base44.entities.WorkflowRequest.update(requestId, {
         status: 'campaign_running',
@@ -428,10 +435,11 @@ export default function ProjectReview() {
         }
       });
 
+      console.log('✅ Request updated to campaign_running status');
       toast.success(`✅ Project finalized! ${tasks.length} support tickets created for your team.`);
       navigate(createPageUrl('WorkflowHub'));
     } catch (error) {
-      console.error('Error finalizing:', error);
+      console.error('❌ Error finalizing:', error);
       toast.error('Failed to finalize project');
     } finally {
       setSaving(false);
