@@ -9,75 +9,101 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // FBCA has 6 Transistor.fm podcast feeds
-        const podcasts = [
-            {
-                id: 1,
-                title: 'FBCA Sermons',
-                description: 'Weekly messages from Pastor Dennis Wiles',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/podcasts2022.png',
-                feedUrl: 'https://fbcasermons.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/first-baptist-church-arlington-sermons/playlist',
-                episodes: 0
-            },
-            {
-                id: 2,
-                title: 'Tell Me More',
-                description: 'Your midweek spiritual boost - unpacking Sunday\'s sermon',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_TellMeMore.png',
-                feedUrl: 'https://tellmemore.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/tell-me-more/playlist',
-                episodes: 0
-            },
-            {
-                id: 3,
-                title: 'It Takes A Village',
-                description: 'Insights for parents guiding middle and high schoolers',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_ItTakesAVillage.png',
-                feedUrl: 'https://ittakesavillage.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/it-takes-a-village/playlist',
-                episodes: 0
-            },
-            {
-                id: 4,
-                title: 'Small Steps',
-                description: 'Faith-filled encouragement for young families',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_SmallSteps.png',
-                feedUrl: 'https://smallsteps.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/small-steps/playlist',
-                episodes: 0
-            },
-            {
-                id: 5,
-                title: 'Live Sent',
-                description: 'Living missionally in Arlington and beyond',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_LiveSent.png',
-                feedUrl: 'https://livesent.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/live-sent/playlist',
-                episodes: 0
-            },
-            {
-                id: 6,
-                title: 'Family Talk Box',
-                description: 'Building stronger family connections through conversation',
-                thumbnail: 'https://www.fbca.org/wp-content/uploads/2022/09/Podcasts_FamilyTalkBox.png',
-                feedUrl: 'https://familytalkbox.transistor.fm/',
-                embedUrl: 'https://share.transistor.fm/e/family-talk-box/playlist',
-                episodes: 0
+        console.log('🎙️ ========== FETCHING FBCA PODCASTS ==========');
+
+        const transistorUrl = 'https://fbcasermons.transistor.fm/';
+        console.log('🌐 Fetching:', transistorUrl);
+        
+        const response = await fetch(transistorUrl);
+        const html = await response.text();
+        
+        console.log('📄 HTML received, length:', html.length);
+
+        const podcasts = [];
+
+        // Strategy: Find all podcast show links
+        // Transistor typically has links like /s/show-name
+        const showLinkRegex = /href="(\/s\/[^"]+)"/gi;
+        const showLinks = new Set();
+        
+        let match;
+        while ((match = showLinkRegex.exec(html)) !== null) {
+            showLinks.add(match[1]);
+        }
+        
+        console.log(`🔍 Found ${showLinks.size} unique podcast shows`);
+
+        for (const showPath of Array.from(showLinks)) {
+            try {
+                const showUrl = `https://fbcasermons.transistor.fm${showPath}`;
+                console.log(`\n🎧 Fetching show: ${showUrl}`);
+                
+                const showResponse = await fetch(showUrl);
+                const showHtml = await showResponse.text();
+                
+                // Get show title
+                const titleMatch = showHtml.match(/<title>([^<]+)<\/title>/i);
+                let title = titleMatch ? titleMatch[1].replace(' | FBCA Sermons', '').trim() : 'FBCA Podcast';
+                
+                // Get show description from meta tag
+                const descMatch = showHtml.match(/<meta\s+(?:name|property)=["'](?:description|og:description)["']\s+content=["']([^"']+)["']/i);
+                const description = descMatch ? descMatch[1] : 'FBCA Sermons and Messages';
+                
+                // Get thumbnail/cover image
+                const imageMatch = showHtml.match(/<meta\s+(?:name|property)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i);
+                const thumbnail = imageMatch ? imageMatch[1] : 'https://images.transistor.fm/file/transistor/images/logos/site/20532/x1000.png';
+                
+                // Get RSS feed link
+                const rssFeedMatch = showHtml.match(/href=["']([^"']*feeds\.transistor\.fm[^"']*)["']/i);
+                const feedUrl = rssFeedMatch ? rssFeedMatch[1] : showUrl;
+                
+                console.log(`  📝 Title: ${title}`);
+                console.log(`  📝 Description: ${description.substring(0, 50)}...`);
+                console.log(`  🖼️ Thumbnail: ${thumbnail}`);
+                console.log(`  📡 Feed: ${feedUrl}`);
+                
+                podcasts.push({
+                    id: showPath.replace('/s/', ''),
+                    title: title,
+                    description: description,
+                    thumbnail: thumbnail,
+                    feedUrl: feedUrl,
+                    showUrl: showUrl
+                });
+                
+                console.log(`  ✅ Added podcast: ${title}`);
+                
+            } catch (showError) {
+                console.error(`❌ Error fetching show ${showPath}:`, showError.message);
             }
-        ];
+        }
+
+        console.log('\n✅ ========== PODCAST FETCH SUCCESS ==========');
+        console.log(`📊 Total Podcasts: ${podcasts.length}`);
+        
+        if (podcasts.length > 0) {
+            console.log('\n🎙️ Podcasts found:');
+            podcasts.forEach(podcast => {
+                console.log(`   - ${podcast.title}`);
+            });
+        }
 
         return Response.json({
             success: true,
-            podcasts,
-            featured: podcasts.slice(0, 2) // FBCA Sermons and Tell Me More are featured
+            podcasts: podcasts,
+            count: podcasts.length
         });
 
     } catch (error) {
-        console.error('Error fetching FBCA podcasts:', error);
+        console.error('\n❌ ========== PODCAST FETCH ERROR ==========');
+        console.error('Error:', error.message);
+        console.error('Stack:', error.stack);
+        
         return Response.json({
-            error: 'Failed to fetch FBCA podcasts',
-            details: error.message
+            success: false,
+            error: 'Failed to fetch podcasts',
+            details: error.message,
+            podcasts: []
         }, { status: 500 });
     }
 });

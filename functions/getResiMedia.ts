@@ -9,104 +9,148 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        console.log('📺 Fetching FBCA media from Resi...');
+        console.log('📺 ========== FETCHING RESI MEDIA ==========');
 
-        // Fetch the main Resi page
         const resiUrl = 'https://sites.resi.io/fbcamedia';
+        console.log('🌐 Fetching:', resiUrl);
+        
         const response = await fetch(resiUrl);
         const html = await response.text();
+        
+        console.log('📄 HTML received, length:', html.length);
 
         const collections = [];
 
-        // Strategy: Find all "View All" links which indicate collections
-        const viewAllRegex = /href="(\/fbcamedia\/explore\/[^"]+)"/g;
-        const viewAllMatches = [...html.matchAll(viewAllRegex)];
+        // Strategy 1: Find all "View All" or "explore" links
+        const exploreLinks = [];
+        const exploreLinkRegex = /href="(\/fbcamedia\/explore\/[^"]+)"/gi;
+        let match;
+        while ((match = exploreLinkRegex.exec(html)) !== null) {
+            exploreLinks.push(match[1]);
+        }
         
-        console.log(`🔍 Found ${viewAllMatches.length} collections`);
+        console.log(`🔍 Found ${exploreLinks.length} explore links`);
 
-        for (const match of viewAllMatches) {
-            const exploreUrl = match[1];
-            const collectionId = exploreUrl.split('/').pop();
-            
-            // Find the collection name - look backwards from the link
-            const linkIndex = html.indexOf(match[0]);
-            const sectionBefore = html.substring(Math.max(0, linkIndex - 500), linkIndex);
-            
-            // Extract collection name from h2 or h1 tags
-            const nameMatch = sectionBefore.match(/<h[12][^>]*>(?:\*\*)?([^<*]+)(?:\*\*)?<\/h[12]>/);
-            let collectionName = nameMatch ? nameMatch[1].trim() : `Collection ${collectionId}`;
-            
-            // Find the section containing this collection's videos
-            const sectionStart = html.indexOf(exploreUrl);
-            const nextCollectionStart = html.indexOf('/fbcamedia/explore/', sectionStart + 50);
-            const sectionEnd = nextCollectionStart > 0 ? nextCollectionStart : html.length;
-            const sectionHtml = html.substring(sectionStart - 1000, sectionEnd);
-            
-            console.log(`📁 Processing: ${collectionName}`);
-            
-            // Find all video watch links in this section
-            const videos = [];
-            const videoRegex = /href="(\/fbcamedia\/watch\/[^"]+)"[^>]*>[\s\S]*?(?:src="([^"]*thumbnails[^"]+)"[\s\S]*?)?(?:alt="([^"]*)")?/g;
-            const videoMatches = [...sectionHtml.matchAll(videoRegex)];
-            
-            console.log(`  📹 Found ${videoMatches.length} videos`);
-            
-            for (const videoMatch of videoMatches) {
-                const videoPath = videoMatch[1];
-                const thumbnail = videoMatch[2] || '';
-                let title = videoMatch[3] || '';
+        // Strategy 2: Also look for direct video watch links to group by collection
+        const videoLinks = [];
+        const videoLinkRegex = /href="(\/fbcamedia\/watch\/[^"]+)"/gi;
+        while ((match = videoLinkRegex.exec(html)) !== null) {
+            videoLinks.push(match[1]);
+        }
+        
+        console.log(`🎥 Found ${videoLinks.length} video links`);
+
+        // For each explore link, fetch that collection page
+        for (const exploreLink of exploreLinks) {
+            try {
+                const collectionUrl = `https://sites.resi.io${exploreLink}`;
+                console.log(`\n📂 Fetching collection: ${collectionUrl}`);
                 
-                // Clean up title
-                title = title.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim();
+                const collectionResponse = await fetch(collectionUrl);
+                const collectionHtml = await collectionResponse.text();
                 
-                // If no title, try to find it near the link
-                if (!title || title.length < 3) {
-                    const videoIndex = sectionHtml.indexOf(videoPath);
-                    const videoContext = sectionHtml.substring(videoIndex, videoIndex + 300);
-                    const titleMatch = videoContext.match(/\*\*([^*]+)\*\*/);
-                    if (titleMatch) {
-                        title = titleMatch[1].trim();
+                // Get collection name from page title
+                const titleMatch = collectionHtml.match(/<title>([^<]+)<\/title>/i);
+                const collectionName = titleMatch ? titleMatch[1].replace(' | FBCA Media', '').trim() : 'Collection';
+                
+                console.log(`📁 Collection name: ${collectionName}`);
+                
+                // Extract collection ID
+                const collectionId = exploreLink.split('/').pop();
+                
+                // Find all videos in this collection
+                const videos = [];
+                const videoMatches = collectionHtml.matchAll(/href="(\/fbcamedia\/watch\/([^"]+))"/gi);
+                
+                for (const videoMatch of videoMatches) {
+                    const videoPath = videoMatch[1];
+                    const videoId = videoMatch[2];
+                    
+                    // Find video details near this link
+                    const videoIndex = collectionHtml.indexOf(videoPath);
+                    const videoSection = collectionHtml.substring(Math.max(0, videoIndex - 500), videoIndex + 500);
+                    
+                    // Try to find title
+                    let title = '';
+                    const titleMatches = [
+                        videoSection.match(/alt="([^"]+)"/),
+                        videoSection.match(/title="([^"]+)"/),
+                        videoSection.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/),
+                    ];
+                    
+                    for (const tm of titleMatches) {
+                        if (tm && tm[1] && tm[1].length > 3) {
+                            title = tm[1].trim();
+                            break;
+                        }
                     }
+                    
+                    if (!title || title.length < 3) continue;
+                    
+                    // Find thumbnail
+                    const thumbnailMatch = videoSection.match(/src="([^"]*(?:thumbnail|image)[^"]*)"/i);
+                    const thumbnail = thumbnailMatch ? thumbnailMatch[1] : `https://i.vimeocdn.com/video/${videoId}_640.jpg`;
+                    
+                    // Extract date from title
+                    let date = null;
+                    const dateMatch = title.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+,?\s+\d{4}/i);
+                    if (dateMatch) {
+                        date = dateMatch[0];
+                    }
+                    
+                    videos.push({
+                        id: videoId,
+                        title: title,
+                        thumbnail: thumbnail,
+                        videoUrl: `https://sites.resi.io${videoPath}`,
+                        embedUrl: `https://sites.resi.io${videoPath}`,
+                        date: date,
+                        collectionId: collectionId
+                    });
                 }
                 
-                // Skip if still no valid title
-                if (!title || title.length < 3) continue;
+                console.log(`  ✅ Found ${videos.length} videos in ${collectionName}`);
                 
-                const videoId = videoPath.split('/').pop();
-                const videoUrl = `https://sites.resi.io${videoPath}`;
-                
-                // Extract date from title if present
-                let date = null;
-                const dateMatch = title.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+,\s+\d{4}/);
-                if (dateMatch) {
-                    date = dateMatch[0];
+                if (videos.length > 0) {
+                    collections.push({
+                        id: collectionId,
+                        name: collectionName,
+                        url: collectionUrl,
+                        videos: videos
+                    });
                 }
                 
-                videos.push({
-                    id: videoId,
-                    title: title,
-                    thumbnail: thumbnail,
-                    videoUrl: videoUrl,
-                    embedUrl: videoUrl,
-                    date: date,
-                    collectionId: collectionId
-                });
-            }
-            
-            // Only add collection if it has videos
-            if (videos.length > 0) {
-                collections.push({
-                    id: collectionId,
-                    name: collectionName,
-                    url: `https://sites.resi.io${exploreUrl}`,
-                    videos: videos.slice(0, 20) // Limit per collection
-                });
-                
-                console.log(`  ✅ Added ${videos.length} videos to ${collectionName}`);
+            } catch (collectionError) {
+                console.error(`❌ Error fetching collection ${exploreLink}:`, collectionError.message);
             }
         }
 
-        // Get featured video (first video from first collection)
+        // If no collections found, create a fallback with all videos
+        if (collections.length === 0 && videoLinks.length > 0) {
+            console.log('⚠️ No collections found, creating fallback collection with all videos');
+            
+            const fallbackVideos = [];
+            for (const videoPath of videoLinks.slice(0, 20)) {
+                const videoId = videoPath.split('/').pop();
+                fallbackVideos.push({
+                    id: videoId,
+                    title: 'FBCA Video',
+                    thumbnail: `https://i.vimeocdn.com/video/${videoId}_640.jpg`,
+                    videoUrl: `https://sites.resi.io${videoPath}`,
+                    embedUrl: `https://sites.resi.io${videoPath}`,
+                    date: null,
+                    collectionId: 'all'
+                });
+            }
+            
+            collections.push({
+                id: 'all',
+                name: 'FBCA Videos',
+                url: resiUrl,
+                videos: fallbackVideos
+            });
+        }
+
         const featured = collections[0]?.videos[0] || null;
 
         const result = {
@@ -119,11 +163,12 @@ Deno.serve(async (req) => {
             }
         };
 
-        console.log('✅ SUCCESS!');
-        console.log(`📊 Stats: ${result.stats.totalCollections} collections, ${result.stats.totalVideos} videos`);
+        console.log('\n✅ ========== RESI FETCH SUCCESS ==========');
+        console.log(`📊 Collections: ${result.stats.totalCollections}`);
+        console.log(`📊 Total Videos: ${result.stats.totalVideos}`);
         
         if (collections.length > 0) {
-            console.log('📂 Collections found:');
+            console.log('\n📂 Collections breakdown:');
             collections.forEach(col => {
                 console.log(`   - ${col.name}: ${col.videos.length} videos`);
             });
@@ -132,11 +177,17 @@ Deno.serve(async (req) => {
         return Response.json(result);
 
     } catch (error) {
-        console.error('❌ ERROR:', error.message);
+        console.error('\n❌ ========== RESI FETCH ERROR ==========');
+        console.error('Error:', error.message);
         console.error('Stack:', error.stack);
+        
         return Response.json({
+            success: false,
             error: 'Failed to fetch Resi media',
-            details: error.message
+            details: error.message,
+            collections: [],
+            featured: null,
+            stats: { totalCollections: 0, totalVideos: 0 }
         }, { status: 500 });
     }
 });
