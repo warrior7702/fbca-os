@@ -36,6 +36,7 @@ import ProjectReview from './pages/ProjectReview';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import CronStatus from './pages/CronStatus';
 import EmailTemplateEditor from './pages/EmailTemplateEditor';
+import CampaignRunning from './pages/CampaignRunning';
 import Layout from './Layout.jsx';
 
 
@@ -78,6 +79,7 @@ export const PAGES = {
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
     "CronStatus": CronStatus,
     "EmailTemplateEditor": EmailTemplateEditor,
+    "CampaignRunning": CampaignRunning,
 }
 
 export const pagesConfig = {
