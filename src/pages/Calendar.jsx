@@ -264,7 +264,9 @@ export default function Calendar() {
                 <Filter className="w-4 h-4 text-slate-600" />
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All Resources" />
+                    <SelectValue>
+                      {selectedCategory === "all" ? "All Resources" : selectedCategory}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Resources</SelectItem>
@@ -282,7 +284,9 @@ export default function Calendar() {
                 <Filter className="w-4 h-4 text-slate-600" />
                 <Select value={selectedTag} onValueChange={setSelectedTag}>
                   <SelectTrigger className="w-44">
-                    <SelectValue placeholder="All Tags" />
+                    <SelectValue>
+                      {selectedTag === "all" ? "All Tags" : selectedTag}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Tags</SelectItem>
@@ -756,3 +760,4 @@ export default function Calendar() {
     </div>
   );
 }
+
