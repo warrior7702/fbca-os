@@ -9,18 +9,16 @@ import {
   Mic2,
   Headphones,
   Music,
-  Archive,
+  Film,
   ArrowLeft,
   Calendar,
   ExternalLink,
   Loader2,
-  Film,
   Volume2,
   ChevronRight,
   Clock,
-  TrendingUp,
   Sparkles,
-  AlertCircle
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,107 +33,46 @@ export default function MediaPlayer() {
   const section = searchParams.get('section') || 'home';
   
   const [loading, setLoading] = useState(true);
-  const [resiData, setResiData] = useState({ collections: [], featured: null });
-  const [podcasts, setPodcasts] = useState([]);
+  const [media, setMedia] = useState({ sermons: [], videos: [], podcasts: [], livestream: null });
   const [isLive, setIsLive] = useState(false);
-  const [checkingLive, setCheckingLive] = useState(true);
-  const [errors, setErrors] = useState({ resi: null, podcasts: null });
 
   useEffect(() => {
     loadMediaData();
-    checkLiveStatus();
     const liveCheckInterval = setInterval(checkLiveStatus, 120000);
     return () => clearInterval(liveCheckInterval);
   }, []);
 
   const checkLiveStatus = async () => {
-    setCheckingLive(true);
     try {
-      const now = new Date();
-      const day = now.getDay();
-      const hour = now.getHours();
-      const minute = now.getMinutes();
-      const currentMinutes = hour * 60 + minute;
-
-      const sundayMorning1Start = 540 - 15;
-      const sundayMorning1End = 540 + 75;
-      const sundayMorning2Start = 645 - 15;
-      const sundayMorning2End = 645 + 75;
-      const wednesdayEveningStart = 1110 - 15;
-      const wednesdayEveningEnd = 1110 + 90;
-
-      let live = false;
-      if (day === 0) {
-        live = (currentMinutes >= sundayMorning1Start && currentMinutes <= sundayMorning1End) ||
-               (currentMinutes >= sundayMorning2Start && currentMinutes <= sundayMorning2End);
-      } else if (day === 3) {
-        live = currentMinutes >= wednesdayEveningStart && currentMinutes <= wednesdayEveningEnd;
+      const response = await base44.functions.invoke('getUnifiedMedia');
+      if (response.data?.media?.livestream) {
+        setIsLive(response.data.media.livestream.isLive);
       }
-
-      setIsLive(live);
     } catch (error) {
       console.error('Error checking live status:', error);
-      setIsLive(false);
-    } finally {
-      setCheckingLive(false);
     }
   };
 
   const loadMediaData = async () => {
-    console.log('🎬 ========== LOADING MEDIA DATA ==========');
+    console.log('🎬 Loading unified media...');
     setLoading(true);
-    const newErrors = { resi: null, podcasts: null };
     
     try {
-      // Load Resi videos
-      console.log('📺 Fetching Resi media...');
-      try {
-        const resiResponse = await base44.functions.invoke('getResiMedia');
-        console.log('📺 Resi Response:', resiResponse.data);
-        
-        if (resiResponse.data.success) {
-          setResiData(resiResponse.data);
-          console.log('✅ Resi loaded:', resiResponse.data.stats);
-        } else {
-          console.error('❌ Resi failed:', resiResponse.data);
-          newErrors.resi = 'Failed to load Resi videos';
-        }
-      } catch (error) {
-        console.error('❌ Resi error:', error);
-        newErrors.resi = error.message;
-      }
-
-      // Load Podcasts
-      console.log('🎙️ Fetching podcasts...');
-      try {
-        const podcastsResponse = await base44.functions.invoke('getFBCAPodcasts');
-        console.log('🎙️ Podcasts Response:', podcastsResponse.data);
-        
-        if (podcastsResponse.data.success) {
-          setPodcasts(podcastsResponse.data.podcasts || []);
-          console.log('✅ Podcasts loaded:', podcastsResponse.data.podcasts?.length || 0);
-        } else {
-          console.error('❌ Podcasts failed:', podcastsResponse.data);
-          newErrors.podcasts = 'Failed to load podcasts';
-        }
-      } catch (error) {
-        console.error('❌ Podcasts error:', error);
-        newErrors.podcasts = error.message;
-      }
-
-      setErrors(newErrors);
+      const response = await base44.functions.invoke('getUnifiedMedia');
+      console.log('📊 Media response:', response.data);
       
-      console.log('📊 Final State:');
-      console.log('  - Resi Collections:', resiData.collections?.length || 0);
-      console.log('  - Podcasts:', podcasts.length);
-      console.log('  - Errors:', newErrors);
-      
+      if (response.data?.success) {
+        setMedia(response.data.media);
+        setIsLive(response.data.media.livestream?.isLive || false);
+        toast.success('Media loaded!');
+      } else {
+        toast.error('Failed to load media');
+      }
     } catch (error) {
       console.error('Error loading media:', error);
       toast.error('Failed to load media content');
     } finally {
       setLoading(false);
-      console.log('✅ Media loading complete');
     }
   };
 
@@ -154,78 +91,34 @@ export default function MediaPlayer() {
       title: 'Sermons',
       icon: Mic2,
       color: 'from-blue-500 to-indigo-500',
-      description: 'Latest messages'
+      description: `${media.sermons.length} messages`,
+      count: media.sermons.length
+    },
+    {
+      id: 'videos',
+      title: 'Videos',
+      icon: Film,
+      color: 'from-green-500 to-emerald-500',
+      description: `${media.videos.length} videos`,
+      count: media.videos.length
     },
     {
       id: 'podcasts',
       title: 'Podcasts',
       icon: Headphones,
       color: 'from-purple-500 to-pink-500',
-      description: '6 shows'
-    },
-    {
-      id: 'videos',
-      title: 'Worship Services',
-      icon: Film,
-      color: 'from-green-500 to-emerald-500',
-      description: 'Past services'
+      description: `${media.podcasts.length} shows`,
+      count: media.podcasts.length
     }
   ];
 
   const renderHome = () => {
-    const featuredVideo = resiData.featured;
-    const sermonsCollection = resiData.collections.find(c => 
-      c.name.toLowerCase().includes('sermon')
-    );
+    const featured = media.sermons[0] || media.videos[0];
 
     return (
       <div className="space-y-6">
-        {/* Debug Info Card */}
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-blue-600" />
-              Debug Info
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-2">
-            <div className="flex justify-between">
-              <span className="text-slate-600">Resi Collections:</span>
-              <span className="font-semibold">{resiData.collections?.length || 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-600">Total Videos:</span>
-              <span className="font-semibold">
-                {resiData.collections?.reduce((sum, col) => sum + (col.videos?.length || 0), 0) || 0}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-600">Podcasts:</span>
-              <span className="font-semibold">{podcasts.length}</span>
-            </div>
-            {errors.resi && (
-              <div className="text-red-600 text-xs mt-2">
-                Resi Error: {errors.resi}
-              </div>
-            )}
-            {errors.podcasts && (
-              <div className="text-red-600 text-xs mt-2">
-                Podcasts Error: {errors.podcasts}
-              </div>
-            )}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={loadMediaData}
-              className="w-full mt-2"
-            >
-              Reload Media Data
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Hero Section - Featured Video */}
-        {featuredVideo && (
+        {/* Hero - Featured Content */}
+        {featured && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -233,8 +126,8 @@ export default function MediaPlayer() {
           >
             <div className="relative aspect-video">
               <img
-                src={featuredVideo.thumbnail}
-                alt={featuredVideo.title}
+                src={featured.thumbnail}
+                alt={featured.title}
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
@@ -246,17 +139,17 @@ export default function MediaPlayer() {
                   </Badge>
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-white mb-2 drop-shadow-lg">
-                  {featuredVideo.title}
+                  {featured.title}
                 </h2>
-                {featuredVideo.date && (
+                {featured.date && (
                   <p className="text-white/90 mb-4 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    {featuredVideo.date}
+                    {featured.date}
                   </p>
                 )}
                 <div className="flex gap-3">
                   <Button
-                    onClick={() => window.open(featuredVideo.videoUrl, '_blank')}
+                    onClick={() => window.open(featured.videoUrl, '_blank')}
                     size="lg"
                     className="bg-white text-slate-900 hover:bg-white/90 shadow-xl"
                   >
@@ -300,7 +193,7 @@ export default function MediaPlayer() {
         </div>
 
         {/* Latest Sermons Row */}
-        {sermonsCollection && sermonsCollection.videos.length > 0 && (
+        {media.sermons.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -317,7 +210,7 @@ export default function MediaPlayer() {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4">
-                {sermonsCollection.videos.slice(0, 3).map((sermon) => (
+                {media.sermons.slice(0, 3).map((sermon) => (
                   <motion.div
                     key={sermon.id}
                     whileHover={{ scale: 1.03 }}
@@ -325,22 +218,24 @@ export default function MediaPlayer() {
                     onClick={() => window.open(sermon.videoUrl, '_blank')}
                   >
                     <Card className="overflow-hidden border-2 border-transparent hover:border-blue-300 transition-all">
-                      <div className="relative">
-                        <img
-                          src={sermon.thumbnail}
-                          alt={sermon.title}
-                          className="w-full h-40 object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                        <Badge className="absolute top-2 left-2 bg-blue-600 text-white">
-                          Sermon
-                        </Badge>
-                        <div className="absolute bottom-2 left-2 right-2">
+                      {sermon.thumbnail && (
+                        <div className="relative">
+                          <img
+                            src={sermon.thumbnail}
+                            alt={sermon.title}
+                            className="w-full h-40 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                          <Badge className="absolute top-2 left-2 bg-blue-600 text-white">
+                            Sermon
+                          </Badge>
                           {sermon.date && (
-                            <p className="text-xs text-white/90">{sermon.date}</p>
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <p className="text-xs text-white/90">{sermon.date}</p>
+                            </div>
                           )}
                         </div>
-                      </div>
+                      )}
                       <CardContent className="p-3">
                         <h3 className="font-semibold text-sm line-clamp-2">{sermon.title}</h3>
                       </CardContent>
@@ -353,12 +248,12 @@ export default function MediaPlayer() {
         )}
 
         {/* Featured Podcasts */}
-        {podcasts.length > 0 && (
+        {media.podcasts.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Headphones className="w-5 h-5 text-purple-600" />
-                Featured Podcasts
+                Podcasts
               </CardTitle>
               <Button
                 variant="ghost"
@@ -370,7 +265,7 @@ export default function MediaPlayer() {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                {podcasts.slice(0, 2).map((podcast) => (
+                {media.podcasts.slice(0, 2).map((podcast) => (
                   <motion.div
                     key={podcast.id}
                     whileHover={{ scale: 1.02 }}
@@ -434,7 +329,7 @@ export default function MediaPlayer() {
         
         <div className="relative aspect-video bg-slate-900">
           <iframe
-            src="https://www.fbca.org/watch-listen/live/"
+            src={media.livestream?.embedUrl || 'https://www.fbca.org/watch-listen/live/'}
             className="w-full h-full"
             frameBorder="0"
             allow="autoplay; fullscreen; picture-in-picture"
@@ -450,16 +345,16 @@ export default function MediaPlayer() {
               <div className="text-sm text-slate-600 space-y-1">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  <span>Sundays: 9:00 AM & 10:45 AM</span>
+                  <span>Sundays: {media.livestream?.schedule?.sunday_morning_1}, {media.livestream?.schedule?.sunday_morning_2}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  <span>Wednesdays: 6:30 PM</span>
+                  <span>Wednesdays: {media.livestream?.schedule?.wednesday_evening}</span>
                 </div>
               </div>
             </div>
             <Button
-              onClick={() => window.open('https://www.fbca.org/watch-listen/live/', '_blank')}
+              onClick={() => window.open(media.livestream?.url || 'https://www.fbca.org/watch-listen/live/', '_blank')}
               variant="outline"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
@@ -471,61 +366,37 @@ export default function MediaPlayer() {
     </div>
   );
 
-  const renderSermons = () => {
-    const sermonsCollection = resiData.collections.find(c => 
-      c.name.toLowerCase().includes('sermon')
-    );
-    const sermons = sermonsCollection?.videos || [];
-
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 mb-2">
-                  <Mic2 className="w-6 h-6 text-blue-600" />
-                  {sermonsCollection?.name || 'Sermons'}
-                </CardTitle>
-                <p className="text-sm text-slate-600">{sermons.length} messages available</p>
-              </div>
-              {sermonsCollection && (
-                <Button
-                  onClick={() => window.open(sermonsCollection.url, '_blank')}
-                  variant="outline"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View on Resi
-                </Button>
-              )}
+  const renderSermons = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardTitle className="flex items-center gap-2 mb-2">
+            <Mic2 className="w-6 h-6 text-blue-600" />
+            Sermons & Messages
+          </CardTitle>
+          <p className="text-sm text-slate-600">{media.sermons.length} sermons available</p>
+        </CardHeader>
+        <CardContent className="p-6">
+          {media.sermons.length === 0 ? (
+            <div className="text-center py-12">
+              <Mic2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">No Sermons Found</h3>
+              <p className="text-slate-600">Check back soon for new content</p>
             </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            {sermons.length === 0 ? (
-              <div className="text-center py-12">
-                <Mic2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No Sermons Found</h3>
-                <p className="text-slate-600 mb-4">Visit FBCA.org to watch recent messages</p>
-                <Button
-                  onClick={() => window.open('https://www.fbca.org', '_blank')}
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {media.sermons.map((sermon, idx) => (
+                <motion.div
+                  key={sermon.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  whileHover={{ scale: 1.03 }}
+                  className="cursor-pointer"
+                  onClick={() => window.open(sermon.videoUrl, '_blank')}
                 >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Visit FBCA.org
-                </Button>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sermons.map((sermon, idx) => (
-                  <motion.div
-                    key={sermon.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    whileHover={{ scale: 1.03 }}
-                    className="cursor-pointer"
-                    onClick={() => window.open(sermon.videoUrl, '_blank')}
-                  >
-                    <Card className="overflow-hidden border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition-all">
+                  <Card className="overflow-hidden border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition-all">
+                    {sermon.thumbnail && (
                       <div className="relative">
                         <img
                           src={sermon.thumbnail}
@@ -533,9 +404,7 @@ export default function MediaPlayer() {
                           className="w-full h-48 object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                        <div className="absolute top-3 left-3">
-                          <Badge className="bg-blue-600 text-white">Sermon</Badge>
-                        </div>
+                        <Badge className="absolute top-3 left-3 bg-blue-600 text-white">Sermon</Badge>
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                           {sermon.date && (
                             <div className="flex items-center text-white text-sm gap-1">
@@ -548,19 +417,82 @@ export default function MediaPlayer() {
                           </div>
                         </div>
                       </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold text-slate-900 line-clamp-2">{sermon.title}</h3>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
+                    )}
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-slate-900 line-clamp-2">{sermon.title}</h3>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderVideos = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
+          <CardTitle className="flex items-center gap-2 mb-2">
+            <Film className="w-6 h-6 text-green-600" />
+            Videos
+          </CardTitle>
+          <p className="text-sm text-slate-600">{media.videos.length} videos available</p>
+        </CardHeader>
+        <CardContent className="p-6">
+          {media.videos.length === 0 ? (
+            <div className="text-center py-12">
+              <Film className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">No Videos Found</h3>
+              <p className="text-slate-600">Check back soon for new content</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {media.videos.map((video, idx) => (
+                <motion.div
+                  key={video.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.03 }}
+                  whileHover={{ scale: 1.03 }}
+                  className="cursor-pointer"
+                  onClick={() => window.open(video.videoUrl, '_blank')}
+                >
+                  <Card className="overflow-hidden border-2 border-transparent hover:border-green-300 hover:shadow-lg transition-all">
+                    {video.thumbnail && (
+                      <div className="relative">
+                        <img
+                          src={video.thumbnail}
+                          alt={video.title}
+                          className="w-full h-40 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        {video.date && (
+                          <Badge className="absolute bottom-2 left-2 bg-white/90 text-slate-900 text-xs">
+                            {video.date}
+                          </Badge>
+                        )}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
+                          <div className="w-12 h-12 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center">
+                            <Play className="w-6 h-6 text-white fill-current ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <CardContent className="p-3">
+                      <h3 className="font-medium text-sm line-clamp-2">{video.title}</h3>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const renderPodcasts = () => (
     <div className="space-y-6">
@@ -568,13 +500,13 @@ export default function MediaPlayer() {
         <CardHeader className="border-b bg-gradient-to-r from-purple-50 to-pink-50">
           <CardTitle className="flex items-center gap-2">
             <Headphones className="w-6 h-6 text-purple-600" />
-            FBCA Podcasts
+            Podcasts
           </CardTitle>
           <p className="text-sm text-slate-600 mt-2">Listen on your favorite podcast platform</p>
         </CardHeader>
         <CardContent className="p-6">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {podcasts.map((podcast, idx) => (
+            {media.podcasts.map((podcast, idx) => (
               <motion.div
                 key={podcast.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -596,7 +528,7 @@ export default function MediaPlayer() {
                     <p className="text-sm text-slate-600 mb-4 line-clamp-2">{podcast.description}</p>
                     <Button size="sm" variant="outline" className="w-full">
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Listen on Transistor
+                      Listen Now
                     </Button>
                   </CardContent>
                 </Card>
@@ -608,101 +540,12 @@ export default function MediaPlayer() {
     </div>
   );
 
-  const renderVideos = () => {
-    const videoCollections = resiData.collections.filter(c => 
-      c.name.toLowerCase().includes('worship')
-    );
-
-    return (
-      <div className="space-y-6">
-        {videoCollections.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Film className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">No Worship Services Found</h3>
-              <p className="text-slate-600 mb-4">Visit FBCA.org to watch full worship services</p>
-              <Button
-                onClick={() => window.open('https://www.fbca.org', '_blank')}
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Visit FBCA.org
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          videoCollections.map((collection) => (
-            <Card key={collection.id}>
-              <CardHeader className="border-b bg-gradient-to-r from-green-50 to-emerald-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 mb-2">
-                      <Film className="w-6 h-6 text-green-600" />
-                      {collection.name}
-                    </CardTitle>
-                    <p className="text-sm text-slate-600">{collection.videos.length} services</p>
-                  </div>
-                  <Button
-                    onClick={() => window.open(collection.url, '_blank')}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {collection.videos.map((video, idx) => (
-                    <motion.div
-                      key={video.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      whileHover={{ scale: 1.03 }}
-                      className="cursor-pointer"
-                      onClick={() => window.open(video.videoUrl, '_blank')}
-                    >
-                      <Card className="overflow-hidden border-2 border-transparent hover:border-green-300 hover:shadow-lg transition-all">
-                        <div className="relative">
-                          <img
-                            src={video.thumbnail}
-                            alt={video.title}
-                            className="w-full h-40 object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          {video.date && (
-                            <Badge className="absolute bottom-2 left-2 bg-white/90 text-slate-900 text-xs">
-                              {video.date}
-                            </Badge>
-                          )}
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
-                            <div className="w-12 h-12 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center">
-                              <Play className="w-6 h-6 text-white fill-current ml-0.5" />
-                            </div>
-                          </div>
-                        </div>
-                        <CardContent className="p-3">
-                          <h3 className="font-medium text-sm line-clamp-2">{video.title}</h3>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-    );
-  };
-
   const renderContent = () => {
     if (loading) {
       return (
         <div className="flex flex-col items-center justify-center py-20">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
-          <p className="text-slate-600">Loading FBCA media...</p>
+          <p className="text-slate-600">Loading media...</p>
         </div>
       );
     }
@@ -712,10 +555,10 @@ export default function MediaPlayer() {
         return renderLiveStream();
       case 'sermons':
         return renderSermons();
-      case 'podcasts':
-        return renderPodcasts();
       case 'videos':
         return renderVideos();
+      case 'podcasts':
+        return renderPodcasts();
       default:
         return renderHome();
     }
@@ -760,23 +603,33 @@ export default function MediaPlayer() {
                 : currentSection?.description || 'Media content'}
             </p>
           </div>
-          {section === 'home' && (
+          <div className="flex gap-2">
             <Button
-              onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=livestream')}
-              className={`bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 ${isLive ? 'animate-pulse' : ''}`}
+              onClick={loadMediaData}
+              variant="outline"
+              size="sm"
+              disabled={loading}
             >
-              {isLive && (
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="w-2 h-2 bg-white rounded-full mr-2"
-                />
-              )}
-              <Radio className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">{isLive ? 'Live Now!' : 'Watch Live'}</span>
-              <span className="sm:hidden">Live</span>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-          )}
+            {section === 'home' && (
+              <Button
+                onClick={() => navigate(createPageUrl('MediaPlayer') + '?section=livestream')}
+                className={`bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 ${isLive ? 'animate-pulse' : ''}`}
+              >
+                {isLive && (
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="w-2 h-2 bg-white rounded-full mr-2"
+                  />
+                )}
+                <Radio className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">{isLive ? 'Live Now!' : 'Watch Live'}</span>
+                <span className="sm:hidden">Live</span>
+              </Button>
+            )}
+          </div>
         </motion.div>
 
         <AnimatePresence mode="wait">
