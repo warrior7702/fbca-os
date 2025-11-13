@@ -9,70 +9,77 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Fetch Resi media site
+        console.log('📺 Fetching FBCA media from Resi...');
+
+        // Fetch the main Resi page
         const resiUrl = 'https://sites.resi.io/fbcamedia';
         const response = await fetch(resiUrl);
         const html = await response.text();
 
-        console.log('📺 Fetching Resi media from:', resiUrl);
-
-        // Parse collections - looking for the section headers with "View All" links
         const collections = [];
-        
-        // More flexible regex to match collection titles and their explore links
-        const collectionHeaderRegex = /<h[12][^>]*>([^<]+)<\/h[12]>[\s\S]*?href="([^"]*\/explore\/[^"]+)"/g;
-        const collectionMatches = [...html.matchAll(collectionHeaderRegex)];
-        
-        console.log('🔍 Found', collectionMatches.length, 'collection headers');
 
-        for (const match of collectionMatches) {
-            let collectionName = match[1].trim();
-            let exploreUrl = match[2];
-            
-            // Clean up collection name
-            collectionName = collectionName.replace(/\*\*/g, '').trim();
-            
+        // Strategy: Find all "View All" links which indicate collections
+        const viewAllRegex = /href="(\/fbcamedia\/explore\/[^"]+)"/g;
+        const viewAllMatches = [...html.matchAll(viewAllRegex)];
+        
+        console.log(`🔍 Found ${viewAllMatches.length} collections`);
+
+        for (const match of viewAllMatches) {
+            const exploreUrl = match[1];
             const collectionId = exploreUrl.split('/').pop();
             
-            console.log('📁 Processing collection:', collectionName, '(ID:', collectionId + ')');
+            // Find the collection name - look backwards from the link
+            const linkIndex = html.indexOf(match[0]);
+            const sectionBefore = html.substring(Math.max(0, linkIndex - 500), linkIndex);
             
-            // Find the section of HTML for this collection
-            const sectionStart = html.indexOf(collectionName);
-            const nextSectionStart = html.indexOf('<h1', sectionStart + 100);
-            const sectionHtml = html.substring(sectionStart, nextSectionStart > 0 ? nextSectionStart : html.length);
+            // Extract collection name from h2 or h1 tags
+            const nameMatch = sectionBefore.match(/<h[12][^>]*>(?:\*\*)?([^<*]+)(?:\*\*)?<\/h[12]>/);
+            let collectionName = nameMatch ? nameMatch[1].trim() : `Collection ${collectionId}`;
             
-            // Extract videos from this section - look for watch URLs and thumbnails
+            // Find the section containing this collection's videos
+            const sectionStart = html.indexOf(exploreUrl);
+            const nextCollectionStart = html.indexOf('/fbcamedia/explore/', sectionStart + 50);
+            const sectionEnd = nextCollectionStart > 0 ? nextCollectionStart : html.length;
+            const sectionHtml = html.substring(sectionStart - 1000, sectionEnd);
+            
+            console.log(`📁 Processing: ${collectionName}`);
+            
+            // Find all video watch links in this section
             const videos = [];
-            const videoLinkRegex = /href="(\/fbcamedia\/watch\/[^"]+)"/g;
-            const videoLinks = [...sectionHtml.matchAll(videoLinkRegex)];
+            const videoRegex = /href="(\/fbcamedia\/watch\/[^"]+)"[^>]*>[\s\S]*?(?:src="([^"]*thumbnails[^"]+)"[\s\S]*?)?(?:alt="([^"]*)")?/g;
+            const videoMatches = [...sectionHtml.matchAll(videoRegex)];
             
-            console.log('  📹 Found', videoLinks.length, 'video links');
+            console.log(`  📹 Found ${videoMatches.length} videos`);
             
-            for (const videoLink of videoLinks) {
-                const videoPath = videoLink[1];
-                const videoUrl = `https://sites.resi.io${videoPath}`;
-                const videoId = videoPath.split('/').pop();
-                
-                // Find thumbnail and title near this video link
-                const linkIndex = sectionHtml.indexOf(videoPath);
-                const videoSection = sectionHtml.substring(Math.max(0, linkIndex - 500), linkIndex + 500);
-                
-                // Extract thumbnail
-                const thumbnailMatch = videoSection.match(/src="(https:\/\/lib\.resi\.media\/[^"]+)"/);
-                const thumbnail = thumbnailMatch ? thumbnailMatch[1] : '';
-                
-                // Extract title - look for alt text or nearby text
-                const altMatch = videoSection.match(/alt="([^"]+)"/);
-                let title = altMatch ? altMatch[1] : `Video ${videos.length + 1}`;
+            for (const videoMatch of videoMatches) {
+                const videoPath = videoMatch[1];
+                const thumbnail = videoMatch[2] || '';
+                let title = videoMatch[3] || '';
                 
                 // Clean up title
                 title = title.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim();
                 
-                // Extract date from title
+                // If no title, try to find it near the link
+                if (!title || title.length < 3) {
+                    const videoIndex = sectionHtml.indexOf(videoPath);
+                    const videoContext = sectionHtml.substring(videoIndex, videoIndex + 300);
+                    const titleMatch = videoContext.match(/\*\*([^*]+)\*\*/);
+                    if (titleMatch) {
+                        title = titleMatch[1].trim();
+                    }
+                }
+                
+                // Skip if still no valid title
+                if (!title || title.length < 3) continue;
+                
+                const videoId = videoPath.split('/').pop();
+                const videoUrl = `https://sites.resi.io${videoPath}`;
+                
+                // Extract date from title if present
                 let date = null;
-                const dateMatch = title.match(/(\w+ \d+, \d{4})/);
+                const dateMatch = title.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+,\s+\d{4}/);
                 if (dateMatch) {
-                    date = dateMatch[1];
+                    date = dateMatch[0];
                 }
                 
                 videos.push({
@@ -91,15 +98,15 @@ Deno.serve(async (req) => {
                 collections.push({
                     id: collectionId,
                     name: collectionName,
-                    url: exploreUrl.startsWith('http') ? exploreUrl : `https://sites.resi.io${exploreUrl}`,
-                    videos: videos.slice(0, 15) // Limit to 15 videos per collection
+                    url: `https://sites.resi.io${exploreUrl}`,
+                    videos: videos.slice(0, 20) // Limit per collection
                 });
                 
-                console.log('  ✅ Added collection with', videos.length, 'videos');
+                console.log(`  ✅ Added ${videos.length} videos to ${collectionName}`);
             }
         }
 
-        // Get featured/latest video (first video from first collection)
+        // Get featured video (first video from first collection)
         const featured = collections[0]?.videos[0] || null;
 
         const result = {
@@ -112,12 +119,21 @@ Deno.serve(async (req) => {
             }
         };
 
-        console.log('✅ Success! Found', result.stats.totalCollections, 'collections with', result.stats.totalVideos, 'total videos');
+        console.log('✅ SUCCESS!');
+        console.log(`📊 Stats: ${result.stats.totalCollections} collections, ${result.stats.totalVideos} videos`);
+        
+        if (collections.length > 0) {
+            console.log('📂 Collections found:');
+            collections.forEach(col => {
+                console.log(`   - ${col.name}: ${col.videos.length} videos`);
+            });
+        }
 
         return Response.json(result);
 
     } catch (error) {
-        console.error('❌ Error fetching Resi media:', error);
+        console.error('❌ ERROR:', error.message);
+        console.error('Stack:', error.stack);
         return Response.json({
             error: 'Failed to fetch Resi media',
             details: error.message
