@@ -18,158 +18,75 @@ Deno.serve(async (req) => {
             podcasts: []
         };
 
-        // 1. Fetch YouTube content
+        // 1. Fetch YouTube content via RSS (works without API key!)
         console.log('\n📺 === FETCHING YOUTUBE CONTENT ===');
         try {
             const youtubeChannelId = 'UCnXo8yLYZYwWEOQ-OqQcJFw'; // @FirstBaptistArlington
+            const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${youtubeChannelId}`;
             
-            // YouTube RSS feeds (no API key needed!)
-            const youtubeFeeds = [
-                { url: `https://www.youtube.com/feeds/videos.xml?channel_id=${youtubeChannelId}`, type: 'videos' },
-            ];
-
-            for (const feed of youtubeFeeds) {
-                try {
-                    const response = await fetch(feed.url);
-                    const xmlText = await response.text();
+            console.log('📡 Fetching YouTube RSS:', rssUrl);
+            const response = await fetch(rssUrl);
+            const xmlText = await response.text();
+            
+            console.log('✅ YouTube RSS received');
+            
+            // Parse XML for video entries
+            const videoMatches = xmlText.matchAll(/<entry>(.*?)<\/entry>/gs);
+            let videoCount = 0;
+            
+            for (const match of videoMatches) {
+                const entry = match[1];
+                
+                const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+                const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+                const publishedMatch = entry.match(/<published>([^<]+)<\/published>/);
+                const descriptionMatch = entry.match(/<media:description>([^<]*)<\/media:description>/);
+                
+                if (videoIdMatch && titleMatch) {
+                    const videoId = videoIdMatch[1];
+                    const title = titleMatch[1];
+                    const published = publishedMatch ? new Date(publishedMatch[1]) : null;
+                    const description = descriptionMatch ? descriptionMatch[1] : '';
                     
-                    // Parse XML for video entries
-                    const videoMatches = xmlText.matchAll(/<entry>(.*?)<\/entry>/gs);
+                    const video = {
+                        id: `yt-${videoId}`,
+                        title: title,
+                        description: description,
+                        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                        videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                        embedUrl: `https://www.youtube.com/embed/${videoId}`,
+                        date: published ? published.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null,
+                        publishedDate: published,
+                        source: 'youtube'
+                    };
                     
-                    for (const match of videoMatches) {
-                        const entry = match[1];
-                        
-                        const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-                        const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
-                        const publishedMatch = entry.match(/<published>([^<]+)<\/published>/);
-                        
-                        if (videoIdMatch && titleMatch) {
-                            const videoId = videoIdMatch[1];
-                            const title = titleMatch[1];
-                            const published = publishedMatch ? new Date(publishedMatch[1]) : null;
-                            
-                            const video = {
-                                id: `yt-${videoId}`,
-                                title: title,
-                                thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-                                videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
-                                embedUrl: `https://www.youtube.com/embed/${videoId}`,
-                                date: published ? published.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null,
-                                source: 'youtube',
-                                type: feed.type
-                            };
-                            
-                            // Categorize based on title keywords
-                            const titleLower = title.toLowerCase();
-                            if (titleLower.includes('sermon') || titleLower.includes('message') || titleLower.includes('worship service')) {
-                                allMedia.sermons.push(video);
-                            } else {
-                                allMedia.videos.push(video);
-                            }
-                        }
+                    // Categorize based on title keywords
+                    const titleLower = title.toLowerCase();
+                    if (titleLower.includes('sermon') || 
+                        titleLower.includes('message') || 
+                        titleLower.includes('worship service') ||
+                        titleLower.includes('sunday') ||
+                        titleLower.includes('pastor') ||
+                        titleLower.includes('dr.') ||
+                        titleLower.includes('rev.')) {
+                        allMedia.sermons.push(video);
+                    } else {
+                        allMedia.videos.push(video);
                     }
                     
-                    console.log(`✅ Fetched ${feed.type} from YouTube`);
-                } catch (feedError) {
-                    console.error(`❌ YouTube ${feed.type} error:`, feedError.message);
+                    videoCount++;
                 }
             }
+            
+            console.log(`✅ Parsed ${videoCount} videos from YouTube RSS`);
+            console.log(`   - Sermons: ${allMedia.sermons.length}`);
+            console.log(`   - Other Videos: ${allMedia.videos.length}`);
+            
         } catch (ytError) {
             console.error('❌ YouTube fetch error:', ytError.message);
         }
 
-        // 2. Fetch Planning Center media
-        console.log('\n⛪ === FETCHING PLANNING CENTER MEDIA ===');
-        try {
-            const pcoResponse = await fetch('https://fbca.churchcenter.com/pages/media');
-            const pcoHtml = await pcoResponse.text();
-            
-            // Look for video embeds or links
-            const videoMatches = pcoHtml.matchAll(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/g);
-            const foundVideos = new Set();
-            
-            for (const match of videoMatches) {
-                const videoId = match[1];
-                if (!foundVideos.has(videoId)) {
-                    foundVideos.add(videoId);
-                    
-                    allMedia.videos.push({
-                        id: `pco-${videoId}`,
-                        title: 'FBCA Media',
-                        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-                        videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
-                        embedUrl: `https://www.youtube.com/embed/${videoId}`,
-                        source: 'planning_center'
-                    });
-                }
-            }
-            
-            console.log(`✅ Found ${foundVideos.size} videos from Planning Center`);
-        } catch (pcoError) {
-            console.error('❌ Planning Center error:', pcoError.message);
-        }
-
-        // 3. Fetch FBCA.org sermons
-        console.log('\n🎤 === FETCHING FBCA.ORG SERMONS ===');
-        try {
-            const sermonsResponse = await fetch('https://www.fbca.org/sermons/');
-            const sermonsHtml = await sermonsResponse.text();
-            
-            // Look for sermon links and embeds
-            const sermonMatches = sermonsHtml.matchAll(/href="([^"]*sermons[^"]*)"/gi);
-            
-            for (const match of sermonMatches) {
-                const url = match[1];
-                if (url && !url.includes('#') && !url.includes('javascript')) {
-                    const fullUrl = url.startsWith('http') ? url : `https://www.fbca.org${url}`;
-                    
-                    // Try to get title from nearby text
-                    const index = sermonsHtml.indexOf(url);
-                    const section = sermonsHtml.substring(Math.max(0, index - 200), index + 200);
-                    const titleMatch = section.match(/<[^>]*>([^<]{10,})<\/[^>]*>/);
-                    
-                    allMedia.sermons.push({
-                        id: `sermon-${url.split('/').pop()}`,
-                        title: titleMatch ? titleMatch[1].trim() : 'FBCA Sermon',
-                        videoUrl: fullUrl,
-                        source: 'fbca_org'
-                    });
-                }
-            }
-            
-            console.log(`✅ Found ${allMedia.sermons.length} sermons from FBCA.org`);
-        } catch (sermonsError) {
-            console.error('❌ FBCA.org sermons error:', sermonsError.message);
-        }
-
-        // 4. Fetch Resi media
-        console.log('\n📹 === FETCHING RESI MEDIA ===');
-        try {
-            const resiResponse = await fetch('https://sites.resi.io/fbcamedia');
-            const resiHtml = await resiResponse.text();
-            
-            // Look for Resi video players
-            const resiMatches = resiHtml.matchAll(/href="(\/fbcamedia\/watch\/[^"]+)"/gi);
-            
-            for (const match of resiMatches) {
-                const videoPath = match[1];
-                const videoId = videoPath.split('/').pop();
-                
-                allMedia.videos.push({
-                    id: `resi-${videoId}`,
-                    title: 'FBCA Video',
-                    videoUrl: `https://sites.resi.io${videoPath}`,
-                    embedUrl: `https://sites.resi.io${videoPath}`,
-                    source: 'resi'
-                });
-            }
-            
-            console.log(`✅ Found ${allMedia.videos.length} videos from Resi`);
-        } catch (resiError) {
-            console.error('❌ Resi error:', resiError.message);
-        }
-
-        // 5. Fetch Transistor podcasts
+        // 2. Fetch Transistor podcasts
         console.log('\n🎙️ === FETCHING PODCASTS ===');
         try {
             const transistorResponse = await fetch('https://fbcasermons.transistor.fm/');
@@ -183,6 +100,8 @@ Deno.serve(async (req) => {
                 showLinks.add(match[1]);
             }
             
+            console.log(`🔍 Found ${showLinks.size} podcast shows`);
+            
             for (const showPath of Array.from(showLinks).slice(0, 10)) {
                 try {
                     const showUrl = `https://fbcasermons.transistor.fm${showPath}`;
@@ -194,7 +113,7 @@ Deno.serve(async (req) => {
                     const imageMatch = showHtml.match(/<meta\s+(?:name|property)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i);
                     const rssFeedMatch = showHtml.match(/href=["']([^"']*feeds\.transistor\.fm[^"']*)["']/i);
                     
-                    allMedia.podcasts.push({
+                    const podcast = {
                         id: showPath.replace('/s/', ''),
                         title: titleMatch ? titleMatch[1].replace(' | FBCA Sermons', '').trim() : 'FBCA Podcast',
                         description: descMatch ? descMatch[1] : 'FBCA Sermons and Messages',
@@ -202,18 +121,61 @@ Deno.serve(async (req) => {
                         feedUrl: rssFeedMatch ? rssFeedMatch[1] : showUrl,
                         showUrl: showUrl,
                         source: 'transistor'
-                    });
+                    };
+                    
+                    allMedia.podcasts.push(podcast);
+                    console.log(`  ✅ Added: ${podcast.title}`);
+                    
                 } catch (showError) {
                     console.error(`❌ Podcast show error:`, showError.message);
                 }
             }
             
-            console.log(`✅ Found ${allMedia.podcasts.length} podcasts`);
+            console.log(`✅ Total podcasts found: ${allMedia.podcasts.length}`);
+            
         } catch (podcastError) {
             console.error('❌ Podcast error:', podcastError.message);
         }
 
-        // 6. Check live stream status
+        // 3. Try to get Planning Center videos
+        console.log('\n⛪ === CHECKING PLANNING CENTER ===');
+        try {
+            const pcoResponse = await fetch('https://fbca.churchcenter.com/pages/media');
+            const pcoHtml = await pcoResponse.text();
+            
+            // Look for embedded YouTube videos
+            const youtubeMatches = pcoHtml.matchAll(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/g);
+            const foundVideos = new Set();
+            
+            for (const match of youtubeMatches) {
+                const videoId = match[1];
+                if (!foundVideos.has(videoId)) {
+                    foundVideos.add(videoId);
+                    
+                    // Check if we already have this video from YouTube RSS
+                    const existing = allMedia.sermons.find(v => v.id === `yt-${videoId}`) ||
+                                   allMedia.videos.find(v => v.id === `yt-${videoId}`);
+                    
+                    if (!existing) {
+                        allMedia.videos.push({
+                            id: `pco-${videoId}`,
+                            title: 'FBCA Media',
+                            thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                            videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                            embedUrl: `https://www.youtube.com/embed/${videoId}`,
+                            source: 'planning_center'
+                        });
+                    }
+                }
+            }
+            
+            console.log(`✅ Found ${foundVideos.size} videos from Planning Center (${foundVideos.size === 0 ? 'may already be in YouTube feed' : 'added unique ones'})`);
+            
+        } catch (pcoError) {
+            console.error('❌ Planning Center error:', pcoError.message);
+        }
+
+        // 4. Check live stream status
         console.log('\n📡 === CHECKING LIVE STREAM ===');
         const now = new Date();
         const day = now.getDay();
@@ -250,22 +212,22 @@ Deno.serve(async (req) => {
 
         console.log(`✅ Live stream status: ${isLive ? 'LIVE' : 'Offline'}`);
 
-        // Remove duplicates and sort
-        allMedia.sermons = removeDuplicates(allMedia.sermons);
-        allMedia.videos = removeDuplicates(allMedia.videos);
-        allMedia.podcasts = removeDuplicates(allMedia.podcasts);
+        // Remove duplicates based on video URL
+        allMedia.sermons = removeDuplicatesByUrl(allMedia.sermons);
+        allMedia.videos = removeDuplicatesByUrl(allMedia.videos);
+        allMedia.podcasts = removeDuplicatesByUrl(allMedia.podcasts);
 
         // Sort by date (newest first)
         allMedia.sermons.sort((a, b) => {
-            if (!a.date) return 1;
-            if (!b.date) return -1;
-            return new Date(b.date) - new Date(a.date);
+            if (!a.publishedDate) return 1;
+            if (!b.publishedDate) return -1;
+            return b.publishedDate - a.publishedDate;
         });
         
         allMedia.videos.sort((a, b) => {
-            if (!a.date) return 1;
-            if (!b.date) return -1;
-            return new Date(b.date) - new Date(a.date);
+            if (!a.publishedDate) return 1;
+            if (!b.publishedDate) return -1;
+            return b.publishedDate - a.publishedDate;
         });
 
         const stats = {
@@ -303,12 +265,12 @@ Deno.serve(async (req) => {
     }
 });
 
-function removeDuplicates(items) {
-    const seen = new Set();
+function removeDuplicatesByUrl(items) {
+    const seen = new Map();
     return items.filter(item => {
         const key = item.videoUrl || item.feedUrl || item.id;
         if (seen.has(key)) return false;
-        seen.add(key);
+        seen.set(key, true);
         return true;
     });
 }
