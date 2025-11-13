@@ -54,7 +54,8 @@ Deno.serve(async (req) => {
 
         console.log(`🔑 Token source: ${tokenSource}`);
 
-        // Fetch users with extension attributes
+        // Fetch users with BOTH cloud and on-prem extension attributes
+        // For hybrid AD: onPremisesExtensionAttributes contains synced on-prem attributes
         const graphUrl = 'https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,jobTitle,onPremisesExtensionAttributes&$top=999';
         
         const response = await fetch(graphUrl, {
@@ -81,35 +82,66 @@ Deno.serve(async (req) => {
 
         console.log(`✅ Retrieved ${allUsers.length} users from Microsoft`);
 
-        // Parse and categorize users based on BOTH extension attributes
-        // extensionAttribute1 = OSTicketRole → "worker" (can be assigned) or "viewer" (read-only)
-        // extensionAttribute2 = OSDept → "Admin", "Kitchen", "Comms", etc. (department for ticket routing)
+        // Parse and categorize users based on extension attributes
+        // HYBRID AD SETUP:
+        // - onPremisesExtensionAttributes.extensionAttribute1 = OSTicketRole → "worker" or "viewer"
+        // - onPremisesExtensionAttributes.extensionAttribute2 = OSDept → "Admin", "Kitchen", "Comms", etc.
+        // These attributes are synced from on-prem AD to Entra ID via Azure AD Connect
+        
         const workers = [];
         const viewers = [];
         const uncategorized = [];
         const departmentStats = {};
         const roleStats = { worker: 0, viewer: 0, noRole: 0 };
         const departmentList = new Set();
+        const attributeSources = { onPrem: 0, cloud: 0, both: 0, neither: 0 };
 
         allUsers.forEach(u => {
-            const extAttrs = u.onPremisesExtensionAttributes || {};
-            const osTicketRole = extAttrs.extensionAttribute1?.toLowerCase(); // "worker" or "viewer"
-            const osDept = extAttrs.extensionAttribute2; // "Admin", "Kitchen", "Comms", etc.
+            // Check on-premises extension attributes (synced from local AD)
+            const onPremExtAttrs = u.onPremisesExtensionAttributes || {};
+            
+            // Extract values - normalize role to lowercase
+            const osTicketRole = onPremExtAttrs.extensionAttribute1?.toLowerCase()?.trim();
+            const osDept = onPremExtAttrs.extensionAttribute2?.trim();
+
+            // Track where attributes are coming from
+            const hasOnPremRole = !!onPremExtAttrs.extensionAttribute1;
+            const hasOnPremDept = !!onPremExtAttrs.extensionAttribute2;
+            
+            if (hasOnPremRole || hasOnPremDept) {
+                attributeSources.onPrem++;
+            } else {
+                attributeSources.neither++;
+            }
 
             const userInfo = {
                 id: u.id,
                 displayName: u.displayName,
                 email: u.mail || u.userPrincipalName,
-                department: u.department, // O365 department field (might be different)
+                department: u.department, // O365 department field (different from OSDept)
                 jobTitle: u.jobTitle,
                 osTicketRole: osTicketRole || null,
                 osDept: osDept || null,
                 hasTicketRole: !!osTicketRole,
                 hasDepartment: !!osDept,
-                hasExtensionData: !!(osTicketRole || osDept)
+                hasExtensionData: !!(osTicketRole || osDept),
+                attributeSource: (hasOnPremRole || hasOnPremDept) ? 'On-Premises (synced)' : 'None'
             };
 
-            // Track role stats
+            // Log first few users for debugging
+            if (allUsers.indexOf(u) < 3) {
+                console.log('🔍 Sample user:', {
+                    name: u.displayName,
+                    email: u.mail || u.userPrincipalName,
+                    onPremExtAttrs: onPremExtAttrs,
+                    parsed: {
+                        osTicketRole: osTicketRole,
+                        osDept: osDept
+                    }
+                });
+            }
+
+            // Categorize by role
             if (osTicketRole === 'worker') {
                 roleStats.worker++;
                 workers.push(userInfo);
@@ -163,17 +195,26 @@ Deno.serve(async (req) => {
         console.log('📊 Stats:', JSON.stringify(stats, null, 2));
         console.log('📊 Role breakdown:', JSON.stringify(roleStats, null, 2));
         console.log('📊 Departments found:', Array.from(departmentList).sort());
+        console.log('📊 Attribute sources:', JSON.stringify(attributeSources, null, 2));
 
         return Response.json({
             success: true,
             tokenSource: tokenSource,
             stats: stats,
             roleStats: roleStats,
+            attributeSources: attributeSources,
             workers: workers,
             viewers: viewers,
             uncategorized: uncategorized,
             departmentStats: departmentStats,
             departmentList: Array.from(departmentList).sort(),
+            setupInfo: {
+                type: 'Hybrid AD (Azure AD Connect)',
+                extensionAttribute1: 'OSTicketRole (worker/viewer)',
+                extensionAttribute2: 'OSDept (Admin/Kitchen/Comms/etc.)',
+                syncedFrom: 'On-Premises Active Directory → Entra ID',
+                apiField: 'onPremisesExtensionAttributes'
+            },
             allUsers: allUsers.map(u => {
                 const ext = u.onPremisesExtensionAttributes || {};
                 return {
@@ -182,9 +223,10 @@ Deno.serve(async (req) => {
                     email: u.mail || u.userPrincipalName,
                     department: u.department,
                     jobTitle: u.jobTitle,
-                    osTicketRole: ext.extensionAttribute1?.toLowerCase() || null,
-                    osDept: ext.extensionAttribute2 || null,
-                    rawExtensionAttributes: ext // Include raw data for debugging
+                    osTicketRole: ext.extensionAttribute1?.toLowerCase()?.trim() || null,
+                    osDept: ext.extensionAttribute2?.trim() || null,
+                    rawOnPremExtensionAttributes: ext, // Full raw data for debugging
+                    attributeSource: (ext.extensionAttribute1 || ext.extensionAttribute2) ? 'On-Premises (synced)' : 'None'
                 };
             })
         });
