@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -114,7 +115,6 @@ export default function ProjectReview() {
         // Load or auto-generate tasks
         if (projectData.tasks && projectData.tasks.length > 0) {
           // Remove duplicate photographer tasks (keep only first one)
-          const seenPhotographer = false;
           const cleanedTasks = [];
           let hasPhotographer = false;
           
@@ -526,7 +526,9 @@ export default function ProjectReview() {
                         {format(day, 'd')}
                       </span>
                       {isEventDay && (
-                        <Badge className="bg-purple-600 text-white text-xs">EVENT</Badge>
+                        <Badge className="bg-purple-600 text-white text-[10px] px-1 py-0 truncate max-w-[80px]" title={request.title}>
+                          {request.title}
+                        </Badge>
                       )}
                     </div>
 
