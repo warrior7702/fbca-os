@@ -345,7 +345,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
 
   const loadBookingStaffAndServices = async (businessId) => {
     try {
-      const response = await base44.functions.invoke('getBookingStaffAndServices', { businessId });
+      const response = await base44.functions.invoke('getBookingStaff', { businessId });
 
       if (response.data.success) {
         setBookingStaff(response.data.staff || []);
@@ -906,7 +906,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                             </Button>
                           </div>
                         )}
-                      </div>
+                      </div >
                     )}
 
                     {/* Meeting Notes Display */}
