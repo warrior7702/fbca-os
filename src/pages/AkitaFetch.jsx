@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -58,7 +59,7 @@ export default function AkitaFetch() {
         type: 'buildings'
       });
       
-      console.log('AkitaBox response:', response.data);
+      console.log('AkitaBox response:', response);
       
       if (response.data.success) {
         const buildingsData = response.data.data.buildings || [];
@@ -69,11 +70,19 @@ export default function AkitaFetch() {
           setError('No buildings found in AkitaBox');
         }
       } else {
-        setError(response.data.error || 'Failed to load buildings');
+        const errorMsg = response.data.error || 'Failed to load buildings';
+        const errorDetails = response.data.details || '';
+        console.error('Error from backend:', errorMsg, errorDetails);
+        setError(`${errorMsg}${errorDetails ? ': ' + errorDetails : ''}`);
       }
     } catch (error) {
       console.error('Error loading buildings:', error);
-      setError(error.message || 'Failed to connect to AkitaBox');
+      console.error('Error response:', error.response?.data);
+      
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to connect to AkitaBox';
+      const errorDetails = error.response?.data?.details || '';
+      
+      setError(`${errorMsg}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}`);
       toast.error('Failed to load buildings');
     } finally {
       setLoading(false);
@@ -176,7 +185,7 @@ export default function AkitaFetch() {
             <AlertCircle className="w-4 h-4 text-red-600" />
             <AlertDescription className="text-red-900">
               <p className="font-semibold mb-2">Failed to load AkitaBox data</p>
-              <p className="text-sm">{error}</p>
+              <pre className="text-sm whitespace-pre-wrap bg-red-100 p-3 rounded mt-2 text-red-800">{error}</pre>
               <Button 
                 onClick={loadBuildings}
                 className="mt-4"
