@@ -43,6 +43,7 @@ import MediaPlayer from './pages/MediaPlayer';
 import Achievements from './pages/Achievements';
 import DepartmentTest from './pages/DepartmentTest';
 import TicketRoleVerification from './pages/TicketRoleVerification';
+import Buildings from './pages/Buildings';
 import Layout from './Layout.jsx';
 
 
@@ -92,6 +93,7 @@ export const PAGES = {
     "Achievements": Achievements,
     "DepartmentTest": DepartmentTest,
     "TicketRoleVerification": TicketRoleVerification,
+    "Buildings": Buildings,
 }
 
 export const pagesConfig = {

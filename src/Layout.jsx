@@ -89,6 +89,13 @@ const apps = [
 
 const systemApps = [
   {
+    name: "Buildings",
+    path: "Buildings",
+    icon: Building2,
+    color: "text-blue-500",
+    action: null
+  },
+  {
     name: "Media Player",
     path: "MediaPlayer",
     icon: Play,
@@ -558,6 +565,15 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-1 md:gap-3">
             {/* System Icons - Hidden on mobile */}
             <div className="hidden lg:flex items-center gap-2">
+              <Link to={createPageUrl('Buildings')}>
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Buildings & Facilities"
+                >
+                  <Building2 className="w-4 h-4 text-white/80" />
+                </motion.div>
+              </Link>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
