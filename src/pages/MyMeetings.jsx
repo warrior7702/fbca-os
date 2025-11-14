@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes, addMinutes } from "date-fns"; // Added addMinutes
+import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes, addMinutes } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -92,6 +92,35 @@ export default function MyMeetings() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Load staff when modal opens
+  useEffect(() => {
+    if (showBookingModal && bookingStep === 'select-person' && staffResults.length === 0) {
+      loadAllStaff();
+    }
+  }, [showBookingModal, bookingStep, staffResults.length]); // Added staffResults.length to dependency array
+
+  const loadAllStaff = async () => {
+    setSearchingStaff(true);
+    try {
+      const response = await base44.entities.StaffContact.filter({});
+      if (response && response.length > 0) {
+        // Convert to format expected by the UI
+        const formattedStaff = response.map(person => ({
+          id: person.id,
+          displayName: person.full_name,
+          mail: person.email,
+          userPrincipalName: person.email
+        }));
+        setStaffResults(formattedStaff);
+      }
+    } catch (error) {
+      console.error('Error loading staff:', error);
+      toast.error('Failed to load staff');
+    } finally {
+      setSearchingStaff(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -315,17 +344,28 @@ ${meetingNotes.transcript || 'No transcript available.'}
   // New Booking functions
   const searchStaff = async (query) => {
     if (!query || query.length < 2) {
-      setStaffResults([]);
+      loadAllStaff(); // Changed from setStaffResults([]);
       return;
     }
 
     setSearchingStaff(true);
     try {
-      const response = await base44.functions.invoke('getMicrosoftGraphUsers', { query });
-      if (response.data && response.data.users) {
-        // Filter out the current user from search results
-        const filteredUsers = response.data.users.filter(u => u.mail?.toLowerCase() !== user?.email?.toLowerCase());
-        setStaffResults(filteredUsers);
+      // Changed to use base44.entities.StaffContact instead of getMicrosoftGraphUsers
+      const response = await base44.entities.StaffContact.filter({});
+      if (response && response.length > 0) {
+        const lowerQuery = query.toLowerCase();
+        const filtered = response
+          .filter(person =>
+            person.full_name?.toLowerCase().includes(lowerQuery) ||
+            person.email?.toLowerCase().includes(lowerQuery)
+          )
+          .map(person => ({
+            id: person.id,
+            displayName: person.full_name,
+            mail: person.email,
+            userPrincipalName: person.email
+          }));
+        setStaffResults(filtered);
       } else {
         setStaffResults([]);
       }
