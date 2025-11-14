@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -45,8 +46,8 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
+import { SheetTrigger } from "@/components/ui/sheet"; // Ensure SheetTrigger is imported
 
 const apps = [
   {
@@ -89,8 +90,8 @@ const apps = [
 
 const systemApps = [
   {
-    name: "Buildings",
-    path: "Buildings",
+    name: "AkitaFetch",
+    path: "AkitaFetch",
     icon: Building2,
     color: "text-blue-500",
     action: null
@@ -565,11 +566,11 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-1 md:gap-3">
             {/* System Icons - Hidden on mobile */}
             <div className="hidden lg:flex items-center gap-2">
-              <Link to={createPageUrl('Buildings')}>
+              <Link to={createPageUrl('AkitaFetch')}>
                 <motion.div
                   whileHover={{ scale: 1.1 }}
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Buildings & Facilities"
+                  title="AkitaFetch"
                 >
                   <Building2 className="w-4 h-4 text-white/80" />
                 </motion.div>

@@ -1,0 +1,428 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import {
+  Building2,
+  Loader2,
+  ArrowLeft,
+  Layers,
+  MapPin,
+  Package,
+  Plus,
+  Search,
+  Grid3x3,
+  Image as ImageIcon,
+  Ticket
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+
+export default function AkitaFetch() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [assets, setAssets] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("rooms");
+
+  useEffect(() => {
+    loadBuildings();
+  }, []);
+
+  useEffect(() => {
+    if (selectedBuilding && selectedLevel) {
+      loadRooms();
+      loadAssets();
+    }
+  }, [selectedBuilding, selectedLevel]);
+
+  const loadBuildings = async () => {
+    setLoading(true);
+    try {
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'buildings'
+      });
+      
+      if (response.data.success) {
+        setBuildings(response.data.data.buildings);
+      }
+    } catch (error) {
+      console.error('Error loading buildings:', error);
+      toast.error('Failed to load buildings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRooms = async () => {
+    if (!selectedBuilding || !selectedLevel) return;
+    
+    setLoadingRooms(true);
+    try {
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'rooms',
+        buildingId: selectedBuilding.id,
+        levelId: selectedLevel._id
+      });
+      
+      if (response.data.success) {
+        const roomsData = response.data.data.rooms || response.data.data || [];
+        setRooms(Array.isArray(roomsData) ? roomsData : []);
+      }
+    } catch (error) {
+      console.error('Error loading rooms:', error);
+      setRooms([]);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  const loadAssets = async () => {
+    if (!selectedBuilding || !selectedLevel) return;
+    
+    setLoadingAssets(true);
+    try {
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'assets',
+        buildingId: selectedBuilding.id,
+        levelId: selectedLevel._id
+      });
+      
+      if (response.data.success) {
+        const assetsData = response.data.data.assets || response.data.data || [];
+        setAssets(Array.isArray(assetsData) ? assetsData : []);
+      }
+    } catch (error) {
+      console.error('Error loading assets:', error);
+      setAssets([]);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  const handleCreateTicket = (room = null, asset = null) => {
+    const params = new URLSearchParams();
+    if (selectedBuilding) {
+      params.set('building_id', selectedBuilding.id);
+      params.set('building_name', selectedBuilding.name);
+    }
+    if (selectedLevel) {
+      params.set('level', selectedLevel.name);
+    }
+    if (room) {
+      params.set('room', room.name || room.number);
+    }
+    if (asset) {
+      params.set('asset', asset.name);
+    }
+    
+    navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+  };
+
+  const filteredRooms = rooms.filter(room => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (room.name?.toLowerCase().includes(query) || 
+            room.number?.toLowerCase().includes(query));
+  });
+
+  const filteredAssets = assets.filter(asset => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (asset.name?.toLowerCase().includes(query) || 
+            asset.type?.toLowerCase().includes(query));
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 p-3 sm:p-6 overflow-auto">
+      <div className="max-w-7xl mx-auto pb-20">
+        <div className="flex items-center gap-3 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(createPageUrl('Dashboard'))}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
+              AkitaFetch
+            </h1>
+            <p className="text-sm text-slate-600">Browse buildings, floor plans, rooms, and assets</p>
+          </div>
+        </div>
+
+        {!selectedBuilding ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {buildings.map((building) => (
+              <motion.div
+                key={building.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }}
+              >
+                <Card 
+                  className="cursor-pointer hover:shadow-lg transition-all"
+                  onClick={() => setSelectedBuilding(building)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                          <Building2 className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{building.name}</CardTitle>
+                          {building.address && (
+                            <p className="text-xs text-slate-600 mt-1">{building.address}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 text-sm text-slate-600">
+                      <div className="flex items-center gap-1">
+                        <Layers className="w-4 h-4" />
+                        <span>{building.levels?.length || 0} floors</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : !selectedLevel ? (
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedBuilding(null)}
+              className="mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Buildings
+            </Button>
+
+            <Card className="mb-6 border-2 border-blue-200 bg-blue-50">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{selectedBuilding.name}</h2>
+                    {selectedBuilding.address && (
+                      <p className="text-sm text-slate-600">{selectedBuilding.address}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <h3 className="text-xl font-bold text-slate-900 mb-4">Select a Floor</h3>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {selectedBuilding.levels?.map((level) => (
+                <motion.div
+                  key={level._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <Card 
+                    className="cursor-pointer hover:shadow-lg transition-all"
+                    onClick={() => setSelectedLevel(level)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                          <Layers className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-lg text-slate-900">{level.name}</p>
+                          <p className="text-xs text-slate-600">Click to view</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedLevel(null)}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Floors
+              </Button>
+              <Badge variant="outline" className="ml-auto">
+                {selectedBuilding.name} - {selectedLevel.name}
+              </Badge>
+            </div>
+
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Grid3x3 className="w-5 h-5" />
+                    {selectedBuilding.name} - {selectedLevel.name}
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleCreateTicket()}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Ticket
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Search rooms or assets..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="rooms">
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Rooms ({filteredRooms.length})
+                </TabsTrigger>
+                <TabsTrigger value="assets">
+                  <Package className="w-4 h-4 mr-2" />
+                  Assets ({filteredAssets.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="rooms" className="space-y-3 mt-4">
+                {loadingRooms ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  </div>
+                ) : filteredRooms.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                      <p className="text-slate-600">No rooms found</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredRooms.map((room) => (
+                      <Card key={room._id} className="hover:shadow-md transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900">
+                                {room.name || room.number || 'Unnamed Room'}
+                              </p>
+                              {room.type && (
+                                <Badge variant="outline" className="mt-1 text-xs">
+                                  {room.type}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => handleCreateTicket(room)}
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Ticket className="w-3 h-3 mr-2" />
+                            Create Ticket
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="assets" className="space-y-3 mt-4">
+                {loadingAssets ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  </div>
+                ) : filteredAssets.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                      <p className="text-slate-600">No assets found</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredAssets.map((asset) => (
+                      <Card key={asset._id} className="hover:shadow-md transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900">
+                                {asset.name || 'Unnamed Asset'}
+                              </p>
+                              {asset.type && (
+                                <Badge variant="outline" className="mt-1 text-xs">
+                                  {asset.type}
+                                </Badge>
+                              )}
+                              {asset.tag && (
+                                <p className="text-xs text-slate-500 mt-1">ID: {asset.tag}</p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => handleCreateTicket(null, asset)}
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Ticket className="w-3 h-3 mr-2" />
+                            Create Ticket
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
