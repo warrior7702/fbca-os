@@ -78,8 +78,6 @@ export default function MyMeetings() {
     duration: 30, // Default duration
     notes: ''
   });
-  const [availability, setAvailability] = useState(null);
-  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   useEffect(() => {
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -100,19 +98,7 @@ export default function MyMeetings() {
     if (showBookingModal && bookingStep === 'select-person' && staffResults.length === 0) {
       loadAllStaff();
     }
-  }, [showBookingModal, bookingStep, staffResults.length]);
-
-  // Check availability when date/time or service changes
-  useEffect(() => {
-    if (showBookingModal && selectedPerson && bookingData.date && bookingData.time) {
-      const debounceTimer = setTimeout(() => {
-        checkAvailability();
-      }, 700); // Debounce to prevent excessive API calls
-      return () => clearTimeout(debounceTimer);
-    } else {
-      setAvailability(null); // Clear availability if essential data is missing or modal is closed
-    }
-  }, [bookingData.date, bookingData.time, bookingData.duration, bookingData.serviceId, selectedPerson, showBookingModal, timezone]);
+  }, [showBookingModal, bookingStep, staffResults.length]); // Added staffResults.length to dependency array
 
   const loadAllStaff = async () => {
     setSearchingStaff(true);
@@ -355,55 +341,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const checkAvailability = async () => {
-    if (!selectedPerson || !bookingData.date || !bookingData.time) {
-      setAvailability(null);
-      return;
-    }
-
-    setCheckingAvailability(true);
-    setAvailability(null); // Clear previous availability state
-
-    try {
-      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`;
-      const startDateTime = new Date(startDateTimeString);
-      
-      let durationMinutes = bookingData.duration; // Default duration from state
-      if (bookingStep === 'booking-form' && bookingData.serviceId) {
-          const service = bookingServices.find(s => s.id === bookingData.serviceId);
-          if (service) {
-              durationMinutes = service.defaultDuration / 60;
-          }
-      }
-
-      const endDateTime = addMinutes(startDateTime, durationMinutes);
-
-      if (isNaN(startDateTime.getTime())) {
-        setCheckingAvailability(false);
-        return;
-      }
-
-      const response = await base44.functions.invoke('checkPersonAvailability', {
-        personEmail: selectedPerson.mail || selectedPerson.userPrincipalName,
-        startDateTime: startDateTime.toISOString(),
-        endDateTime: endDateTime.toISOString(),
-        timezone: timezone
-      });
-
-      if (response.data) {
-        setAvailability(response.data);
-      } else {
-        setAvailability(null);
-      }
-    } catch (error) {
-      console.error('Error checking availability:', error);
-      toast.error('Failed to check availability.');
-      setAvailability(null);
-    } finally {
-      setCheckingAvailability(false);
-    }
-  };
-
   // New Booking functions
   const searchStaff = async (query) => {
     if (!query || query.length < 2) {
@@ -443,7 +380,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
   const handleSelectPerson = async (person) => {
     setSelectedPerson(person);
     setLoadingBookingInfo(true);
-    setAvailability(null); // Clear availability on new person selection
 
     try {
       // Check if person has Bookings setup
@@ -582,8 +518,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
     setBookingBusiness(null);
     setBookingServices([]);
     setLoadingBookingInfo(false);
-    setAvailability(null);
-    setCheckingAvailability(false);
     setBookingData({
       serviceId: '',
       date: '',
@@ -694,7 +628,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
           action={
             <div className="flex gap-2">
               <Button
-                onClick={() => setShowBookingModal(true)}
+                onClick={() => setShowBookingModal(true)} // Modified onClick
                 variant="outline"
                 size="sm"
                 className="bg-white hover:bg-slate-50"
@@ -1313,14 +1247,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                 <label className="text-sm font-medium">Service</label>
                 <Select
                   value={bookingData.serviceId}
-                  onValueChange={(value) => {
-                    const selectedService = bookingServices.find(s => s.id === value);
-                    setBookingData({
-                      ...bookingData,
-                      serviceId: value,
-                      duration: selectedService ? selectedService.defaultDuration / 60 : bookingData.duration
-                    });
-                  }}
+                  onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
                   required
                   disabled={bookingServices.length === 0}
                 >
@@ -1359,47 +1286,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
                 </div>
               </div>
 
-              {/* Availability Check */}
-              {checkingAvailability && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Checking availability...
-                </div>
-              )}
-
-              {availability && !checkingAvailability && (
-                <div className={`p-3 rounded-lg border ${
-                  availability.isAvailable 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-orange-50 border-orange-200'
-                }`}>
-                  {availability.isAvailable ? (
-                    <div className="flex items-center gap-2 text-green-700">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">Available</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-700">
-                        <XCircle className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {availability.outOfOffice ? 'Out of Office' : 'Conflict Detected'}
-                        </span>
-                      </div>
-                      {availability.conflicts && availability.conflicts.length > 0 && (
-                        <div className="text-xs text-orange-600 space-y-1 ml-6">
-                          {availability.conflicts.map((conflict, idx) => (
-                            <div key={idx}>
-                              • {conflict.subject} ({format(parseISO(conflict.start), 'h:mm a')} - {format(parseISO(conflict.end), 'h:mm a')})
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="space-y-2">
                 <label className="text-sm font-medium">Notes (optional)</label>
                 <Textarea
@@ -1414,18 +1300,14 @@ ${meetingNotes.transcript || 'No transcript available.'}
                 <Button type="button" variant="outline" onClick={resetBookingModal}>
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  className="bg-purple-600 hover:bg-purple-700"
-                  disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time || (availability && !availability.isAvailable && !availability.outOfOffice)}
-                >
+                <Button type="submit" disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
                   {loadingBookingInfo ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Creating...
                     </>
                   ) : (
-                    availability && !availability.isAvailable ? 'Book Anyway' : 'Create Booking'
+                    'Create Booking'
                   )}
                 </Button>
               </div>
@@ -1477,47 +1359,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
                 />
               </div>
 
-              {/* Availability Check */}
-              {checkingAvailability && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Checking availability...
-                </div>
-              )}
-
-              {availability && !checkingAvailability && (
-                <div className={`p-3 rounded-lg border ${
-                  availability.isAvailable 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-orange-50 border-orange-200'
-                }`}>
-                  {availability.isAvailable ? (
-                    <div className="flex items-center gap-2 text-green-700">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">Available</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-700">
-                        <XCircle className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {availability.outOfOffice ? 'Out of Office' : 'Conflict Detected'}
-                        </span>
-                      </div>
-                      {availability.conflicts && availability.conflicts.length > 0 && (
-                        <div className="text-xs text-orange-600 space-y-1 ml-6">
-                          {availability.conflicts.map((conflict, idx) => (
-                            <div key={idx}>
-                              • {conflict.subject} ({format(parseISO(conflict.start), 'h:mm a')} - {format(parseISO(conflict.end), 'h:mm a')})
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="space-y-2">
                 <label className="text-sm font-medium">Notes (optional)</label>
                 <Textarea
@@ -1539,7 +1380,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                       Sending...
                     </>
                   ) : (
-                    availability && !availability.isAvailable ? 'Send Request Anyway' : 'Send Meeting Request'
+                    'Send Meeting Request'
                   )}
                 </Button>
               </div>
