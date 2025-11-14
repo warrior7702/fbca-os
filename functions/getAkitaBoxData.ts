@@ -33,9 +33,8 @@ Deno.serve(async (req) => {
 
     switch (type) {
       case 'buildings':
-        // Try direct buildings endpoint first
         url = `${AKITABOX_API}/organizations/${ORG_ID}/buildings?insensitive=true&limit=1000&skip=0&sort=name,%20asc`;
-        console.log('Fetching buildings directly from:', url);
+        console.log('Fetching buildings from:', url);
         
         const buildingsResponse = await fetch(url, { headers });
         console.log('Buildings response status:', buildingsResponse.status);
@@ -50,12 +49,8 @@ Deno.serve(async (req) => {
         }
         
         const buildingsData = await buildingsResponse.json();
-        console.log('Raw buildings response:', JSON.stringify(buildingsData, null, 2));
-        
-        // Handle both array and object with data property
         let buildings = Array.isArray(buildingsData) ? buildingsData : (buildingsData.data || buildingsData.results || []);
         
-        // Map to consistent format
         buildings = buildings.map(building => ({
           id: building._id || building.id,
           name: building.name,
@@ -64,8 +59,34 @@ Deno.serve(async (req) => {
         }));
         
         console.log('Buildings extracted:', buildings.length);
-        console.log('Buildings:', buildings.map(b => b.name));
+        console.log('Sample building with levels:', JSON.stringify(buildings[0], null, 2));
         data = { buildings };
+        break;
+
+      case 'levels':
+        if (!buildingId) {
+          return Response.json({ error: 'buildingId required' }, { status: 400 });
+        }
+        
+        url = `${AKITABOX_API}/buildings/${buildingId}/levels?limit=1000&skip=0`;
+        console.log('Fetching levels from:', url);
+        
+        const levelsResponse = await fetch(url, { headers });
+        console.log('Levels response status:', levelsResponse.status);
+        
+        if (!levelsResponse.ok) {
+          const errorText = await levelsResponse.text();
+          console.error('Levels API Error:', errorText);
+          return Response.json({ 
+            error: `AkitaBox API error: ${levelsResponse.status}`,
+            details: errorText
+          }, { status: 500 });
+        }
+        
+        const levelsData = await levelsResponse.json();
+        const levels = Array.isArray(levelsData) ? levelsData : (levelsData.data || levelsData.results || []);
+        console.log('Levels extracted:', levels.length);
+        data = { levels };
         break;
 
       case 'rooms':
@@ -89,9 +110,6 @@ Deno.serve(async (req) => {
         }
         
         const roomsData = await roomsResponse.json();
-        console.log('Raw rooms response type:', typeof roomsData);
-        console.log('Rooms count:', Array.isArray(roomsData) ? roomsData.length : 'not array');
-        
         const rooms = Array.isArray(roomsData) ? roomsData : (roomsData.data || roomsData.results || []);
         console.log('Rooms extracted:', rooms.length);
         data = { rooms };
@@ -118,9 +136,6 @@ Deno.serve(async (req) => {
         }
         
         const assetsData = await assetsResponse.json();
-        console.log('Raw assets response type:', typeof assetsData);
-        console.log('Assets count:', Array.isArray(assetsData) ? assetsData.length : 'not array');
-        
         const assets = Array.isArray(assetsData) ? assetsData : (assetsData.data || assetsData.results || []);
         console.log('Assets extracted:', assets.length);
         data = { assets };

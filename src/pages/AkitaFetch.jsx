@@ -35,6 +35,7 @@ export default function AkitaFetch() {
   const [assets, setAssets] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [loadingLevels, setLoadingLevels] = useState(false); // New state for loading levels
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("rooms");
   const [error, setError] = useState(null);
@@ -42,6 +43,13 @@ export default function AkitaFetch() {
   useEffect(() => {
     loadBuildings();
   }, []);
+
+  // New useEffect to load levels when a building is selected and its levels are not yet loaded
+  useEffect(() => {
+    if (selectedBuilding && (!selectedBuilding.levels || selectedBuilding.levels.length === 0)) {
+      loadLevels();
+    }
+  }, [selectedBuilding]);
 
   useEffect(() => {
     if (selectedBuilding && selectedLevel) {
@@ -64,6 +72,7 @@ export default function AkitaFetch() {
       if (response.data.success) {
         const buildingsData = response.data.data.buildings || [];
         console.log('Buildings loaded:', buildingsData.length);
+        console.log('Buildings:', buildingsData); // Added for visibility
         setBuildings(buildingsData);
         
         if (buildingsData.length === 0) {
@@ -89,6 +98,47 @@ export default function AkitaFetch() {
     }
   };
 
+  const loadLevels = async () => {
+    if (!selectedBuilding) return;
+    
+    setLoadingLevels(true);
+    try {
+      console.log('Loading levels for building:', selectedBuilding.id);
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'levels',
+        buildingId: selectedBuilding.id
+      });
+      
+      if (response.data.success) {
+        const levelsData = response.data.data.levels || [];
+        console.log('Levels loaded:', levelsData.length);
+        setSelectedBuilding(prevBuilding => ({
+          ...prevBuilding,
+          levels: levelsData
+        }));
+      } else {
+        const errorMsg = response.data.error || 'Failed to load levels';
+        const errorDetails = response.data.details || '';
+        console.error('Error from backend:', errorMsg, errorDetails);
+        toast.error(`Failed to load levels: ${errorMsg}`);
+        setSelectedBuilding(prevBuilding => ({ // Ensure levels array is at least empty to avoid re-triggering loadLevels if there's an error
+          ...prevBuilding,
+          levels: []
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading levels:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error('Failed to load levels for building.');
+      setSelectedBuilding(prevBuilding => ({ // Ensure levels array is at least empty to avoid re-triggering loadLevels if there's an error
+        ...prevBuilding,
+        levels: []
+      }));
+    } finally {
+      setLoadingLevels(false);
+    }
+  };
+
   const loadRooms = async () => {
     if (!selectedBuilding || !selectedLevel) return;
     
@@ -107,11 +157,14 @@ export default function AkitaFetch() {
         const roomsData = response.data.data.rooms || [];
         console.log('Rooms data:', roomsData.length, roomsData);
         setRooms(Array.isArray(roomsData) ? roomsData : []);
+      } else {
+        toast.error("Failed to load rooms.");
       }
     } catch (error) {
       console.error('Error loading rooms:', error);
       console.error('Error response:', error.response?.data);
       setRooms([]);
+      toast.error("Failed to load rooms.");
     } finally {
       setLoadingRooms(false);
     }
@@ -135,11 +188,14 @@ export default function AkitaFetch() {
         const assetsData = response.data.data.assets || [];
         console.log('Assets data:', assetsData.length, assetsData);
         setAssets(Array.isArray(assetsData) ? assetsData : []);
+      } else {
+        toast.error("Failed to load assets.");
       }
     } catch (error) {
       console.error('Error loading assets:', error);
       console.error('Error response:', error.response?.data);
       setAssets([]);
+      toast.error("Failed to load assets.");
     } finally {
       setLoadingAssets(false);
     }
@@ -244,7 +300,7 @@ export default function AkitaFetch() {
                 No Buildings Found
               </h3>
               <p className="text-slate-600 mb-6">
-                No buildings were found in your AkitaBox organization.
+                No buildings were found in your AkitaBox.
               </p>
               <Button onClick={loadBuildings}>
                 Refresh
@@ -321,7 +377,12 @@ export default function AkitaFetch() {
 
             <h3 className="text-xl font-bold text-slate-900 mb-4">Select a Floor</h3>
             
-            {selectedBuilding.levels && selectedBuilding.levels.length > 0 ? (
+            {loadingLevels ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <p className="text-sm text-slate-600 mt-2">Loading floors...</p>
+              </div>
+            ) : selectedBuilding.levels && selectedBuilding.levels.length > 0 ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {selectedBuilding.levels.map((level) => (
                   <motion.div
