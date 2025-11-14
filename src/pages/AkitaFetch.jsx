@@ -93,18 +93,23 @@ export default function AkitaFetch() {
     
     setLoadingRooms(true);
     try {
+      console.log('Loading rooms for:', { buildingId: selectedBuilding.id, levelId: selectedLevel._id });
       const response = await base44.functions.invoke('getAkitaBoxData', {
         type: 'rooms',
         buildingId: selectedBuilding.id,
         levelId: selectedLevel._id
       });
       
+      console.log('Rooms response:', response);
+      
       if (response.data.success) {
-        const roomsData = response.data.data.rooms || response.data.data || [];
+        const roomsData = response.data.data.rooms || [];
+        console.log('Rooms data:', roomsData.length, roomsData);
         setRooms(Array.isArray(roomsData) ? roomsData : []);
       }
     } catch (error) {
       console.error('Error loading rooms:', error);
+      console.error('Error response:', error.response?.data);
       setRooms([]);
     } finally {
       setLoadingRooms(false);
@@ -116,18 +121,23 @@ export default function AkitaFetch() {
     
     setLoadingAssets(true);
     try {
+      console.log('Loading assets for:', { buildingId: selectedBuilding.id, levelId: selectedLevel._id });
       const response = await base44.functions.invoke('getAkitaBoxData', {
         type: 'assets',
         buildingId: selectedBuilding.id,
         levelId: selectedLevel._id
       });
       
+      console.log('Assets response:', response);
+      
       if (response.data.success) {
-        const assetsData = response.data.data.assets || response.data.data || [];
+        const assetsData = response.data.data.assets || [];
+        console.log('Assets data:', assetsData.length, assetsData);
         setAssets(Array.isArray(assetsData) ? assetsData : []);
       }
     } catch (error) {
       console.error('Error loading assets:', error);
+      console.error('Error response:', error.response?.data);
       setAssets([]);
     } finally {
       setLoadingAssets(false);
@@ -303,33 +313,51 @@ export default function AkitaFetch() {
             </Card>
 
             <h3 className="text-xl font-bold text-slate-900 mb-4">Select a Floor</h3>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedBuilding.levels?.map((level) => (
-                <motion.div
-                  key={level._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <Card 
-                    className="cursor-pointer hover:shadow-lg transition-all"
-                    onClick={() => setSelectedLevel(level)}
+            
+            {selectedBuilding.levels && selectedBuilding.levels.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {selectedBuilding.levels.map((level) => (
+                  <motion.div
+                    key={level._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ scale: 1.02 }}
                   >
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                          <Layers className="w-6 h-6 text-white" />
+                    <Card 
+                      className="cursor-pointer hover:shadow-lg transition-all"
+                      onClick={() => {
+                        console.log('Selected level:', level);
+                        setSelectedLevel(level);
+                      }}
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                            <Layers className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-lg text-slate-900">{level.name}</p>
+                            <p className="text-xs text-slate-600">Click to view</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-lg text-slate-900">{level.name}</p>
-                          <p className="text-xs text-slate-600">Click to view</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Layers className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                    No Floors Available
+                  </h3>
+                  <p className="text-slate-600">
+                    This building has no floor data in AkitaBox.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : (
           <div>
@@ -398,7 +426,7 @@ export default function AkitaFetch() {
                   <Card>
                     <CardContent className="p-12 text-center">
                       <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No rooms found</p>
+                      <p className="text-slate-600">No rooms found on this floor</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -443,7 +471,7 @@ export default function AkitaFetch() {
                   <Card>
                     <CardContent className="p-12 text-center">
                       <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No assets found</p>
+                      <p className="text-slate-600">No assets found on this floor</p>
                     </CardContent>
                   </Card>
                 ) : (

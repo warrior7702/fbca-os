@@ -23,8 +23,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'AkitaBox JWT not configured' }, { status: 500 });
     }
 
-    console.log('JWT found, length:', jwt.length);
-
     const headers = {
       'Cookie': `abx_jwt=${jwt}`,
       'Accept': 'application/json',
@@ -73,6 +71,7 @@ Deno.serve(async (req) => {
         });
         
         console.log('Buildings extracted:', buildings.length);
+        console.log('Sample building:', JSON.stringify(buildings[0], null, 2));
         data = { buildings };
         break;
 
@@ -85,6 +84,8 @@ Deno.serve(async (req) => {
         console.log('Fetching rooms from:', url);
         
         const roomsResponse = await fetch(url, { headers });
+        console.log('Rooms response status:', roomsResponse.status);
+        
         if (!roomsResponse.ok) {
           const errorText = await roomsResponse.text();
           console.error('Rooms API Error:', errorText);
@@ -94,8 +95,13 @@ Deno.serve(async (req) => {
           }, { status: 500 });
         }
         
-        data = await roomsResponse.json();
-        console.log('Rooms fetched:', data.length || 0);
+        const roomsData = await roomsResponse.json();
+        console.log('Raw rooms response:', JSON.stringify(roomsData, null, 2));
+        
+        // The response might be an object with a 'data' property or array directly
+        const rooms = Array.isArray(roomsData) ? roomsData : (roomsData.data || roomsData.results || []);
+        console.log('Rooms extracted:', rooms.length);
+        data = { rooms };
         break;
 
       case 'assets':
@@ -107,6 +113,8 @@ Deno.serve(async (req) => {
         console.log('Fetching assets from:', url);
         
         const assetsResponse = await fetch(url, { headers });
+        console.log('Assets response status:', assetsResponse.status);
+        
         if (!assetsResponse.ok) {
           const errorText = await assetsResponse.text();
           console.error('Assets API Error:', errorText);
@@ -116,29 +124,13 @@ Deno.serve(async (req) => {
           }, { status: 500 });
         }
         
-        data = await assetsResponse.json();
-        console.log('Assets fetched:', data.length || 0);
-        break;
-
-      case 'building_details':
-        if (!buildingId) {
-          return Response.json({ error: 'buildingId required' }, { status: 400 });
-        }
+        const assetsData = await assetsResponse.json();
+        console.log('Raw assets response:', JSON.stringify(assetsData, null, 2));
         
-        url = `${AKITABOX_API}/buildings/${buildingId}`;
-        console.log('Fetching building details from:', url);
-        
-        const buildingResponse = await fetch(url, { headers });
-        if (!buildingResponse.ok) {
-          const errorText = await buildingResponse.text();
-          console.error('Building details API Error:', errorText);
-          return Response.json({ 
-            error: `AkitaBox API error: ${buildingResponse.status}`,
-            details: errorText
-          }, { status: 500 });
-        }
-        
-        data = await buildingResponse.json();
+        // The response might be an object with a 'data' property or array directly
+        const assets = Array.isArray(assetsData) ? assetsData : (assetsData.data || assetsData.results || []);
+        console.log('Assets extracted:', assets.length);
+        data = { assets };
         break;
 
       default:
