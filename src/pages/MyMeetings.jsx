@@ -103,16 +103,9 @@ export default function MyMeetings() {
   const loadAllStaff = async () => {
     setSearchingStaff(true);
     try {
-      const response = await base44.entities.StaffContact.filter({});
-      if (response && response.length > 0) {
-        // Convert to format expected by the UI
-        const formattedStaff = response.map(person => ({
-          id: person.id,
-          displayName: person.full_name,
-          mail: person.email,
-          userPrincipalName: person.email
-        }));
-        setStaffResults(formattedStaff);
+      const response = await base44.functions.invoke('getMicrosoftUsers', {});
+      if (response.data.success && response.data.users) {
+        setStaffResults(response.data.users);
       }
     } catch (error) {
       console.error('Error loading staff:', error);
@@ -344,28 +337,17 @@ ${meetingNotes.transcript || 'No transcript available.'}
   // New Booking functions
   const searchStaff = async (query) => {
     if (!query || query.length < 2) {
-      loadAllStaff(); // Changed from setStaffResults([]);
+      loadAllStaff();
       return;
     }
 
     setSearchingStaff(true);
     try {
-      // Changed to use base44.entities.StaffContact instead of getMicrosoftGraphUsers
-      const response = await base44.entities.StaffContact.filter({});
-      if (response && response.length > 0) {
-        const lowerQuery = query.toLowerCase();
-        const filtered = response
-          .filter(person =>
-            person.full_name?.toLowerCase().includes(lowerQuery) ||
-            person.email?.toLowerCase().includes(lowerQuery)
-          )
-          .map(person => ({
-            id: person.id,
-            displayName: person.full_name,
-            mail: person.email,
-            userPrincipalName: person.email
-          }));
-        setStaffResults(filtered);
+      const response = await base44.functions.invoke('getMicrosoftUsers', {
+        searchQuery: query
+      });
+      if (response.data.success && response.data.users) {
+        setStaffResults(response.data.users);
       } else {
         setStaffResults([]);
       }
