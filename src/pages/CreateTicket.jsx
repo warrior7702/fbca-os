@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   Ticket as TicketIcon,
@@ -7,7 +6,9 @@ import {
   X,
   Sparkles,
   CheckCircle,
-  ArrowLeft
+  ArrowLeft,
+  Loader2,
+  MapPin
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,11 +32,20 @@ export default function CreateTicket() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [ticketNumber, setTicketNumber] = useState("");
+  
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [levels, setLevels] = useState([]);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(false);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
     requester_email: "",
     building: "",
+    building_name: "",
     room_number: "",
     subject: "",
     details: "",
@@ -44,7 +54,71 @@ export default function CreateTicket() {
     attachments: []
   });
 
-  // Public users only see basic categories
+  useEffect(() => {
+    loadBuildings();
+  }, []);
+
+  useEffect(() => {
+    if (selectedBuilding && selectedLevel) {
+      loadRooms();
+    }
+  }, [selectedBuilding, selectedLevel]);
+
+  const loadBuildings = async () => {
+    setLoadingBuildings(true);
+    try {
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'buildings'
+      });
+      
+      if (response.data.success) {
+        setBuildings(response.data.data.buildings);
+      }
+    } catch (error) {
+      console.error('Error loading buildings:', error);
+      toast.error('Failed to load buildings');
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
+  const handleBuildingChange = async (buildingId) => {
+    const building = buildings.find(b => b.id === buildingId);
+    setSelectedBuilding(building);
+    setLevels(building?.levels || []);
+    setSelectedLevel(null);
+    setRooms([]);
+    setTicket({
+      ...ticket,
+      building: buildingId,
+      building_name: building?.name || '',
+      room_number: ''
+    });
+  };
+
+  const loadRooms = async () => {
+    if (!selectedBuilding || !selectedLevel) return;
+    
+    setLoadingRooms(true);
+    try {
+      const response = await base44.functions.invoke('getAkitaBoxData', {
+        type: 'rooms',
+        buildingId: selectedBuilding.id,
+        levelId: selectedLevel
+      });
+      
+      if (response.data.success) {
+        const roomsData = response.data.data.rooms || response.data.data || [];
+        setRooms(Array.isArray(roomsData) ? roomsData : []);
+      }
+    } catch (error) {
+      console.error('Error loading rooms:', error);
+      setRooms([]);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
   const availableCategories = [
     { value: 'facility', label: 'Facility Maintenance' },
     { value: 'facility_cleaning', label: 'Cleaning' },
@@ -131,7 +205,6 @@ Keep response concise and actionable.`;
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(ticket.requester_email)) {
       toast.error("Please enter a valid email address");
@@ -149,7 +222,7 @@ Keep response concise and actionable.`;
         requester_name: ticket.requester_name,
         subject: ticket.subject,
         description: `${ticket.subject}\n\n${ticket.details ? 'Additional Details: ' + ticket.details : ''}`.trim(),
-        building: ticket.building,
+        building: ticket.building_name || ticket.building,
         room_number: ticket.room_number,
         status: "open",
         priority: ticket.priority,
@@ -159,7 +232,6 @@ Keep response concise and actionable.`;
         last_activity_at: new Date().toISOString()
       };
 
-      // Get AI suggestions
       const suggestion = await findSimilarTickets(ticket.subject);
       if (suggestion) {
         ticketData.suggested_solution = suggestion;
@@ -181,10 +253,15 @@ Keep response concise and actionable.`;
   const handleReset = () => {
     setSubmitted(false);
     setTicketNumber("");
+    setSelectedBuilding(null);
+    setSelectedLevel(null);
+    setLevels([]);
+    setRooms([]);
     setTicket({
       requester_name: "",
       requester_email: "",
       building: "",
+      building_name: "",
       room_number: "",
       subject: "",
       details: "",
@@ -258,7 +335,6 @@ Keep response concise and actionable.`;
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,7 +351,6 @@ Keep response concise and actionable.`;
           </p>
         </motion.div>
 
-        {/* Form Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -283,11 +358,13 @@ Keep response concise and actionable.`;
         >
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Request Details</CardTitle>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                Request Details
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Row 1: Name and Email */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
@@ -314,39 +391,84 @@ Keep response concise and actionable.`;
                   </div>
                 </div>
 
-                {/* Row 2: Building and Room Number */}
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
                       Building<span className="text-red-500">*</span>
                     </label>
                     <Select 
                       value={ticket.building} 
-                      onValueChange={(value) => setTicket({...ticket, building: value})}
+                      onValueChange={handleBuildingChange}
+                      disabled={loadingBuildings}
                       required
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select building..." />
+                        <SelectValue placeholder={loadingBuildings ? "Loading..." : "Select building..."} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="wade">WADE</SelectItem>
-                        <SelectItem value="fbc">FBC</SelectItem>
-                        <SelectItem value="pcb">PCB</SelectItem>
-                        <SelectItem value="student_center">Student Center</SelectItem>
+                        {buildings.map(building => (
+                          <SelectItem key={building.id} value={building.id}>
+                            {building.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
+                  
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Room Number</label>
-                    <Input
-                      value={ticket.room_number}
-                      onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
-                      placeholder="Room number or common name"
-                    />
+                    <label className="text-sm font-medium">Floor/Level</label>
+                    <Select 
+                      value={selectedLevel} 
+                      onValueChange={setSelectedLevel}
+                      disabled={!selectedBuilding || levels.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select floor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {levels.map(level => (
+                          <SelectItem key={level._id} value={level._id}>
+                            {level.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Room</label>
+                    {loadingRooms ? (
+                      <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-slate-50">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm text-slate-500">Loading rooms...</span>
+                      </div>
+                    ) : rooms.length > 0 ? (
+                      <Select 
+                        value={ticket.room_number} 
+                        onValueChange={(value) => setTicket({...ticket, room_number: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select room..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rooms.map(room => (
+                            <SelectItem key={room._id} value={room.name || room.number || room._id}>
+                              {room.name || room.number || 'Unnamed Room'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={ticket.room_number}
+                        onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
+                        placeholder="Room number or name"
+                        disabled={!selectedBuilding}
+                      />
+                    )}
                   </div>
                 </div>
 
-                {/* Row 3: Category and Brief Description */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
@@ -382,7 +504,6 @@ Keep response concise and actionable.`;
                   </div>
                 </div>
 
-                {/* Row 4: Details and Priority */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Additional Details</label>
@@ -412,7 +533,6 @@ Keep response concise and actionable.`;
                   </div>
                 </div>
 
-                {/* Attachments */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Attachments</label>
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center bg-slate-50 hover:bg-slate-100 transition-colors">
@@ -451,7 +571,6 @@ Keep response concise and actionable.`;
                   )}
                 </div>
 
-                {/* AI Loading State */}
                 {loadingSuggestions && (
                   <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
                     <Sparkles className="w-4 h-4 animate-pulse" />
@@ -459,7 +578,6 @@ Keep response concise and actionable.`;
                   </div>
                 )}
 
-                {/* Submit Button */}
                 <div className="pt-4">
                   <Button 
                     type="submit" 
@@ -474,7 +592,6 @@ Keep response concise and actionable.`;
           </Card>
         </motion.div>
 
-        {/* Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
