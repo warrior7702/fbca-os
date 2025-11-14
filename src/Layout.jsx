@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -46,7 +47,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SheetTrigger } from "@/components/ui/sheet";
-import AISearchBar from "../components/shared/AISearchBar";
+import AISearchBar from "./components/shared/AISearchBar";
 
 const apps = [
   {
