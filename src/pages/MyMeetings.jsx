@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import {
   Video,
-  Calendar as CalendarIcon, // Renamed Calendar to CalendarIcon to avoid conflict with "Calendar" component if exists
+  Calendar as CalendarIcon,
   Clock,
   Users,
   MapPin,
@@ -15,10 +15,11 @@ import {
   XCircle,
   HelpCircle,
   Sparkles,
-  Mic, // New icon for microphone
-  Square, // New icon for stop recording
-  Download, // New icon for download
-  FileText // New icon for file text
+  Mic,
+  Square,
+  Download,
+  FileText,
+  Search // Added Search icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes } from "date-fns";
+import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes, addMinutes } from "date-fns"; // Added addMinutes
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -59,15 +60,18 @@ export default function MyMeetings() {
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
 
-  // New Booking states
+  // NEW Booking states
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingBusinesses, setBookingBusinesses] = useState([]);
-  const [selectedBusiness, setSelectedBusiness] = useState(null);
-  const [bookingStaff, setBookingStaff] = useState([]);
+  const [bookingStep, setBookingStep] = useState('select-person'); // 'select-person', 'booking-form', 'meeting-request'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [staffResults, setStaffResults] = useState([]);
+  const [searchingStaff, setSearchingStaff] = useState(false);
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [hasBookings, setHasBookings] = useState(false);
+  const [bookingBusiness, setBookingBusiness] = useState(null);
   const [bookingServices, setBookingServices] = useState([]);
-  const [loadingBooking, setLoadingBooking] = useState(false);
+  const [loadingBookingInfo, setLoadingBookingInfo] = useState(false);
   const [bookingData, setBookingData] = useState({
-    staffMemberId: '',
     serviceId: '',
     date: '',
     time: '',
@@ -309,85 +313,95 @@ ${meetingNotes.transcript || 'No transcript available.'}
   };
 
   // New Booking functions
-  const loadBookingData = async () => {
+  const searchStaff = async (query) => {
+    if (!query || query.length < 2) {
+      setStaffResults([]);
+      return;
+    }
+
+    setSearchingStaff(true);
     try {
-      const response = await base44.functions.invoke('getMicrosoftBookings');
-
-      if (response.data.success) {
-        setBookingBusinesses(response.data.businesses || []);
-
-        if (response.data.businesses && response.data.businesses.length > 0) {
-          // Select the first business by default
-          const firstBusiness = response.data.businesses[0];
-          setSelectedBusiness(firstBusiness);
-          await loadBookingStaffAndServices(firstBusiness.id);
-        } else {
-          setBookingStaff([]);
-          setBookingServices([]);
-          setSelectedBusiness(null);
-        }
+      const response = await base44.functions.invoke('getMicrosoftGraphUsers', { query });
+      if (response.data && response.data.users) {
+        // Filter out the current user from search results
+        const filteredUsers = response.data.users.filter(u => u.mail?.toLowerCase() !== user?.email?.toLowerCase());
+        setStaffResults(filteredUsers);
       } else {
-        setBookingBusinesses([]);
-        setBookingStaff([]);
-        setBookingServices([]);
-        setSelectedBusiness(null);
-        toast.error(response.data.message || 'Failed to load booking businesses.');
+        setStaffResults([]);
       }
     } catch (error) {
-      console.error('Error loading booking data:', error);
-      toast.error('Failed to load booking options');
-      setBookingBusinesses([]);
-      setBookingStaff([]);
-      setBookingServices([]);
-      setSelectedBusiness(null);
+      console.error('Error searching staff:', error);
+      setStaffResults([]);
+    } finally {
+      setSearchingStaff(false);
     }
   };
 
-  const loadBookingStaffAndServices = async (businessId) => {
-    try {
-      const response = await base44.functions.invoke('getBookingStaff', { businessId });
+  const handleSelectPerson = async (person) => {
+    setSelectedPerson(person);
+    setLoadingBookingInfo(true);
 
-      if (response.data.success) {
-        setBookingStaff(response.data.staff || []);
-        setBookingServices(response.data.services || []);
+    try {
+      // Check if person has Bookings setup
+      const response = await base44.functions.invoke('checkUserBookingAvailability', {
+        targetUserEmail: person.mail || person.userPrincipalName
+      });
+
+      if (response.data.hasBookings && response.data.bookingBusiness) {
+        setHasBookings(true);
+        setBookingBusiness(response.data.bookingBusiness);
+
+        // Load services for this business
+        const servicesResponse = await base44.functions.invoke('getBookingServices', { // Changed from getBookingStaff
+          businessId: response.data.bookingBusiness.id
+        });
+
+        if (servicesResponse.data.success) {
+          setBookingServices(servicesResponse.data.services || []);
+        }
+
+        setBookingStep('booking-form');
       } else {
-        setBookingStaff([]);
-        setBookingServices([]);
-        toast.error(response.data.message || 'Failed to load staff and services.');
+        setHasBookings(false);
+        setBookingStep('meeting-request');
       }
     } catch (error) {
-      console.error('Error loading staff and services:', error);
-      toast.error('Failed to load staff and services for the selected business.');
-      setBookingStaff([]);
-      setBookingServices([]);
+      console.error('Error checking booking availability:', error);
+      toast.error('Failed to check booking availability for this person.');
+      setHasBookings(false);
+      setBookingStep('meeting-request');
+    } finally {
+      setLoadingBookingInfo(false);
     }
   };
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
-    setLoadingBooking(true);
+    setLoadingBookingInfo(true); // Re-using loadingBookingInfo for form submission
 
     try {
-      if (!selectedBusiness || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user) {
+      if (!selectedPerson || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user || !bookingBusiness) {
         toast.error('Please fill all required fields and ensure user data is available.');
-        setLoadingBooking(false);
+        setLoadingBookingInfo(false);
         return;
       }
 
       const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`; // Ensure seconds are included for ISO string
       const startDateTime = new Date(startDateTimeString);
-      const endDateTime = new Date(startDateTime.getTime() + bookingData.duration * 60000);
+      const service = bookingServices.find(s => s.id === bookingData.serviceId);
+      const durationInMinutes = service ? service.defaultDuration / 60 : bookingData.duration;
+      const endDateTime = addMinutes(startDateTime, durationInMinutes);
 
       if (isNaN(startDateTime.getTime())) {
         toast.error('Invalid date or time entered.');
-        setLoadingBooking(false);
+        setLoadingBookingInfo(false);
         return;
       }
 
       const response = await base44.functions.invoke('createMicrosoftBooking', {
-        businessId: selectedBusiness.id,
+        businessId: bookingBusiness.id,
         serviceId: bookingData.serviceId,
-        staffMemberId: bookingData.staffMemberId || null, // Optional
+        // staffMemberId: staff members are auto-assigned by Bookings by default when not specified
         startDateTime: startDateTime.toISOString(),
         endDateTime: endDateTime.toISOString(),
         customerName: user.full_name || user.email.split('@')[0], // Fallback for name
@@ -397,16 +411,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
 
       if (response.data.success) {
         toast.success('Booking created successfully!');
-        setShowBookingModal(false);
-        // Reset booking data
-        setBookingData({
-          staffMemberId: '',
-          serviceId: '',
-          date: '',
-          time: '',
-          duration: 30,
-          notes: ''
-        });
+        resetBookingModal();
         await loadData(); // Reload meetings to show the new booking
       } else {
         toast.error(response.data.message || 'Failed to create booking.');
@@ -415,8 +420,71 @@ ${meetingNotes.transcript || 'No transcript available.'}
       console.error('Error creating booking:', error);
       toast.error('Failed to create booking: ' + error.message);
     } finally {
-      setLoadingBooking(false);
+      setLoadingBookingInfo(false);
     }
+  };
+
+  const handleSendMeetingRequest = async (e) => {
+    e.preventDefault();
+    setLoadingBookingInfo(true); // Re-using loadingBookingInfo for form submission
+
+    try {
+      if (!selectedPerson || !bookingData.date || !bookingData.time || !user) {
+        toast.error('Please fill all required fields');
+        setLoadingBookingInfo(false);
+        return;
+      }
+
+      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`;
+      const startDateTime = new Date(startDateTimeString);
+      const endDateTime = addMinutes(startDateTime, bookingData.duration);
+
+      if (isNaN(startDateTime.getTime())) {
+        toast.error('Invalid date or time entered.');
+        setLoadingBookingInfo(false);
+        return;
+      }
+
+      const response = await base44.functions.invoke('sendMeetingRequest', {
+        attendeeEmail: selectedPerson.mail || selectedPerson.userPrincipalName,
+        subject: `Meeting with ${selectedPerson.displayName}`,
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        body: bookingData.notes || `Meeting request with ${selectedPerson.displayName} for ${format(startDateTime, 'Pp')}`
+      });
+
+      if (response.data.success) {
+        toast.success('Meeting request sent!');
+        resetBookingModal();
+        await loadData();
+      } else {
+        toast.error('Failed to send meeting request');
+      }
+    } catch (error) {
+      console.error('Error sending meeting request:', error);
+      toast.error('Failed to send meeting request: ' + error.message);
+    } finally {
+      setLoadingBookingInfo(false);
+    }
+  };
+
+  const resetBookingModal = () => {
+    setShowBookingModal(false);
+    setBookingStep('select-person');
+    setSearchQuery('');
+    setStaffResults([]);
+    setSelectedPerson(null);
+    setHasBookings(false);
+    setBookingBusiness(null);
+    setBookingServices([]);
+    setLoadingBookingInfo(false);
+    setBookingData({
+      serviceId: '',
+      date: '',
+      time: '',
+      duration: 30,
+      notes: ''
+    });
   };
 
   const getMeetingStatus = (meeting) => {
@@ -520,10 +588,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
           action={
             <div className="flex gap-2">
               <Button
-                onClick={() => {
-                  setShowBookingModal(true);
-                  loadBookingData();
-                }}
+                onClick={() => setShowBookingModal(true)} // Modified onClick
                 variant="outline"
                 size="sm"
                 className="bg-white hover:bg-slate-50"
@@ -573,7 +638,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                   <div className="flex items-center gap-4 text-sm text-purple-100 flex-wrap">
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
+                      {start ? format(start, 'h:mm a') : 'N/A'} - {end ? format(end, 'h:mm a') : 'N/A'}
                     </span>
                     {status.status === 'live' && (
                       <Badge className="bg-green-500 text-white animate-pulse">
@@ -1063,143 +1128,224 @@ ${meetingNotes.transcript || 'No transcript available.'}
         </DialogContent>
       </Dialog>
 
-      {/* NEW: Booking Modal */}
-      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
-        <DialogContent className="max-w-2xl">
+      {/* NEW: Booking Modal with Person Search */}
+      <Dialog open={showBookingModal} onOpenChange={(isOpen) => {
+        if (!isOpen) resetBookingModal();
+        else setShowBookingModal(true);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Book a Meeting</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleCreateBooking} className="space-y-4">
-            {bookingBusinesses.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Business</label>
-                <Select
-                  value={selectedBusiness?.id || ''}
-                  onValueChange={(businessId) => {
-                    const business = bookingBusinesses.find(b => b.id === businessId);
-                    setSelectedBusiness(business);
-                    if (business) {
-                      loadBookingStaffAndServices(business.id);
-                    }
+          {bookingStep === 'select-person' && (
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search for a coworker..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    searchStaff(e.target.value);
                   }}
+                  className="pl-10"
+                />
+              </div>
+
+              {searchingStaff && (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
+                </div>
+              )}
+
+              {staffResults.length > 0 && (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {staffResults.map((person) => (
+                    <div
+                      key={person.id}
+                      onClick={() => handleSelectPerson(person)}
+                      className="p-3 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-semibold">
+                          {person.displayName?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">{person.displayName}</p>
+                          <p className="text-xs text-slate-500">{person.mail || person.userPrincipalName}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {loadingBookingInfo && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600">Checking availability...</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {bookingStep === 'booking-form' && selectedPerson && (
+            <form onSubmit={handleCreateBooking} className="space-y-4">
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-sm">
+                  <strong>Booking with:</strong> {selectedPerson.displayName}
+                </p>
+                {bookingBusiness && (
+                  <p className="text-xs text-slate-600 mt-1">
+                    Business: {bookingBusiness.displayName}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Service</label>
+                <Select
+                  value={bookingData.serviceId}
+                  onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
                   required
+                  disabled={bookingServices.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a business..." />
+                    <SelectValue placeholder="Select a service..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {bookingBusinesses.map(business => (
-                      <SelectItem key={business.id} value={business.id}>
-                        {business.displayName}
+                    {bookingServices.map(service => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.displayName} ({service.defaultDuration / 60} min)
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Service</label>
-              <Select
-                value={bookingData.serviceId}
-                onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
-                required
-                disabled={!selectedBusiness || bookingServices.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a service..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {bookingServices.map(service => (
-                    <SelectItem key={service.id} value={service.id}>
-                      {service.displayName} ({service.defaultDuration / 60} min)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date</label>
+                  <Input
+                    type="date"
+                    value={bookingData.date}
+                    onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Staff Member (Optional)</label>
-              <Select
-                value={bookingData.staffMemberId}
-                onValueChange={(value) => setBookingData({...bookingData, staffMemberId: value})}
-                disabled={!selectedBusiness || bookingStaff.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select staff member..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {bookingStaff.map(staff => (
-                    <SelectItem key={staff.id} value={staff.id}>
-                      {staff.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time</label>
+                  <Input
+                    type="time"
+                    value={bookingData.time}
+                    onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
+                <label className="text-sm font-medium">Notes (optional)</label>
+                <Textarea
+                  value={bookingData.notes}
+                  onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
+                  placeholder="Add any notes..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={resetBookingModal}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
+                  {loadingBookingInfo ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Booking'
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {bookingStep === 'meeting-request' && selectedPerson && (
+            <form onSubmit={handleSendMeetingRequest} className="space-y-4">
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm">
+                  <strong>Meeting with:</strong> {selectedPerson.displayName}
+                </p>
+                <p className="text-xs text-slate-600 mt-1">
+                  This person doesn't have Bookings set up. Sending a regular meeting request instead.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date</label>
+                  <Input
+                    type="date"
+                    value={bookingData.date}
+                    onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time</label>
+                  <Input
+                    type="time"
+                    value={bookingData.time}
+                    onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Duration (minutes)</label>
                 <Input
-                  type="date"
-                  value={bookingData.date}
-                  onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                  type="number"
+                  value={bookingData.duration}
+                  onChange={(e) => setBookingData({...bookingData, duration: parseInt(e.target.value, 10)})}
+                  min="15"
+                  step="15"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Time</label>
-                <Input
-                  type="time"
-                  value={bookingData.time}
-                  onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
-                  required
+                <label className="text-sm font-medium">Notes (optional)</label>
+                <Textarea
+                  value={bookingData.notes}
+                  onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
+                  placeholder="Add meeting details..."
+                  rows={3}
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Duration (minutes)</label>
-              <Input
-                type="number"
-                value={bookingData.duration}
-                onChange={(e) => setBookingData({...bookingData, duration: parseInt(e.target.value, 10)})}
-                min="15"
-                step="15"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (optional)</label>
-              <Textarea
-                value={bookingData.notes}
-                onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                placeholder="Add any notes or special requests..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowBookingModal(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loadingBooking || !selectedBusiness || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
-                {loadingBooking ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Booking'
-                )}
-              </Button>
-            </div>
-          </form>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={resetBookingModal}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loadingBookingInfo || !bookingData.date || !bookingData.time} className="bg-blue-600 hover:bg-blue-700">
+                  {loadingBookingInfo ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Meeting Request'
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
