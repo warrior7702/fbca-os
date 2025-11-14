@@ -55,7 +55,7 @@ export default function MyDepartment() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
-  const [expandedDepts, setExpandedDepts] = useState(['it', 'facilities', 'comms']);
+  const [expandedDepts, setExpandedDepts] = useState(['it', 'facilities', 'comms', 'print_shop', 'hospitality']);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -115,11 +115,13 @@ export default function MyDepartment() {
       'facility_cleaning': 'facilities',
       'av_production': 'comms',
       'marketing': 'comms',
-      'graphics': 'comms',
+      'graphics': 'print_shop',
       'social_media': 'comms',
       'communications': 'comms',
       'event_setup': 'facilities',
-      'room_setup': 'facilities'
+      'room_setup': 'facilities',
+      'catering': 'hospitality',
+      'hospitality': 'hospitality'
     };
     return deptMap[category] || 'other';
   };
@@ -194,7 +196,9 @@ export default function MyDepartment() {
     return {
       it: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'it')),
       facilities: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'facilities')),
-      comms: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'comms'))
+      comms: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'comms')),
+      print_shop: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'print_shop')),
+      hospitality: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'hospitality'))
     };
   };
 
@@ -324,6 +328,8 @@ export default function MyDepartment() {
     it: filteredTickets.filter(t => getDepartment(t.category) === 'it'),
     facilities: filteredTickets.filter(t => getDepartment(t.category) === 'facilities'),
     comms: filteredTickets.filter(t => getDepartment(t.category) === 'comms'),
+    print_shop: filteredTickets.filter(t => getDepartment(t.category) === 'print_shop'),
+    hospitality: filteredTickets.filter(t => getDepartment(t.category) === 'hospitality'),
     other: filteredTickets.filter(t => getDepartment(t.category) === 'other')
   };
 
@@ -363,6 +369,26 @@ export default function MyDepartment() {
       color: 'from-purple-500 to-pink-600',
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200'
+    },
+    {
+      id: 'print_shop',
+      name: 'Print Shop',
+      manager: 'TBD',
+      icon: '🖨️',
+      color: 'from-indigo-500 to-blue-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      futureApp: true
+    },
+    {
+      id: 'hospitality',
+      name: 'Hospitality',
+      manager: 'TBD',
+      icon: '☕',
+      color: 'from-rose-500 to-pink-600',
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-200',
+      futureApp: true
     }
   ];
 
@@ -578,7 +604,7 @@ export default function MyDepartment() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-5 gap-4">
                   {departments.map((dept) => {
                     const avgTime = performanceMetrics[dept.id];
                     const status = !avgTime ? 'gray' : avgTime < 3 ? 'green' : avgTime < 6 ? 'yellow' : 'red';
@@ -587,7 +613,7 @@ export default function MyDepartment() {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">{dept.icon}</span>
-                            <p className="font-semibold text-slate-900">{dept.name}</p>
+                            <p className="font-semibold text-slate-900 text-sm">{dept.name}</p>
                           </div>
                           <div className={`w-3 h-3 rounded-full ${
                             status === 'green' ? 'bg-green-500' :
@@ -598,7 +624,12 @@ export default function MyDepartment() {
                         <div className="text-2xl font-bold text-slate-900">
                           {avgTime ? `${avgTime}hrs` : 'N/A'}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">Avg. resolution time</p>
+                        <p className="text-xs text-slate-600 mt-1">Avg. resolution</p>
+                        {dept.futureApp && (
+                          <Badge variant="outline" className="mt-2 text-xs">
+                            Future App
+                          </Badge>
+                        )}
                       </div>
                     );
                   })}
@@ -688,6 +719,9 @@ export default function MyDepartment() {
                           <div>
                             <CardTitle className="text-xl flex items-center gap-2">
                               {dept.name}
+                              {dept.futureApp && (
+                                <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                              )}
                               {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                             </CardTitle>
                             <p className="text-sm text-slate-600">Manager: {dept.manager}</p>
@@ -794,9 +828,16 @@ export default function MyDepartment() {
                                 )}
                               </div>
                             ) : (
-                              <p className="text-center text-sm text-slate-500 py-4">
-                                No tickets found
-                              </p>
+                              <div className="text-center py-8">
+                                <p className="text-sm text-slate-500 mb-2">
+                                  {dept.futureApp ? 'App launching soon!' : 'No tickets found'}
+                                </p>
+                                {dept.futureApp && (
+                                  <p className="text-xs text-slate-400">
+                                    Metrics will appear when the app goes live
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </CardContent>
                         </motion.div>
