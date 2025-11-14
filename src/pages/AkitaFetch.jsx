@@ -12,15 +12,16 @@ import {
   Plus,
   Search,
   Grid3x3,
-  Image as ImageIcon,
-  Ticket
+  Ticket,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { motion, AnimatePresence } from "framer-motion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 export default function AkitaFetch() {
@@ -35,6 +36,7 @@ export default function AkitaFetch() {
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("rooms");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadBuildings();
@@ -49,16 +51,29 @@ export default function AkitaFetch() {
 
   const loadBuildings = async () => {
     setLoading(true);
+    setError(null);
     try {
+      console.log('Fetching buildings from AkitaBox...');
       const response = await base44.functions.invoke('getAkitaBoxData', {
         type: 'buildings'
       });
       
+      console.log('AkitaBox response:', response.data);
+      
       if (response.data.success) {
-        setBuildings(response.data.data.buildings);
+        const buildingsData = response.data.data.buildings || [];
+        console.log('Buildings loaded:', buildingsData.length);
+        setBuildings(buildingsData);
+        
+        if (buildingsData.length === 0) {
+          setError('No buildings found in AkitaBox');
+        }
+      } else {
+        setError(response.data.error || 'Failed to load buildings');
       }
     } catch (error) {
       console.error('Error loading buildings:', error);
+      setError(error.message || 'Failed to connect to AkitaBox');
       toast.error('Failed to load buildings');
     } finally {
       setLoading(false);
@@ -146,8 +161,32 @@ export default function AkitaFetch() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-sm text-slate-600">Loading buildings from AkitaBox...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-gradient-to-br from-blue-50 to-cyan-50 p-6 overflow-auto">
+        <div className="max-w-2xl mx-auto pt-12">
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="text-red-900">
+              <p className="font-semibold mb-2">Failed to load AkitaBox data</p>
+              <p className="text-sm">{error}</p>
+              <Button 
+                onClick={loadBuildings}
+                className="mt-4"
+                size="sm"
+              >
+                Try Again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
     );
   }
@@ -172,7 +211,22 @@ export default function AkitaFetch() {
           </div>
         </div>
 
-        {!selectedBuilding ? (
+        {buildings.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                No Buildings Found
+              </h3>
+              <p className="text-slate-600 mb-6">
+                No buildings were found in your AkitaBox organization.
+              </p>
+              <Button onClick={loadBuildings}>
+                Refresh
+              </Button>
+            </CardContent>
+          </Card>
+        ) : !selectedBuilding ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {buildings.map((building) => (
               <motion.div
