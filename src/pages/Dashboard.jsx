@@ -29,7 +29,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } => "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
