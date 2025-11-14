@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import AppHeader from "@/components/shared/AppHeader";
@@ -56,7 +55,7 @@ const CATEGORY_COLORS = {
 export default function MyTasks() {
   const [user, setUser] = useState(null);
   const [clickupTasks, setClickupTasks] = useState([]);
-  const [listsTasks, setListsTasks] = useState([]); // Changed from todoTasks
+  const [listsTasks, setListsTasks] = useState([]);
   const [emails, setEmails] = useState({ categorized: {} });
   const [loading, setLoading] = useState(true);
   const [loadingEmails, setLoadingEmails] = useState(true);
@@ -89,7 +88,6 @@ export default function MyTasks() {
     try {
       console.log('📞 Calling getMySchedule (PCO events with door codes)...');
       
-      // Load PCO events
       const pcoResponse = await base44.functions.invoke('getMySchedule');
       
       console.log('✅ PCO Response:', pcoResponse.data);
@@ -104,7 +102,6 @@ export default function MyTasks() {
       console.log(`📊 I'm in ${pcoResponse.data.my_groups_count || 0} approval groups`);
       console.log(`📊 Managing ${pcoResponse.data.my_resources_count || 0} resources`);
 
-      // Load Microsoft meetings if connected
       let microsoftMeetings = [];
       if (user?.microsoft_access_token) {
         console.log('📞 Loading Microsoft meetings...');
@@ -115,14 +112,11 @@ export default function MyTasks() {
           });
           
           if (msResponse.data && msResponse.data.events) {
-            // Format Microsoft meetings to match PCO event structure
             microsoftMeetings = msResponse.data.events.map(meeting => ({
-              // Use a distinct prefix to identify Microsoft meetings
               id: `ms-${meeting.id}`,
               name: meeting.subject || 'Untitled Meeting',
               starts_at: meeting.start,
               ends_at: meeting.end,
-              // Mark as Microsoft meeting
               source: 'microsoft',
               meetingLink: meeting.onlineMeeting?.joinUrl || null,
               location: meeting.location?.displayName || null,
@@ -135,11 +129,9 @@ export default function MyTasks() {
               })) || [],
               isOnlineMeeting: meeting.isOnlineMeeting,
               responseStatus: meeting.responseStatus?.response || null,
-              // No door codes or PCO-specific fields for Microsoft events
               resources: [],
               posted_door_code: null,
               access_time: null,
-              // Add other potentially useful MS-specific fields
               type: meeting.type, 
               sensitivity: meeting.sensitivity, 
             }));
@@ -150,10 +142,7 @@ export default function MyTasks() {
         }
       }
 
-      // Merge events - PCO first, then Microsoft
       const allEvents = [...pcoEvents, ...microsoftMeetings];
-      
-      // Sort by start time
       allEvents.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
       
       console.log(`✅ Total events: ${allEvents.length} (${pcoEvents.length} PCO + ${microsoftMeetings.length} Microsoft)`);
@@ -216,9 +205,9 @@ export default function MyTasks() {
 
       if (currentUser.microsoft_access_token) {
         taskPromises.push(
-          base44.functions.invoke('getMicrosoftLists') // Changed from getMicrosoftToDo
-            .then(res => ({ type: 'lists', data: res.data.tasks || [] })) // Changed from 'todo' and res.data.tasks || res.data
-            .catch(() => ({ type: 'lists', data: [] })) // Changed from 'todo'
+          base44.functions.invoke('getMicrosoftLists')
+            .then(res => ({ type: 'lists', data: res.data.tasks || [] }))
+            .catch(() => ({ type: 'lists', data: [] }))
         );
 
         taskPromises.push(
@@ -232,7 +221,7 @@ export default function MyTasks() {
 
       results.forEach(result => {
         if (result.type === 'clickup') setClickupTasks(result.data);
-        else if (result.type === 'lists') setListsTasks(result.data); // Changed from 'todo' and setTodoTasks
+        else if (result.type === 'lists') setListsTasks(result.data);
         else if (result.type === 'emails') setEmails({ categorized: result.data });
       });
 
@@ -263,7 +252,7 @@ export default function MyTasks() {
   };
 
   const handleTaskClick = (task) => {
-    if (task.source === 'microsoft_lists' && task.url) { // Changed from 'microsoft_todo'
+    if (task.source === 'microsoft_lists' && task.url) {
       window.open(task.url, '_blank', 'noopener,noreferrer');
       return;
     }
@@ -274,12 +263,12 @@ export default function MyTasks() {
   const handleCompleteTask = async (task, e) => {
     e.stopPropagation();
     try {
-      if (task.source === 'microsoft_lists') { // Changed from 'microsoft_todo'
-        await base44.functions.invoke('updateMicrosoftListItem', { // Changed from completeMicrosoftToDoTask
-          siteId: task.site_id, // New parameter
-          listId: task.list_id, // Changed from list_id
-          itemId: task.id, // Changed from task_id
-          completed: true // New parameter
+      if (task.source === 'microsoft_lists') {
+        await base44.functions.invoke('updateMicrosoftListItem', {
+          siteId: task.site_id,
+          listId: task.list_id,
+          itemId: task.id,
+          completed: true
         });
         toast.success('Task completed!');
       } else {
@@ -300,7 +289,7 @@ export default function MyTasks() {
     await loadData();
   };
 
-  const allTasks = [...clickupTasks, ...listsTasks]; // Changed from todoTasks
+  const allTasks = [...clickupTasks, ...listsTasks];
   const myDayTasks = allTasks.filter(task => task.due_date && isToday(new Date(task.due_date)));
 
   const LIST_COLORS = {
@@ -339,7 +328,6 @@ export default function MyTasks() {
     }
   };
 
-  // Calculate events today - including Microsoft meetings
   const eventsToday = myScheduleEvents.filter(event => {
     const eventDate = new Date(event.starts_at);
     return isToday(eventDate);
@@ -480,8 +468,8 @@ export default function MyTasks() {
             ) : (
               <div className="space-y-3">
                 {myDayTasks.map((task) => {
-                  const isMicrosoftLists = task.source === 'microsoft_lists'; // Changed from isMicrosoftToDo
-                  const listColor = isMicrosoftLists ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default); // Logic unchanged, only variable name
+                  const isMicrosoftLists = task.source === 'microsoft_lists';
+                  const listColor = isMicrosoftLists ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
 
                   return (
                     <div
@@ -503,8 +491,8 @@ export default function MyTasks() {
                             <Badge className={getStatusColor(task.status)}>
                               {formatStatus(task.status)}
                             </Badge>
-                            {isMicrosoftLists ? ( // Changed from isMicrosoftToDo
-                              <span className="text-xs text-slate-500 font-medium">From Lists</span> // Changed from 'From To Do'
+                            {isMicrosoftLists ? (
+                              <span className="text-xs text-slate-500 font-medium">From Lists</span>
                             ) : task.list_name && (
                               <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
                             )}
@@ -529,12 +517,22 @@ export default function MyTasks() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5" />
-              Task Calendar
-            </CardTitle>
-            <CardDescription>Your upcoming tasks</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5" />
+                Task Calendar
+              </CardTitle>
+              <CardDescription>Your upcoming tasks</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFullCalendar(true)}
+            >
+              <Maximize2 className="w-4 h-4 mr-2" />
+              Full Calendar
+            </Button>
           </CardHeader>
           <CardContent>
             <TaskCalendar
@@ -545,18 +543,18 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        {user?.microsoft_access_token && listsTasks.length > 0 && ( // Changed from todoTasks
+        {user?.microsoft_access_token && listsTasks.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ListChecks className="w-5 h-5 text-blue-600" />
-                Microsoft Lists {/* Changed title */}
+                Microsoft Lists
               </CardTitle>
-              <CardDescription>{listsTasks.length} task{listsTasks.length !== 1 ? 's' : ''}</CardDescription> {/* Changed from todoTasks */}
+              <CardDescription>{listsTasks.length} task{listsTasks.length !== 1 ? 's' : ''}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {listsTasks.map((task) => ( {/* Changed from todoTasks */}
+                {listsTasks.map((task) => (
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
@@ -577,7 +575,7 @@ export default function MyTasks() {
                             {formatStatus(task.status)}
                           </Badge>
                           <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
-                          {task.site_name && ( // Added site_name display
+                          {task.site_name && (
                             <span className="text-xs text-slate-400">{task.site_name}</span>
                           )}
                           {task.due_date && (
