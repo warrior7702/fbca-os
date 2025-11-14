@@ -33,45 +33,38 @@ Deno.serve(async (req) => {
 
     switch (type) {
       case 'buildings':
-        url = `${AKITABOX_API}/organizations/${ORG_ID}/building_groups?insensitive=true&limit=1000&skip=0&sort=name,%20asc`;
-        console.log('Fetching building groups from:', url);
+        // Try direct buildings endpoint first
+        url = `${AKITABOX_API}/organizations/${ORG_ID}/buildings?insensitive=true&limit=1000&skip=0&sort=name,%20asc`;
+        console.log('Fetching buildings directly from:', url);
         
-        const groupsResponse = await fetch(url, { headers });
-        console.log('Response status:', groupsResponse.status);
+        const buildingsResponse = await fetch(url, { headers });
+        console.log('Buildings response status:', buildingsResponse.status);
         
-        if (!groupsResponse.ok) {
-          const errorText = await groupsResponse.text();
-          console.error('API Error:', errorText);
+        if (!buildingsResponse.ok) {
+          const errorText = await buildingsResponse.text();
+          console.error('Buildings API Error:', errorText);
           return Response.json({ 
-            error: `AkitaBox API error: ${groupsResponse.status}`,
+            error: `AkitaBox API error: ${buildingsResponse.status}`,
             details: errorText
           }, { status: 500 });
         }
         
-        const groups = await groupsResponse.json();
-        console.log('Groups fetched:', groups.length);
+        const buildingsData = await buildingsResponse.json();
+        console.log('Raw buildings response:', JSON.stringify(buildingsData, null, 2));
         
-        const buildings = [];
-        const buildingIds = new Set();
+        // Handle both array and object with data property
+        let buildings = Array.isArray(buildingsData) ? buildingsData : (buildingsData.data || buildingsData.results || []);
         
-        groups.forEach(group => {
-          if (group.buildings) {
-            group.buildings.forEach(building => {
-              if (!buildingIds.has(building._id)) {
-                buildingIds.add(building._id);
-                buildings.push({
-                  id: building._id,
-                  name: building.name,
-                  address: building.address,
-                  levels: building.levels || []
-                });
-              }
-            });
-          }
-        });
+        // Map to consistent format
+        buildings = buildings.map(building => ({
+          id: building._id || building.id,
+          name: building.name,
+          address: building.address,
+          levels: building.levels || []
+        }));
         
         console.log('Buildings extracted:', buildings.length);
-        console.log('Sample building:', JSON.stringify(buildings[0], null, 2));
+        console.log('Buildings:', buildings.map(b => b.name));
         data = { buildings };
         break;
 
@@ -96,9 +89,9 @@ Deno.serve(async (req) => {
         }
         
         const roomsData = await roomsResponse.json();
-        console.log('Raw rooms response:', JSON.stringify(roomsData, null, 2));
+        console.log('Raw rooms response type:', typeof roomsData);
+        console.log('Rooms count:', Array.isArray(roomsData) ? roomsData.length : 'not array');
         
-        // The response might be an object with a 'data' property or array directly
         const rooms = Array.isArray(roomsData) ? roomsData : (roomsData.data || roomsData.results || []);
         console.log('Rooms extracted:', rooms.length);
         data = { rooms };
@@ -125,9 +118,9 @@ Deno.serve(async (req) => {
         }
         
         const assetsData = await assetsResponse.json();
-        console.log('Raw assets response:', JSON.stringify(assetsData, null, 2));
+        console.log('Raw assets response type:', typeof assetsData);
+        console.log('Assets count:', Array.isArray(assetsData) ? assetsData.length : 'not array');
         
-        // The response might be an object with a 'data' property or array directly
         const assets = Array.isArray(assetsData) ? assetsData : (assetsData.data || assetsData.results || []);
         console.log('Assets extracted:', assets.length);
         data = { assets };
