@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -220,12 +221,18 @@ export default function AkitaFetch() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
-              <Building2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
-              AkitaFetch
-            </h1>
-            <p className="text-sm text-slate-600">Browse buildings, floor plans, rooms, and assets</p>
+          <div className="flex items-center gap-3">
+            <img 
+              src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/af69470b7_akitafetch_hybrid_64x64.png"
+              alt="AkitaFetch"
+              className="w-10 h-10"
+            />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                AkitaFetch
+              </h1>
+              <p className="text-sm text-slate-600">Browse buildings, floor plans, rooms, and assets</p>
+            </div>
           </div>
         </div>
 

@@ -94,6 +94,7 @@ const systemApps = [
     path: "AkitaFetch",
     icon: Building2,
     color: "text-blue-500",
+    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/1d4b6425d_akitafetch_hybrid_32x32.png",
     action: null
   },
   {
@@ -434,7 +435,11 @@ export default function Layout({ children, currentPageName }) {
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
-                        <app.icon className="w-5 h-5 text-white" />
+                        {app.customIcon ? (
+                          <img src={app.customIcon} alt={app.name} className="w-5 h-5" />
+                        ) : (
+                          <app.icon className="w-5 h-5 text-white" />
+                        )}
                       </div>
                       <span className="font-medium text-slate-900">{app.name}</span>
                     </div>
@@ -572,7 +577,11 @@ export default function Layout({ children, currentPageName }) {
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="AkitaFetch"
                 >
-                  <Building2 className="w-4 h-4 text-white/80" />
+                  <img 
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/1d4b6425d_akitafetch_hybrid_32x32.png"
+                    alt="AkitaFetch"
+                    className="w-5 h-5"
+                  />
                 </motion.div>
               </Link>
               <motion.div

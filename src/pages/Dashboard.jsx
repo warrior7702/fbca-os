@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -17,13 +18,18 @@ import {
   Mail,
   Briefcase,
   FileSpreadsheet,
-  Trophy
+  Trophy,
+  Play, // New Import
+  Wifi, // New Import
+  Battery, // New Import
+  Printer, // New Import
+  X // New Import for close button
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } => "react-router-dom";
 
 const defaultApps = [
   { id: "mytasks", name: "Tasks", icon: ListChecks, color: "from-blue-500 to-indigo-500", path: "MyTasks" },
@@ -41,6 +47,45 @@ const defaultApps = [
   { id: "planningtool", name: "Planning Tool", icon: Briefcase, color: "from-indigo-500 to-purple-500", path: "PlanningTool" },
   { id: "sharepoint", name: "SharePoint", icon: FileSpreadsheet, color: "from-green-600 to-emerald-600", path: "SharePoint" },
   { id: "settings", name: "Settings", icon: Settings, color: "from-slate-500 to-slate-600", path: "Settings" }
+];
+
+const systemApps = [
+  {
+    name: "AkitaFetch",
+    path: "AkitaFetch",
+    icon: Building2,
+    color: "text-blue-500",
+    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/af69470b7_akitafetch_hybrid_64x64.png",
+    action: null
+  },
+  {
+    name: "Media Player",
+    path: "MediaPlayer",
+    icon: Play,
+    color: "text-green-500",
+    action: null
+  },
+  {
+    name: "Network Helper",
+    path: null,
+    icon: Wifi,
+    color: "text-blue-500",
+    action: () => toast.info('FBCA Network Helper - Coming Soon!')
+  },
+  {
+    name: "Gud Deo",
+    path: null,
+    icon: Battery,
+    color: "text-yellow-500",
+    action: () => toast.info('Gud Deo - Coming Soon!')
+  },
+  {
+    name: "Printshot",
+    path: null,
+    icon: Printer,
+    color: "text-purple-500",
+    action: () => toast.info('Purpose Printshot - Coming Soon!')
+  }
 ];
 
 const wallpapers = {
@@ -84,6 +129,7 @@ export default function Dashboard() {
   const [tasksDueToday, setTasksDueToday] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // New state for mobile menu
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -294,6 +340,15 @@ export default function Dashboard() {
     navigate(createPageUrl(app.path));
   };
 
+  const handleSystemAppClick = (app) => {
+    setMobileMenuOpen(false);
+    if (app.path) {
+      navigate(createPageUrl(app.path));
+    } else if (app.action) {
+      app.action();
+    }
+  };
+
   const wallpaperUrl = wallpapers[wallpaper] || wallpapers.cross_white_glow;
 
   if (isLoading) {
@@ -347,6 +402,54 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
+        {/* Button to open System Tools menu */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+          <Button onClick={() => setMobileMenuOpen(true)} className="bg-white/80 backdrop-blur-sm text-slate-800 hover:bg-white px-6 py-3 rounded-full shadow-lg font-semibold">
+            System Tools
+          </Button>
+        </div>
+
+        {/* Mobile System Tools Menu (Overlay) */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "tween", duration: 0.3 }}
+              className="fixed inset-0 z-50 bg-white p-4 overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-900">System Tools</h2>
+                <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
+                  <X className="h-6 w-6 text-slate-500" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 mb-2">
+                  System Tools
+                </p>
+                {systemApps.map((app) => (
+                  <div
+                    key={app.name}
+                    onClick={() => handleSystemAppClick(app)}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
+                      {app.customIcon ? (
+                        <img src={app.customIcon} alt={app.name} className="w-6 h-6" />
+                      ) : (
+                        <app.icon className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                    <span className="font-medium text-slate-900">{app.name}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
