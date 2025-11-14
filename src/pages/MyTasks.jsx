@@ -56,7 +56,7 @@ const CATEGORY_COLORS = {
 export default function MyTasks() {
   const [user, setUser] = useState(null);
   const [clickupTasks, setClickupTasks] = useState([]);
-  const [todoTasks, setTodoTasks] = useState([]);
+  const [listsTasks, setListsTasks] = useState([]); // Changed from todoTasks
   const [emails, setEmails] = useState({ categorized: {} });
   const [loading, setLoading] = useState(true);
   const [loadingEmails, setLoadingEmails] = useState(true);
@@ -216,9 +216,9 @@ export default function MyTasks() {
 
       if (currentUser.microsoft_access_token) {
         taskPromises.push(
-          base44.functions.invoke('getMicrosoftToDo')
-            .then(res => ({ type: 'todo', data: res.data.tasks || res.data || [] }))
-            .catch(() => ({ type: 'todo', data: [] }))
+          base44.functions.invoke('getMicrosoftLists') // Changed from getMicrosoftToDo
+            .then(res => ({ type: 'lists', data: res.data.tasks || [] })) // Changed from 'todo' and res.data.tasks || res.data
+            .catch(() => ({ type: 'lists', data: [] })) // Changed from 'todo'
         );
 
         taskPromises.push(
@@ -232,7 +232,7 @@ export default function MyTasks() {
 
       results.forEach(result => {
         if (result.type === 'clickup') setClickupTasks(result.data);
-        else if (result.type === 'todo') setTodoTasks(result.data);
+        else if (result.type === 'lists') setListsTasks(result.data); // Changed from 'todo' and setTodoTasks
         else if (result.type === 'emails') setEmails({ categorized: result.data });
       });
 
@@ -263,8 +263,8 @@ export default function MyTasks() {
   };
 
   const handleTaskClick = (task) => {
-    if (task.source === 'microsoft_todo') {
-      if (task.url) window.open(task.url, '_blank', 'noopener,noreferrer');
+    if (task.source === 'microsoft_lists' && task.url) { // Changed from 'microsoft_todo'
+      window.open(task.url, '_blank', 'noopener,noreferrer');
       return;
     }
     setSelectedTask(task);
@@ -274,10 +274,12 @@ export default function MyTasks() {
   const handleCompleteTask = async (task, e) => {
     e.stopPropagation();
     try {
-      if (task.source === 'microsoft_todo') {
-        await base44.functions.invoke('completeMicrosoftToDoTask', {
-          list_id: task.list_id,
-          task_id: task.id
+      if (task.source === 'microsoft_lists') { // Changed from 'microsoft_todo'
+        await base44.functions.invoke('updateMicrosoftListItem', { // Changed from completeMicrosoftToDoTask
+          siteId: task.site_id, // New parameter
+          listId: task.list_id, // Changed from list_id
+          itemId: task.id, // Changed from task_id
+          completed: true // New parameter
         });
         toast.success('Task completed!');
       } else {
@@ -298,7 +300,7 @@ export default function MyTasks() {
     await loadData();
   };
 
-  const allTasks = [...clickupTasks, ...todoTasks];
+  const allTasks = [...clickupTasks, ...listsTasks]; // Changed from todoTasks
   const myDayTasks = allTasks.filter(task => task.due_date && isToday(new Date(task.due_date)));
 
   const LIST_COLORS = {
@@ -478,8 +480,8 @@ export default function MyTasks() {
             ) : (
               <div className="space-y-3">
                 {myDayTasks.map((task) => {
-                  const isMicrosoftToDo = task.source === 'microsoft_todo';
-                  const listColor = isMicrosoftToDo ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default);
+                  const isMicrosoftLists = task.source === 'microsoft_lists'; // Changed from isMicrosoftToDo
+                  const listColor = isMicrosoftLists ? '#0078d4' : (LIST_COLORS[task.list_name] || LIST_COLORS.default); // Logic unchanged, only variable name
 
                   return (
                     <div
@@ -501,8 +503,8 @@ export default function MyTasks() {
                             <Badge className={getStatusColor(task.status)}>
                               {formatStatus(task.status)}
                             </Badge>
-                            {isMicrosoftToDo ? (
-                              <span className="text-xs text-slate-500 font-medium">From To Do</span>
+                            {isMicrosoftLists ? ( // Changed from isMicrosoftToDo
+                              <span className="text-xs text-slate-500 font-medium">From Lists</span> // Changed from 'From To Do'
                             ) : task.list_name && (
                               <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
                             )}
@@ -527,22 +529,12 @@ export default function MyTasks() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5" />
-                Task Calendar
-              </CardTitle>
-              <CardDescription>Your upcoming tasks</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFullCalendar(true)}
-            >
-              <Maximize2 className="w-4 h-4 mr-2" />
-              Full Calendar
-            </Button>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5" />
+              Task Calendar
+            </CardTitle>
+            <CardDescription>Your upcoming tasks</CardDescription>
           </CardHeader>
           <CardContent>
             <TaskCalendar
@@ -553,18 +545,18 @@ export default function MyTasks() {
           </CardContent>
         </Card>
 
-        {user?.microsoft_access_token && todoTasks.length > 0 && (
+        {user?.microsoft_access_token && listsTasks.length > 0 && ( // Changed from todoTasks
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ListChecks className="w-5 h-5 text-blue-600" />
-                Microsoft To Do
+                Microsoft Lists {/* Changed title */}
               </CardTitle>
-              <CardDescription>{todoTasks.length} task{todoTasks.length !== 1 ? 's' : ''}</CardDescription>
+              <CardDescription>{listsTasks.length} task{listsTasks.length !== 1 ? 's' : ''}</CardDescription> {/* Changed from todoTasks */}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {todoTasks.map((task) => (
+                {listsTasks.map((task) => ( {/* Changed from todoTasks */}
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
@@ -585,6 +577,9 @@ export default function MyTasks() {
                             {formatStatus(task.status)}
                           </Badge>
                           <span className="text-xs text-slate-500 font-medium">{task.list_name}</span>
+                          {task.site_name && ( // Added site_name display
+                            <span className="text-xs text-slate-400">{task.site_name}</span>
+                          )}
                           {task.due_date && (
                             <span className="text-xs text-slate-400">
                               Due: {format(new Date(task.due_date), 'MMM d')}

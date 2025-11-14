@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes } from "date-fns"; // Removed unused imports
+import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -34,37 +34,54 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function MyMeetings() {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
-  const [showMeetingDetail, setShowMeetingDetail] = useState(false); // New state for dialog
+  const [showMeetingDetail, setShowMeetingDetail] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [timezone, setTimezone] = useState(''); // Renamed from userTimezone
-  const [user, setUser] = useState(null); // NEW: Add user state
+  const [timezone, setTimezone] = useState('');
+  const [user, setUser] = useState(null);
 
-  // NEW: Recording state
+  // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState(null);
   const [processingNotes, setProcessingNotes] = useState(false);
   const [meetingNotes, setMeetingNotes] = useState(null);
-  const [savedNotes, setSavedNotes] = useState(null); // NEW: For displaying saved notes
+  const [savedNotes, setSavedNotes] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
 
+  // New Booking states
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingBusinesses, setBookingBusinesses] = useState([]);
+  const [selectedBusiness, setSelectedBusiness] = useState(null);
+  const [bookingStaff, setBookingStaff] = useState([]);
+  const [bookingServices, setBookingServices] = useState([]);
+  const [loadingBooking, setLoadingBooking] = useState(false);
+  const [bookingData, setBookingData] = useState({
+    staffMemberId: '',
+    serviceId: '',
+    date: '',
+    time: '',
+    duration: 30, // Default duration
+    notes: ''
+  });
+
   useEffect(() => {
-    // Detect user's timezone
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setTimezone(detectedTimezone);
     console.log('🌍 Detected timezone:', detectedTimezone);
 
-    loadData(); // Call loadData without argument as timezone is now state
+    loadData();
 
-    // Update current time every second for accurate countdown and recording time
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -76,26 +93,25 @@ export default function MyMeetings() {
     setLoading(true);
     try {
       const currentUser = await base44.auth.me();
-      setUser(currentUser); // NEW: Store user
+      setUser(currentUser);
 
       if (!currentUser || !currentUser.microsoft_access_token) {
-        // If not connected, set meetings to empty and display warning
         setMeetings([]);
         setLoading(false);
         toast.error('Please connect Microsoft in Settings to see your meetings.');
         return;
       }
 
-      console.log('📅 Fetching calendar with timezone:', timezone); // Use timezone from state
+      console.log('📅 Fetching calendar with timezone:', timezone);
 
       const response = await base44.functions.invoke('getMicrosoftCalendar', {
-        timezone: timezone // Pass timezone from state
+        timezone: timezone
       });
 
       if (response.data && response.data.events) {
         setMeetings(response.data.events);
         console.log(`✅ Loaded ${response.data.events.length} meetings`);
-        console.log('🌍 Calendar timezone:', timezone); // Use timezone from state
+        console.log('🌍 Calendar timezone:', timezone);
 
         toast.success(`Loaded ${response.data.events.length} meetings`);
       } else {
@@ -127,10 +143,10 @@ export default function MyMeetings() {
     if (meeting.onlineMeeting?.joinUrl) {
       window.open(meeting.onlineMeeting.joinUrl, '_blank');
       toast.success(`Opening meeting link...`);
-    } else if (meeting.meetingLink?.url) { // Fallback to meetingLink if onlineMeeting not available
+    } else if (meeting.meetingLink?.url) {
       window.open(meeting.meetingLink.url, '_blank');
       toast.success(`Opening ${meeting.meetingLink.provider}...`);
-    } else if (meeting.webLink) { // Fallback to webLink
+    } else if (meeting.webLink) {
       window.open(meeting.webLink, '_blank');
       toast.success('Opening in Outlook...');
     } else {
@@ -138,26 +154,23 @@ export default function MyMeetings() {
     }
   };
 
-  // Parse dates - they're already in the correct timezone from the API
   const parseMeetingDate = (dateStr) => {
     if (!dateStr) return null;
     return parseISO(dateStr);
   };
 
-  // NEW: Load saved notes when modal opens
   const loadSavedNotes = async (meetingId) => {
-    if (!user) return; // Ensure user is loaded
+    if (!user) return;
 
     try {
-      // Assuming 'base44.entities.MeetingNote' is available for database interaction
       const notes = await base44.entities.MeetingNote.filter({
         meeting_id: meetingId,
-        user_email: user.email // Filter by current user's email
+        user_email: user.email
       });
 
       if (notes && notes.length > 0) {
-        setSavedNotes(notes[0]); // Assuming one note per meeting per user
-        setMeetingNotes(notes[0]); // Display the saved notes
+        setSavedNotes(notes[0]);
+        setMeetingNotes(notes[0]);
         console.log('✅ Loaded saved notes for meeting:', meetingId);
       } else {
         setSavedNotes(null);
@@ -169,7 +182,6 @@ export default function MyMeetings() {
     }
   };
 
-  // NEW: Recording functions
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -186,7 +198,7 @@ export default function MyMeetings() {
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(audioBlob);
-        stream.getTracks().forEach(track => track.stop()); // Stop all tracks on stream
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
@@ -214,7 +226,7 @@ export default function MyMeetings() {
   };
 
   const generateNotes = async () => {
-    if (!audioBlob || !selectedMeeting || !user) { // Added !user check
+    if (!audioBlob || !selectedMeeting || !user) {
       toast.error("Missing required data (audio, meeting, or user)");
       return;
     }
@@ -223,15 +235,12 @@ export default function MyMeetings() {
     try {
       console.log('🎙️ Uploading audio file...');
 
-      // base44.integrations.Core.UploadFile does not take FormData directly,
-      // it expects a File or Blob object.
       const uploadResponse = await base44.integrations.Core.UploadFile({
         file: new File([audioBlob], 'meeting-recording.webm', { type: audioBlob.type })
       });
 
       console.log('✅ Audio uploaded:', uploadResponse.file_url);
 
-      // Generate notes using AI
       console.log('🤖 Generating meeting notes...');
       const notesResponse = await base44.functions.invoke('generateMeetingNotes', {
         audio_url: uploadResponse.file_url,
@@ -241,17 +250,16 @@ export default function MyMeetings() {
 
       console.log('✅ Notes generated:', notesResponse.data);
 
-      // Save notes to database
       const savedNote = await base44.entities.MeetingNote.create({
         meeting_id: selectedMeeting.id,
         meeting_subject: selectedMeeting.subject,
         meeting_date: selectedMeeting.start,
-        user_email: user.email, // Use user email for tracking
+        user_email: user.email,
         audio_url: uploadResponse.file_url,
         summary: notesResponse.data.summary,
         action_items: notesResponse.data.action_items || [],
         transcript: notesResponse.data.transcript,
-        recording_duration: recordingTime // Store recording duration
+        recording_duration: recordingTime
       });
 
       console.log('💾 Notes saved to database:', savedNote.id);
@@ -271,7 +279,6 @@ export default function MyMeetings() {
   const downloadNotes = () => {
     if (!meetingNotes) return;
 
-    // Use full meeting notes object for better formatting
     const notesContent = `Meeting Notes - ${selectedMeeting?.subject || 'Meeting'}
 
 Date: ${selectedMeeting?.start ? format(parseISO(selectedMeeting.start), 'PPpp') : 'N/A'}
@@ -301,7 +308,117 @@ ${meetingNotes.transcript || 'No transcript available.'}
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get meeting status
+  // New Booking functions
+  const loadBookingData = async () => {
+    try {
+      const response = await base44.functions.invoke('getMicrosoftBookings');
+
+      if (response.data.success) {
+        setBookingBusinesses(response.data.businesses || []);
+
+        if (response.data.businesses && response.data.businesses.length > 0) {
+          // Select the first business by default
+          const firstBusiness = response.data.businesses[0];
+          setSelectedBusiness(firstBusiness);
+          await loadBookingStaffAndServices(firstBusiness.id);
+        } else {
+          setBookingStaff([]);
+          setBookingServices([]);
+          setSelectedBusiness(null);
+        }
+      } else {
+        setBookingBusinesses([]);
+        setBookingStaff([]);
+        setBookingServices([]);
+        setSelectedBusiness(null);
+        toast.error(response.data.message || 'Failed to load booking businesses.');
+      }
+    } catch (error) {
+      console.error('Error loading booking data:', error);
+      toast.error('Failed to load booking options');
+      setBookingBusinesses([]);
+      setBookingStaff([]);
+      setBookingServices([]);
+      setSelectedBusiness(null);
+    }
+  };
+
+  const loadBookingStaffAndServices = async (businessId) => {
+    try {
+      const response = await base44.functions.invoke('getBookingStaffAndServices', { businessId });
+
+      if (response.data.success) {
+        setBookingStaff(response.data.staff || []);
+        setBookingServices(response.data.services || []);
+      } else {
+        setBookingStaff([]);
+        setBookingServices([]);
+        toast.error(response.data.message || 'Failed to load staff and services.');
+      }
+    } catch (error) {
+      console.error('Error loading staff and services:', error);
+      toast.error('Failed to load staff and services for the selected business.');
+      setBookingStaff([]);
+      setBookingServices([]);
+    }
+  };
+
+  const handleCreateBooking = async (e) => {
+    e.preventDefault();
+    setLoadingBooking(true);
+
+    try {
+      if (!selectedBusiness || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user) {
+        toast.error('Please fill all required fields and ensure user data is available.');
+        setLoadingBooking(false);
+        return;
+      }
+
+      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`; // Ensure seconds are included for ISO string
+      const startDateTime = new Date(startDateTimeString);
+      const endDateTime = new Date(startDateTime.getTime() + bookingData.duration * 60000);
+
+      if (isNaN(startDateTime.getTime())) {
+        toast.error('Invalid date or time entered.');
+        setLoadingBooking(false);
+        return;
+      }
+
+      const response = await base44.functions.invoke('createMicrosoftBooking', {
+        businessId: selectedBusiness.id,
+        serviceId: bookingData.serviceId,
+        staffMemberId: bookingData.staffMemberId || null, // Optional
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        customerName: user.full_name || user.email.split('@')[0], // Fallback for name
+        customerEmail: user.email,
+        notes: bookingData.notes
+      });
+
+      if (response.data.success) {
+        toast.success('Booking created successfully!');
+        setShowBookingModal(false);
+        // Reset booking data
+        setBookingData({
+          staffMemberId: '',
+          serviceId: '',
+          date: '',
+          time: '',
+          duration: 30,
+          notes: ''
+        });
+        await loadData(); // Reload meetings to show the new booking
+      } else {
+        toast.error(response.data.message || 'Failed to create booking.');
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      toast.error('Failed to create booking: ' + error.message);
+    } finally {
+      setLoadingBooking(false);
+    }
+  };
+
   const getMeetingStatus = (meeting) => {
     const start = parseMeetingDate(meeting.start);
     const end = parseMeetingDate(meeting.end);
@@ -326,7 +443,6 @@ ${meetingNotes.transcript || 'No transcript available.'}
     return { status: 'past', label: 'Ended', bg: 'bg-slate-50', textColor: 'text-slate-400', icon: CalendarIcon };
   };
 
-  // Get response status badge
   const getResponseBadge = (status) => {
     switch (status) {
       case 'accepted':
@@ -356,10 +472,9 @@ ${meetingNotes.transcript || 'No transcript available.'}
     if (meeting.meetingLink?.provider) {
       return <Badge variant="outline">{meeting.meetingLink.provider}</Badge>;
     }
-    return null; // Don't show "In Person" badge if no explicit online meeting provider
+    return null;
   };
 
-  // Filter meetings
   const todaysMeetings = meetings.filter(m => {
     const start = parseMeetingDate(m.start);
     return start && isToday(start);
@@ -367,13 +482,11 @@ ${meetingNotes.transcript || 'No transcript available.'}
 
   const upcomingMeetings = meetings.filter(m => {
     const start = parseMeetingDate(m.start);
-    // Include today's meetings that haven't started yet, and future meetings
     return start && isFuture(start);
   }).sort((a, b) => parseMeetingDate(a.start) - parseMeetingDate(b.start));
 
-  // Find next meeting (only from upcoming, excluding today's if they are handled separately)
   const nextMeeting = upcomingMeetings
-    .filter(m => !isToday(parseMeetingDate(m.start))) // Exclude today's meetings if already handled in todaysMeetings
+    .filter(m => !isToday(parseMeetingDate(m.start)))
     .sort((a, b) => parseMeetingDate(a.start) - parseMeetingDate(b.start))[0];
 
   if (loading) {
@@ -405,24 +518,38 @@ ${meetingNotes.transcript || 'No transcript available.'}
           }
           iconColor="from-purple-500 to-pink-500"
           action={
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
-              size="sm"
-            >
-              {syncing ? (
-                <>
-                  <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Syncing...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Sync Calendar</span>
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowBookingModal(true);
+                  loadBookingData();
+                }}
+                variant="outline"
+                size="sm"
+                className="bg-white hover:bg-slate-50"
+              >
+                <CalendarIcon className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Book Meeting</span>
+              </Button>
+              <Button
+                onClick={handleSync}
+                disabled={syncing}
+                className="bg-purple-600 hover:bg-purple-700"
+                size="sm"
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Sync</span>
+                  </>
+                )}
+              </Button>
+            </div>
           }
         />
 
@@ -504,8 +631,8 @@ ${meetingNotes.transcript || 'No transcript available.'}
                       onClick={() => {
                         setSelectedMeeting(meeting);
                         setShowMeetingDetail(true);
-                        setAudioBlob(null); // Clear previous recording
-                        setMeetingNotes(null); // Clear previous notes
+                        setAudioBlob(null);
+                        setMeetingNotes(null);
                       }}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -568,7 +695,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-4">Upcoming Meetings</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingMeetings.slice(0, 6).map((meeting) => { // Only show up to 6 upcoming meetings
+              {upcomingMeetings.slice(0, 6).map((meeting) => {
                 const start = parseMeetingDate(meeting.start);
                 if (!start) return null;
 
@@ -579,8 +706,8 @@ ${meetingNotes.transcript || 'No transcript available.'}
                     onClick={() => {
                       setSelectedMeeting(meeting);
                       setShowMeetingDetail(true);
-                      setAudioBlob(null); // Clear previous recording
-                      setMeetingNotes(null); // Clear previous notes
+                      setAudioBlob(null);
+                      setMeetingNotes(null);
                     }}
                   >
                     <Card className="border-none h-full">
@@ -614,7 +741,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
         )}
 
         {/* Empty State */}
-        {meetings.length === 0 && !loading && ( // Ensure it's not just loading
+        {meetings.length === 0 && !loading && (
           <Card className="border-none shadow-none">
             <CardContent className="p-12 text-center">
               <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -642,23 +769,22 @@ ${meetingNotes.transcript || 'No transcript available.'}
         )}
       </div>
 
-      {/* Meeting Detail Modal - UPDATED with Recording */}
+      {/* Meeting Detail Modal */}
       <Dialog open={showMeetingDetail} onOpenChange={(isOpen) => {
         setShowMeetingDetail(isOpen);
         if (!isOpen) {
           setSelectedMeeting(null);
-          // Reset recording states when closing modal
           setIsRecording(false);
           setRecordingTime(0);
           setAudioBlob(null);
           setProcessingNotes(false);
           setMeetingNotes(null);
-          setSavedNotes(null); // NEW: Clear savedNotes on close
+          setSavedNotes(null);
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop(); // Stop any active recording
+            mediaRecorderRef.current.stop();
           }
           clearInterval(recordingIntervalRef.current);
-        } else if (selectedMeeting) { // NEW: Load saved notes when opening dialog
+        } else if (selectedMeeting) {
           loadSavedNotes(selectedMeeting.id);
         }
       }}>
@@ -708,7 +834,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                   </div>
                 )}
 
-                {/* NEW: AI Notetaker Section */}
+                {/* AI Notetaker Section */}
                 <Card className="border-2 border-blue-200 bg-blue-50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -934,6 +1060,146 @@ ${meetingNotes.transcript || 'No transcript available.'}
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* NEW: Booking Modal */}
+      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Book a Meeting</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateBooking} className="space-y-4">
+            {bookingBusinesses.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Business</label>
+                <Select
+                  value={selectedBusiness?.id || ''}
+                  onValueChange={(businessId) => {
+                    const business = bookingBusinesses.find(b => b.id === businessId);
+                    setSelectedBusiness(business);
+                    if (business) {
+                      loadBookingStaffAndServices(business.id);
+                    }
+                  }}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a business..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bookingBusinesses.map(business => (
+                      <SelectItem key={business.id} value={business.id}>
+                        {business.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Service</label>
+              <Select
+                value={bookingData.serviceId}
+                onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
+                required
+                disabled={!selectedBusiness || bookingServices.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a service..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bookingServices.map(service => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.displayName} ({service.defaultDuration / 60} min)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Staff Member (Optional)</label>
+              <Select
+                value={bookingData.staffMemberId}
+                onValueChange={(value) => setBookingData({...bookingData, staffMemberId: value})}
+                disabled={!selectedBusiness || bookingStaff.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff member..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bookingStaff.map(staff => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date</label>
+                <Input
+                  type="date"
+                  value={bookingData.date}
+                  onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Time</label>
+                <Input
+                  type="time"
+                  value={bookingData.time}
+                  onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Duration (minutes)</label>
+              <Input
+                type="number"
+                value={bookingData.duration}
+                onChange={(e) => setBookingData({...bookingData, duration: parseInt(e.target.value, 10)})}
+                min="15"
+                step="15"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes (optional)</label>
+              <Textarea
+                value={bookingData.notes}
+                onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
+                placeholder="Add any notes or special requests..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowBookingModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loadingBooking || !selectedBusiness || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
+                {loadingBooking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Booking'
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
