@@ -48,6 +48,8 @@ export default function MyMeetings() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timezone, setTimezone] = useState('');
   const [user, setUser] = useState(null);
+  const [allMeetingNotes, setAllMeetingNotes] = useState([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -143,12 +145,38 @@ export default function MyMeetings() {
       } else {
         setMeetings([]);
       }
+
+      // Load all meeting notes
+      await loadAllMeetingNotes(currentUser);
     } catch (error) {
       console.error('Error loading meetings:', error);
       toast.error('Failed to load meetings');
       setMeetings([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAllMeetingNotes = async (currentUser) => {
+    if (!currentUser) return;
+    
+    setLoadingNotes(true);
+    try {
+      const notes = await base44.entities.MeetingNote.filter({
+        user_email: currentUser.email
+      });
+      
+      // Sort by meeting date, most recent first
+      const sortedNotes = notes.sort((a, b) => 
+        new Date(b.meeting_date) - new Date(a.meeting_date)
+      );
+      
+      setAllMeetingNotes(sortedNotes);
+      console.log(`📝 Loaded ${sortedNotes.length} meeting notes`);
+    } catch (error) {
+      console.error('Error loading meeting notes:', error);
+    } finally {
+      setLoadingNotes(false);
     }
   };
 
@@ -292,6 +320,7 @@ export default function MyMeetings() {
 
       setMeetingNotes(notesResponse.data);
       setSavedNotes(savedNote);
+      await loadAllMeetingNotes(user); // Refresh notes list
       toast.success("Meeting notes generated and saved!");
 
     } catch (error) {
@@ -302,28 +331,28 @@ export default function MyMeetings() {
     }
   };
 
-  const downloadNotes = () => {
-    if (!meetingNotes) return;
+  const downloadNotes = (notesData) => {
+    if (!notesData) return;
 
-    const notesContent = `Meeting Notes - ${selectedMeeting?.subject || 'Meeting'}
+    const notesContent = `Meeting Notes - ${notesData.meeting_subject || 'Meeting'}
 
-Date: ${selectedMeeting?.start ? format(parseISO(selectedMeeting.start), 'PPpp') : 'N/A'}
+Date: ${notesData.meeting_date ? format(parseISO(notesData.meeting_date), 'PPpp') : 'N/A'}
 Timezone: ${timezone}
 
 Summary:
-${meetingNotes.summary || 'No summary available.'}
+${notesData.summary || 'No summary available.'}
 
-${meetingNotes.action_items && meetingNotes.action_items.length > 0 ? 'Action Items:\n' + meetingNotes.action_items.map(item => `- ${item}`).join('\n') : ''}
+${notesData.action_items && notesData.action_items.length > 0 ? 'Action Items:\n' + notesData.action_items.map(item => `- ${item}`).join('\n') : ''}
 
 Transcript:
-${meetingNotes.transcript || 'No transcript available.'}
+${notesData.transcript || 'No transcript available.'}
 `;
 
     const blob = new Blob([notesContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meeting-notes-${format(new Date(), 'yyyy-MM-dd-HHmm')}.txt`;
+    a.download = `meeting-notes-${format(new Date(notesData.meeting_date || new Date()), 'yyyy-MM-dd-HHmm')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -827,8 +856,81 @@ ${meetingNotes.transcript || 'No transcript available.'}
           </div>
         )}
 
+        {/* AI Meeting Notes Section - NEW */}
+        {allMeetingNotes.length > 0 && (
+          <Card className="border-2 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                AI Meeting Notes
+                <Badge variant="secondary">{allMeetingNotes.length} note{allMeetingNotes.length !== 1 ? 's' : ''}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingNotes ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {allMeetingNotes.slice(0, 5).map((note) => (
+                    <motion.div
+                      key={note.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-white rounded-lg border border-blue-200 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-blue-100 text-blue-700">
+                              {note.meeting_subject || 'Untitled Meeting'}
+                            </Badge>
+                            <span className="text-xs text-slate-500">
+                              {format(new Date(note.meeting_date), 'MMM d, h:mm a')}
+                            </span>
+                          </div>
+                          {note.summary && (
+                            <p className="text-sm text-slate-700 line-clamp-2 mb-2">
+                              {note.summary}
+                            </p>
+                          )}
+                          {note.action_items && note.action_items.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-semibold text-slate-600 mb-1">Action Items:</p>
+                              <ul className="list-disc list-inside space-y-1">
+                                {note.action_items.slice(0, 3).map((item, idx) => (
+                                  <li key={idx} className="text-xs text-slate-600 line-clamp-1">
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => downloadNotes(note)}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {allMeetingNotes.length > 5 && (
+                    <p className="text-sm text-slate-500 text-center mt-4">
+                      And {allMeetingNotes.length - 5} more notes...
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Empty State */}
-        {meetings.length === 0 && !loading && (
+        {meetings.length === 0 && (allMeetingNotes.length === 0 || !loadingNotes) && !loading && (
           <Card className="border-none shadow-none">
             <CardContent className="p-12 text-center">
               <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -991,7 +1093,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                                 </>
                               )}
                             </Button>
-                          </div>
+                          </div >
                         )}
                       </div >
                     )}
@@ -1011,7 +1113,7 @@ ${meetingNotes.transcript || 'No transcript available.'}
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={downloadNotes}
+                            onClick={() => downloadNotes(meetingNotes)}
                           >
                             <Download className="w-4 h-4 mr-2" />
                             Download
