@@ -873,6 +873,10 @@ export default function Settings() {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                      <Button onClick={() => navigate(createPageUrl('TicketRoleVerification'))} variant="outline">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Ticket Roles
+                      </Button>
                       <Button onClick={() => navigate(createPageUrl('DepartmentTest'))} variant="outline">
                         <Database className="w-4 h-4 mr-2" />
                         Departments
