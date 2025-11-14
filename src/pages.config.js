@@ -45,6 +45,7 @@ import DepartmentTest from './pages/DepartmentTest';
 import TicketRoleVerification from './pages/TicketRoleVerification';
 import Buildings from './pages/Buildings';
 import AkitaFetch from './pages/AkitaFetch';
+import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
 import Layout from './Layout.jsx';
 
 
@@ -96,6 +97,7 @@ export const PAGES = {
     "TicketRoleVerification": TicketRoleVerification,
     "Buildings": Buildings,
     "AkitaFetch": AkitaFetch,
+    "AkitaBoxExplorer": AkitaBoxExplorer,
 }
 
 export const pagesConfig = {
