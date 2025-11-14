@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -43,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { motion, AnimatePresence } => "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -251,8 +250,8 @@ export default function MyDepartment() {
       const description = (t.description || '').toLowerCase();
       
       return tags.includes('multi-department') ||
-             (description.includes('it') && description.includes('facilities')) ||
-             (description.includes('av') && description.includes('setup'));
+             description.includes('it') && description.includes('facilities') ||
+             description.includes('av') && description.includes('setup');
     });
   };
 
@@ -409,7 +408,6 @@ export default function MyDepartment() {
   return (
     <div className="h-full bg-gradient-to-br from-violet-50 to-purple-50 p-3 sm:p-6 overflow-auto">
       <div className="max-w-7xl mx-auto pb-20">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Button
@@ -432,7 +430,6 @@ export default function MyDepartment() {
           </div>
         </div>
 
-        {/* Preview Mode Banner */}
         {isPreviewMode && (
           <Card className="mb-6 border-2 border-amber-300 bg-amber-50">
             <CardContent className="p-4">
@@ -465,9 +462,7 @@ export default function MyDepartment() {
             </TabsTrigger>
           </TabsList>
 
-          {/* OVERVIEW TAB */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Top Stats with Trends */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Card>
                 <CardContent className="p-4">
@@ -536,7 +531,6 @@ export default function MyDepartment() {
               </Card>
             </div>
 
-            {/* Escalation Alerts */}
             {escalations.length > 0 && (
               <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
@@ -585,7 +579,6 @@ export default function MyDepartment() {
               </Card>
             )}
 
-            {/* Performance Metrics */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -627,7 +620,6 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Filters */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -688,7 +680,6 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Department Sections */}
             <div className="space-y-4">
               {departments.map((dept) => {
                 const deptTickets = ticketsByDept[dept.id];
@@ -839,9 +830,7 @@ export default function MyDepartment() {
             </div>
           </TabsContent>
 
-          {/* INSIGHTS TAB */}
           <TabsContent value="insights" className="space-y-6">
-            {/* Hot Spots */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -879,7 +868,6 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Recurring Issues */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -917,7 +905,6 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Cross-Department Coordination */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -955,7 +942,6 @@ export default function MyDepartment() {
             </Card>
           </TabsContent>
 
-          {/* ACTIVITY TAB */}
           <TabsContent value="activity" className="space-y-6">
             <Card>
               <CardHeader>
@@ -967,10 +953,10 @@ export default function MyDepartment() {
               <CardContent>
                 <div className="space-y-3">
                   {activityFeed.map((activity, index) => {
-                    const timeDiffHours = differenceInHours(new Date(), activity.timestamp);
-                    const timeDisplay = timeDiffHours < 1 
-                      ? `${Math.max(0, Math.floor(new Date().getMinutes() - activity.timestamp.getMinutes()))}m ago` // Calculate minutes if less than an hour
-                      : `${timeDiffHours}h ago`;
+                    const timeAgo = differenceInHours(new Date(), activity.timestamp);
+                    const timeDisplay = timeAgo < 1 
+                      ? `${Math.floor(differenceInHours(new Date(), activity.timestamp) * 60)}m ago`
+                      : `${timeAgo}h ago`;
 
                     return (
                       <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
