@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -19,7 +18,11 @@ import {
   MessageSquare,
   Calendar,
   User as UserIcon,
-  BarChart3
+  BarChart3,
+  MousePointerClick,
+  Zap,
+  Mail,
+  Workflow
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +54,6 @@ export default function SupportTickets() {
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   useEffect(() => {
-    // If there's a ticket ID in URL, navigate to detail page
     if (ticketId) {
       navigate(createPageUrl('TicketDetail') + `?id=${ticketId}`);
       return;
@@ -84,6 +86,41 @@ export default function SupportTickets() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSourceBadge = (source) => {
+    const sourceConfig = {
+      manual_request: {
+        label: "Requested",
+        icon: MousePointerClick,
+        className: "bg-blue-100 text-blue-700 border-blue-300"
+      },
+      pco_auto: {
+        label: "PCO Auto",
+        icon: Zap,
+        className: "bg-purple-100 text-purple-700 border-purple-300"
+      },
+      email: {
+        label: "Email",
+        icon: Mail,
+        className: "bg-green-100 text-green-700 border-green-300"
+      },
+      workflow: {
+        label: "Workflow",
+        icon: Workflow,
+        className: "bg-orange-100 text-orange-700 border-orange-300"
+      }
+    };
+
+    const config = sourceConfig[source] || sourceConfig.manual_request;
+    const Icon = config.icon;
+
+    return (
+      <Badge variant="outline" className={`${config.className} flex items-center gap-1`}>
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </Badge>
+    );
   };
 
   const getPriorityColor = (priority) => {
@@ -366,6 +403,7 @@ export default function SupportTickets() {
                       </div>
                       
                       <div className="flex flex-wrap gap-2">
+                        {getSourceBadge(ticket.source || 'manual_request')}
                         <Badge className={getStatusColor(ticket.status)}>
                           {ticket.status?.replace('_', ' ')}
                         </Badge>
