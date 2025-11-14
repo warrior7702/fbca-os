@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } => "framer-motion";
 import { toast } from "sonner";
 import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -126,7 +127,6 @@ export default function MyDepartment() {
     return deptMap[category] || 'other';
   };
 
-  // Calculate escalations
   const getEscalations = () => {
     const now = new Date();
     return tickets.filter(t => {
@@ -136,15 +136,14 @@ export default function MyDepartment() {
       const hoursOpen = differenceInHours(now, createdDate);
       
       return (
-        !t.assigned_to || // No assignment
-        (t.priority === 'urgent' && hoursOpen > 2) || // Urgent open > 2hrs
-        (t.priority === 'high' && hoursOpen > 4) || // High open > 4hrs
-        hoursOpen > 24 // Any open > 24hrs
+        !t.assigned_to || 
+        (t.priority === 'urgent' && hoursOpen > 2) || 
+        (t.priority === 'high' && hoursOpen > 4) || 
+        hoursOpen > 24
       );
     });
   };
 
-  // Calculate week over week trends
   const getWeeklyTrends = () => {
     const now = new Date();
     const thisWeekStart = startOfWeek(now);
@@ -174,7 +173,6 @@ export default function MyDepartment() {
     };
   };
 
-  // Calculate performance metrics
   const getPerformanceMetrics = () => {
     const resolvedTickets = tickets.filter(t => 
       t.status === 'resolved' || t.status === 'closed'
@@ -202,7 +200,6 @@ export default function MyDepartment() {
     };
   };
 
-  // Hot spot analysis
   const getHotSpots = () => {
     const buildingCounts = {};
     tickets.forEach(t => {
@@ -224,7 +221,6 @@ export default function MyDepartment() {
       }));
   };
 
-  // Recurring issues detector
   const getRecurringIssues = () => {
     const issueMap = {};
     
@@ -249,24 +245,21 @@ export default function MyDepartment() {
       .slice(0, 5);
   };
 
-  // Cross-department tickets
   const getCrossDepartmentTickets = () => {
     return tickets.filter(t => {
       const tags = t.tags || [];
       const description = (t.description || '').toLowerCase();
       
       return tags.includes('multi-department') ||
-             description.includes('it') && description.includes('facilities') ||
-             description.includes('av') && description.includes('setup');
+             (description.includes('it') && description.includes('facilities')) ||
+             (description.includes('av') && description.includes('setup'));
     });
   };
 
-  // Activity feed
   const getActivityFeed = () => {
     const activities = [];
     
     tickets.slice(0, 50).forEach(ticket => {
-      // Ticket creation
       activities.push({
         type: 'created',
         ticket,
@@ -275,7 +268,6 @@ export default function MyDepartment() {
         user: ticket.requester_name
       });
 
-      // Assignment
       if (ticket.assigned_to) {
         activities.push({
           type: 'assigned',
@@ -286,7 +278,6 @@ export default function MyDepartment() {
         });
       }
 
-      // Status changes
       if (ticket.status === 'resolved' && ticket.resolved_at) {
         activities.push({
           type: 'resolved',
@@ -297,7 +288,6 @@ export default function MyDepartment() {
         });
       }
 
-      // Comments
       if (ticket.comments && ticket.comments.length > 0) {
         ticket.comments.forEach(comment => {
           activities.push({
@@ -373,7 +363,7 @@ export default function MyDepartment() {
     {
       id: 'print_shop',
       name: 'Print Shop',
-      manager: 'TBD',
+      manager: 'Merrick Steele',
       icon: '🖨️',
       color: 'from-indigo-500 to-blue-600',
       bgColor: 'bg-indigo-50',
@@ -383,7 +373,7 @@ export default function MyDepartment() {
     {
       id: 'hospitality',
       name: 'Hospitality',
-      manager: 'TBD',
+      manager: 'Erica Salyer',
       icon: '☕',
       color: 'from-rose-500 to-pink-600',
       bgColor: 'bg-rose-50',
@@ -977,10 +967,10 @@ export default function MyDepartment() {
               <CardContent>
                 <div className="space-y-3">
                   {activityFeed.map((activity, index) => {
-                    const timeAgo = differenceInHours(new Date(), activity.timestamp);
-                    const timeDisplay = timeAgo < 1 
-                      ? `${Math.floor(differenceInHours(new Date(), activity.timestamp) * 60)}m ago`
-                      : `${timeAgo}h ago`;
+                    const timeDiffHours = differenceInHours(new Date(), activity.timestamp);
+                    const timeDisplay = timeDiffHours < 1 
+                      ? `${Math.max(0, Math.floor(new Date().getMinutes() - activity.timestamp.getMinutes()))}m ago` // Calculate minutes if less than an hour
+                      : `${timeDiffHours}h ago`;
 
                     return (
                       <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
