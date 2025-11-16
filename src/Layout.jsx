@@ -383,23 +383,6 @@ export default function Layout({ children, currentPageName }) {
                   />
                 </motion.div>
               </Link>
-              <Link to={createPageUrl('Documents')}>
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Documents"
-                >
-                  <Folder className="w-4 h-4 text-white/80" />
-                </motion.div>
-              </Link>
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                onClick={() => toast.info('SharePoint - Coming Soon!')}
-                title="SharePoint"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-white/80" />
-              </motion.div>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
