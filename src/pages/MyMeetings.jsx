@@ -97,10 +97,10 @@ export default function MyMeetings() {
 
   // Load staff when modal opens
   useEffect(() => {
-    if (showBookingModal && bookingStep === 'select-person' && staffResults.length === 0) {
+    if (showBookingModal && bookingStep === 'select-person') {
       loadAllStaff();
     }
-  }, [showBookingModal, bookingStep, staffResults.length]); // Added staffResults.length to dependency array
+  }, [showBookingModal, bookingStep]); // Modified dependency array
 
   const loadAllStaff = async () => {
     setSearchingStaff(true);
