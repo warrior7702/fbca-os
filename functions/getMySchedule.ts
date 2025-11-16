@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
         // Check my groups (limited to speed up)
         const myGroups = [];
-        for (const group of allGroups.slice(0, 20)) { // Check first 20 groups only
+        for (const group of allGroups.slice(0, 20)) {
             await delay(50);
             
             const membersResponse = await fetchWithRetry(
@@ -185,9 +185,11 @@ Deno.serve(async (req) => {
             const batchResults = await Promise.all(
                 batch.map(async (eventId) => {
                     try {
-                        const [eventResponse, requestsResponse] = await Promise.all([
+                        const [eventResponse, requestsResponse, notesResponse, questionsResponse] = await Promise.all([
                             fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}`, { headers }),
-                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`, { headers })
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`, { headers }),
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/notes?per_page=100`, { headers }),
+                            fetchWithRetry(`https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_questions?per_page=100`, { headers })
                         ]);
 
                         if (!eventResponse.ok || !requestsResponse.ok) {
@@ -198,6 +200,37 @@ Deno.serve(async (req) => {
                         const requestsData = await requestsResponse.json();
                         const event = eventData.data;
 
+                        // Get door code from notes
+                        let postedDoorCode = null;
+                        let accessTime = null;
+                        
+                        if (notesResponse.ok) {
+                            const notesData = await notesResponse.json();
+                            for (const note of (notesData.data || [])) {
+                                const content = note.attributes?.content || '';
+                                const category = note.attributes?.category_name || '';
+                                
+                                if (category === 'Access' || content.includes('Door Code') || content.includes('door code')) {
+                                    const codeMatch = content.match(/(\d{4,6}#?)/);
+                                    if (codeMatch) {
+                                        postedDoorCode = codeMatch[1].replace('#', '');
+                                    } else if (content.toLowerCase().includes('unlock')) {
+                                        postedDoorCode = 'unlock';
+                                    }
+                                }
+                                
+                                if (category === 'Access' || content.includes('Access Time') || content.includes('access time')) {
+                                    const timeMatch = content.match(/(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)/);
+                                    if (timeMatch) {
+                                        accessTime = timeMatch[1];
+                                    }
+                                }
+                            }
+                        }
+
+                        // Get questions and answers
+                        const questions = questionsResponse.ok ? (await questionsResponse.json()).data || [] : [];
+                        
                         const myRequestedResources = [];
                         
                         for (const request of (requestsData.data || [])) {
@@ -206,10 +239,33 @@ Deno.serve(async (req) => {
                             const resourceName = resource?.attributes?.name || 'Unknown';
                             
                             if (myResourceIds.has(resourceId)) {
+                                // Get answers for this request
+                                let answers = {};
+                                try {
+                                    const answersResponse = await fetchWithRetry(
+                                        `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_question_answers?per_page=100`,
+                                        { headers }
+                                    );
+                                    
+                                    if (answersResponse.ok) {
+                                        const answersData = await answersResponse.json();
+                                        for (const answer of (answersData.data || [])) {
+                                            const questionId = answer.relationships?.resource_question?.data?.id;
+                                            const question = questions.find(q => q.id === questionId);
+                                            if (question) {
+                                                answers[question.attributes?.question] = answer.attributes?.answer;
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to get answers for request:', request.id);
+                                }
+
                                 myRequestedResources.push({
                                     id: resourceId,
                                     name: resourceName,
-                                    approval_status: request.attributes?.approval_status
+                                    approval_status: request.attributes?.approval_status,
+                                    answers: answers
                                 });
                             }
                         }
@@ -241,12 +297,14 @@ Deno.serve(async (req) => {
                                 ends_at: endsAt,
                                 summary: event.attributes?.summary,
                                 resources: myRequestedResources,
-                                access_time: null
+                                posted_door_code: postedDoorCode,
+                                access_time: accessTime
                             });
                         }
                         
                         return { events };
                     } catch (error) {
+                        console.error('Error processing event:', error);
                         return { events: [] };
                     }
                 })
