@@ -46,7 +46,7 @@ import TicketRoleVerification from './pages/TicketRoleVerification';
 import Buildings from './pages/Buildings';
 import AkitaFetch from './pages/AkitaFetch';
 import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
-import Layout from './Layout.jsx';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -103,5 +103,5 @@ export const PAGES = {
 export const pagesConfig = {
     mainPage: "Loading",
     Pages: PAGES,
-    Layout: Layout,
+    Layout: __Layout,
 };

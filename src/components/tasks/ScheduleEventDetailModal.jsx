@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   XCircle,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Package
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 
@@ -283,9 +284,7 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                     className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors mb-3 border border-blue-200"
                   >
                     <h3 className="font-semibold text-blue-900 flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                      <Package className="w-5 h-5" />
                       Resources ({event.resources.filter(r => r.kind !== 'Room').length})
                     </h3>
                     {resourcesExpanded ? (

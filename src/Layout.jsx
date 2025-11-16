@@ -278,9 +278,9 @@ export default function Layout({ children, currentPageName }) {
 
             <div className="h-10 w-px bg-white/20 mx-0.5 md:mx-1 hidden sm:block" />
 
-            {/* Quick Launch - Desktop/Tablet */}
+            {/* Quick Launch - Desktop/Tablet - Show all 6 apps */}
             <div className="hidden sm:flex items-center gap-1">
-              {apps.slice(0, 4).map((app) => {
+              {apps.map((app) => {
                 const isActive = location.pathname === createPageUrl(app.path);
                 return (
                   <Link key={app.name} to={createPageUrl(app.path)}>
