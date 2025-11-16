@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -28,8 +27,7 @@ import {
   XCircle,
   HelpCircle,
   Sparkles,
-  Package,
-  MessageSquare
+  Package
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 
@@ -241,33 +239,6 @@ export default function ScheduleEventDetailModal({ open, onOpenChange, event }) 
                       ? 'Unlock' 
                       : `${event.posted_door_code}#`
                     }
-                  </div>
-                </div>
-              )}
-
-              {/* Request Answers */}
-              {event.resources && event.resources.some(r => r.answers && Object.keys(r.answers).length > 0) && (
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
-                    <p className="font-semibold text-blue-900">Request Details</p>
-                  </div>
-                  <div className="space-y-3">
-                    {event.resources.map(resource => {
-                      if (!resource.answers || Object.keys(resource.answers).length === 0) return null;
-                      
-                      return (
-                        <div key={resource.id}>
-                          <p className="text-sm font-semibold text-slate-700 mb-2">{resource.name}</p>
-                          {Object.entries(resource.answers).map(([question, answer]) => (
-                            <div key={question} className="p-3 bg-white rounded-lg mb-2">
-                              <Label className="text-xs text-slate-500">{question}</Label>
-                              <p className="text-sm text-slate-900 mt-1">{answer}</p>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}

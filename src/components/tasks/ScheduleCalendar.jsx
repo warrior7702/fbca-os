@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock, Unlock, Video, Users, MessageSquare } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock, Video, Users } from 'lucide-react';
 
 export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
   const today = new Date();
@@ -62,11 +62,6 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                         // For PCO events
                         const isUnlock = !isMicrosoftMeeting && event.posted_door_code && 
                                        event.posted_door_code.toLowerCase() === 'unlock';
-                        
-                        // Check if there are any answers
-                        const hasAnswers = !isMicrosoftMeeting && event.resources?.some(r => 
-                          r.answers && Object.keys(r.answers).length > 0
-                        );
                         
                         // Determine meeting type badge
                         let meetingBadge = null;
@@ -174,13 +169,6 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                                       `}>
                                         {isUnlock ? 'Unlock' : `${event.posted_door_code}#`}
                                       </span>
-                                    </div>
-                                  )}
-
-                                  {hasAnswers && (
-                                    <div className="flex items-center gap-1 text-[10px] text-blue-600">
-                                      <MessageSquare className="w-3 h-3" />
-                                      <span>Has request details</span>
                                     </div>
                                   )}
                                 </>
