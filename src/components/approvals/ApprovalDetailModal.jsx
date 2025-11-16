@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -145,7 +144,7 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
 
   if (!approval) return null;
 
-  const pcoUrl = `https://calendar.planningcenteronline.com/requests/${approval.request_id}`;
+  const pcoUrl = 'https://calendar.planningcenteronline.com/approvals';
 
   return (
     <Dialog open={!!approval} onOpenChange={onClose}>
