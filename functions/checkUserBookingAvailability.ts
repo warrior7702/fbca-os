@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'targetUserEmail required' }, { status: 400 });
     }
 
-    console.log('🔍 Checking booking availability for:', targetUserEmail);
+    console.log('🔍 Checking Book with Me availability for:', targetUserEmail);
 
-    // Get user details from Microsoft Graph to get their principal name
+    // Get user details from Microsoft Graph
     const userDetailsResponse = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(targetUserEmail)}`,
       {
@@ -37,30 +37,8 @@ Deno.serve(async (req) => {
       }
     );
 
-    let targetUserPrincipalName = targetUserEmail;
-    let targetDisplayName = '';
-    
-    if (userDetailsResponse.ok) {
-      const userData = await userDetailsResponse.json();
-      targetUserPrincipalName = userData.userPrincipalName || targetUserEmail;
-      targetDisplayName = userData.displayName || '';
-      console.log('✅ User found:', targetDisplayName, targetUserPrincipalName);
-    }
-
-    // Get all booking businesses
-    const businessesResponse = await fetch(
-      'https://graph.microsoft.com/v1.0/solutions/bookingBusinesses',
-      {
-        headers: {
-          'Authorization': ssoAuthorization,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (!businessesResponse.ok) {
-      const errorText = await businessesResponse.text();
-      console.error('❌ Bookings API error:', errorText);
+    if (!userDetailsResponse.ok) {
+      console.error('❌ User not found in Microsoft 365');
       return Response.json({
         success: true,
         hasBookings: false,
@@ -69,75 +47,38 @@ Deno.serve(async (req) => {
       });
     }
 
-    const businessesData = await businessesResponse.json();
-    const businesses = businessesData.value || [];
-    console.log(`📊 Found ${businesses.length} booking businesses`);
+    const userData = await userDetailsResponse.json();
+    console.log('✅ User found:', userData.displayName);
 
-    // Check each business for the target user
-    for (const business of businesses) {
-      console.log(`🔍 Checking business: ${business.displayName || business.id}`);
-      
-      // Check if business name matches user
-      const businessNameLower = (business.displayName || '').toLowerCase();
-      const displayNameLower = targetDisplayName.toLowerCase();
-      
-      if (displayNameLower && businessNameLower.includes(displayNameLower)) {
-        console.log('✅ Found matching business by name!');
-        return Response.json({
-          success: true,
-          hasBookings: true,
-          bookingBusiness: business,
-          userEmail: targetUserEmail
-        });
-      }
-
-      // Check staff members
-      try {
-        const staffResponse = await fetch(
-          `https://graph.microsoft.com/v1.0/solutions/bookingBusinesses/${business.id}/staffMembers`,
-          {
-            headers: {
-              'Authorization': ssoAuthorization,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (staffResponse.ok) {
-          const staffData = await staffResponse.json();
-          const staff = staffData.value || [];
-          console.log(`📋 Found ${staff.length} staff members in ${business.displayName}`);
-          
-          // Check multiple email fields and user principal name
-          const isStaffMember = staff.some(member => {
-            const memberEmail = (member.emailAddress || '').toLowerCase();
-            const memberUpn = (member.userPrincipalName || '').toLowerCase();
-            const targetEmailLower = targetUserEmail.toLowerCase();
-            const targetUpnLower = targetUserPrincipalName.toLowerCase();
-            
-            return memberEmail === targetEmailLower || 
-                   memberUpn === targetUpnLower ||
-                   memberEmail === targetUpnLower ||
-                   memberUpn === targetEmailLower;
-          });
-
-          if (isStaffMember) {
-            console.log('✅ Found user as staff member!');
-            return Response.json({
-              success: true,
-              hasBookings: true,
-              bookingBusiness: business,
-              userEmail: targetUserEmail
-            });
-          }
+    // Check if user has a mailbox (required for Book with Me)
+    const mailboxResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(targetUserEmail)}/mailboxSettings`,
+      {
+        headers: {
+          'Authorization': ssoAuthorization,
+          'Content-Type': 'application/json'
         }
-      } catch (error) {
-        console.error(`❌ Error checking staff for business ${business.id}:`, error);
-        continue;
       }
+    );
+
+    if (mailboxResponse.ok) {
+      console.log('✅ User has Book with Me capability');
+      // User has a mailbox, so they can use Book with Me
+      return Response.json({
+        success: true,
+        hasBookings: true,
+        bookingType: 'bookwithme',
+        bookingBusiness: {
+          id: userData.id,
+          displayName: userData.displayName,
+          email: userData.mail || userData.userPrincipalName,
+          bookWithMeUrl: `https://outlook.office.com/bookwithme/user/${encodeURIComponent(userData.userPrincipalName || targetUserEmail)}?anonymous&ismsaljsauthenabled`
+        },
+        userEmail: targetUserEmail
+      });
     }
 
-    console.log('❌ No booking business found for user');
+    console.log('❌ User does not have Book with Me capability');
     return Response.json({
       success: true,
       hasBookings: false,
