@@ -38,6 +38,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 export default function MyMeetings() {
   const [meetings, setMeetings] = useState([]);
@@ -52,6 +54,8 @@ export default function MyMeetings() {
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [myBookings, setMyBookings] = useState([]); // NEW: State for user's bookings
   const [loadingBookings, setLoadingBookings] = useState(false); // NEW: State for loading bookings
+
+  const navigate = useNavigate();
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -985,11 +989,21 @@ ${notesData.transcript || 'No transcript available.'}
         {allMeetingNotes.length > 0 && (
           <Card className="border-2 border-blue-200">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                AI Meeting Notes
-                <Badge variant="secondary">{allMeetingNotes.length} note{allMeetingNotes.length !== 1 ? 's' : ''}</Badge>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
+                  AI Meeting Notes
+                  <Badge variant="secondary">{allMeetingNotes.length} note{allMeetingNotes.length !== 1 ? 's' : ''}</Badge>
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(createPageUrl('MeetingNotes'))}
+                >
+                  View All
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingNotes ? (
@@ -998,12 +1012,13 @@ ${notesData.transcript || 'No transcript available.'}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {allMeetingNotes.slice(0, 5).map((note) => (
+                  {allMeetingNotes.slice(0, 3).map((note) => (
                     <motion.div
                       key={note.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-white rounded-lg border border-blue-200 hover:shadow-md transition-all"
+                      className="p-4 bg-white rounded-lg border border-blue-200 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => navigate(createPageUrl('MeetingNotes'))}
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex-1 min-w-0">
@@ -1024,7 +1039,7 @@ ${notesData.transcript || 'No transcript available.'}
                             <div className="mt-2">
                               <p className="text-xs font-semibold text-slate-600 mb-1">Action Items:</p>
                               <ul className="list-disc list-inside space-y-1">
-                                {note.action_items.slice(0, 3).map((item, idx) => (
+                                {note.action_items.slice(0, 2).map((item, idx) => (
                                   <li key={idx} className="text-xs text-slate-600 line-clamp-1">
                                     {item}
                                   </li>
@@ -1036,17 +1051,25 @@ ${notesData.transcript || 'No transcript available.'}
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => downloadNotes(note)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadNotes(note);
+                          }}
                         >
                           <Download className="w-4 h-4" />
                         </Button>
                       </div>
                     </motion.div>
                   ))}
-                  {allMeetingNotes.length > 5 && (
-                    <p className="text-sm text-slate-500 text-center mt-4">
-                      And {allMeetingNotes.length - 5} more notes...
-                    </p>
+                  {allMeetingNotes.length > 3 && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => navigate(createPageUrl('MeetingNotes'))}
+                    >
+                      View All {allMeetingNotes.length} Notes
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
                   )}
                 </div>
               )}

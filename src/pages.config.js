@@ -46,6 +46,7 @@ import TicketRoleVerification from './pages/TicketRoleVerification';
 import Buildings from './pages/Buildings';
 import AkitaFetch from './pages/AkitaFetch';
 import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
+import MeetingNotes from './pages/MeetingNotes';
 import __Layout from './Layout.jsx';
 
 
@@ -98,6 +99,7 @@ export const PAGES = {
     "Buildings": Buildings,
     "AkitaFetch": AkitaFetch,
     "AkitaBoxExplorer": AkitaBoxExplorer,
+    "MeetingNotes": MeetingNotes,
 }
 
 export const pagesConfig = {
