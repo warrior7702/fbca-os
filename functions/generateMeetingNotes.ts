@@ -1,19 +1,27 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
+  console.log('========================================');
+  console.log('🎙️ GENERATE MEETING NOTES');
+  console.log('========================================');
+  
   try {
     const base44 = createClientFromRequest(req);
     
     // Check authentication
     const user = await base44.auth.me();
     if (!user) {
+      console.error('❌ No authenticated user');
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    console.log('✅ User:', user.email);
 
     const body = await req.json();
     const { audio_url, meeting_subject, meeting_date } = body;
 
     if (!audio_url) {
+      console.error('❌ Missing audio_url');
       return Response.json({ error: 'Missing audio_url' }, { status: 400 });
     }
 
@@ -43,8 +51,9 @@ Format your response as JSON with this structure:
 }`;
 
     console.log('🤖 Calling AI to process audio...');
+    console.log('📝 Prompt length:', prompt.length);
 
-    const llmResponse = await base44.integrations.Core.InvokeLLM({
+    const llmResponse = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: prompt,
       file_urls: [audio_url],
       response_json_schema: {
@@ -68,20 +77,31 @@ Format your response as JSON with this structure:
       }
     });
 
-    console.log('✅ Notes generated successfully');
+    console.log('✅ AI Response received');
+    console.log('📊 Response keys:', Object.keys(llmResponse || {}));
 
     return Response.json({
       success: true,
-      ...llmResponse,
+      summary: llmResponse.summary || '',
+      action_items: llmResponse.action_items || [],
+      key_points: llmResponse.key_points || [],
+      decisions: llmResponse.decisions || [],
+      transcript: llmResponse.transcript || '',
       meeting_subject,
       meeting_date
     });
 
   } catch (error) {
-    console.error('❌ Error generating meeting notes:', error);
+    console.error('========================================');
+    console.error('❌ ERROR generating meeting notes:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('========================================');
+    
     return Response.json({ 
-      error: error.message,
-      details: 'Failed to generate meeting notes'
+      success: false,
+      error: error.message || 'Failed to generate meeting notes',
+      details: error.stack
     }, { status: 500 });
   }
 });
