@@ -9,9 +9,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+    const ssoAuthorization = await base44.asServiceRole.sso.getAccessToken(user.id);
     
-    if (!accessToken) {
+    if (!ssoAuthorization) {
       return Response.json({ 
         error: 'Microsoft 365 not connected',
         needsAuth: true 
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': ssoAuthorization,
         'Content-Type': 'application/json'
       }
     });
