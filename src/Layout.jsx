@@ -69,12 +69,6 @@ const apps = [
     color: "text-purple-500"
   },
   {
-    name: "Meeting Notes",
-    path: "MeetingNotes",
-    icon: FileSpreadsheet, // Reusing FileSpreadsheet, consider a specific icon if available
-    color: "text-blue-500"
-  },
-  {
     name: "My Department",
     path: "MyDepartment",
     icon: Building2,
@@ -91,12 +85,6 @@ const apps = [
     path: "Documents",
     icon: Folder,
     color: "text-blue-500"
-  },
-  {
-    name: "SharePoint",
-    path: "SharePoint",
-    icon: FileSpreadsheet,
-    color: "text-green-600"
   }
 ];
 

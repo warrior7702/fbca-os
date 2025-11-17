@@ -19,15 +19,16 @@ import {
   Square,
   Download,
   FileText,
-  Search // Added Search icon
+  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, parseISO, isToday, isTomorrow, isFuture, differenceInMinutes, addMinutes } from "date-fns";
+import { format, parseISO, isToday, isTomorrow, isFuture, isYesterday, differenceInMinutes, addMinutes } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -42,6 +43,8 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
 export default function MyMeetings() {
+  const navigate = useNavigate();
+
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -52,10 +55,10 @@ export default function MyMeetings() {
   const [user, setUser] = useState(null);
   const [allMeetingNotes, setAllMeetingNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
-  const [myBookings, setMyBookings] = useState([]); // NEW: State for user's bookings
-  const [loadingBookings, setLoadingBookings] = useState(false); // NEW: State for loading bookings
-
-  const navigate = useNavigate();
+  const [myBookings, setMyBookings] = useState([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [activeTab, setActiveTab] = useState('meetings');
+  const [notesSearchQuery, setNotesSearchQuery] = useState('');
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -68,9 +71,9 @@ export default function MyMeetings() {
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
 
-  // NEW Booking states
+  // Booking states
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingStep, setBookingStep] = useState('select-person'); // 'select-person', 'booking-form', 'meeting-request'
+  const [bookingStep, setBookingStep] = useState('select-person');
   const [searchQuery, setSearchQuery] = useState('');
   const [staffResults, setStaffResults] = useState([]);
   const [searchingStaff, setSearchingStaff] = useState(false);
@@ -83,7 +86,7 @@ export default function MyMeetings() {
     serviceId: '',
     date: '',
     time: '',
-    duration: 30, // Default duration
+    duration: 30,
     notes: ''
   });
 
@@ -154,7 +157,7 @@ export default function MyMeetings() {
 
       // Load all meeting notes
       await loadAllMeetingNotes(currentUser);
-      
+
       // Load bookings (NEW)
       await loadMyBookings();
     } catch (error) {
@@ -168,18 +171,18 @@ export default function MyMeetings() {
 
   const loadAllMeetingNotes = async (currentUser) => {
     if (!currentUser) return;
-    
+
     setLoadingNotes(true);
     try {
       const notes = await base44.entities.MeetingNote.filter({
         user_email: currentUser.email
       });
-      
+
       // Sort by meeting date, most recent first
-      const sortedNotes = notes.sort((a, b) => 
+      const sortedNotes = notes.sort((a, b) =>
         new Date(b.meeting_date) - new Date(a.meeting_date)
       );
-      
+
       setAllMeetingNotes(sortedNotes);
       console.log(`📝 Loaded ${sortedNotes.length} meeting notes`);
     } catch (error) {
@@ -189,7 +192,7 @@ export default function MyMeetings() {
     }
   };
 
-  const loadMyBookings = async () => { // NEW: Function to load user's bookings
+  const loadMyBookings = async () => {
     setLoadingBookings(true);
     try {
       const response = await base44.functions.invoke('getMyBookings');
@@ -313,7 +316,7 @@ export default function MyMeetings() {
 
     setProcessingNotes(true);
     toast.info("Starting AI processing...");
-    
+
     try {
       console.log('🎙️ Step 1: Uploading audio file...');
       console.log('Audio blob size:', audioBlob.size, 'bytes');
@@ -334,7 +337,7 @@ export default function MyMeetings() {
       });
 
       console.log('✅ Notes response:', notesResponse);
-      
+
       if (!notesResponse.data) {
         throw new Error('No data returned from generateMeetingNotes');
       }
@@ -406,7 +409,7 @@ ${notesData.transcript || 'No transcript available.'}
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // New Booking functions
+  // Booking functions
   const searchStaff = async (query) => {
     if (!query || query.length < 2) {
       loadAllStaff();
@@ -588,6 +591,49 @@ ${notesData.transcript || 'No transcript available.'}
     });
   };
 
+  const getDateLabel = (dateStr) => {
+    const date = parseISO(dateStr);
+    if (isToday(date)) return 'Today';
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'EEEE, MMM d');
+  };
+
+  const groupedNotes = allMeetingNotes.reduce((groups, note) => {
+    const dateLabel = getDateLabel(note.meeting_date);
+    if (!groups[dateLabel]) {
+      groups[dateLabel] = [];
+    }
+    groups[dateLabel].push(note);
+    return groups;
+  }, {});
+
+  const filteredGroupedNotes = Object.entries(groupedNotes).reduce((acc, [dateLabel, dateNotes]) => {
+    const filtered = dateNotes.filter(note => {
+      const searchLower = notesSearchQuery.toLowerCase();
+      return (
+        note.meeting_subject?.toLowerCase().includes(searchLower) ||
+        note.summary?.toLowerCase().includes(searchLower) ||
+        note.transcript?.toLowerCase().includes(searchLower) ||
+        note.action_items?.some(item => item.toLowerCase().includes(searchLower))
+      );
+    });
+    if (filtered.length > 0) {
+      acc[dateLabel] = filtered;
+    }
+    return acc;
+  }, {});
+
+  const highlightKeywords = (text) => {
+    if (!text) return '';
+    const keywords = ['parking', 'security', 'staff', 'event', 'discussed', 'decided'];
+    let highlighted = text;
+    keywords.forEach(keyword => {
+      const regex = new RegExp(`\\b(${keyword})\\b`, 'gi');
+      highlighted = highlighted.replace(regex, '<span class="text-blue-600 font-medium">$1</span>');
+    });
+    return highlighted;
+  };
+
   const getMeetingStatus = (meeting) => {
     const start = parseMeetingDate(meeting.start);
     const end = parseMeetingDate(meeting.end);
@@ -728,382 +774,442 @@ ${notesData.transcript || 'No transcript available.'}
           }
         />
 
-        {/* Next Meeting Countdown */}
-        {nextMeeting && (() => {
-          const start = parseMeetingDate(nextMeeting.start);
-          const end = parseMeetingDate(nextMeeting.end);
-          const status = getMeetingStatus(nextMeeting);
-          if (!start || !end) return null;
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="meetings">Meetings</TabsTrigger>
+            <TabsTrigger value="notes">
+              AI Notes
+              {allMeetingNotes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{allMeetingNotes.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-          return (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 text-white"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-purple-100 text-sm mb-1">Next Meeting</p>
-                  <h2 className="text-2xl font-bold mb-2">{nextMeeting.subject}</h2>
-                  <div className="flex items-center gap-4 text-sm text-purple-100 flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {start ? format(start, 'h:mm a') : 'N/A'} - {end ? format(end, 'h:mm a') : 'N/A'}
-                    </span>
-                    {status.status === 'live' && (
-                      <Badge className="bg-green-500 text-white animate-pulse">
-                        🔴 Live Now
-                      </Badge>
-                    )}
-                    {status.status === 'soon' && (
-                      <Badge className="bg-orange-500 text-white">
-                        Starts in {differenceInMinutes(start, currentTime)} minutes
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                {nextMeeting.onlineMeeting?.joinUrl && (
-                  <Button
-                    onClick={() => joinMeeting(nextMeeting)}
-                    className="bg-white text-purple-600 hover:bg-purple-50"
-                    size="lg"
-                  >
-                    <Video className="w-5 h-5 mr-2" />
-                    Join
-                  </Button>
-                )}
-              </div>
-            </motion.div>
-          );
-        })()}
+          <TabsContent value="meetings" className="space-y-6 mt-6">
+            {/* Next Meeting Countdown */}
+            {nextMeeting && (() => {
+              const start = parseMeetingDate(nextMeeting.start);
+              const end = parseMeetingDate(nextMeeting.end);
+              const status = getMeetingStatus(nextMeeting);
+              if (!start || !end) return null;
 
-        {/* Today's Meetings */}
-        {todaysMeetings.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-600" />
-                Today's Schedule
-                <Badge variant="secondary">{todaysMeetings.length} meeting{todaysMeetings.length !== 1 ? 's' : ''}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {todaysMeetings.map((meeting) => {
-                  const start = parseMeetingDate(meeting.start);
-                  const end = parseMeetingDate(meeting.end);
-                  const status = getMeetingStatus(meeting);
-                  const StatusIcon = status.icon;
-
-                  if (!start || !end) return null;
-
-                  return (
-                    <motion.div
-                      key={meeting.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => {
-                        setSelectedMeeting(meeting);
-                        setShowMeetingDetail(true);
-                        setAudioBlob(null);
-                        setMeetingNotes(null);
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <Badge className={`${status.bg} ${status.textColor}`}>
-                              <StatusIcon className="w-3 h-3 mr-1" />
-                              {status.label}
-                            </Badge>
-                            {getProviderBadge(meeting)}
-                            {meeting.responseStatus && getResponseBadge(meeting.responseStatus)}
-                          </div>
-                          <h3 className="font-semibold text-slate-900 mb-1">{meeting.subject || 'Untitled Meeting'}</h3>
-                          <div className="flex items-center gap-3 text-sm text-slate-600 flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {start ? format(start, 'h:mm a') : 'N/A'} - {end ? format(end, 'h:mm a') : 'N/A'}
-                              <span className="text-slate-400 ml-2">
-                                ({differenceInMinutes(end, start)} min)
-                              </span>
-                            </span>
-                            {meeting.location?.displayName && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-4 h-4" />
-                                {meeting.location.displayName}
-                              </span>
-                            )}
-                            {meeting.attendees && meeting.attendees.length > 0 && (
-                              <span className="flex items-center gap-1">
-                                <Users className="w-4 h-4" />
-                                {meeting.attendees.length} attendee{meeting.attendees.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {meeting.onlineMeeting?.joinUrl && status.status !== 'past' && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              joinMeeting(meeting);
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            <Video className="w-4 h-4 mr-2" />
-                            Join
-                          </Button>
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 text-white"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-purple-100 text-sm mb-1">Next Meeting</p>
+                      <h2 className="text-2xl font-bold mb-2">{nextMeeting.subject}</h2>
+                      <div className="flex items-center gap-4 text-sm text-purple-100 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          {start ? format(start, 'h:mm a') : 'N/A'} - {end ? format(end, 'h:mm a') : 'N/A'}
+                        </span>
+                        {status.status === 'live' && (
+                          <Badge className="bg-green-500 text-white animate-pulse">
+                            🔴 Live Now
+                          </Badge>
+                        )}
+                        {status.status === 'soon' && (
+                          <Badge className="bg-orange-500 text-white">
+                            Starts in {differenceInMinutes(start, currentTime)} minutes
+                          </Badge>
                         )}
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    </div>
+                    {nextMeeting.onlineMeeting?.joinUrl && (
+                      <Button
+                        onClick={() => joinMeeting(nextMeeting)}
+                        className="bg-white text-purple-600 hover:bg-purple-50"
+                        size="lg"
+                      >
+                        <Video className="w-5 h-5 mr-2" />
+                        Join
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })()}
 
-        {/* Upcoming Meetings */}
-        {upcomingMeetings.length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Upcoming Meetings</h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingMeetings.slice(0, 6).map((meeting) => {
-                const start = parseMeetingDate(meeting.start);
-                if (!start) return null;
+            {/* Today's Meetings */}
+            {todaysMeetings.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-blue-600" />
+                    Today's Schedule
+                    <Badge variant="secondary">{todaysMeetings.length} meeting{todaysMeetings.length !== 1 ? 's' : ''}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {todaysMeetings.map((meeting) => {
+                      const start = parseMeetingDate(meeting.start);
+                      const end = parseMeetingDate(meeting.end);
+                      const status = getMeetingStatus(meeting);
+                      const StatusIcon = status.icon;
 
-                return (
-                  <motion.div
-                    key={meeting.id}
-                    className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
-                    onClick={() => {
-                      setSelectedMeeting(meeting);
-                      setShowMeetingDetail(true);
-                      setAudioBlob(null);
-                      setMeetingNotes(null);
-                    }}
-                  >
-                    <Card className="border-none h-full">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">
-                              {isToday(start) ? 'Today' :
-                                isTomorrow(start) ? 'Tomorrow' :
-                                  format(start, 'EEEE, MMM d')}
-                            </p>
-                            <h3 className="font-semibold text-slate-900 line-clamp-2">
-                              {meeting.subject}
-                            </h3>
-                          </div>
+                      if (!start || !end) return null;
 
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Clock className="w-4 h-4" />
-                            {format(start, 'h:mm a')}
-                          </div>
-
-                          {getProviderBadge(meeting)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* My Bookings Section - NEW */}
-        {myBookings.length > 0 && (
-          <Card className="border-2 border-purple-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-purple-600" />
-                My Bookings
-                <Badge variant="secondary">{myBookings.length} booking{myBookings.length !== 1 ? 's' : ''}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingBookings ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {myBookings.map((booking) => (
-                    <motion.div
-                      key={booking.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-white rounded-lg border border-purple-200 hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-slate-900 mb-2">{booking.title}</h3>
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4" />
-                              <span>
-                                {format(new Date(booking.start), 'MMM d, h:mm a')} - {format(new Date(booking.end), 'h:mm a')}
-                              </span>
+                      return (
+                        <motion.div
+                          key={meeting.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                          onClick={() => {
+                            setSelectedMeeting(meeting);
+                            setShowMeetingDetail(true);
+                            setAudioBlob(null);
+                            setMeetingNotes(null);
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <Badge className={`${status.bg} ${status.textColor}`}>
+                                  <StatusIcon className="w-3 h-3 mr-1" />
+                                  {status.label}
+                                </Badge>
+                                {getProviderBadge(meeting)}
+                                {meeting.responseStatus && getResponseBadge(meeting.responseStatus)}
+                              </div>
+                              <h3 className="font-semibold text-slate-900 mb-1">{meeting.subject || 'Untitled Meeting'}</h3>
+                              <div className="flex items-center gap-3 text-sm text-slate-600 flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  {start ? format(start, 'h:mm a') : 'N/A'} - {end ? format(end, 'h:mm a') : 'N/A'}
+                                  <span className="text-slate-400 ml-2">
+                                    ({differenceInMinutes(end, start)} min)
+                                  </span>
+                                </span>
+                                {meeting.location?.displayName && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-4 h-4" />
+                                    {meeting.location.displayName}
+                                  </span>
+                                )}
+                                {meeting.attendees && meeting.attendees.length > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-4 h-4" />
+                                    {meeting.attendees.length} attendee{meeting.attendees.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {booking.customerName && (
-                              <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4" />
-                                <span>{booking.customerName}</span>
-                                {booking.customerEmail && (
-                                  <span className="text-slate-400 text-xs">({booking.customerEmail})</span>
+                            {meeting.onlineMeeting?.joinUrl && status.status !== 'past' && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  joinMeeting(meeting);
+                                }}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                <Video className="w-4 h-4 mr-2" />
+                                Join
+                              </Button>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Upcoming Meetings */}
+            {upcomingMeetings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 mb-4">Upcoming Meetings</h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {upcomingMeetings.slice(0, 6).map((meeting) => {
+                    const start = parseMeetingDate(meeting.start);
+                    if (!start) return null;
+
+                    return (
+                      <motion.div
+                        key={meeting.id}
+                        className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
+                        onClick={() => {
+                          setSelectedMeeting(meeting);
+                          setShowMeetingDetail(true);
+                          setAudioBlob(null);
+                          setMeetingNotes(null);
+                        }}
+                      >
+                        <Card className="border-none h-full">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-xs text-slate-500 mb-1">
+                                  {isToday(start) ? 'Today' :
+                                    isTomorrow(start) ? 'Tomorrow' :
+                                      format(start, 'EEEE, MMM d')}
+                                </p>
+                                <h3 className="font-semibold text-slate-900 line-clamp-2">
+                                  {meeting.subject}
+                                </h3>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <Clock className="w-4 h-4" />
+                                {format(start, 'h:mm a')}
+                              </div>
+
+                              {getProviderBadge(meeting)}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* My Bookings Section */}
+            {myBookings.length > 0 && (
+              <Card className="border-2 border-purple-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-purple-600" />
+                    My Bookings
+                    <Badge variant="secondary">{myBookings.length} booking{myBookings.length !== 1 ? 's' : ''}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingBookings ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {myBookings.map((booking) => (
+                        <motion.div
+                          key={booking.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-white rounded-lg border border-purple-200 hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-slate-900 mb-2">{booking.title}</h3>
+                              <div className="space-y-1 text-sm text-slate-600">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4" />
+                                  <span>
+                                    {format(new Date(booking.start), 'MMM d, h:mm a')} - {format(new Date(booking.end), 'h:mm a')}
+                                  </span>
+                                </div>
+                                {booking.customerName && (
+                                  <div className="flex items-center gap-2">
+                                    <Users className="w-4 h-4" />
+                                    <span>{booking.customerName}</span>
+                                    {booking.customerEmail && (
+                                      <span className="text-slate-400 text-xs">({booking.customerEmail})</span>
+                                    )}
+                                  </div>
+                                )}
+                                {booking.location && (
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="w-4 h-4" />
+                                    <span>{booking.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {booking.meetingLink && (
+                              <Button
+                                size="sm"
+                                onClick={() => window.open(booking.meetingLink, '_blank')}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                <Video className="w-4 h-4 mr-2" />
+                                Join
+                              </Button>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Empty State for Meetings tab, if no meetings or bookings */}
+            {meetings.length === 0 && myBookings.length === 0 && (
+                <Card className="border-none shadow-none">
+                    <CardContent className="p-12 text-center">
+                        <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2">No meetings or bookings found</h3>
+                        <p className="text-slate-600">Your calendar and bookings are clear! Enjoy your day.</p>
+                        <Button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="bg-purple-600 hover:bg-purple-700 mt-4"
+                        >
+                            {syncing ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Syncing...
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                    Try Syncing Calendar
+                                </>
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="notes" className="space-y-6 mt-6">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                placeholder="Search notes by subject, summary, transcript, or action items..."
+                value={notesSearchQuery}
+                onChange={(e) => setNotesSearchQuery(e.target.value)}
+                className="pl-11 h-12 text-base"
+              />
+            </div>
+
+            {/* Notes List */}
+            {loadingNotes ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-600">Loading AI notes...</p>
+              </div>
+            ) : Object.keys(filteredGroupedNotes).length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                    {notesSearchQuery ? 'No notes found matching your search' : 'No meeting notes yet'}
+                  </h3>
+                  <p className="text-slate-600 mb-4">
+                    {notesSearchQuery
+                      ? 'Try a different search term or clear the search to see all notes.'
+                      : 'Record your meetings to create AI-powered notes.'
+                    }
+                  </p>
+                  {notesSearchQuery && (
+                    <Button variant="outline" onClick={() => setNotesSearchQuery('')}>
+                      Clear Search
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-8">
+                {Object.entries(filteredGroupedNotes).map(([dateLabel, dateNotes]) => (
+                  <div key={dateLabel}>
+                    <h2 className="text-lg font-semibold text-slate-700 mb-4 sticky top-0 bg-gradient-to-br from-purple-50 to-pink-50 py-2 z-10">
+                      {dateLabel}
+                    </h2>
+                    <div className="space-y-4">
+                      {dateNotes.map((note) => (
+                        <motion.div
+                          key={note.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-slate-200"
+                        >
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-xl font-semibold text-slate-900">
+                                      {note.meeting_subject || 'Untitled Meeting'}
+                                    </h3>
+                                    <div className="flex items-center gap-3 text-sm text-slate-500">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {format(parseISO(note.meeting_date), 'h:mm a')}
+                                      </span>
+                                      {note.recording_duration && (
+                                        <span className="flex items-center gap-1">
+                                          • {formatRecordingTime(note.recording_duration)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); downloadNotes(note); }}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
+
+                            {note.summary && (
+                              <div className="mb-4">
+                                <p
+                                  className="text-slate-700 leading-relaxed"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlightKeywords(note.summary)
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {note.action_items && note.action_items.length > 0 && (
+                              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Sparkles className="w-4 h-4 text-amber-600" />
+                                  <p className="text-sm font-semibold text-amber-900">
+                                    Action Items
+                                  </p>
+                                </div>
+                                <ul className="space-y-2">
+                                  {note.action_items.slice(0, 3).map((item, idx) => (
+                                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-900">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                                {note.action_items.length > 3 && (
+                                  <p className="text-xs text-amber-700 mt-2">
+                                    +{note.action_items.length - 3} more action items
+                                  </p>
                                 )}
                               </div>
                             )}
-                            {booking.location && (
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4" />
-                                <span>{booking.location}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {booking.meetingLink && (
-                          <Button
-                            size="sm"
-                            onClick={() => window.open(booking.meetingLink, '_blank')}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            <Video className="w-4 h-4 mr-2" />
-                            Join
-                          </Button>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* AI Meeting Notes Section */}
-        {allMeetingNotes.length > 0 && (
-          <Card className="border-2 border-blue-200">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
-                  AI Meeting Notes
-                  <Badge variant="secondary">{allMeetingNotes.length} note{allMeetingNotes.length !== 1 ? 's' : ''}</Badge>
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(createPageUrl('MeetingNotes'))}
-                >
-                  View All
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loadingNotes ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {allMeetingNotes.slice(0, 3).map((note) => (
-                    <motion.div
-                      key={note.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-white rounded-lg border border-blue-200 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => navigate(createPageUrl('MeetingNotes'))}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge className="bg-blue-100 text-blue-700">
-                              {note.meeting_subject || 'Untitled Meeting'}
-                            </Badge>
-                            <span className="text-xs text-slate-500">
-                              {format(new Date(note.meeting_date), 'MMM d, h:mm a')}
-                            </span>
-                          </div>
-                          {note.summary && (
-                            <p className="text-sm text-slate-700 line-clamp-2 mb-2">
-                              {note.summary}
-                            </p>
-                          )}
-                          {note.action_items && note.action_items.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-semibold text-slate-600 mb-1">Action Items:</p>
-                              <ul className="list-disc list-inside space-y-1">
-                                {note.action_items.slice(0, 2).map((item, idx) => (
-                                  <li key={idx} className="text-xs text-slate-600 line-clamp-1">
-                                    {item}
-                                  </li>
-                                ))}
-                              </ul>
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                              <Badge variant="outline" className="gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                AI Generated
+                              </Badge>
                             </div>
-                          )}
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadNotes(note);
-                          }}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ))}
-                  {allMeetingNotes.length > 3 && (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => navigate(createPageUrl('MeetingNotes'))}
-                    >
-                      View All {allMeetingNotes.length} Notes
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Empty State */}
-        {meetings.length === 0 && (allMeetingNotes.length === 0 || !loadingNotes) && !loading && myBookings.length === 0 && (
-          <Card className="border-none shadow-none">
-            <CardContent className="p-12 text-center">
-              <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">No meetings found</h3>
-              <p className="text-slate-600">Your calendar is clear! Enjoy your day.</p>
-              <Button
-                onClick={handleSync}
-                disabled={syncing}
-                className="bg-purple-600 hover:bg-purple-700 mt-4"
-              >
-                {syncing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Try Syncing Calendar
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Meeting Detail Modal */}
