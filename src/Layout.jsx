@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -60,6 +61,18 @@ const apps = [
     path: "MyApprovals",
     icon: ClipboardCheck,
     color: "text-orange-500"
+  },
+  {
+    name: "Meetings",
+    path: "MyMeetings",
+    icon: CalendarIcon, // Reusing CalendarIcon, consider a specific icon if available
+    color: "text-purple-500"
+  },
+  {
+    name: "Meeting Notes",
+    path: "MeetingNotes",
+    icon: FileSpreadsheet, // Reusing FileSpreadsheet, consider a specific icon if available
+    color: "text-blue-500"
   },
   {
     name: "My Department",
