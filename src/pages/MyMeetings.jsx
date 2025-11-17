@@ -393,7 +393,7 @@ ${notesData.transcript || 'No transcript available.'}
     setLoadingBookingInfo(true);
 
     try {
-      // Check if person has Bookings setup
+      // Check if person has Book with Me setup
       const response = await base44.functions.invoke('checkUserBookingAvailability', {
         targetUserEmail: person.mail || person.userPrincipalName
       });
@@ -402,16 +402,23 @@ ${notesData.transcript || 'No transcript available.'}
         setHasBookings(true);
         setBookingBusiness(response.data.bookingBusiness);
 
-        // Load services for this business
-        const servicesResponse = await base44.functions.invoke('getBookingServices', { // Changed from getBookingStaff
-          businessId: response.data.bookingBusiness.id
-        });
+        // If it's a "Book with Me" page, open it directly
+        if (response.data.bookingType === 'bookwithme' && response.data.bookingBusiness.bookWithMeUrl) {
+          window.open(response.data.bookingBusiness.bookWithMeUrl, '_blank');
+          toast.success(`Opening ${person.displayName}'s booking page...`);
+          resetBookingModal();
+        } else {
+          // It's a formal Bookings business - load services
+          const servicesResponse = await base44.functions.invoke('getBookingServices', {
+            businessId: response.data.bookingBusiness.id
+          });
 
-        if (servicesResponse.data.success) {
-          setBookingServices(servicesResponse.data.services || []);
+          if (servicesResponse.data.success) {
+            setBookingServices(servicesResponse.data.services || []);
+          }
+
+          setBookingStep('booking-form');
         }
-
-        setBookingStep('booking-form');
       } else {
         setHasBookings(false);
         setBookingStep('meeting-request');
