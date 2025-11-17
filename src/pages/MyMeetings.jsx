@@ -269,10 +269,14 @@ export default function MyMeetings() {
 
   const startRecording = async () => {
     try {
+      console.log('🎙️ Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('✅ Microphone access granted');
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      console.log('📼 MediaRecorder created');
 
       // Audio level visualization
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -283,28 +287,34 @@ export default function MyMeetings() {
       source.connect(analyser);
       analyser.fftSize = 256;
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      console.log('🎚️ Audio level meter initialized');
 
       const updateLevel = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        setAudioLevel(average);
-        if (mediaRecorderRef.current?.state === 'recording') {
-          requestAnimationFrame(updateLevel);
-        } else {
-          // Ensure loop stops when recording is no longer active
-          setAudioLevel(0);
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+          setAudioLevel(average);
+
+          if (mediaRecorderRef.current?.state === 'recording') {
+            requestAnimationFrame(updateLevel);
+          } else {
+            setAudioLevel(0);
+          }
         }
       };
       updateLevel();
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
+          console.log('📊 Audio chunk received:', event.data.size, 'bytes');
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
+        console.log('🛑 Recording stopped, creating blob from', audioChunksRef.current.length, 'chunks');
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('✅ Audio blob created:', audioBlob.size, 'bytes');
         setAudioBlob(audioBlob);
         stream.getTracks().forEach(track => track.stop());
         if (audioContextRef.current) {
@@ -317,15 +327,16 @@ export default function MyMeetings() {
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      console.log('▶️ Recording started');
 
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
-      toast.success("Recording started");
+      toast.success("Recording started - speak into your microphone!");
     } catch (error) {
-      console.error("Error starting recording:", error);
-      toast.error("Failed to start recording. Please allow microphone access.");
+      console.error("❌ Error starting recording:", error);
+      toast.error("Failed to start recording: " + error.message);
     }
   };
 
@@ -345,15 +356,24 @@ export default function MyMeetings() {
   };
 
   const generateNotes = async () => {
+    console.log('🔍 Generate Notes clicked');
+    console.log('audioBlob:', audioBlob);
+    console.log('selectedMeeting:', selectedMeeting);
+    console.log('user:', user);
+
     if (!audioBlob || !selectedMeeting || !user) {
-      console.error('❌ Missing required data:', { audioBlob: !!audioBlob, selectedMeeting: !!selectedMeeting, user: !!user });
+      console.error('❌ Missing required data:', {
+        hasAudioBlob: !!audioBlob,
+        hasSelectedMeeting: !!selectedMeeting,
+        hasUser: !!user
+      });
       toast.error("Missing required data (audio, meeting, or user)");
       return;
     }
 
     setProcessingNotes(true);
     const processingToast = toast.loading("Starting AI processing...");
-    
+
     try {
       console.log('🎙️ Step 1: Uploading audio file...');
       console.log('Audio blob size:', audioBlob.size, 'bytes');
@@ -365,13 +385,19 @@ export default function MyMeetings() {
         file: new File([audioBlob], 'meeting-recording.webm', { type: audioBlob.type })
       });
 
-      console.log('✅ Audio uploaded:', uploadResponse.file_url);
+      console.log('✅ Audio uploaded successfully');
+      console.log('File URL:', uploadResponse.file_url);
       toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
 
       console.log('🤖 Step 2: Generating meeting notes with AI...');
-      
+      console.log('Calling generateMeetingNotes with:', {
+        audio_url: uploadResponse.file_url,
+        meeting_subject: selectedMeeting?.subject || 'Meeting',
+        meeting_date: selectedMeeting?.start
+      });
+
       // Set a longer timeout for AI processing
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('AI processing timed out after 2 minutes. Please try again or with a shorter recording.')), 120000)
       );
 
@@ -381,15 +407,18 @@ export default function MyMeetings() {
         meeting_date: selectedMeeting?.start
       });
 
+      console.log('⏳ Waiting for AI response...');
       const notesResponse = await Promise.race([notesPromise, timeoutPromise]);
 
-      console.log('✅ Notes response:', notesResponse);
-      
+      console.log('✅ AI Response received:', notesResponse);
+
       if (!notesResponse.data) {
+        console.error('❌ No data in response');
         throw new Error('No data returned from generateMeetingNotes');
       }
 
       if (notesResponse.data.error) {
+        console.error('❌ Error in response:', notesResponse.data.error);
         throw new Error(notesResponse.data.error);
       }
 
@@ -413,20 +442,19 @@ export default function MyMeetings() {
       setMeetingNotes(notesResponse.data);
       setSavedNotes(savedNote);
       await loadAllMeetingNotes(user);
-      
+
       toast.success("Meeting notes generated and saved!", { id: processingToast });
+      console.log('✅ Switching to notes tab');
       setActiveTab('notes'); // Switch to notes tab
 
     } catch (error) {
       console.error("❌ Error generating notes:", error);
-      console.error("Error details:", {
-        message: error.message,
-        response: error.response,
-        stack: error.stack
-      });
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
       toast.error(`Failed: ${error.message}`, { id: processingToast });
     } finally {
       setProcessingNotes(false);
+      console.log('🏁 Generate notes process complete');
     }
   };
 
@@ -1385,7 +1413,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-slate-600">Level:</span>
                               <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className="h-full bg-green-500 transition-all duration-100"
                                   style={{ width: `${Math.min(audioLevel / 2.5, 100)}%` }}
                                 />
