@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 async function refreshTokenIfNeeded(base44, user) {
     const expiresAt = new Date(user.microsoft_token_expires_at);
@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
         if (!user || !user.microsoft_access_token) {
             console.log('❌ No Microsoft token');
             return Response.json({ 
+                success: true,
                 events: [], 
                 message: 'Microsoft not connected. Please connect in Settings > Integrations' 
             });
@@ -182,11 +183,12 @@ Deno.serve(async (req) => {
                 endTimeZone: event.end?.timeZone || timezone,
                 location: event.location?.displayName || null,
                 isOnlineMeeting: event.isOnlineMeeting || false,
+                onlineMeeting: event.onlineMeeting || null,
                 meetingLink: meetingLink,
                 attendees: (event.attendees || []).map(a => ({
                     name: a.emailAddress?.name,
                     email: a.emailAddress?.address,
-                    status: a.status?.response // accepted, declined, tentative, etc.
+                    status: a.status?.response
                 })),
                 organizer: {
                     name: event.organizer?.emailAddress?.name,
@@ -196,9 +198,9 @@ Deno.serve(async (req) => {
                 body: event.body?.content || null,
                 isAllDay: event.isAllDay || false,
                 isCancelled: event.isCancelled || false,
-                responseStatus: event.responseStatus?.response, // organizer, accepted, declined, etc.
-                sensitivity: event.sensitivity, // normal, personal, private, confidential
-                showAs: event.showAs, // free, tentative, busy, oof, workingElsewhere, unknown
+                responseStatus: event.responseStatus?.response,
+                sensitivity: event.sensitivity,
+                showAs: event.showAs,
                 webLink: event.webLink,
                 categories: event.categories || [],
                 hasAttachments: event.hasAttachments || false
@@ -224,6 +226,7 @@ Deno.serve(async (req) => {
         console.error('Stack:', error.stack);
         console.error('========================================');
         return Response.json({ 
+            success: false,
             error: error.message,
             events: []
         }, { status: 500 });
