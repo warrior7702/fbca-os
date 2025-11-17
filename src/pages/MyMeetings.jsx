@@ -100,7 +100,7 @@ export default function MyMeetings() {
     if (showBookingModal && bookingStep === 'select-person') {
       loadAllStaff();
     }
-  }, [showBookingModal, bookingStep]); // Modified dependency array
+  }, [showBookingModal, bookingStep]);
 
   const loadAllStaff = async () => {
     setSearchingStaff(true);
@@ -639,13 +639,22 @@ ${notesData.transcript || 'No transcript available.'}
           action={
             <div className="flex gap-2">
               <Button
-                onClick={() => setShowBookingModal(true)} // Modified onClick
+                onClick={() => setShowBookingModal(true)}
                 variant="outline"
                 size="sm"
                 className="bg-white hover:bg-slate-50"
               >
                 <CalendarIcon className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Book Meeting</span>
+              </Button>
+              <Button
+                onClick={() => window.open('https://outlook.office.com/bookings/homepage', '_blank')}
+                variant="outline"
+                size="sm"
+                className="bg-white hover:bg-slate-50"
+              >
+                <ExternalLink className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Edit My Bookings</span>
               </Button>
               <Button
                 onClick={handleSync}
