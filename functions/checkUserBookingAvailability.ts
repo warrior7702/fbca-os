@@ -24,7 +24,30 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'targetUserEmail required' }, { status: 400 });
     }
 
-    // Get all booking businesses the user has access to
+    console.log('🔍 Checking booking availability for:', targetUserEmail);
+
+    // Get user details from Microsoft Graph to get their principal name
+    const userDetailsResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(targetUserEmail)}`,
+      {
+        headers: {
+          'Authorization': ssoAuthorization,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    let targetUserPrincipalName = targetUserEmail;
+    let targetDisplayName = '';
+    
+    if (userDetailsResponse.ok) {
+      const userData = await userDetailsResponse.json();
+      targetUserPrincipalName = userData.userPrincipalName || targetUserEmail;
+      targetDisplayName = userData.displayName || '';
+      console.log('✅ User found:', targetDisplayName, targetUserPrincipalName);
+    }
+
+    // Get all booking businesses
     const businessesResponse = await fetch(
       'https://graph.microsoft.com/v1.0/solutions/bookingBusinesses',
       {
@@ -37,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (!businessesResponse.ok) {
       const errorText = await businessesResponse.text();
-      console.error('Bookings API error:', errorText);
+      console.error('❌ Bookings API error:', errorText);
       return Response.json({
         success: true,
         hasBookings: false,
@@ -48,9 +71,27 @@ Deno.serve(async (req) => {
 
     const businessesData = await businessesResponse.json();
     const businesses = businessesData.value || [];
+    console.log(`📊 Found ${businesses.length} booking businesses`);
 
-    // For each business, check if the target user is a staff member
+    // Check each business for the target user
     for (const business of businesses) {
+      console.log(`🔍 Checking business: ${business.displayName || business.id}`);
+      
+      // Check if business name matches user
+      const businessNameLower = (business.displayName || '').toLowerCase();
+      const displayNameLower = targetDisplayName.toLowerCase();
+      
+      if (displayNameLower && businessNameLower.includes(displayNameLower)) {
+        console.log('✅ Found matching business by name!');
+        return Response.json({
+          success: true,
+          hasBookings: true,
+          bookingBusiness: business,
+          userEmail: targetUserEmail
+        });
+      }
+
+      // Check staff members
       try {
         const staffResponse = await fetch(
           `https://graph.microsoft.com/v1.0/solutions/bookingBusinesses/${business.id}/staffMembers`,
@@ -65,13 +106,23 @@ Deno.serve(async (req) => {
         if (staffResponse.ok) {
           const staffData = await staffResponse.json();
           const staff = staffData.value || [];
+          console.log(`📋 Found ${staff.length} staff members in ${business.displayName}`);
           
-          // Check if target user is in the staff list
-          const isStaffMember = staff.some(member => 
-            member.emailAddress?.toLowerCase() === targetUserEmail.toLowerCase()
-          );
+          // Check multiple email fields and user principal name
+          const isStaffMember = staff.some(member => {
+            const memberEmail = (member.emailAddress || '').toLowerCase();
+            const memberUpn = (member.userPrincipalName || '').toLowerCase();
+            const targetEmailLower = targetUserEmail.toLowerCase();
+            const targetUpnLower = targetUserPrincipalName.toLowerCase();
+            
+            return memberEmail === targetEmailLower || 
+                   memberUpn === targetUpnLower ||
+                   memberEmail === targetUpnLower ||
+                   memberUpn === targetEmailLower;
+          });
 
           if (isStaffMember) {
+            console.log('✅ Found user as staff member!');
             return Response.json({
               success: true,
               hasBookings: true,
@@ -81,12 +132,12 @@ Deno.serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`Error checking staff for business ${business.id}:`, error);
+        console.error(`❌ Error checking staff for business ${business.id}:`, error);
         continue;
       }
     }
 
-    // No booking business found for this user
+    console.log('❌ No booking business found for user');
     return Response.json({
       success: true,
       hasBookings: false,
@@ -95,7 +146,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Check booking availability error:', error);
+    console.error('❌ Check booking availability error:', error);
     return Response.json({
       error: error.message
     }, { status: 500 });
