@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Removed Select, SelectContent, SelectItem, SelectTrigger, SelectValue as they are no longer used for simplified booking
 import { Textarea } from "@/components/ui/textarea";
 
 export default function MyMeetings() {
@@ -50,8 +50,8 @@ export default function MyMeetings() {
   const [user, setUser] = useState(null);
   const [allMeetingNotes, setAllMeetingNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
-  const [myBookings, setMyBookings] = useState([]); // NEW: State for user's bookings
-  const [loadingBookings, setLoadingBookings] = useState(false); // NEW: State for loading bookings
+  const [myBookings, setMyBookings] = useState([]); // State for user's bookings
+  const [loadingBookings, setLoadingBookings] = useState(false); // State for loading bookings
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -64,19 +64,16 @@ export default function MyMeetings() {
   const audioChunksRef = useRef([]);
   const recordingIntervalRef = useRef(null);
 
-  // NEW Booking states
+  // Simplified Booking states
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingStep, setBookingStep] = useState('select-person'); // 'select-person', 'booking-form', 'meeting-request'
+  // bookingStep, hasBookings, bookingBusiness, bookingServices states removed
   const [searchQuery, setSearchQuery] = useState('');
   const [staffResults, setStaffResults] = useState([]);
   const [searchingStaff, setSearchingStaff] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState(null);
-  const [hasBookings, setHasBookings] = useState(false);
-  const [bookingBusiness, setBookingBusiness] = useState(null);
-  const [bookingServices, setBookingServices] = useState([]);
-  const [loadingBookingInfo, setLoadingBookingInfo] = useState(false);
+  const [loadingBookingInfo, setLoadingBookingInfo] = useState(false); // Used for sending meeting request now
   const [bookingData, setBookingData] = useState({
-    serviceId: '',
+    // serviceId removed
     date: '',
     time: '',
     duration: 30, // Default duration
@@ -99,10 +96,11 @@ export default function MyMeetings() {
 
   // Load staff when modal opens
   useEffect(() => {
-    if (showBookingModal && bookingStep === 'select-person') {
+    // Only load staff when the modal is shown
+    if (showBookingModal) {
       loadAllStaff();
     }
-  }, [showBookingModal, bookingStep]);
+  }, [showBookingModal]); // Removed bookingStep from dependency array
 
   const loadAllStaff = async () => {
     setSearchingStaff(true);
@@ -151,7 +149,7 @@ export default function MyMeetings() {
       // Load all meeting notes
       await loadAllMeetingNotes(currentUser);
       
-      // Load bookings (NEW)
+      // Load bookings
       await loadMyBookings();
     } catch (error) {
       console.error('Error loading meetings:', error);
@@ -185,7 +183,7 @@ export default function MyMeetings() {
     }
   };
 
-  const loadMyBookings = async () => { // NEW: Function to load user's bookings
+  const loadMyBookings = async () => {
     setLoadingBookings(true);
     try {
       const response = await base44.functions.invoke('getMyBookings');
@@ -402,10 +400,10 @@ ${notesData.transcript || 'No transcript available.'}
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // New Booking functions
+  // Simplified Booking functions
   const searchStaff = async (query) => {
     if (!query || query.length < 2) {
-      loadAllStaff();
+      loadAllStaff(); // If query is too short, show all staff
       return;
     }
 
@@ -428,98 +426,12 @@ ${notesData.transcript || 'No transcript available.'}
   };
 
   const handleSelectPerson = async (person) => {
+    // Directly set the selected person and prepare for a meeting request
     setSelectedPerson(person);
-    setLoadingBookingInfo(true);
-
-    try {
-      // Check if person has Book with Me setup
-      const response = await base44.functions.invoke('checkUserBookingAvailability', {
-        targetUserEmail: person.mail || person.userPrincipalName
-      });
-
-      if (response.data.hasBookings && response.data.bookingBusiness) {
-        setHasBookings(true);
-        setBookingBusiness(response.data.bookingBusiness);
-
-        // If it's a "Book with Me" page, open it directly
-        if (response.data.bookingType === 'bookwithme' && response.data.bookingBusiness.bookWithMeUrl) {
-          window.open(response.data.bookingBusiness.bookWithMeUrl, '_blank');
-          toast.success(`Opening ${person.displayName}'s booking page...`);
-          resetBookingModal();
-        } else {
-          // It's a formal Bookings business - load services
-          const servicesResponse = await base44.functions.invoke('getBookingServices', {
-            businessId: response.data.bookingBusiness.id
-          });
-
-          if (servicesResponse.data.success) {
-            setBookingServices(servicesResponse.data.services || []);
-          }
-
-          setBookingStep('booking-form');
-        }
-      } else {
-        setHasBookings(false);
-        setBookingStep('meeting-request');
-      }
-    } catch (error) {
-      console.error('Error checking booking availability:', error);
-      toast.error('Failed to check booking availability for this person.');
-      setHasBookings(false);
-      setBookingStep('meeting-request');
-    } finally {
-      setLoadingBookingInfo(false);
-    }
+    // No longer checking for booking availability or setting booking steps
   };
 
-  const handleCreateBooking = async (e) => {
-    e.preventDefault();
-    setLoadingBookingInfo(true); // Re-using loadingBookingInfo for form submission
-
-    try {
-      if (!selectedPerson || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user || !bookingBusiness) {
-        toast.error('Please fill all required fields and ensure user data is available.');
-        setLoadingBookingInfo(false);
-        return;
-      }
-
-      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`; // Ensure seconds are included for ISO string
-      const startDateTime = new Date(startDateTimeString);
-      const service = bookingServices.find(s => s.id === bookingData.serviceId);
-      const durationInMinutes = service ? service.defaultDuration / 60 : bookingData.duration;
-      const endDateTime = addMinutes(startDateTime, durationInMinutes);
-
-      if (isNaN(startDateTime.getTime())) {
-        toast.error('Invalid date or time entered.');
-        setLoadingBookingInfo(false);
-        return;
-      }
-
-      const response = await base44.functions.invoke('createMicrosoftBooking', {
-        businessId: bookingBusiness.id,
-        serviceId: bookingData.serviceId,
-        // staffMemberId: staff members are auto-assigned by Bookings by default when not specified
-        startDateTime: startDateTime.toISOString(),
-        endDateTime: endDateTime.toISOString(),
-        customerName: user.full_name || user.email.split('@')[0], // Fallback for name
-        customerEmail: user.email,
-        notes: bookingData.notes
-      });
-
-      if (response.data.success) {
-        toast.success('Booking created successfully!');
-        resetBookingModal();
-        await loadData(); // Reload meetings to show the new booking
-      } else {
-        toast.error(response.data.message || 'Failed to create booking.');
-      }
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      toast.error('Failed to create booking: ' + error.message);
-    } finally {
-      setLoadingBookingInfo(false);
-    }
-  };
+  // Removed handleCreateBooking function
 
   const handleSendMeetingRequest = async (e) => {
     e.preventDefault();
@@ -547,7 +459,7 @@ ${notesData.transcript || 'No transcript available.'}
         subject: `Meeting with ${selectedPerson.displayName}`,
         startDateTime: startDateTime.toISOString(),
         endDateTime: endDateTime.toISOString(),
-        body: bookingData.notes || `Meeting request with ${selectedPerson.displayName} for ${format(startDateTime, 'Pp')}`
+        body: bookingData.notes || `Meeting request for ${format(startDateTime, 'PPp')}`
       });
 
       if (response.data.success) {
@@ -567,16 +479,14 @@ ${notesData.transcript || 'No transcript available.'}
 
   const resetBookingModal = () => {
     setShowBookingModal(false);
-    setBookingStep('select-person');
+    // bookingStep removed
     setSearchQuery('');
     setStaffResults([]);
     setSelectedPerson(null);
-    setHasBookings(false);
-    setBookingBusiness(null);
-    setBookingServices([]);
+    // hasBookings, bookingBusiness, bookingServices removed
     setLoadingBookingInfo(false);
     setBookingData({
-      serviceId: '',
+      // serviceId removed
       date: '',
       time: '',
       duration: 30,
@@ -693,15 +603,7 @@ ${notesData.transcript || 'No transcript available.'}
                 <CalendarIcon className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Book Meeting</span>
               </Button>
-              <Button
-                onClick={() => window.open('https://outlook.office.com/bookings/homepage', '_blank')}
-                variant="outline"
-                size="sm"
-                className="bg-white hover:bg-slate-50"
-              >
-                <ExternalLink className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Edit My Bookings</span>
-              </Button>
+              {/* "Edit My Bookings" button removed */}
               <Button
                 onClick={handleSync}
                 disabled={syncing}
@@ -911,7 +813,7 @@ ${notesData.transcript || 'No transcript available.'}
           </div>
         )}
 
-        {/* My Bookings Section - NEW */}
+        {/* My Bookings Section */}
         {myBookings.length > 0 && (
           <Card className="border-2 border-purple-200">
             <CardHeader>
@@ -1377,7 +1279,7 @@ ${notesData.transcript || 'No transcript available.'}
         </DialogContent>
       </Dialog>
 
-      {/* NEW: Booking Modal with Person Search */}
+      {/* Simplified Booking Modal */}
       <Dialog open={showBookingModal} onOpenChange={(isOpen) => {
         if (!isOpen) resetBookingModal();
         else setShowBookingModal(true);
@@ -1387,7 +1289,7 @@ ${notesData.transcript || 'No transcript available.'}
             <DialogTitle>Book a Meeting</DialogTitle>
           </DialogHeader>
 
-          {bookingStep === 'select-person' && (
+          {!selectedPerson ? ( // If no person is selected, show the search interface
             <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1429,108 +1331,17 @@ ${notesData.transcript || 'No transcript available.'}
                   ))}
                 </div>
               )}
-
-              {loadingBookingInfo && (
-                <div className="text-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
-                  <p className="text-sm text-slate-600">Checking availability...</p>
-                </div>
-              )}
+              {/* Removed loadingBookingInfo spinner for checking availability here */}
             </div>
-          )}
-
-          {bookingStep === 'booking-form' && selectedPerson && (
-            <form onSubmit={handleCreateBooking} className="space-y-4">
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-sm">
-                  <strong>Booking with:</strong> {selectedPerson.displayName}
-                </p>
-                {bookingBusiness && (
-                  <p className="text-xs text-slate-600 mt-1">
-                    Business: {bookingBusiness.displayName}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Service</label>
-                <Select
-                  value={bookingData.serviceId}
-                  onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
-                  required
-                  disabled={bookingServices.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a service..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bookingServices.map(service => (
-                      <SelectItem key={service.id} value={service.id}>
-                        {service.displayName} ({service.defaultDuration / 60} min)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    value={bookingData.date}
-                    onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Time</label>
-                  <Input
-                    type="time"
-                    value={bookingData.time}
-                    onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Notes (optional)</label>
-                <Textarea
-                  value={bookingData.notes}
-                  onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                  placeholder="Add any notes..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={resetBookingModal}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
-                  {loadingBookingInfo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Booking'
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {bookingStep === 'meeting-request' && selectedPerson && (
+          ) : ( // If a person is selected, show the meeting request form
             <form onSubmit={handleSendMeetingRequest} className="space-y-4">
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm">
                   <strong>Meeting with:</strong> {selectedPerson.displayName}
                 </p>
+                <p className="text-xs text-slate-600 mt-1">{selectedPerson.mail || selectedPerson.userPrincipalName}</p>
                 <p className="text-xs text-slate-600 mt-1">
-                  This person doesn't have Bookings set up. Sending a regular meeting request instead.
+                  A meeting request will be sent to {selectedPerson.displayName}.
                 </p>
               </div>
 
