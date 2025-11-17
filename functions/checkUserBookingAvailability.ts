@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'targetUserEmail required' }, { status: 400 });
     }
 
-    // Check if user has Bookings business
+    // Get all booking businesses the user has access to
     const businessesResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${targetUserEmail}/bookingBusinesses`,
+      'https://graph.microsoft.com/v1.0/solutions/bookingBusinesses',
       {
         headers: {
           'Authorization': ssoAuthorization,
@@ -35,21 +35,62 @@ Deno.serve(async (req) => {
       }
     );
 
-    let hasBookings = false;
-    let bookingBusiness = null;
+    if (!businessesResponse.ok) {
+      const errorText = await businessesResponse.text();
+      console.error('Bookings API error:', errorText);
+      return Response.json({
+        success: true,
+        hasBookings: false,
+        bookingBusiness: null,
+        userEmail: targetUserEmail
+      });
+    }
 
-    if (businessesResponse.ok) {
-      const businessesData = await businessesResponse.json();
-      if (businessesData.value && businessesData.value.length > 0) {
-        hasBookings = true;
-        bookingBusiness = businessesData.value[0];
+    const businessesData = await businessesResponse.json();
+    const businesses = businessesData.value || [];
+
+    // For each business, check if the target user is a staff member
+    for (const business of businesses) {
+      try {
+        const staffResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/solutions/bookingBusinesses/${business.id}/staffMembers`,
+          {
+            headers: {
+              'Authorization': ssoAuthorization,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (staffResponse.ok) {
+          const staffData = await staffResponse.json();
+          const staff = staffData.value || [];
+          
+          // Check if target user is in the staff list
+          const isStaffMember = staff.some(member => 
+            member.emailAddress?.toLowerCase() === targetUserEmail.toLowerCase()
+          );
+
+          if (isStaffMember) {
+            return Response.json({
+              success: true,
+              hasBookings: true,
+              bookingBusiness: business,
+              userEmail: targetUserEmail
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking staff for business ${business.id}:`, error);
+        continue;
       }
     }
 
+    // No booking business found for this user
     return Response.json({
       success: true,
-      hasBookings,
-      bookingBusiness,
+      hasBookings: false,
+      bookingBusiness: null,
       userEmail: targetUserEmail
     });
 
