@@ -50,6 +50,8 @@ export default function MyMeetings() {
   const [user, setUser] = useState(null);
   const [allMeetingNotes, setAllMeetingNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [myBookings, setMyBookings] = useState([]); // NEW: State for user's bookings
+  const [loadingBookings, setLoadingBookings] = useState(false); // NEW: State for loading bookings
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -148,6 +150,9 @@ export default function MyMeetings() {
 
       // Load all meeting notes
       await loadAllMeetingNotes(currentUser);
+      
+      // Load bookings (NEW)
+      await loadMyBookings();
     } catch (error) {
       console.error('Error loading meetings:', error);
       toast.error('Failed to load meetings');
@@ -177,6 +182,22 @@ export default function MyMeetings() {
       console.error('Error loading meeting notes:', error);
     } finally {
       setLoadingNotes(false);
+    }
+  };
+
+  const loadMyBookings = async () => { // NEW: Function to load user's bookings
+    setLoadingBookings(true);
+    try {
+      const response = await base44.functions.invoke('getMyBookings');
+      if (response.data.success) {
+        setMyBookings(response.data.bookings || []);
+        console.log(`📅 Loaded ${response.data.bookings?.length || 0} bookings`);
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      toast.error('Failed to load your bookings.');
+    } finally {
+      setLoadingBookings(false);
     }
   };
 
@@ -872,7 +893,77 @@ ${notesData.transcript || 'No transcript available.'}
           </div>
         )}
 
-        {/* AI Meeting Notes Section - NEW */}
+        {/* My Bookings Section - NEW */}
+        {myBookings.length > 0 && (
+          <Card className="border-2 border-purple-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-purple-600" />
+                My Bookings
+                <Badge variant="secondary">{myBookings.length} booking{myBookings.length !== 1 ? 's' : ''}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingBookings ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myBookings.map((booking) => (
+                    <motion.div
+                      key={booking.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-white rounded-lg border border-purple-200 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-slate-900 mb-2">{booking.title}</h3>
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              <span>
+                                {format(new Date(booking.start), 'MMM d, h:mm a')} - {format(new Date(booking.end), 'h:mm a')}
+                              </span>
+                            </div>
+                            {booking.customerName && (
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                <span>{booking.customerName}</span>
+                                {booking.customerEmail && (
+                                  <span className="text-slate-400 text-xs">({booking.customerEmail})</span>
+                                )}
+                              </div>
+                            )}
+                            {booking.location && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                <span>{booking.location}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {booking.meetingLink && (
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(booking.meetingLink, '_blank')}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            <Video className="w-4 h-4 mr-2" />
+                            Join
+                          </Button>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Meeting Notes Section */}
         {allMeetingNotes.length > 0 && (
           <Card className="border-2 border-blue-200">
             <CardHeader>
@@ -946,7 +1037,7 @@ ${notesData.transcript || 'No transcript available.'}
         )}
 
         {/* Empty State */}
-        {meetings.length === 0 && (allMeetingNotes.length === 0 || !loadingNotes) && !loading && (
+        {meetings.length === 0 && (allMeetingNotes.length === 0 || !loadingNotes) && !loading && myBookings.length === 0 && (
           <Card className="border-none shadow-none">
             <CardContent className="p-12 text-center">
               <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
