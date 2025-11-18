@@ -223,7 +223,33 @@ export default function SharePointPage() {
   return (
     <div className="h-full bg-gradient-to-br from-blue-50 to-indigo-50 overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {!user && <ConnectionWarning />}
+        {!user?.microsoft_access_token && <ConnectionWarning />}
+
+        {sites.length === 0 && !loading && (
+          <Card className="border-2 border-yellow-200 bg-yellow-50">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold">!</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-yellow-900 mb-2">No SharePoint Sites Found</h3>
+                  <p className="text-sm text-yellow-800 mb-3">
+                    Your account needs access to SharePoint Online. Please check:
+                  </p>
+                  <ul className="text-sm text-yellow-800 space-y-1 ml-4">
+                    <li>• You have a Microsoft 365 subscription with SharePoint Online</li>
+                    <li>• Your account has been granted access to SharePoint sites</li>
+                    <li>• Microsoft SSO is properly configured in Settings</li>
+                  </ul>
+                  <p className="text-xs text-yellow-700 mt-3">
+                    Check the browser console (F12) for detailed error messages.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <AppHeader
           icon={Library}
