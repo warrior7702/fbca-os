@@ -17,7 +17,10 @@ import {
   Sparkles,
   Download,
   ExternalLink,
-  Library
+  Library,
+  List,
+  Plus,
+  Settings
 } from "lucide-react";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
@@ -58,6 +61,16 @@ export default function SharePointPage() {
   const [uploading, setUploading] = useState(false);
   const [aiTagging, setAiTagging] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [activeTab, setActiveTab] = useState('libraries');
+  const [lists, setLists] = useState([]);
+  const [loadingLists, setLoadingLists] = useState(false);
+  const [showCreateListModal, setShowCreateListModal] = useState(false);
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [selectedList, setSelectedList] = useState(null);
+  const [newListData, setNewListData] = useState({ displayName: '', description: '', template: 'genericList' });
+  const [newColumnData, setNewColumnData] = useState({ columnName: '', columnType: 'text', required: false, description: '' });
+  const [creatingList, setCreatingList] = useState(false);
+  const [addingColumn, setAddingColumn] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -111,6 +124,86 @@ export default function SharePointPage() {
       toast.error('Failed to load document libraries');
     } finally {
       setLoadingLibraries(false);
+    }
+  };
+
+  const loadLists = async (site) => {
+    setLoadingLists(true);
+    setSelectedSite(site);
+    
+    try {
+      const response = await base44.functions.invoke('getSharePointLists', {
+        siteId: site.id
+      });
+      
+      if (response.data.success) {
+        setLists(response.data.lists);
+      }
+    } catch (error) {
+      console.error('Error loading lists:', error);
+      toast.error('Failed to load SharePoint lists');
+    } finally {
+      setLoadingLists(false);
+    }
+  };
+
+  const handleCreateList = async () => {
+    if (!newListData.displayName.trim()) {
+      toast.error('List name is required');
+      return;
+    }
+
+    setCreatingList(true);
+    try {
+      const response = await base44.functions.invoke('createSharePointList', {
+        siteId: selectedSite.id,
+        displayName: newListData.displayName,
+        description: newListData.description,
+        template: newListData.template
+      });
+
+      if (response.data.success) {
+        toast.success('List created successfully!');
+        setShowCreateListModal(false);
+        setNewListData({ displayName: '', description: '', template: 'genericList' });
+        loadLists(selectedSite);
+      }
+    } catch (error) {
+      console.error('Error creating list:', error);
+      toast.error('Failed to create list');
+    } finally {
+      setCreatingList(false);
+    }
+  };
+
+  const handleAddColumn = async () => {
+    if (!newColumnData.columnName.trim()) {
+      toast.error('Column name is required');
+      return;
+    }
+
+    setAddingColumn(true);
+    try {
+      const response = await base44.functions.invoke('addSharePointColumn', {
+        siteId: selectedSite.id,
+        listId: selectedList.id,
+        columnName: newColumnData.columnName,
+        columnType: newColumnData.columnType,
+        required: newColumnData.required,
+        description: newColumnData.description
+      });
+
+      if (response.data.success) {
+        toast.success('Column added successfully!');
+        setShowAddColumnModal(false);
+        setNewColumnData({ columnName: '', columnType: 'text', required: false, description: '' });
+        loadLists(selectedSite);
+      }
+    } catch (error) {
+      console.error('Error adding column:', error);
+      toast.error('Failed to add column');
+    } finally {
+      setAddingColumn(false);
     }
   };
 
@@ -300,11 +393,25 @@ export default function SharePointPage() {
                     Select a SharePoint Site
                   </h3>
                   <p className="text-slate-600">
-                    Choose a site from the sidebar to view document libraries
+                    Choose a site from the sidebar to view document libraries and lists
                   </p>
                 </CardContent>
               </Card>
-            ) : !selectedLibrary ? (
+            ) : (
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="libraries" onClick={() => loadLibraries(selectedSite)}>
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Libraries
+                  </TabsTrigger>
+                  <TabsTrigger value="lists" onClick={() => loadLists(selectedSite)}>
+                    <List className="w-4 h-4 mr-2" />
+                    Lists
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="libraries" className="mt-4">
+                  {!selectedLibrary ? (
               <div>
                 <h3 className="font-semibold text-slate-900 mb-4">
                   Document Libraries in {selectedSite.displayName}
@@ -416,6 +523,135 @@ export default function SharePointPage() {
             )}
           </div>
         </div>
+
+        {/* Create List Modal */}
+        <Dialog open={showCreateListModal} onOpenChange={setShowCreateListModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New SharePoint List</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">List Name *</label>
+                <Input
+                  placeholder="e.g., Projects, Tasks, Contacts"
+                  value={newListData.displayName}
+                  onChange={(e) => setNewListData({...newListData, displayName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Input
+                  placeholder="Brief description of this list"
+                  value={newListData.description}
+                  onChange={(e) => setNewListData({...newListData, description: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Template</label>
+                <select
+                  className="w-full p-2 border rounded"
+                  value={newListData.template}
+                  onChange={(e) => setNewListData({...newListData, template: e.target.value})}
+                >
+                  <option value="genericList">Generic List</option>
+                  <option value="documentLibrary">Document Library</option>
+                  <option value="events">Events</option>
+                  <option value="tasks">Tasks</option>
+                  <option value="contacts">Contacts</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCreateListModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateList}
+                  disabled={creatingList}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {creatingList ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create List'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Column Modal */}
+        <Dialog open={showAddColumnModal} onOpenChange={setShowAddColumnModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Column to {selectedList?.displayName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Column Name *</label>
+                <Input
+                  placeholder="e.g., Status, Due Date, Priority"
+                  value={newColumnData.columnName}
+                  onChange={(e) => setNewColumnData({...newColumnData, columnName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Column Type</label>
+                <select
+                  className="w-full p-2 border rounded"
+                  value={newColumnData.columnType}
+                  onChange={(e) => setNewColumnData({...newColumnData, columnType: e.target.value})}
+                >
+                  <option value="text">Single Line of Text</option>
+                  <option value="number">Number</option>
+                  <option value="boolean">Yes/No</option>
+                  <option value="dateTime">Date & Time</option>
+                  <option value="choice">Choice (dropdown)</option>
+                  <option value="multiChoice">Multiple Choice</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Input
+                  placeholder="Optional column description"
+                  value={newColumnData.description}
+                  onChange={(e) => setNewColumnData({...newColumnData, description: e.target.value})}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={newColumnData.required}
+                  onChange={(e) => setNewColumnData({...newColumnData, required: e.target.checked})}
+                />
+                <label className="text-sm">Required field</label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddColumnModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddColumn}
+                  disabled={addingColumn}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {addingColumn ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Column'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Upload Modal */}
         <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
