@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,8 @@ import {
   User,
   Search,
   X,
-  Eye
+  Eye,
+  Trash2 // Added Trash2 icon
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -33,6 +35,7 @@ import {
 export default function EnhancedMeetingNotes({ 
   notes, 
   onDownload, 
+  onDelete, // Added onDelete prop
   staffResults = [], 
   onSearchStaff, 
   onAssignPerson,
@@ -88,6 +91,17 @@ export default function EnhancedMeetingNotes({
             <Download className="w-4 h-4 mr-2" />
             Download
           </Button>
+          {onDelete && ( // Conditionally render Delete button
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDelete}
+              className="text-red-600 hover:text-red-700 hover:border-red-300"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
 

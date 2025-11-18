@@ -19,7 +19,8 @@ import {
   Square,
   Download,
   FileText,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -931,6 +932,33 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
     .filter(m => !isToday(parseMeetingDate(m.start)))
     .sort((a, b) => parseMeetingDate(a.start) - parseMeetingDate(b.start))[0];
 
+  const handleDeleteNote = async (noteId) => {
+    if (!confirm('Are you sure you want to delete this meeting note?')) return;
+
+    try {
+      await base44.entities.MeetingNote.delete(noteId);
+      await loadAllMeetingNotes(user);
+      toast.success('Meeting note deleted');
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast.error('Failed to delete note');
+    }
+  };
+
+  const handleDeleteAllNotes = async () => {
+    if (!confirm(`Are you sure you want to delete all ${allMeetingNotes.length} meeting notes? This cannot be undone.`)) return;
+
+    try {
+      await Promise.all(allMeetingNotes.map(note => base44.entities.MeetingNote.delete(note.id)));
+      await loadAllMeetingNotes(user);
+      toast.success('All meeting notes deleted');
+    } catch (error) {
+      console.error('Error deleting notes:', error);
+      toast.error('Failed to delete notes');
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -1300,15 +1328,27 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
           </TabsContent>
 
           <TabsContent value="notes" className="space-y-6 mt-6">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                placeholder="Search notes by subject, summary, transcript, or action items..."
-                value={notesSearchQuery}
-                onChange={(e) => setNotesSearchQuery(e.target.value)}
-                className="pl-11 h-12 text-base"
-              />
+            {/* Search Bar with Delete All */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Input
+                  placeholder="Search notes by subject, summary, transcript, or action items..."
+                  value={notesSearchQuery}
+                  onChange={(e) => setNotesSearchQuery(e.target.value)}
+                  className="pl-11 h-12 text-base"
+                />
+              </div>
+              {allMeetingNotes.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={handleDeleteAllNotes}
+                  className="text-red-600 hover:text-red-700 hover:border-red-300"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete All ({allMeetingNotes.length})
+                </Button>
+              )}
             </div>
 
             {/* Notes List */}
@@ -1355,6 +1395,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                           <EnhancedMeetingNotes
                             notes={note}
                             onDownload={() => downloadNotes(note)}
+                            onDelete={() => handleDeleteNote(note.id)}
                             staffResults={staffForAssignment}
                             onSearchStaff={handleSearchStaffForAssignment}
                             onAssignPerson={(idx, person) => handleAssignActionItem(idx, person)}
