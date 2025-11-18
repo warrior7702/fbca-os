@@ -122,6 +122,8 @@ export default function MyMeetings() {
   const [adHocAttendees, setAdHocAttendees] = useState([]);
   const [adHocSearchQuery, setAdHocSearchQuery] = useState('');
   const [adHocSearchResults, setAdHocSearchResults] = useState([]);
+  const [currentMeetings, setCurrentMeetings] = useState([]);
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState(null);
 
   useEffect(() => {
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -980,6 +982,33 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
     }
   };
 
+  const loadCurrentMeetings = () => {
+    const now = new Date();
+    const oneHourFromNow = addMinutes(now, 60);
+
+    const current = meetings.filter(m => {
+      const start = parseMeetingDate(m.start);
+      const end = parseMeetingDate(m.end);
+      if (!start || !end) return false;
+
+      // Meeting is happening now or starts within next hour
+      return (now >= start && now <= end) || (start >= now && start <= oneHourFromNow);
+    }).sort((a, b) => parseMeetingDate(a.start) - parseMeetingDate(b.start));
+
+    setCurrentMeetings(current);
+  };
+
+  const handleSelectCalendarEvent = (meeting) => {
+    setSelectedCalendarEvent(meeting);
+    setAdHocMeetingTitle(meeting.subject || '');
+    setAdHocAttendees(
+      meeting.attendees?.map(a => ({
+        name: a.name,
+        email: a.email
+      })) || []
+    );
+  };
+
   const handleAdHocStaffSearch = async (query) => {
     if (!query || query.length < 2) {
       setAdHocSearchResults([]);
@@ -1048,10 +1077,14 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
         setTimeout(() => reject(new Error('AI processing timed out after 2 minutes.')), 120000)
       );
 
+      // Use selectedCalendarEvent for meeting_id and meeting_date if available
+      const meetingIdForNotes = selectedCalendarEvent?.id || ('adhoc-' + Date.now());
+      const meetingDateForNotes = selectedCalendarEvent?.start || new Date().toISOString();
+
       const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
         audio_url: uploadResponse.file_url,
         meeting_subject: adHocMeetingTitle,
-        meeting_date: new Date().toISOString(),
+        meeting_date: meetingDateForNotes,
         attendees: attendeesData
       });
 
@@ -1064,9 +1097,9 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
       toast.loading("Saving notes...", { id: processingToast });
 
       const savedNote = await base44.entities.MeetingNote.create({
-        meeting_id: 'adhoc-' + Date.now(),
+        meeting_id: meetingIdForNotes,
         meeting_subject: adHocMeetingTitle,
-        meeting_date: new Date().toISOString(),
+        meeting_date: meetingDateForNotes,
         user_email: user.email,
         audio_url: uploadResponse.file_url,
         summary: notesResponse.data.summary || '',
@@ -1093,6 +1126,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
       setAudioBlob(null);
       setIsRecording(false);
       setRecordingTime(0);
+      setSelectedCalendarEvent(null);
 
     } catch (error) {
       console.error("Error generating notes:", error);
@@ -2067,6 +2101,9 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
 
         {/* Ad-Hoc Recording Modal */}
         <Dialog open={showAdHocRecording} onOpenChange={(isOpen) => {
+          if (isOpen) {
+            loadCurrentMeetings();
+          }
           if (!isOpen) {
             setShowAdHocRecording(false);
             setAdHocMeetingTitle('');
@@ -2074,6 +2111,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
             setAudioBlob(null);
             setIsRecording(false);
             setRecordingTime(0);
+            setSelectedCalendarEvent(null);
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
               mediaRecorderRef.current.stop();
             }
@@ -2093,13 +2131,56 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* Calendar Event Selection */}
+              {currentMeetings.length > 0 && !isRecording && (
+                <Card className="border-2 border-purple-200 bg-purple-50">
+                  <CardContent className="pt-4 space-y-3">
+                    <p className="text-sm font-medium text-purple-900">
+                      Select from your calendar or enter manually:
+                    </p>
+                    <div className="space-y-2">
+                      {currentMeetings.slice(0, 3).map((meeting) => {
+                        const start = parseMeetingDate(meeting.start);
+                        return (
+                          <button
+                            key={meeting.id}
+                            onClick={() => handleSelectCalendarEvent(meeting)}
+                            className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                              selectedCalendarEvent?.id === meeting.id
+                                ? 'border-purple-600 bg-purple-100'
+                                : 'border-purple-200 bg-white hover:border-purple-400'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-slate-900 truncate">{meeting.subject}</p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {start ? format(start, 'h:mm a') : 'Time N/A'}
+                                  {meeting.attendees?.length > 0 && ` • ${meeting.attendees.length} attendee${meeting.attendees.length > 1 ? 's' : ''}`}
+                                </p>
+                              </div>
+                              {selectedCalendarEvent?.id === meeting.id && (
+                                <CheckCircle2 className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Meeting Title */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Meeting Title *</label>
                 <Input
                   placeholder="e.g., Quick Team Sync"
                   value={adHocMeetingTitle}
-                  onChange={(e) => setAdHocMeetingTitle(e.target.value)}
+                  onChange={(e) => {
+                    setAdHocMeetingTitle(e.target.value);
+                    setSelectedCalendarEvent(null);
+                  }}
                   disabled={isRecording}
                 />
               </div>
