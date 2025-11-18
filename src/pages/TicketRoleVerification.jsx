@@ -204,9 +204,9 @@ export default function TicketRoleVerification() {
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm text-slate-600">Viewers</p>
-                                            <p className="text-xs text-slate-500 mb-1">(Read-only)</p>
-                                            <p className="text-2xl font-bold text-blue-700">{data.stats.viewers}</p>
+                                            <p className="text-sm text-slate-600">Admins</p>
+                                            <p className="text-xs text-slate-500 mb-1">(OS_Ticket_Admin)</p>
+                                            <p className="text-2xl font-bold text-blue-700">{data.stats.admins || data.stats.viewers}</p>
                                         </div>
                                         <Eye className="w-8 h-8 text-blue-500" />
                                     </div>
@@ -277,9 +277,16 @@ export default function TicketRoleVerification() {
                                                         <div className="flex items-center justify-between">
                                                             <span className="flex items-center gap-1">
                                                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                                Viewers:
+                                                                Admins:
                                                             </span>
-                                                            <span className="font-semibold">{stats.viewers}</span>
+                                                            <span className="font-semibold">{stats.admins || stats.viewers}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="flex items-center gap-1">
+                                                                <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
+                                                                Requesters:
+                                                            </span>
+                                                            <span className="font-semibold">{stats.requesters || 0}</span>
                                                         </div>
 
                                                         <div className="flex items-center justify-between border-t pt-1 mt-1">

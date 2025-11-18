@@ -75,10 +75,11 @@ Deno.serve(async (req) => {
 
         // Process each user to get their group memberships
         const workers = [];
-        const viewers = [];
+        const admins = [];
         const requesters = [];
         const departmentStats = {};
         const departmentList = new Set();
+        let processedCount = 0;
 
         for (const u of allUsers) {
             try {
@@ -118,35 +119,43 @@ Deno.serve(async (req) => {
                     groups: groupNames
                 };
 
-                // Categorize
+                // Categorize by primary role
                 if (isWorker) {
                     workers.push(userInfo);
                 } else if (isAdmin) {
-                    viewers.push(userInfo);
+                    admins.push(userInfo);
                 } else {
                     requesters.push(userInfo);
                 }
 
-                // Track departments
-                userDepts.forEach(dept => {
-                    departmentList.add(dept);
-                    
-                    if (!departmentStats[dept]) {
-                        departmentStats[dept] = {
-                            workers: 0,
-                            viewers: 0,
-                            total: 0
-                        };
-                    }
-                    
-                    departmentStats[dept].total++;
-                    
-                    if (isWorker) {
-                        departmentStats[dept].workers++;
-                    } else if (isAdmin) {
-                        departmentStats[dept].viewers++;
-                    }
-                });
+                // Track department stats - count each user only once per department
+                if (userDepts.length > 0) {
+                    userDepts.forEach(dept => {
+                        departmentList.add(dept);
+                        
+                        if (!departmentStats[dept]) {
+                            departmentStats[dept] = {
+                                workers: 0,
+                                admins: 0,
+                                requesters: 0,
+                                total: 0
+                            };
+                        }
+                        
+                        // Count this user once for this department
+                        departmentStats[dept].total++;
+                        
+                        if (isWorker) {
+                            departmentStats[dept].workers++;
+                        } else if (isAdmin) {
+                            departmentStats[dept].admins++;
+                        } else {
+                            departmentStats[dept].requesters++;
+                        }
+                    });
+                }
+
+                processedCount++;
 
             } catch (error) {
                 console.error(`Error processing user ${u.displayName}:`, error);
@@ -154,25 +163,26 @@ Deno.serve(async (req) => {
         }
 
         const stats = {
-            total: allUsers.length,
+            total: processedCount,
             workers: workers.length,
-            viewers: viewers.length,
+            admins: admins.length,
             requesters: requesters.length,
             departments: Array.from(departmentList).sort()
         };
 
         console.log('📊 Stats:', JSON.stringify(stats, null, 2));
         console.log('📊 Departments found:', Array.from(departmentList).sort());
+        console.log('📊 Department breakdown:', JSON.stringify(departmentStats, null, 2));
 
         return Response.json({
             success: true,
             stats: stats,
             workers: workers,
-            viewers: viewers,
+            viewers: admins,
             requesters: requesters,
             departmentStats: departmentStats,
             departmentList: Array.from(departmentList).sort(),
-            allUsers: [...workers, ...viewers, ...requesters],
+            allUsers: [...workers, ...admins, ...requesters],
             groupsFound: {
                 workerGroup: !!workerGroup,
                 adminGroup: !!adminGroup,
