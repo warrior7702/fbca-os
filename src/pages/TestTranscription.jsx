@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -93,18 +94,42 @@ export default function TestTranscription() {
         meeting_date: new Date().toISOString()
       });
       
-      console.log('📥 Response:', response);
+      console.log('📥 Full response object:', response);
+      console.log('📊 Response data:', response.data);
+      console.log('📊 Response status:', response.status);
       
       if (response.data.success) {
         setResult(response.data);
         toast.success('Transcription complete!');
       } else {
-        throw new Error(response.data.error || 'Transcription failed');
+        // Show detailed error from backend
+        const errorMsg = response.data.error || 'Transcription failed';
+        const step = response.data.step || 'unknown';
+        const details = response.data.details || '';
+        
+        console.error('❌ Backend error:', {
+          error: errorMsg,
+          step: step,
+          details: details
+        });
+        
+        throw new Error(`[${step}] ${errorMsg}${details ? '\n\nDetails: ' + details : ''}`);
       }
     } catch (err) {
       console.error('❌ Error:', err);
-      setError(err.message);
-      toast.error('Process failed: ' + err.message);
+      console.error('Error response:', err.response?.data);
+      
+      let errorMessage = err.message;
+      if (err.response?.data) {
+        const data = err.response.data;
+        errorMessage = `Step: ${data.step || 'unknown'}\nError: ${data.error || err.message}`;
+        if (data.details) {
+          errorMessage += `\n\nDetails: ${data.details}`;
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error('Process failed - check console for details');
     } finally {
       setUploading(false);
       setTranscribing(false);
@@ -210,7 +235,7 @@ export default function TestTranscription() {
                 <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div>
                   <p className="font-semibold text-red-900">Error</p>
-                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                  <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{error}</p>
                 </div>
               </div>
             </CardContent>

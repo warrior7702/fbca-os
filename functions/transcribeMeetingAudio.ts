@@ -12,7 +12,11 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) {
       console.error('❌ No authenticated user');
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json({ 
+        success: false,
+        error: 'Unauthorized',
+        step: 'authentication'
+      }, { status: 401 });
     }
     console.log('✅ User authenticated:', user.email);
 
@@ -22,7 +26,11 @@ Deno.serve(async (req) => {
 
     if (!audio_url) {
       console.error('❌ Missing audio_url');
-      return Response.json({ error: 'Missing audio_url' }, { status: 400 });
+      return Response.json({ 
+        success: false,
+        error: 'Missing audio_url',
+        step: 'validation'
+      }, { status: 400 });
     }
 
     console.log('✅ Request parsed successfully');
@@ -31,17 +39,35 @@ Deno.serve(async (req) => {
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+      console.error('❌ OPENAI_API_KEY not configured');
+      return Response.json({ 
+        success: false,
+        error: 'OPENAI_API_KEY not configured in environment variables',
+        step: 'configuration'
+      }, { status: 500 });
     }
+    console.log('✅ OpenAI API key found');
 
     // Step 1: Download the audio file
-    console.log('3️⃣ Downloading audio file...');
-    const audioResponse = await fetch(audio_url);
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download audio: ${audioResponse.status}`);
+    console.log('3️⃣ Downloading audio file from:', audio_url);
+    let audioResponse;
+    try {
+      audioResponse = await fetch(audio_url);
+      if (!audioResponse.ok) {
+        throw new Error(`HTTP ${audioResponse.status}: ${audioResponse.statusText}`);
+      }
+    } catch (downloadError) {
+      console.error('❌ Download failed:', downloadError);
+      return Response.json({ 
+        success: false,
+        error: `Failed to download audio: ${downloadError.message}`,
+        step: 'download',
+        audio_url
+      }, { status: 500 });
     }
+    
     const audioBlob = await audioResponse.blob();
-    console.log('✅ Audio downloaded:', audioBlob.size, 'bytes');
+    console.log('✅ Audio downloaded:', audioBlob.size, 'bytes, type:', audioBlob.type);
 
     // Step 2: Transcribe with Whisper
     console.log('4️⃣ Transcribing with Whisper...');
@@ -49,23 +75,35 @@ Deno.serve(async (req) => {
     formData.append('file', audioBlob, 'audio.webm');
     formData.append('model', 'whisper-1');
 
-    const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: formData
-    });
+    let transcriptionResponse;
+    try {
+      transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: formData
+      });
 
-    if (!transcriptionResponse.ok) {
-      const error = await transcriptionResponse.text();
-      console.error('❌ Whisper API error:', error);
-      throw new Error(`Whisper transcription failed: ${error}`);
+      if (!transcriptionResponse.ok) {
+        const errorText = await transcriptionResponse.text();
+        console.error('❌ Whisper API error response:', errorText);
+        throw new Error(`Whisper API returned ${transcriptionResponse.status}: ${errorText}`);
+      }
+    } catch (whisperError) {
+      console.error('❌ Whisper request failed:', whisperError);
+      return Response.json({ 
+        success: false,
+        error: `Whisper transcription failed: ${whisperError.message}`,
+        step: 'whisper',
+        details: whisperError.toString()
+      }, { status: 500 });
     }
 
     const transcriptionData = await transcriptionResponse.json();
     const transcript = transcriptionData.text;
     console.log('✅ Transcription complete:', transcript.length, 'characters');
+    console.log('📝 Transcript preview:', transcript.substring(0, 100));
 
     // Step 3: Generate summary and action items with GPT
     console.log('5️⃣ Generating summary with GPT...');
@@ -86,26 +124,38 @@ Respond in JSON format:
   "action_items": ["action 1", "action 2"]
 }`;
 
-    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a helpful meeting assistant that summarizes meetings and extracts action items.' },
-          { role: 'user', content: prompt }
-        ],
-        response_format: { type: 'json_object' }
-      })
-    });
+    let gptResponse;
+    try {
+      gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a helpful meeting assistant that summarizes meetings and extracts action items.' },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
 
-    if (!gptResponse.ok) {
-      const error = await gptResponse.text();
-      console.error('❌ GPT API error:', error);
-      throw new Error(`GPT summarization failed: ${error}`);
+      if (!gptResponse.ok) {
+        const errorText = await gptResponse.text();
+        console.error('❌ GPT API error response:', errorText);
+        throw new Error(`GPT API returned ${gptResponse.status}: ${errorText}`);
+      }
+    } catch (gptError) {
+      console.error('❌ GPT request failed:', gptError);
+      return Response.json({ 
+        success: false,
+        error: `GPT summarization failed: ${gptError.message}`,
+        step: 'gpt',
+        transcript: transcript,
+        details: gptError.toString()
+      }, { status: 500 });
     }
 
     const gptData = await gptResponse.json();
@@ -135,7 +185,9 @@ Respond in JSON format:
     return Response.json({ 
       success: false,
       error: error.message || 'Failed to transcribe meeting audio',
-      details: error.stack
+      step: 'unknown',
+      details: error.stack,
+      errorType: error.constructor.name
     }, { status: 500 });
   }
 });
