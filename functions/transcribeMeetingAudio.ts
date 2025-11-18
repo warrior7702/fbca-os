@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     console.log('2️⃣ Parsing request body...');
     const body = await req.json();
-    const { audio_url, meeting_subject, meeting_date } = body;
+    const { audio_url, meeting_subject, meeting_date, attendees } = body;
 
     if (!audio_url) {
       console.error('❌ Missing audio_url');
@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
     console.log('✅ Request parsed successfully');
     console.log('📎 Audio URL:', audio_url);
     console.log('📋 Meeting:', meeting_subject);
+    console.log('👥 Attendees:', attendees?.length || 0);
 
     // Step 1: Transcribe with Whisper
     console.log('3️⃣ Fetching audio file...');
@@ -69,18 +70,30 @@ Deno.serve(async (req) => {
     const transcript = whisperData.text;
     console.log('✅ Transcription complete:', transcript.substring(0, 100) + '...');
 
-    // Step 2: Analyze with LLM
+    // Step 2: Enhanced Analysis with LLM
     console.log('5️⃣ Analyzing with LLM...');
-    const prompt = `Analyze this meeting transcript and provide:
+    
+    const attendeeList = attendees && attendees.length > 0 
+      ? attendees.map(a => `- ${a.name} (${a.email})`).join('\n')
+      : 'Not specified';
 
-1. A concise summary (2-3 sentences)
-2. A list of action items (if any)
+    const prompt = `Analyze this meeting transcript and provide a comprehensive analysis.
 
 Meeting: ${meeting_subject || 'Meeting'}
 Date: ${meeting_date || 'N/A'}
 
+Attendees:
+${attendeeList}
+
 Transcript:
-${transcript}`;
+${transcript}
+
+Provide:
+1. A concise summary (2-3 sentences)
+2. Key discussion points (bullet points)
+3. A structured outline of topics discussed
+4. Action items with specific assignments to attendees (match names from attendee list when possible)
+5. Identify speakers and try to match them to attendees based on context`;
 
     const analysisResponse = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,
@@ -88,9 +101,40 @@ ${transcript}`;
         type: "object",
         properties: {
           summary: { type: "string" },
-          action_items: { 
+          key_points: {
             type: "array",
             items: { type: "string" }
+          },
+          outline: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                topic: { type: "string" },
+                details: { type: "string" }
+              }
+            }
+          },
+          action_items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                task: { type: "string" },
+                assigned_to: { type: "string" },
+                assigned_email: { type: "string" }
+              }
+            }
+          },
+          speakers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                email: { type: "string" }
+              }
+            }
           }
         }
       }
@@ -102,7 +146,10 @@ ${transcript}`;
       success: true,
       transcript: transcript,
       summary: analysisResponse.summary || '',
+      key_points: analysisResponse.key_points || [],
+      outline: analysisResponse.outline || [],
       action_items: analysisResponse.action_items || [],
+      speakers: analysisResponse.speakers || [],
       meeting_subject,
       meeting_date
     });
