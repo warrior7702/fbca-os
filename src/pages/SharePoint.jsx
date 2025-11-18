@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   FolderOpen,
   FileText,
@@ -20,7 +21,10 @@ import {
   Library,
   List,
   Plus,
-  Settings
+  Settings,
+  Star,
+  Clock,
+  Filter
 } from "lucide-react";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
@@ -71,6 +75,15 @@ export default function SharePointPage() {
   const [newColumnData, setNewColumnData] = useState({ columnName: '', columnType: 'text', required: false, description: '' });
   const [creatingList, setCreatingList] = useState(false);
   const [addingColumn, setAddingColumn] = useState(false);
+  const [recentFiles, setRecentFiles] = useState([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+  const [ministryFilter, setMinistryFilter] = useState('all');
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [viewMode, setViewMode] = useState('browse'); // browse, recent, favorites, search
 
   useEffect(() => {
     loadData();
@@ -96,6 +109,12 @@ export default function SharePointPage() {
       } else {
         toast.error(response.data.error || 'Failed to load SharePoint sites');
       }
+
+      // Load recent files and favorites
+      await Promise.all([
+        loadRecentFiles(),
+        loadFavorites()
+      ]);
     } catch (error) {
       console.error('Error loading SharePoint:', error);
       const errorMsg = error.response?.data?.error || error.message || 'Failed to load SharePoint sites';
@@ -103,6 +122,92 @@ export default function SharePointPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRecentFiles = async () => {
+    setLoadingRecent(true);
+    try {
+      const response = await base44.functions.invoke('getRecentSharePointFiles');
+      if (response.data.success) {
+        setRecentFiles(response.data.files);
+      }
+    } catch (error) {
+      console.error('Error loading recent files:', error);
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
+
+  const loadFavorites = async () => {
+    if (!user) return;
+    setLoadingFavorites(true);
+    try {
+      const favs = await base44.entities.SharePointFavorite.filter({
+        user_email: user.email
+      });
+      setFavorites(favs);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  const toggleFavorite = async (file, site, drive) => {
+    if (!user) return;
+
+    const existingFav = favorites.find(f => f.file_id === file.id);
+
+    try {
+      if (existingFav) {
+        await base44.entities.SharePointFavorite.delete(existingFav.id);
+        setFavorites(favorites.filter(f => f.id !== existingFav.id));
+        toast.success('Removed from favorites');
+      } else {
+        const newFav = await base44.entities.SharePointFavorite.create({
+          user_email: user.email,
+          site_id: site?.id || '',
+          site_name: site?.displayName || '',
+          drive_id: drive?.id || '',
+          drive_name: drive?.name || '',
+          file_id: file.id,
+          file_name: file.name,
+          file_url: file.webUrl,
+          ministry: 'Other',
+          last_accessed: new Date().toISOString()
+        });
+        setFavorites([...favorites, newFav]);
+        toast.success('Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorites');
+    }
+  };
+
+  const handleGlobalSearch = async () => {
+    if (!globalSearchQuery.trim()) return;
+
+    setSearching(true);
+    try {
+      const response = await base44.functions.invoke('searchSharePointFiles', {
+        searchQuery: globalSearchQuery
+      });
+
+      if (response.data.success) {
+        setSearchResults(response.data.results);
+        setViewMode('search');
+      }
+    } catch (error) {
+      console.error('Error searching:', error);
+      toast.error('Search failed');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const isFavorited = (fileId) => {
+    return favorites.some(f => f.file_id === fileId);
   };
 
   const loadLibraries = async (site) => {
@@ -349,42 +454,325 @@ export default function SharePointPage() {
           title="SharePoint Media Hub"
           description="Smart media archive and document management"
           iconColor="from-blue-500 to-indigo-500"
-          action={
-            selectedLibrary && (
-              <Button
-                onClick={() => setShowUploadModal(true)}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload
-              </Button>
-            )
-          }
         />
 
-        <div className="grid grid-cols-12 gap-6">
-          {/* Sites Sidebar */}
-          <div className="col-span-3 space-y-3">
-            <h3 className="font-semibold text-slate-900">SharePoint Sites</h3>
-            <div className="space-y-2">
-              {sites.map(site => (
-                <button
-                  key={site.id}
-                  onClick={() => loadLibraries(site)}
-                  className={`w-full p-3 rounded-lg text-left transition-all ${
-                    selectedSite?.id === site.id
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-white hover:bg-slate-50 border border-slate-200'
-                  }`}
-                >
-                  <p className="font-medium truncate">{site.displayName}</p>
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Quick Access Bar */}
+        <Card className="border-2 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <Button
+                variant={viewMode === 'browse' ? 'default' : 'outline'}
+                onClick={() => setViewMode('browse')}
+                size="sm"
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Browse Sites
+              </Button>
+              <Button
+                variant={viewMode === 'recent' ? 'default' : 'outline'}
+                onClick={() => setViewMode('recent')}
+                size="sm"
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                Recent Files
+                {recentFiles.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{recentFiles.length}</Badge>
+                )}
+              </Button>
+              <Button
+                variant={viewMode === 'favorites' ? 'default' : 'outline'}
+                onClick={() => setViewMode('favorites')}
+                size="sm"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Favorites
+                {favorites.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{favorites.length}</Badge>
+                )}
+              </Button>
 
-          {/* Main Content */}
-          <div className="col-span-9 space-y-4">
+              <div className="flex-1" />
+
+              {/* Ministry Filter */}
+              <Select value={ministryFilter} onValueChange={setMinistryFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ministries</SelectItem>
+                  <SelectItem value="Youth">Youth</SelectItem>
+                  <SelectItem value="Worship">Worship</SelectItem>
+                  <SelectItem value="Pastoral">Pastoral</SelectItem>
+                  <SelectItem value="Children">Children</SelectItem>
+                  <SelectItem value="Outreach">Outreach</SelectItem>
+                  <SelectItem value="Events">Events</SelectItem>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Facilities">Facilities</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Global Search */}
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search all files..."
+                  value={globalSearchQuery}
+                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleGlobalSearch()}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                onClick={handleGlobalSearch}
+                disabled={searching || !globalSearchQuery.trim()}
+                size="sm"
+              >
+                {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content Area */}
+        {viewMode === 'recent' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+                Recently Accessed Files
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingRecent ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                </div>
+              ) : recentFiles.length === 0 ? (
+                <p className="text-center text-slate-600 py-8">No recent files</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {recentFiles.map(file => (
+                    <motion.div
+                      key={file.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            {getFileIcon(file)}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-medium text-sm truncate">{file.name}</p>
+                                <button
+                                  onClick={() => toggleFavorite(file, null, null)}
+                                  className="flex-shrink-0"
+                                >
+                                  <Star
+                                    className={`w-4 h-4 ${
+                                      isFavorited(file.id)
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : 'text-slate-400'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                              {file.size && (
+                                <p className="text-xs text-slate-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              )}
+                              {file.lastModifiedDateTime && (
+                                <p className="text-xs text-slate-400">
+                                  {format(new Date(file.lastModifiedDateTime), 'MMM d, yyyy')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {file.webUrl && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full mt-3"
+                              onClick={() => window.open(file.webUrl, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-2" />
+                              Open
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {viewMode === 'favorites' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Your Favorites
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingFavorites ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                </div>
+              ) : favorites.length === 0 ? (
+                <p className="text-center text-slate-600 py-8">
+                  No favorites yet. Click the star icon on any file to add it here.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {favorites
+                    .filter(fav => ministryFilter === 'all' || fav.ministry === ministryFilter)
+                    .map(fav => (
+                      <motion.div
+                        key={fav.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-slate-50 rounded-lg border border-slate-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="w-8 h-8 text-blue-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{fav.file_name}</p>
+                              <p className="text-xs text-slate-500">
+                                {fav.site_name} / {fav.drive_name}
+                              </p>
+                              <Badge className={MINISTRY_COLORS[fav.ministry] || 'bg-slate-100'}>
+                                {fav.ministry}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {fav.file_url && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(fav.file_url, '_blank')}
+                              >
+                                <ExternalLink className="w-3 h-3 mr-2" />
+                                Open
+                              </Button>
+                            )}
+                            <button
+                              onClick={async () => {
+                                await base44.entities.SharePointFavorite.delete(fav.id);
+                                setFavorites(favorites.filter(f => f.id !== fav.id));
+                                toast.success('Removed from favorites');
+                              }}
+                            >
+                              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {viewMode === 'search' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5 text-blue-600" />
+                Search Results for "{globalSearchQuery}"
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {searchResults.length === 0 ? (
+                <p className="text-center text-slate-600 py-8">No results found</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {searchResults.map(file => (
+                    <motion.div
+                      key={file.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            {getFileIcon(file)}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-medium text-sm truncate">{file.name}</p>
+                                <button
+                                  onClick={() => toggleFavorite(file, null, null)}
+                                  className="flex-shrink-0"
+                                >
+                                  <Star
+                                    className={`w-4 h-4 ${
+                                      isFavorited(file.id)
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : 'text-slate-400'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                              {file.size && (
+                                <p className="text-xs text-slate-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {file.webUrl && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full mt-3"
+                              onClick={() => window.open(file.webUrl, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-2" />
+                              Open
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {viewMode === 'browse' && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* Sites Sidebar */}
+            <div className="col-span-3 space-y-3">
+              <h3 className="font-semibold text-slate-900">SharePoint Sites</h3>
+              <div className="space-y-2">
+                {sites.map(site => (
+                  <button
+                    key={site.id}
+                    onClick={() => loadLibraries(site)}
+                    className={`w-full p-3 rounded-lg text-left transition-all ${
+                      selectedSite?.id === site.id
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    <p className="font-medium truncate">{site.displayName}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="col-span-9 space-y-4">
             {!selectedSite ? (
               <Card>
                 <CardContent className="p-12 text-center">
@@ -485,11 +873,28 @@ export default function SharePointPage() {
                         <Card className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
-                              {getFileIcon(file)}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">
-                                  {file.name}
-                                </p>
+                            {getFileIcon(file)}
+                            <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm truncate">
+                              {file.name}
+                            </p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(file, selectedSite, selectedLibrary);
+                              }}
+                              className="flex-shrink-0"
+                            >
+                              <Star
+                                className={`w-4 h-4 ${
+                                  isFavorited(file.id)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-slate-400'
+                                }`}
+                              />
+                            </button>
+                            </div>
                                 {file.size && (
                                   <p className="text-xs text-slate-500">
                                     {(file.size / 1024 / 1024).toFixed(2)} MB
@@ -617,8 +1022,9 @@ export default function SharePointPage() {
                 </TabsContent>
               </Tabs>
             )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Create List Modal */}
         <Dialog open={showCreateListModal} onOpenChange={setShowCreateListModal}>
