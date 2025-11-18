@@ -521,9 +521,9 @@ export default function SharePointPage() {
                 )}
               </div>
             )}
-                </TabsContent>
+          </TabsContent>
 
-                <TabsContent value="lists" className="mt-4">
+          <TabsContent value="lists" className="mt-4">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-slate-900">
