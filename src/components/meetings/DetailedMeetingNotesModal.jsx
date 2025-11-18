@@ -1,36 +1,19 @@
-
-import React, { useState } from "react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { 
   User, 
   Users,
-  MessageSquare,
-  Download, // Download icon is imported but not used in the final code, keeping for consistency with original file.
-  X // X icon is imported but not used in the final code, keeping for consistency with original file.
+  MessageSquare
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { // Command components are imported but not used in the final code, keeping for consistency with original file.
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { // Popover components are imported but not used in the final code, keeping for consistency with original file.
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import AudioTranscriptPlayer from "./AudioTranscriptPlayer"; // New import
+import AudioTranscriptPlayer from "./AudioTranscriptPlayer";
 
 export default function DetailedMeetingNotesModal({ 
   open, 
@@ -40,15 +23,12 @@ export default function DetailedMeetingNotesModal({
   staffResults = [],
   onSearchStaff
 }) {
-  // Removed useState for editingSegmentIndex and searchQuery as their logic is moved into AudioTranscriptPlayer
-
   if (!note) return null;
 
   const handleAssignSpeaker = (segmentIndex, person) => {
     if (onUpdateSegmentSpeaker) {
       onUpdateSegmentSpeaker(segmentIndex, person);
     }
-    // Removed setEditingSegmentIndex(null) and setSearchQuery('') as state management is now within AudioTranscriptPlayer
   };
 
   const handleRemoveSpeaker = (segmentIndex) => {
