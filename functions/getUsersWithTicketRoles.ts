@@ -101,29 +101,42 @@ Deno.serve(async (req) => {
                 const groupNames = userGroups.map(g => g.displayName);
 
                 // Determine role
-                const isWorker = groupNames.includes('OS_Ticket_Worker');
                 const isAdmin = groupNames.includes('OS_Ticket_Admin');
+                const isWorker = groupNames.includes('OS_Ticket_Worker');
                 
                 // Get departments
                 const userDepts = groupNames
                     .filter(name => name?.startsWith('Dept_'))
                     .map(name => name.replace('Dept_', ''));
 
+                // Determine role: Admin > Worker > Requester (if has Dept_)
+                let ticketRole = null;
+                if (isAdmin) {
+                    ticketRole = 'admin';
+                } else if (isWorker) {
+                    ticketRole = 'worker';
+                } else if (userDepts.length > 0) {
+                    ticketRole = 'requester';
+                }
+
+                // Skip users with no ticket system access
+                if (!ticketRole) continue;
+
                 const userInfo = {
                     id: u.id,
                     user_name: u.displayName,
                     user_email: u.mail || u.userPrincipalName,
-                    ticket_role: isWorker ? 'worker' : (isAdmin ? 'admin' : 'requester'),
+                    ticket_role: ticketRole,
                     departments: userDepts,
                     department: userDepts.join(', ') || null,
                     groups: groupNames
                 };
 
                 // Categorize by primary role
-                if (isWorker) {
-                    workers.push(userInfo);
-                } else if (isAdmin) {
+                if (ticketRole === 'admin') {
                     admins.push(userInfo);
+                } else if (ticketRole === 'worker') {
+                    workers.push(userInfo);
                 } else {
                     requesters.push(userInfo);
                 }
