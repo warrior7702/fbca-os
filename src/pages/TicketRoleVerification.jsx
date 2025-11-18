@@ -140,7 +140,7 @@ export default function TicketRoleVerification() {
                             <Shield className="w-7 h-7 text-blue-600" />
                             Ticket Role Management
                         </h1>
-                        <p className="text-slate-600">Manage ticket system role assignments</p>
+                        <p className="text-slate-600">View roles assigned via Microsoft Security Groups</p>
                     </div>
                     <Button
                         onClick={fetchUserData}
@@ -159,11 +159,16 @@ export default function TicketRoleVerification() {
                         <CardContent className="p-12 text-center">
                             <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                                Ready to View Ticket Role Assignments
+                                Ready to Scan Security Groups
                             </h3>
-                            <p className="text-slate-600 mb-6">
-                                Click "Fetch Data" to load current role assignments
+                            <p className="text-slate-600 mb-4">
+                                Click "Fetch Data" to scan Microsoft Security Groups
                             </p>
+                            <div className="text-sm text-slate-500 space-y-1">
+                                <p>• <strong>OS_Ticket_Worker</strong> = Worker role</p>
+                                <p>• <strong>OS_Ticket_Admin</strong> = Admin/Viewer role</p>
+                                <p>• <strong>Dept_*</strong> groups = Department assignments</p>
+                            </div>
                         </CardContent>
                     </Card>
                 ) : (
@@ -352,15 +357,15 @@ export default function TicketRoleVerification() {
                             </TabsList>
 
                             <TabsContent value="workers" className="mt-4">
-                                <UserList users={filterUsers(data.workers)} onDelete={deleteAssignment} />
+                                <UserList users={filterUsers(data.workers)} />
                             </TabsContent>
 
                             <TabsContent value="viewers" className="mt-4">
-                                <UserList users={filterUsers(data.viewers)} onDelete={deleteAssignment} />
+                                <UserList users={filterUsers(data.viewers)} />
                             </TabsContent>
 
                             <TabsContent value="all" className="mt-4">
-                                <UserList users={filterUsers(data.allUsers)} onDelete={deleteAssignment} />
+                                <UserList users={filterUsers(data.allUsers)} />
                             </TabsContent>
                         </Tabs>
                     </>
@@ -370,12 +375,12 @@ export default function TicketRoleVerification() {
     );
 }
 
-function UserList({ users, onDelete }) {
+function UserList({ users }) {
     if (users.length === 0) {
         return (
             <Card>
                 <CardContent className="p-8 text-center">
-                    <p className="text-slate-500">No assignments found</p>
+                    <p className="text-slate-500">No users found</p>
                 </CardContent>
             </Card>
         );
@@ -396,18 +401,27 @@ function UserList({ users, onDelete }) {
                                 <div className="min-w-0 flex-1">
                                     <p className="font-semibold text-slate-900 truncate">{user.user_name}</p>
                                     <p className="text-sm text-slate-600 truncate">{user.user_email}</p>
+                                    {user.departments && user.departments.length > 0 && (
+                                        <p className="text-xs text-slate-500 truncate">
+                                            {user.departments.length} department{user.departments.length > 1 ? 's' : ''}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                                 <Badge className={
                                     user.ticket_role === 'worker' 
                                         ? 'bg-green-100 text-green-700 border border-green-300' 
-                                        : 'bg-blue-100 text-blue-700 border border-blue-300'
+                                        : user.ticket_role === 'admin'
+                                        ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                                        : 'bg-slate-100 text-slate-700 border border-slate-300'
                                 }>
                                     {user.ticket_role === 'worker' ? (
                                         <><UserCheck className="w-3 h-3 mr-1" /> Worker</>
+                                    ) : user.ticket_role === 'admin' ? (
+                                        <><Eye className="w-3 h-3 mr-1" /> Admin</>
                                     ) : (
-                                        <><Eye className="w-3 h-3 mr-1" /> Viewer</>
+                                        'Requester'
                                     )}
                                 </Badge>
                                 {user.department && (
@@ -416,14 +430,6 @@ function UserList({ users, onDelete }) {
                                         {user.department}
                                     </Badge>
                                 )}
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => onDelete(user.id)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                    Remove
-                                </Button>
                             </div>
                         </div>
                     </CardContent>
