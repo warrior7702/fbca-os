@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Dialog,
@@ -12,11 +13,11 @@ import {
   User, 
   Users,
   MessageSquare,
-  Download,
-  X
+  Download, // Download icon is imported but not used in the final code, keeping for consistency with original file.
+  X // X icon is imported but not used in the final code, keeping for consistency with original file.
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import {
+import { // Command components are imported but not used in the final code, keeping for consistency with original file.
   Command,
   CommandEmpty,
   CommandGroup,
@@ -24,11 +25,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
+import { // Popover components are imported but not used in the final code, keeping for consistency with original file.
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import AudioTranscriptPlayer from "./AudioTranscriptPlayer"; // New import
 
 export default function DetailedMeetingNotesModal({ 
   open, 
@@ -38,8 +40,7 @@ export default function DetailedMeetingNotesModal({
   staffResults = [],
   onSearchStaff
 }) {
-  const [editingSegmentIndex, setEditingSegmentIndex] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Removed useState for editingSegmentIndex and searchQuery as their logic is moved into AudioTranscriptPlayer
 
   if (!note) return null;
 
@@ -47,8 +48,7 @@ export default function DetailedMeetingNotesModal({
     if (onUpdateSegmentSpeaker) {
       onUpdateSegmentSpeaker(segmentIndex, person);
     }
-    setEditingSegmentIndex(null);
-    setSearchQuery('');
+    // Removed setEditingSegmentIndex(null) and setSearchQuery('') as state management is now within AudioTranscriptPlayer
   };
 
   const handleRemoveSpeaker = (segmentIndex) => {
@@ -91,104 +91,30 @@ export default function DetailedMeetingNotesModal({
             </Card>
           )}
 
-          {/* Transcript with Speaker Assignment */}
+          {/* Audio Player with Transcript */}
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-4">
               <MessageSquare className="w-4 h-4 text-blue-600" />
-              <h3 className="font-semibold text-slate-900">Transcript</h3>
+              <h3 className="font-semibold text-slate-900">Audio & Transcript</h3>
               <Badge variant="secondary" className="ml-auto">
                 {note.transcript_segments?.length || 0} segments
               </Badge>
             </div>
 
-            <div className="space-y-3">
-              {note.transcript_segments && note.transcript_segments.length > 0 ? (
-                note.transcript_segments.map((segment, idx) => (
-                  <div
-                    key={idx}
-                    className="group p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        {segment.speaker_name ? (
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-300">
-                              <User className="w-3 h-3 mr-1" />
-                              {segment.speaker_name}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleRemoveSpeaker(idx)}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Popover 
-                            open={editingSegmentIndex === idx} 
-                            onOpenChange={(open) => !open && setEditingSegmentIndex(null)}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="mb-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
-                                  setEditingSegmentIndex(idx);
-                                  if (onSearchStaff) onSearchStaff('');
-                                }}
-                              >
-                                <User className="w-3 h-3 mr-2" />
-                                Assign Speaker
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-0" align="start">
-                              <Command>
-                                <CommandInput 
-                                  placeholder="Search for speaker..." 
-                                  value={searchQuery}
-                                  onValueChange={(value) => {
-                                    setSearchQuery(value);
-                                    if (onSearchStaff) onSearchStaff(value);
-                                  }}
-                                />
-                                <CommandList>
-                                  <CommandEmpty>No staff found</CommandEmpty>
-                                  <CommandGroup>
-                                    {staffResults.map((person) => (
-                                      <CommandItem
-                                        key={person.id}
-                                        onSelect={() => handleAssignSpeaker(idx, person)}
-                                      >
-                                        <User className="w-4 h-4 mr-2" />
-                                        <div>
-                                          <p className="font-medium">{person.displayName}</p>
-                                          <p className="text-xs text-slate-500">{person.mail || person.userPrincipalName}</p>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                        <p className="text-slate-700 leading-relaxed">{segment.text}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-6 text-center text-slate-500">
-                  <p>No transcript segments available</p>
-                  {note.transcript && (
-                    <p className="text-xs mt-2">View full transcript in the main notes view</p>
-                  )}
-                </div>
-              )}
-            </div>
+            {note.audio_url ? (
+              <AudioTranscriptPlayer
+                audioUrl={note.audio_url}
+                segments={note.transcript_segments || []}
+                onAssignSpeaker={handleAssignSpeaker}
+                onRemoveSpeaker={handleRemoveSpeaker}
+                staffResults={staffResults}
+                onSearchStaff={onSearchStaff}
+              />
+            ) : (
+              <div className="p-6 text-center text-slate-500">
+                <p>No audio available</p>
+              </div>
+            )}
           </Card>
         </div>
       </DialogContent>

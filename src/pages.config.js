@@ -48,6 +48,7 @@ import AkitaFetch from './pages/AkitaFetch';
 import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
 import MeetingNotes from './pages/MeetingNotes';
 import TestTranscription from './pages/TestTranscription';
+import VoiceProfiles from './pages/VoiceProfiles';
 import __Layout from './Layout.jsx';
 
 
@@ -102,6 +103,7 @@ export const PAGES = {
     "AkitaBoxExplorer": AkitaBoxExplorer,
     "MeetingNotes": MeetingNotes,
     "TestTranscription": TestTranscription,
+    "VoiceProfiles": VoiceProfiles,
 }
 
 export const pagesConfig = {
