@@ -82,7 +82,7 @@ const apps = [
   {
     name: "SharePoint",
     path: "SharePoint",
-    icon: Folder,
+    icon: FileSpreadsheet,
     color: "text-cyan-500"
   },
   {
