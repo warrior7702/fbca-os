@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -80,7 +79,7 @@ export default function MyMeetings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [staffResults, setStaffResults] = useState([]);
   const [searchingStaff, setSearchingStaff] = useState(false);
-  const [selectedPerson, setSelectedPerson] = null);
+  const [selectedPerson, setSelectedPerson] = useState(null);
   const [hasBookings, setHasBookings] = useState(false);
   const [bookingBusiness, setBookingBusiness] = useState(null);
   const [bookingServices, setBookingServices] = useState([]);
