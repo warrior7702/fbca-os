@@ -4,22 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
     Users,
-    Briefcase,
-    AlertCircle,
     ArrowLeft,
     Loader2,
     Search,
-    CheckCircle,
-    XCircle,
     Building2,
     Shield,
     UserCheck,
-    UserX,
     RefreshCw,
-    Eye,
-    Info,
-    Server,
-    Cloud
+    Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +31,7 @@ export default function TicketRoleVerification() {
     const [activeTab, setActiveTab] = useState("workers");
     const [sortBy, setSortBy] = useState("name");
     const [departmentFilter, setDepartmentFilter] = useState("all");
+    const [addingUser, setAddingUser] = useState(false);
 
     useEffect(() => {
         loadUser();
@@ -83,33 +76,43 @@ export default function TicketRoleVerification() {
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(u =>
-                u.displayName?.toLowerCase().includes(query) ||
-                u.email?.toLowerCase().includes(query) ||
-                u.osDept?.toLowerCase().includes(query) ||
+                u.user_name?.toLowerCase().includes(query) ||
+                u.user_email?.toLowerCase().includes(query) ||
                 u.department?.toLowerCase().includes(query)
             );
         }
 
         // Filter by department
         if (departmentFilter !== "all") {
-            filtered = filtered.filter(u => u.osDept === departmentFilter);
+            filtered = filtered.filter(u => u.department === departmentFilter);
         }
 
         // Sort
         filtered = [...filtered].sort((a, b) => {
             switch (sortBy) {
                 case "name":
-                    return (a.displayName || "").localeCompare(b.displayName || "");
+                    return (a.user_name || "").localeCompare(b.user_name || "");
                 case "email":
-                    return (a.email || "").localeCompare(b.email || "");
+                    return (a.user_email || "").localeCompare(b.user_email || "");
                 case "department":
-                    return (a.osDept || "").localeCompare(b.osDept || "");
+                    return (a.department || "").localeCompare(b.department || "");
                 default:
                     return 0;
             }
         });
 
         return filtered;
+    };
+
+    const deleteAssignment = async (assignmentId) => {
+        try {
+            await base44.entities.TicketRoleAssignment.delete(assignmentId);
+            toast.success('Assignment removed');
+            fetchUserData();
+        } catch (error) {
+            console.error('Error deleting assignment:', error);
+            toast.error('Failed to remove assignment');
+        }
     };
 
     if (loading) {
@@ -135,9 +138,9 @@ export default function TicketRoleVerification() {
                     <div className="flex-1">
                         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
                             <Shield className="w-7 h-7 text-blue-600" />
-                            Ticket Role Verification
+                            Ticket Role Management
                         </h1>
-                        <p className="text-slate-600">Verify Hybrid AD extension attributes (synced to Entra ID)</p>
+                        <p className="text-slate-600">Manage ticket system role assignments</p>
                     </div>
                     <Button
                         onClick={fetchUserData}
@@ -149,36 +152,17 @@ export default function TicketRoleVerification() {
                     </Button>
                 </div>
 
-                {/* Info Alert */}
-                <Alert className="mb-6 border-blue-200 bg-blue-50">
-                    <Info className="w-4 h-4 text-blue-600" />
-                    <AlertDescription className="text-sm text-blue-900">
-                        <div className="space-y-2">
-                            <p className="font-semibold flex items-center gap-2">
-                                <Server className="w-4 h-4" />
-                                Hybrid AD Setup (On-Premises → Azure AD Connect → Entra ID)
-                            </p>
-                            <div className="space-y-1 ml-6">
-                                <p><strong>extensionAttribute1 (OSTicketRole):</strong> "worker" = assignable | "viewer" = read-only</p>
-                                <p><strong>extensionAttribute2 (OSDept):</strong> Department classification (Admin, Kitchen, Comms, etc.)</p>
-                                <p className="text-xs mt-2 text-blue-700">Set in on-prem AD Attribute Editor → Synced to Entra ID → Accessible via Graph API</p>
-                            </div>
-                        </div>
-                    </AlertDescription>
-                </Alert>
+
 
                 {!data ? (
                     <Card>
                         <CardContent className="p-12 text-center">
                             <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                                Ready to Verify Extension Attributes
+                                Ready to View Ticket Role Assignments
                             </h3>
                             <p className="text-slate-600 mb-6">
-                                Click "Fetch Data" to load users from Microsoft Entra ID
-                            </p>
-                            <p className="text-sm text-slate-500">
-                                This will pull onPremisesExtensionAttributes synced from your local AD
+                                Click "Fetch Data" to load current role assignments
                             </p>
                         </CardContent>
                     </Card>
@@ -224,25 +208,13 @@ export default function TicketRoleVerification() {
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm text-slate-600">No Role Set</p>
-                                            <p className="text-xs text-slate-500 mb-1">(extensionAttribute1)</p>
-                                            <p className="text-2xl font-bold text-orange-700">{data.stats.uncategorized}</p>
-                                        </div>
-                                        <UserX className="w-8 h-8 text-orange-500" />
-                                    </div>
-                                </CardContent>
-                            </Card>
+
 
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-slate-600">Departments</p>
-                                            <p className="text-xs text-slate-500 mb-1">(extensionAttribute2)</p>
                                             <p className="text-2xl font-bold text-purple-700">{data.stats.departments.length}</p>
                                         </div>
                                         <Building2 className="w-8 h-8 text-purple-500" />
@@ -251,42 +223,13 @@ export default function TicketRoleVerification() {
                             </Card>
                         </div>
 
-                        {/* Token & Setup Info */}
-                        <div className="grid md:grid-cols-2 gap-4 mb-6">
-                            <Card className="border-green-300 bg-green-50">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <CheckCircle className="w-5 h-5 text-green-600" />
-                                        <div>
-                                            <p className="font-semibold text-green-900">Using {data.tokenSource} Token</p>
-                                            <p className="text-sm text-green-700">Successfully retrieved onPremisesExtensionAttributes</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {data.setupInfo && (
-                                <Card className="border-blue-300 bg-blue-50">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center gap-3">
-                                            <Server className="w-5 h-5 text-blue-600" />
-                                            <div>
-                                                <p className="font-semibold text-blue-900">{data.setupInfo.type}</p>
-                                                <p className="text-sm text-blue-700">{data.setupInfo.syncedFrom}</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-
-                        {/* Department List (OSDept values) */}
+                        {/* Department List */}
                         {data.departmentList && data.departmentList.length > 0 && (
                             <Card className="mb-6">
                                 <CardHeader>
                                     <CardTitle className="text-sm flex items-center gap-2">
                                         <Building2 className="w-4 h-4" />
-                                        Departments Found (extensionAttribute2 / OSDept)
+                                        Departments
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -333,15 +276,7 @@ export default function TicketRoleVerification() {
                                                             </span>
                                                             <span className="font-semibold">{stats.viewers}</span>
                                                         </div>
-                                                        {stats.noRole > 0 && (
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="flex items-center gap-1">
-                                                                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                                                                    No role:
-                                                                </span>
-                                                                <span className="font-semibold">{stats.noRole}</span>
-                                                            </div>
-                                                        )}
+
                                                         <div className="flex items-center justify-between border-t pt-1 mt-1">
                                                             <span>Total:</span>
                                                             <span className="font-bold">{stats.total}</span>
@@ -401,7 +336,7 @@ export default function TicketRoleVerification() {
 
                         {/* User Lists */}
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
-                            <TabsList className="grid w-full grid-cols-4">
+                            <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="workers">
                                     <UserCheck className="w-4 h-4 mr-2" />
                                     Workers ({data.stats.workers})
@@ -410,10 +345,6 @@ export default function TicketRoleVerification() {
                                     <Eye className="w-4 h-4 mr-2" />
                                     Viewers ({data.stats.viewers})
                                 </TabsTrigger>
-                                <TabsTrigger value="uncategorized">
-                                    <UserX className="w-4 h-4 mr-2" />
-                                    No Role ({data.stats.uncategorized})
-                                </TabsTrigger>
                                 <TabsTrigger value="all">
                                     <Users className="w-4 h-4 mr-2" />
                                     All ({data.stats.total})
@@ -421,19 +352,15 @@ export default function TicketRoleVerification() {
                             </TabsList>
 
                             <TabsContent value="workers" className="mt-4">
-                                <UserList users={filterUsers(data.workers)} />
+                                <UserList users={filterUsers(data.workers)} onDelete={deleteAssignment} />
                             </TabsContent>
 
                             <TabsContent value="viewers" className="mt-4">
-                                <UserList users={filterUsers(data.viewers)} />
-                            </TabsContent>
-
-                            <TabsContent value="uncategorized" className="mt-4">
-                                <UserList users={filterUsers(data.uncategorized)} />
+                                <UserList users={filterUsers(data.viewers)} onDelete={deleteAssignment} />
                             </TabsContent>
 
                             <TabsContent value="all" className="mt-4">
-                                <UserList users={filterUsers(data.allUsers)} />
+                                <UserList users={filterUsers(data.allUsers)} onDelete={deleteAssignment} />
                             </TabsContent>
                         </Tabs>
                     </>
@@ -443,12 +370,12 @@ export default function TicketRoleVerification() {
     );
 }
 
-function UserList({ users }) {
+function UserList({ users, onDelete }) {
     if (users.length === 0) {
         return (
             <Card>
                 <CardContent className="p-8 text-center">
-                    <p className="text-slate-500">No users found</p>
+                    <p className="text-slate-500">No assignments found</p>
                 </CardContent>
             </Card>
         );
@@ -463,46 +390,40 @@ function UserList({ users }) {
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
                                     <span className="text-white text-sm font-bold">
-                                        {user.displayName?.[0]?.toUpperCase() || 'U'}
+                                        {user.user_name?.[0]?.toUpperCase() || 'U'}
                                     </span>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="font-semibold text-slate-900 truncate">{user.displayName}</p>
-                                    <p className="text-sm text-slate-600 truncate">{user.email}</p>
-                                    {user.jobTitle && (
-                                        <p className="text-xs text-slate-500 truncate">{user.jobTitle}</p>
-                                    )}
+                                    <p className="font-semibold text-slate-900 truncate">{user.user_name}</p>
+                                    <p className="text-sm text-slate-600 truncate">{user.user_email}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                                {user.osTicketRole ? (
-                                    <Badge className={
-                                        user.osTicketRole === 'worker' 
-                                            ? 'bg-green-100 text-green-700 border border-green-300' 
-                                            : 'bg-blue-100 text-blue-700 border border-blue-300'
-                                    }>
-                                        {user.osTicketRole === 'worker' ? (
-                                            <><UserCheck className="w-3 h-3 mr-1" /> Worker</>
-                                        ) : (
-                                            <><Eye className="w-3 h-3 mr-1" /> Viewer</>
-                                        )}
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                        <UserX className="w-3 h-3 mr-1" />
-                                        No Role
-                                    </Badge>
-                                )}
-                                {user.osDept ? (
+                                <Badge className={
+                                    user.ticket_role === 'worker' 
+                                        ? 'bg-green-100 text-green-700 border border-green-300' 
+                                        : 'bg-blue-100 text-blue-700 border border-blue-300'
+                                }>
+                                    {user.ticket_role === 'worker' ? (
+                                        <><UserCheck className="w-3 h-3 mr-1" /> Worker</>
+                                    ) : (
+                                        <><Eye className="w-3 h-3 mr-1" /> Viewer</>
+                                    )}
+                                </Badge>
+                                {user.department && (
                                     <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
                                         <Building2 className="w-3 h-3 mr-1" />
-                                        {user.osDept}
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" className="text-slate-400">
-                                        No Dept
+                                        {user.department}
                                     </Badge>
                                 )}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => onDelete(user.id)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                    Remove
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
