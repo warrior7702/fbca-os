@@ -73,6 +73,13 @@ Deno.serve(async (req) => {
             deptGroups: deptGroups.map(g => g.displayName)
         });
 
+        if (!workerGroup) {
+            console.warn('⚠️ OS_Ticket_Worker group not found!');
+        }
+        if (!adminGroup) {
+            console.warn('⚠️ OS_Ticket_Admin group not found!');
+        }
+
         // Process each user to get their group memberships
         const workers = [];
         const admins = [];
@@ -100,9 +107,14 @@ Deno.serve(async (req) => {
                 const userGroups = memberOfData.value || [];
                 const groupNames = userGroups.map(g => g.displayName);
 
-                // Determine role
+                // Determine role (exact match, case-sensitive)
                 const isAdmin = groupNames.includes('OS_Ticket_Admin');
                 const isWorker = groupNames.includes('OS_Ticket_Worker');
+
+                // Debug log for first few users
+                if (processedCount < 3 || isWorker || isAdmin) {
+                    console.log(`👤 User ${u.displayName}: Admin=${isAdmin}, Worker=${isWorker}, Groups=[${groupNames.join(', ')}]`);
+                }
                 
                 // Get departments
                 const userDepts = groupNames
