@@ -1,67 +1,99 @@
-
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Upload, FileAudio, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Mic, Square, FileAudio, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TestTranscription() {
-  const [file, setFile] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [audioBlob, setAudioBlob] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState('');
   const [transcribing, setTranscribing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingIntervalRef = useRef(null);
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+        console.log('✅ Recording saved:', blob.size, 'bytes');
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+      setRecordingTime(0);
       setUploadedUrl('');
       setResult(null);
       setError(null);
-      console.log('📁 File selected:', selectedFile.name, selectedFile.type, selectedFile.size, 'bytes');
+
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+      toast.success("Recording started!");
+    } catch (err) {
+      console.error('❌ Recording error:', err);
+      setError('Failed to start recording: ' + err.message);
+      toast.error("Failed to start recording");
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      clearInterval(recordingIntervalRef.current);
+      toast.success("Recording stopped");
+    }
+  };
+
+  const handleUploadAndTranscribe = async () => {
+    if (!audioBlob) return;
 
     setUploading(true);
     setError(null);
+    
     try {
-      console.log('⬆️ Uploading file...');
-      const response = await base44.integrations.Core.UploadFile({ file });
-      console.log('✅ Upload response:', response);
-      setUploadedUrl(response.file_url);
-      toast.success('File uploaded!');
-    } catch (err) {
-      console.error('❌ Upload error:', err);
-      setError('Upload failed: ' + err.message);
-      toast.error('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleTranscribe = async () => {
-    if (!uploadedUrl) return;
-
-    setTranscribing(true);
-    setError(null);
-    try {
-      console.log('🎙️ Starting transcription...');
-      console.log('Audio URL:', uploadedUrl);
+      // Step 1: Upload
+      console.log('⬆️ Uploading audio...');
+      const uploadResponse = await base44.integrations.Core.UploadFile({
+        file: new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
+      });
+      console.log('✅ Uploaded:', uploadResponse.file_url);
+      setUploadedUrl(uploadResponse.file_url);
       
+      setUploading(false);
+      setTranscribing(true);
+      
+      // Step 2: Transcribe
+      console.log('🎙️ Transcribing...');
       const response = await base44.functions.invoke('transcribeMeetingAudio', {
-        audio_url: uploadedUrl,
-        meeting_subject: 'Test Meeting',
+        audio_url: uploadResponse.file_url,
+        meeting_subject: 'Test Recording',
         meeting_date: new Date().toISOString()
       });
       
-      console.log('📥 Full response:', response);
-      console.log('📊 Response data:', response.data);
+      console.log('📥 Response:', response);
       
       if (response.data.success) {
         setResult(response.data);
@@ -70,13 +102,19 @@ export default function TestTranscription() {
         throw new Error(response.data.error || 'Transcription failed');
       }
     } catch (err) {
-      console.error('❌ Transcription error:', err);
-      console.error('Error details:', err.response?.data);
-      setError('Transcription failed: ' + err.message);
-      toast.error('Transcription failed');
+      console.error('❌ Error:', err);
+      setError(err.message);
+      toast.error('Process failed: ' + err.message);
     } finally {
+      setUploading(false);
       setTranscribing(false);
     }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -84,46 +122,67 @@ export default function TestTranscription() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Audio Transcription Test</h1>
-          <p className="text-slate-600">Upload an audio file to test the transcription functionality</p>
-          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900 font-semibold mb-1">Supported Audio Formats:</p>
-            <p className="text-sm text-blue-700">mp3, mp4, mpeg, mpga, m4a, wav, webm</p>
-            <p className="text-xs text-blue-600 mt-1">Maximum file size: 25 MB</p>
-          </div>
+          <p className="text-slate-600">Record audio from your microphone to test transcription</p>
         </div>
 
-        {/* Step 1: Upload File */}
+        {/* Recording Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              Step 1: Upload Audio File
+              <Mic className="w-5 h-5" />
+              Step 1: Record Audio
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <input
-              type="file"
-              accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,audio/*"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-slate-600
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-lg file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
-            />
-            
-            {file && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <FileAudio className="w-4 h-4" />
-                <span>{file.name}</span>
-                <span className="text-slate-400">({Math.round(file.size / 1024)} KB, {file.type})</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {!recording && !audioBlob && (
+                <Button onClick={startRecording} className="bg-red-600 hover:bg-red-700">
+                  <Mic className="w-4 h-4 mr-2" />
+                  Start Recording
+                </Button>
+              )}
+              
+              {recording && (
+                <>
+                  <Button onClick={stopRecording} className="bg-red-600 hover:bg-red-700">
+                    <Square className="w-4 h-4 mr-2" />
+                    Stop Recording
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-sm font-medium">{formatTime(recordingTime)}</span>
+                  </div>
+                </>
+              )}
 
+              {audioBlob && !recording && (
+                <div className="flex items-center gap-2 text-sm text-green-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Recording saved ({Math.round(audioBlob.size / 1024)} KB)</span>
+                </div>
+              )}
+            </div>
+
+            {audioBlob && (
+              <Button onClick={() => { setAudioBlob(null); setUploadedUrl(''); setResult(null); }} variant="outline">
+                Record Again
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Process Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileAudio className="w-5 h-5" />
+              Step 2: Upload & Transcribe
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <Button 
-              onClick={handleUpload} 
-              disabled={!file || uploading}
+              onClick={handleUploadAndTranscribe} 
+              disabled={!audioBlob || uploading || transcribing}
               className="w-full"
             >
               {uploading ? (
@@ -131,47 +190,13 @@ export default function TestTranscription() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Uploading...
                 </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload File
-                </>
-              )}
-            </Button>
-
-            {uploadedUrl && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-green-800">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>File uploaded successfully!</span>
-                </div>
-                <p className="text-xs text-green-600 mt-1 break-all">{uploadedUrl}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Step 2: Transcribe */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileAudio className="w-5 h-5" />
-              Step 2: Transcribe Audio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={handleTranscribe} 
-              disabled={!uploadedUrl || transcribing}
-              className="w-full"
-            >
-              {transcribing ? (
+              ) : transcribing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Transcribing... (this may take 30-60 seconds)
+                  Transcribing... (may take 30-60 seconds)
                 </>
               ) : (
-                'Start Transcription'
+                'Upload & Transcribe'
               )}
             </Button>
           </CardContent>
