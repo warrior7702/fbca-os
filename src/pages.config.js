@@ -49,6 +49,7 @@ import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
 import MeetingNotes from './pages/MeetingNotes';
 import TestTranscription from './pages/TestTranscription';
 import VoiceProfiles from './pages/VoiceProfiles';
+import SharePoint from './pages/SharePoint';
 import __Layout from './Layout.jsx';
 
 
@@ -104,6 +105,7 @@ export const PAGES = {
     "MeetingNotes": MeetingNotes,
     "TestTranscription": TestTranscription,
     "VoiceProfiles": VoiceProfiles,
+    "SharePoint": SharePoint,
 }
 
 export const pagesConfig = {
