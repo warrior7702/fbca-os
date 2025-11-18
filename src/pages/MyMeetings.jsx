@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import EnhancedMeetingNotes from "../components/meetings/EnhancedMeetingNotes";
 
 export default function MyMeetings() {
   const navigate = useNavigate();
@@ -92,6 +93,9 @@ export default function MyMeetings() {
     duration: 30,
     notes: ''
   });
+
+  // Add staff search state
+  const [staffForAssignment, setStaffForAssignment] = useState([]);
 
   useEffect(() => {
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -390,10 +394,18 @@ export default function MyMeetings() {
       toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
 
       console.log('🤖 Step 2: Generating meeting notes with AI...');
+
+      // Prepare attendees data
+      const attendeesData = selectedMeeting.attendees?.map(a => ({
+        name: a.name,
+        email: a.email
+      })) || [];
+
       console.log('Calling transcribeMeetingAudio with:', {
         audio_url: uploadResponse.file_url,
         meeting_subject: selectedMeeting?.subject || 'Meeting',
-        meeting_date: selectedMeeting?.start
+        meeting_date: selectedMeeting?.start,
+        attendees: attendeesData
       });
 
       // Set a longer timeout for AI processing
@@ -404,7 +416,8 @@ export default function MyMeetings() {
       const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
         audio_url: uploadResponse.file_url,
         meeting_subject: selectedMeeting?.subject || 'Meeting',
-        meeting_date: selectedMeeting?.start
+        meeting_date: selectedMeeting?.start,
+        attendees: attendeesData
       });
 
       console.log('⏳ Waiting for AI response...');
@@ -432,7 +445,10 @@ export default function MyMeetings() {
         user_email: user.email,
         audio_url: uploadResponse.file_url,
         summary: notesResponse.data.summary || '',
+        key_points: notesResponse.data.key_points || [],
+        outline: notesResponse.data.outline || [],
         action_items: notesResponse.data.action_items || [],
+        speakers: notesResponse.data.speakers || [],
         transcript: notesResponse.data.transcript || '',
         recording_duration: recordingTime
       });
@@ -445,7 +461,7 @@ export default function MyMeetings() {
 
       toast.success("Meeting notes generated and saved!", { id: processingToast });
       console.log('✅ Switching to notes tab');
-      setActiveTab('notes'); // Switch to notes tab
+      setActiveTab('notes');
 
     } catch (error) {
       console.error("❌ Error generating notes:", error);
@@ -458,6 +474,92 @@ export default function MyMeetings() {
     }
   };
 
+  // Staff search for assignment
+  const handleSearchStaffForAssignment = async (query) => {
+    if (!query || query.length < 2) {
+      const response = await base44.functions.invoke('getMicrosoftUsers', {});
+      if (response.data.success && response.data.users) {
+        setStaffForAssignment(response.data.users);
+      }
+      return;
+    }
+
+    try {
+      const response = await base44.functions.invoke('getMicrosoftUsers', {
+        searchQuery: query
+      });
+      if (response.data.success && response.data.users) {
+        setStaffForAssignment(response.data.users);
+      }
+    } catch (error) {
+      console.error('Error searching staff:', error);
+      setStaffForAssignment([]);
+    }
+  };
+
+  const handleAssignActionItem = async (actionItemIndex, person) => {
+    if (!savedNotes) return;
+
+    try {
+      const updatedActionItems = [...savedNotes.action_items];
+      // Ensure the action item itself is an object, or convert it
+      if (typeof updatedActionItems[actionItemIndex] === 'string') {
+        updatedActionItems[actionItemIndex] = {
+          item: updatedActionItems[actionItemIndex],
+          assigned_to: person.displayName,
+          assigned_email: person.mail || person.userPrincipalName
+        };
+      } else {
+        updatedActionItems[actionItemIndex] = {
+          ...updatedActionItems[actionItemIndex],
+          assigned_to: person.displayName,
+          assigned_email: person.mail || person.userPrincipalName
+        };
+      }
+
+
+      await base44.entities.MeetingNote.update(savedNotes.id, {
+        action_items: updatedActionItems
+      });
+
+      setSavedNotes({
+        ...savedNotes,
+        action_items: updatedActionItems
+      });
+
+      // Also update the currently displayed meetingNotes if they are the same instance
+      setMeetingNotes(prevMeetingNotes => {
+        if (!prevMeetingNotes) return null;
+        const newActionItems = [...prevMeetingNotes.action_items];
+        if (typeof newActionItems[actionItemIndex] === 'string') {
+          newActionItems[actionItemIndex] = {
+            item: newActionItems[actionItemIndex],
+            assigned_to: person.displayName,
+            assigned_email: person.mail || person.userPrincipalName
+          };
+        } else {
+          newActionItems[actionItemIndex] = {
+            ...newActionItems[actionItemIndex],
+            assigned_to: person.displayName,
+            assigned_email: person.mail || person.userPrincipalName
+          };
+        }
+        return {
+          ...prevMeetingNotes,
+          action_items: newActionItems
+        };
+      });
+
+      await loadAllMeetingNotes(user);
+
+      toast.success(`Assigned to ${person.displayName}`);
+    } catch (error) {
+      console.error('Error assigning action item:', error);
+      toast.error('Failed to assign action item');
+    }
+  };
+
+
   const downloadNotes = (notesData) => {
     if (!notesData) return;
 
@@ -469,7 +571,13 @@ Timezone: ${timezone}
 Summary:
 ${notesData.summary || 'No summary available.'}
 
-${notesData.action_items && notesData.action_items.length > 0 ? '\nAction Items:\n' + notesData.action_items.map(item => `- ${item}`).join('\n') : ''}
+${notesData.key_points && notesData.key_points.length > 0 ? '\nKey Points:\n' + notesData.key_points.map(item => `- ${item}`).join('\n') : ''}
+
+${notesData.outline && notesData.outline.length > 0 ? '\nOutline:\n' + notesData.outline.map(item => `- ${item}`).join('\n') : ''}
+
+${notesData.action_items && notesData.action_items.length > 0 ? '\nAction Items:\n' + notesData.action_items.map(item => `- ${typeof item === 'string' ? item : item.item + (item.assigned_to ? ` (Assigned to: ${item.assigned_to})` : '')}`).join('\n') : ''}
+
+${notesData.speakers && notesData.speakers.length > 0 ? '\nSpeakers:\n' + notesData.speakers.map(s => `- ${s.name}: ${s.email || 'N/A'}`).join('\n') : ''}
 
 ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
 `;
@@ -690,11 +798,14 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
   const filteredGroupedNotes = Object.entries(groupedNotes).reduce((acc, [dateLabel, dateNotes]) => {
     const filtered = dateNotes.filter(note => {
       const searchLower = notesSearchQuery.toLowerCase();
+      const actionItemsText = note.action_items?.map(item => typeof item === 'string' ? item : item.item).join(' ').toLowerCase();
       return (
         note.meeting_subject?.toLowerCase().includes(searchLower) ||
         note.summary?.toLowerCase().includes(searchLower) ||
         note.transcript?.toLowerCase().includes(searchLower) ||
-        note.action_items?.some(item => item.toLowerCase().includes(searchLower))
+        actionItemsText?.includes(searchLower) ||
+        note.key_points?.some(item => item.toLowerCase().includes(searchLower)) ||
+        note.outline?.some(item => item.toLowerCase().includes(searchLower))
       );
     });
     if (filtered.length > 0) {
@@ -1203,84 +1314,15 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                           key={note.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-slate-200"
+                          className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-slate-200 p-6"
                         >
-                          <div className="p-6">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
-                                    <FileText className="w-5 h-5 text-white" />
-                                  </div>
-                                  <div>
-                                    <h3 className="text-xl font-semibold text-slate-900">
-                                      {note.meeting_subject || 'Untitled Meeting'}
-                                    </h3>
-                                    <div className="flex items-center gap-3 text-sm text-slate-500">
-                                      <span className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />
-                                        {format(parseISO(note.meeting_date), 'h:mm a')}
-                                      </span>
-                                      {note.recording_duration && (
-                                        <span className="flex items-center gap-1">
-                                          • {formatRecordingTime(note.recording_duration)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => { e.stopPropagation(); downloadNotes(note); }}
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </div>
-
-                            {note.summary && (
-                              <div className="mb-4">
-                                <p
-                                  className="text-slate-700 leading-relaxed"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlightKeywords(note.summary)
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {note.action_items && note.action_items.length > 0 && (
-                              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Sparkles className="w-4 h-4 text-amber-600" />
-                                  <p className="text-sm font-semibold text-amber-900">
-                                    Action Items
-                                  </p>
-                                </div>
-                                <ul className="space-y-2">
-                                  {note.action_items.slice(0, 3).map((item, idx) => (
-                                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-900">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
-                                      <span>{item}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                                {note.action_items.length > 3 && (
-                                  <p className="text-xs text-amber-700 mt-2">
-                                    +{note.action_items.length - 3} more action items
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                              <Badge variant="outline" className="gap-1">
-                                <Sparkles className="w-3 h-3" />
-                                AI Generated
-                              </Badge>
-                            </div>
-                          </div>
+                          <EnhancedMeetingNotes
+                            notes={note}
+                            onDownload={() => downloadNotes(note)}
+                            staffResults={staffForAssignment}
+                            onSearchStaff={handleSearchStaffForAssignment}
+                            onAssignPerson={(actionItemIndex, person) => handleAssignActionItem(actionItemIndex, person)}
+                          />
                         </motion.div>
                       ))}
                     </div>
@@ -1289,541 +1331,499 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
               </div>
             )}
           </TabsContent>
-        </Tabs>
-      </div>
 
-      {/* Meeting Detail Modal */}
-      <Dialog open={showMeetingDetail} onOpenChange={(isOpen) => {
-        setShowMeetingDetail(isOpen);
-        if (!isOpen) {
-          setSelectedMeeting(null);
-          setIsRecording(false);
-          setRecordingTime(0);
-          setAudioBlob(null);
-          setProcessingNotes(false);
-          setMeetingNotes(null);
-          setSavedNotes(null);
-          setAudioLevel(0); // Reset audio level on close
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop();
-          }
-          if (recordingIntervalRef.current) {
-            clearInterval(recordingIntervalRef.current);
-          }
-          if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-            analyserRef.current = null;
-          }
-        } else if (selectedMeeting) {
-          loadSavedNotes(selectedMeeting.id);
-        }
-      }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl pr-8">
-              {selectedMeeting?.subject || 'Meeting Details'}
-            </DialogTitle>
-          </DialogHeader>
+          {/* Meeting Detail Modal */}
+          <Dialog open={showMeetingDetail} onOpenChange={(isOpen) => {
+            setShowMeetingDetail(isOpen);
+            if (!isOpen) {
+              setSelectedMeeting(null);
+              setIsRecording(false);
+              setRecordingTime(0);
+              setAudioBlob(null);
+              setProcessingNotes(false);
+              setMeetingNotes(null);
+              setSavedNotes(null);
+              setAudioLevel(0); // Reset audio level on close
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+              }
+              if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+              }
+              if (audioContextRef.current) {
+                audioContextRef.current.close();
+                audioContextRef.current = null;
+                analyserRef.current = null;
+              }
+            } else if (selectedMeeting) {
+              loadSavedNotes(selectedMeeting.id);
+            }
+          }}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl pr-8">
+                  {selectedMeeting?.subject || 'Meeting Details'}
+                </DialogTitle>
+              </DialogHeader>
 
-          {selectedMeeting && (() => {
-            const start = parseMeetingDate(selectedMeeting.start);
-            const end = parseMeetingDate(selectedMeeting.end);
-            const status = getMeetingStatus(selectedMeeting);
+              {selectedMeeting && (() => {
+                const start = parseMeetingDate(selectedMeeting.start);
+                const end = parseMeetingDate(selectedMeeting.end);
+                const status = getMeetingStatus(selectedMeeting);
 
-            return (
-              <div className="space-y-6">
-                {/* Date & Time */}
-                <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-lg">
-                  <CalendarIcon className="w-5 h-5 text-purple-600 mt-1" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-900 mb-1">
-                      {start ? format(start, 'EEEE, MMMM d, yyyy') : 'Date unavailable'}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {start ? format(start, 'h:mm a') : 'N/A'} -
-                      {end ? format(end, 'h:mm a') : 'N/A'}
-                      <span className="text-slate-400 ml-2">
-                        ({differenceInMinutes(end, start)} minutes)
-                      </span>
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {selectedMeeting.startTimeZone || timezone}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge className={`${status.bg} ${status.textColor}`}>{status.label}</Badge>
-                      {getResponseBadge(selectedMeeting.responseStatus)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location */}
-                {selectedMeeting.location?.displayName && (
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
-                    <MapPin className="w-5 h-5 text-slate-600" />
-                    <span className="text-slate-700">{selectedMeeting.location.displayName}</span>
-                  </div>
-                )}
-
-                {/* AI Notetaker Section */}
-                <Card className="border-2 border-blue-200 bg-blue-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Sparkles className="w-5 h-5 text-blue-600" />
-                      AI Meeting Notetaker
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Show if notes already exist */}
-                    {savedNotes && !audioBlob && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-800">
-                          <strong>✅ Notes saved:</strong> {format(new Date(savedNotes.created_date), 'PPp')}
+                return (
+                  <div className="space-y-6">
+                    {/* Date & Time */}
+                    <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-lg">
+                      <CalendarIcon className="w-5 h-5 text-purple-600 mt-1" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900 mb-1">
+                          {start ? format(start, 'EEEE, MMMM d, yyyy') : 'Date unavailable'}
                         </p>
+                        <p className="text-sm text-slate-600">
+                          {start ? format(start, 'h:mm a') : 'N/A'} -
+                          {end ? format(end, 'h:mm a') : 'N/A'}
+                          <span className="text-slate-400 ml-2">
+                            ({differenceInMinutes(end, start)} minutes)
+                          </span>
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {selectedMeeting.startTimeZone || timezone}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Badge className={`${status.bg} ${status.textColor}`}>{status.label}</Badge>
+                          {getResponseBadge(selectedMeeting.responseStatus)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    {selectedMeeting.location?.displayName && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
+                        <MapPin className="w-5 h-5 text-slate-600" />
+                        <span className="text-slate-700">{selectedMeeting.location.displayName}</span>
                       </div>
                     )}
 
-                    {/* Recording Controls */}
-                    {!savedNotes && (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {!isRecording && !audioBlob && (
-                          <Button
-                            onClick={startRecording}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            <Mic className="w-4 h-4 mr-2" />
-                            Start Recording
-                          </Button>
+                    {/* AI Notetaker Section */}
+                    <Card className="border-2 border-blue-200 bg-blue-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Sparkles className="w-5 h-5 text-blue-600" />
+                          AI Meeting Notetaker
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Show if notes already exist */}
+                        {savedNotes && !audioBlob && (
+                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-sm text-green-800">
+                              <strong>✅ Notes saved:</strong> {format(new Date(savedNotes.created_date), 'PPp')}
+                            </p>
+                          </div>
                         )}
 
-                        {isRecording && (
-                          <>
-                            <Button
-                              onClick={stopRecording}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              <Square className="w-4 h-4 mr-2" />
-                              Stop Recording
-                            </Button>
-                            <Badge className="bg-red-500 text-white animate-pulse">
-                              <div className="w-2 h-2 bg-white rounded-full mr-2" />
-                              Recording: {formatRecordingTime(recordingTime)}
-                            </Badge>
-                            {/* Audio Level Meter */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-600">Level:</span>
-                              <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-green-500 transition-all duration-100"
-                                  style={{ width: `${Math.min(audioLevel / 2.5, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          </>
-                        )}
+                        {/* Recording Controls */}
+                        {!savedNotes && (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {!isRecording && !audioBlob && (
+                              <Button
+                                onClick={startRecording}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                <Mic className="w-4 h-4 mr-2" />
+                                Start Recording
+                              </Button>
+                            )}
 
-                        {audioBlob && !meetingNotes && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge className="bg-green-500 text-white">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Recording saved ({formatRecordingTime(recordingTime)})
-                            </Badge>
-                            <Button
-                              onClick={generateNotes}
-                              disabled={processingNotes}
-                              className="bg-blue-600 hover:bg-blue-700"
-                            >
-                              {processingNotes ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="w-4 h-4 mr-2" />
-                                  Generate Notes
-                                </>
-                              )}
-                            </Button>
+                            {isRecording && (
+                              <>
+                                <Button
+                                  onClick={stopRecording}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  <Square className="w-4 h-4 mr-2" />
+                                  Stop Recording
+                                </Button>
+                                <Badge className="bg-red-500 text-white animate-pulse">
+                                  <div className="w-2 h-2 bg-white rounded-full mr-2" />
+                                  Recording: {formatRecordingTime(recordingTime)}
+                                </Badge>
+                                {/* Audio Level Meter */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-600">Level:</span>
+                                  <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-green-500 transition-all duration-100"
+                                      style={{ width: `${Math.min(audioLevel / 2.5, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            {audioBlob && !meetingNotes && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="bg-green-500 text-white">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Recording saved ({formatRecordingTime(recordingTime)})
+                                </Badge>
+                                <Button
+                                  onClick={generateNotes}
+                                  disabled={processingNotes}
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                  {processingNotes ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-4 h-4 mr-2" />
+                                      Generate Notes
+                                    </>
+                                  )}
+                                </Button>
+                              </div >
+                            )}
                           </div >
                         )}
-                      </div >
-                    )}
 
-                    {/* Meeting Notes Display */}
-                    {meetingNotes && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            Meeting Notes
-                          </h3>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => downloadNotes(meetingNotes)}
+                        {/* Meeting Notes Display - Use new component */}
+                        {meetingNotes && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
                           >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download
-                          </Button>
+                            <EnhancedMeetingNotes
+                              notes={{
+                                ...meetingNotes,
+                                meeting_subject: selectedMeeting?.subject,
+                                meeting_date: selectedMeeting?.start,
+                                recording_duration: recordingTime
+                              }}
+                              onDownload={() => downloadNotes(meetingNotes)}
+                              staffResults={staffForAssignment}
+                              onSearchStaff={handleSearchStaffForAssignment}
+                              onAssignPerson={(actionItemIndex, person) => handleAssignActionItem(actionItemIndex, person)}
+                            />
+                          </motion.div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Organizer */}
+                    {selectedMeeting.organizer && (
+                      <div className="p-4 bg-slate-50 rounded-lg">
+                        <p className="text-sm font-semibold text-slate-700 mb-2">Organizer</p>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-semibold">
+                            {selectedMeeting.organizer.name?.[0]?.toUpperCase() || 'O'}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900">{selectedMeeting.organizer.name}</p>
+                            <p className="text-xs text-slate-500">{selectedMeeting.organizer.email}</p>
+                          </div>
                         </div>
-
-                        {meetingNotes.summary && (
-                          <Card className="bg-white">
-                            <CardHeader>
-                              <CardTitle className="text-sm">Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-sm text-slate-700 whitespace-pre-wrap">{meetingNotes.summary}</p>
-                            </CardContent>
-                          </Card>
-                        )}
-
-                        {meetingNotes.action_items && meetingNotes.action_items.length > 0 && (
-                          <Card className="bg-white">
-                            <CardHeader>
-                              <CardTitle className="text-sm">Action Items</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <ul className="list-disc list-inside space-y-1">
-                                {meetingNotes.action_items.map((item, idx) => (
-                                  <li key={idx} className="text-sm text-slate-700">{item}</li>
-                                ))}
-                              </ul>
-                            </CardContent>
-                          </Card>
-                        )}
-
-                        {meetingNotes.transcript && (
-                          <Card className="bg-white">
-                            <CardHeader>
-                              <CardTitle className="text-sm">Transcript</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-xs text-slate-600 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">
-                                {meetingNotes.transcript}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </motion.div>
+                      </div>
                     )}
-                  </CardContent>
-                </Card>
 
-                {/* Organizer */}
-                {selectedMeeting.organizer && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-2">Organizer</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-semibold">
-                        {selectedMeeting.organizer.name?.[0]?.toUpperCase() || 'O'}
+                    {/* Attendees */}
+                    {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
+                      <div className="p-4 bg-slate-50 rounded-lg">
+                        <p className="text-sm font-semibold text-slate-700 mb-3">
+                          Attendees ({selectedMeeting.attendees.length})
+                        </p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {selectedMeeting.attendees.map((attendee, idx) => (
+                            <div key={idx} className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                                  {attendee.name?.[0]?.toUpperCase() || 'A'}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900">{attendee.name}</p>
+                                  <p className="text-xs text-slate-500">{attendee.email}</p>
+                                </div>
+                              </div>
+                              {attendee.status && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    attendee.status === 'accepted' ? 'bg-green-50 text-green-700' :
+                                    attendee.status === 'declined' ? 'bg-red-50 text-red-700' :
+                                    attendee.status === 'tentative' ? 'bg-yellow-50 text-yellow-700' :
+                                    'bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  {attendee.status}
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{selectedMeeting.organizer.name}</p>
-                        <p className="text-xs text-slate-500">{selectedMeeting.organizer.email}</p>
+                    )}
+
+                    {/* Body Preview */}
+                    {selectedMeeting.bodyPreview && (
+                      <div className="p-4 bg-slate-50 rounded-lg">
+                        <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedMeeting.bodyPreview}</p>
                       </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      {selectedMeeting.onlineMeeting?.joinUrl && (
+                        <Button
+                          onClick={() => joinMeeting(selectedMeeting)}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        >
+                          <Video className="w-4 h-4 mr-2" />
+                          Join Meeting
+                        </Button>
+                      )}
+                      {selectedMeeting.webLink && (
+                        <Button
+                          onClick={() => window.open(selectedMeeting.webLink, '_blank')}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open in Outlook
+                        </Button>
+                      )}
                     </div>
                   </div>
-                )}
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
 
-                {/* Attendees */}
-                {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-3">
-                      Attendees ({selectedMeeting.attendees.length})
-                    </p>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {selectedMeeting.attendees.map((attendee, idx) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                              {attendee.name?.[0]?.toUpperCase() || 'A'}
+          {/* NEW: Booking Modal with Person Search */}
+          <Dialog open={showBookingModal} onOpenChange={(isOpen) => {
+            if (!isOpen) resetBookingModal();
+            else setShowBookingModal(true);
+          }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Book a Meeting</DialogTitle>
+              </DialogHeader>
+
+              {bookingStep === 'select-person' && (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      placeholder="Search for a coworker..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        searchStaff(e.target.value);
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {searchingStaff && (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
+                    </div>
+                  )}
+
+                  {staffResults.length > 0 && (
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {staffResults.map((person) => (
+                        <div
+                          key={person.id}
+                          onClick={() => handleSelectPerson(person)}
+                          className="p-3 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-semibold">
+                              {person.displayName?.[0]?.toUpperCase() || 'U'}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-slate-900">{attendee.name}</p>
-                              <p className="text-xs text-slate-500">{attendee.email}</p>
+                              <p className="font-medium text-slate-900">{person.displayName}</p>
+                              <p className="text-xs text-slate-500">{person.mail || person.userPrincipalName}</p>
                             </div>
                           </div>
-                          {attendee.status && (
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                attendee.status === 'accepted' ? 'bg-green-50 text-green-700' :
-                                attendee.status === 'declined' ? 'bg-red-50 text-red-700' :
-                                attendee.status === 'tentative' ? 'bg-yellow-50 text-yellow-700' :
-                                'bg-slate-50 text-slate-700'
-                              }`}
-                            >
-                              {attendee.status}
-                            </Badge>
-                          )}
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Body Preview */}
-                {selectedMeeting.bodyPreview && (
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm font-semibold text-slate-700 mb-2">Description</p>
-                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedMeeting.bodyPreview}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  {selectedMeeting.onlineMeeting?.joinUrl && (
-                    <Button
-                      onClick={() => joinMeeting(selectedMeeting)}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
-                    >
-                      <Video className="w-4 h-4 mr-2" />
-                      Join Meeting
-                    </Button>
                   )}
-                  {selectedMeeting.webLink && (
-                    <Button
-                      onClick={() => window.open(selectedMeeting.webLink, '_blank')}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open in Outlook
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
 
-      {/* NEW: Booking Modal with Person Search */}
-      <Dialog open={showBookingModal} onOpenChange={(isOpen) => {
-        if (!isOpen) resetBookingModal();
-        else setShowBookingModal(true);
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Book a Meeting</DialogTitle>
-          </DialogHeader>
-
-          {bookingStep === 'select-person' && (
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  placeholder="Search for a coworker..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    searchStaff(e.target.value);
-                  }}
-                  className="pl-10"
-                />
-              </div>
-
-              {searchingStaff && (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
-                </div>
-              )}
-
-              {staffResults.length > 0 && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {staffResults.map((person) => (
-                    <div
-                      key={person.id}
-                      onClick={() => handleSelectPerson(person)}
-                      className="p-3 border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-semibold">
-                          {person.displayName?.[0]?.toUpperCase() || 'U'}
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{person.displayName}</p>
-                          <p className="text-xs text-slate-500">{person.mail || person.userPrincipalName}</p>
-                        </div>
-                      </div>
+                  {loadingBookingInfo && (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+                      <p className="text-sm text-slate-600">Checking availability...</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
-              {loadingBookingInfo && (
-                <div className="text-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
-                  <p className="text-sm text-slate-600">Checking availability...</p>
-                </div>
+              {bookingStep === 'booking-form' && selectedPerson && (
+                <form onSubmit={handleCreateBooking} className="space-y-4">
+                  <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <p className="text-sm">
+                      <strong>Booking with:</strong> {selectedPerson.displayName}
+                    </p>
+                    {bookingBusiness && (
+                      <p className="text-xs text-slate-600 mt-1">
+                        Business: {bookingBusiness.displayName}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Service</label>
+                    <Select
+                      value={bookingData.serviceId}
+                      onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
+                      required
+                      disabled={bookingServices.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a service..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bookingServices.map(service => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.displayName} ({service.defaultDuration / 60} min)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Date</label>
+                      <Input
+                        type="date"
+                        value={bookingData.date}
+                        onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Time</label>
+                      <Input
+                        type="time"
+                        value={bookingData.time}
+                        onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes (optional)</label>
+                    <Textarea
+                      value={bookingData.notes}
+                      onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
+                      placeholder="Add any notes..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={resetBookingModal}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
+                      {loadingBookingInfo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Booking'
+                      )}
+                    </Button>
+                  </div>
+                </form>
               )}
-            </div>
-          )}
 
-          {bookingStep === 'booking-form' && selectedPerson && (
-            <form onSubmit={handleCreateBooking} className="space-y-4">
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-sm">
-                  <strong>Booking with:</strong> {selectedPerson.displayName}
-                </p>
-                {bookingBusiness && (
-                  <p className="text-xs text-slate-600 mt-1">
-                    Business: {bookingBusiness.displayName}
-                  </p>
-                )}
-              </div>
+              {bookingStep === 'meeting-request' && selectedPerson && (
+                <form onSubmit={handleSendMeetingRequest} className="space-y-4">
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm">
+                      <strong>Meeting with:</strong> {selectedPerson.displayName}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      This person doesn't have Bookings set up. Sending a regular meeting request instead.
+                    </p>
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Service</label>
-                <Select
-                  value={bookingData.serviceId}
-                  onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
-                  required
-                  disabled={bookingServices.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a service..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bookingServices.map(service => (
-                      <SelectItem key={service.id} value={service.id}>
-                        {service.displayName} ({service.defaultDuration / 60} min)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Date</label>
+                      <Input
+                        type="date"
+                        value={bookingData.date}
+                        onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
+                        required
+                      />
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    value={bookingData.date}
-                    onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
-                    required
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Time</label>
+                      <Input
+                        type="time"
+                        value={bookingData.time}
+                        onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Time</label>
-                  <Input
-                    type="time"
-                    value={bookingData.time}
-                    onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Duration (minutes)</label>
+                    <Input
+                      type="number"
+                      value={bookingData.duration}
+                      onChange={(e) => setBookingData({...bookingData, duration: parseInt(e.target.value, 10)})}
+                      min="15"
+                      step="15"
+                      required
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Notes (optional)</label>
-                <Textarea
-                  value={bookingData.notes}
-                  onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                  placeholder="Add any notes..."
-                  rows={3}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes (optional)</label>
+                    <Textarea
+                      value={bookingData.notes}
+                      onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
+                      placeholder="Add meeting details..."
+                      rows={3}
+                    />
+                  </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={resetBookingModal}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loadingBookingInfo || !bookingData.serviceId || !bookingData.date || !bookingData.time} className="bg-purple-600 hover:bg-purple-700">
-                  {loadingBookingInfo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Booking'
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {bookingStep === 'meeting-request' && selectedPerson && (
-            <form onSubmit={handleSendMeetingRequest} className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm">
-                  <strong>Meeting with:</strong> {selectedPerson.displayName}
-                </p>
-                <p className="text-xs text-slate-600 mt-1">
-                  This person doesn't have Bookings set up. Sending a regular meeting request instead.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    value={bookingData.date}
-                    onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Time</label>
-                  <Input
-                    type="time"
-                    value={bookingData.time}
-                    onChange={(e) => setBookingData({...bookingData, time: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Duration (minutes)</label>
-                <Input
-                  type="number"
-                  value={bookingData.duration}
-                  onChange={(e) => setBookingData({...bookingData, duration: parseInt(e.target.value, 10)})}
-                  min="15"
-                  step="15"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Notes (optional)</label>
-                <Textarea
-                  value={bookingData.notes}
-                  onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                  placeholder="Add meeting details..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={resetBookingModal}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loadingBookingInfo || !bookingData.date || !bookingData.time} className="bg-blue-600 hover:bg-blue-700">
-                  {loadingBookingInfo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Meeting Request'
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={resetBookingModal}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={loadingBookingInfo || !bookingData.date || !bookingData.time} className="bg-blue-600 hover:bg-blue-700">
+                      {loadingBookingInfo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        'Send Meeting Request'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
+        </Tabs>
+      </div>
     </div>
   );
 }
