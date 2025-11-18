@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -50,14 +51,17 @@ export default function TestTranscription() {
     setTranscribing(true);
     setError(null);
     try {
-      console.log('🎙️ Transcribing audio...');
+      console.log('🎙️ Starting transcription...');
+      console.log('Audio URL:', uploadedUrl);
+      
       const response = await base44.functions.invoke('transcribeMeetingAudio', {
         audio_url: uploadedUrl,
         meeting_subject: 'Test Meeting',
         meeting_date: new Date().toISOString()
       });
       
-      console.log('✅ Transcription response:', response);
+      console.log('📥 Full response:', response);
+      console.log('📊 Response data:', response.data);
       
       if (response.data.success) {
         setResult(response.data);
@@ -67,6 +71,7 @@ export default function TestTranscription() {
       }
     } catch (err) {
       console.error('❌ Transcription error:', err);
+      console.error('Error details:', err.response?.data);
       setError('Transcription failed: ' + err.message);
       toast.error('Transcription failed');
     } finally {
@@ -80,6 +85,11 @@ export default function TestTranscription() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Audio Transcription Test</h1>
           <p className="text-slate-600">Upload an audio file to test the transcription functionality</p>
+          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-900 font-semibold mb-1">Supported Audio Formats:</p>
+            <p className="text-sm text-blue-700">mp3, mp4, mpeg, mpga, m4a, wav, webm</p>
+            <p className="text-xs text-blue-600 mt-1">Maximum file size: 25 MB</p>
+          </div>
         </div>
 
         {/* Step 1: Upload File */}
@@ -93,7 +103,7 @@ export default function TestTranscription() {
           <CardContent className="space-y-4">
             <input
               type="file"
-              accept="audio/*"
+              accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,audio/*"
               onChange={handleFileChange}
               className="block w-full text-sm text-slate-600
                 file:mr-4 file:py-2 file:px-4
@@ -107,7 +117,7 @@ export default function TestTranscription() {
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <FileAudio className="w-4 h-4" />
                 <span>{file.name}</span>
-                <span className="text-slate-400">({Math.round(file.size / 1024)} KB)</span>
+                <span className="text-slate-400">({Math.round(file.size / 1024)} KB, {file.type})</span>
               </div>
             )}
 
