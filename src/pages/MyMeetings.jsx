@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -381,7 +382,7 @@ export default function MyMeetings() {
       toast.loading("Uploading audio...", { id: processingToast });
 
       const uploadResponse = await base44.integrations.Core.UploadFile({
-        file: new File([audioBlob], 'meeting-recording.webm', { type: audioBlob.type })
+        file: new File([audioBlob], 'meeting-recording.mp3', { type: 'audio/mpeg' })
       });
 
       console.log('✅ Audio uploaded successfully');
