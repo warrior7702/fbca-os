@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import EnhancedMeetingNotes from "../components/meetings/EnhancedMeetingNotes";
+import DetailedMeetingNotesModal from "../components/meetings/DetailedMeetingNotesModal";
 
 export default function MyMeetings() {
   const navigate = useNavigate();
@@ -96,6 +97,8 @@ export default function MyMeetings() {
 
   // Add staff search state
   const [staffForAssignment, setStaffForAssignment] = useState([]);
+  // New state for viewing detailed notes
+  const [viewingNoteDetail, setViewingNoteDetail] = useState(null);
 
   useEffect(() => {
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -450,6 +453,7 @@ export default function MyMeetings() {
         action_items: notesResponse.data.action_items || [],
         speakers: notesResponse.data.speakers || [],
         transcript: notesResponse.data.transcript || '',
+        transcript_segments: notesResponse.data.transcript_segments || [],
         recording_duration: recordingTime
       });
 
@@ -559,6 +563,38 @@ export default function MyMeetings() {
     }
   };
 
+  const handleUpdateSegmentSpeaker = async (noteId, segmentIndex, person) => {
+    try {
+      const note = allMeetingNotes.find(n => n.id === noteId);
+      if (!note) return;
+
+      const updatedSegments = [...(note.transcript_segments || [])];
+      updatedSegments[segmentIndex] = {
+        ...updatedSegments[segmentIndex],
+        speaker_name: person ? person.displayName : '',
+        speaker_email: person ? (person.mail || person.userPrincipalName) : ''
+      };
+
+      await base44.entities.MeetingNote.update(noteId, {
+        transcript_segments: updatedSegments
+      });
+
+      await loadAllMeetingNotes(user);
+
+      // Update the viewing note if it's currently open
+      if (viewingNoteDetail?.id === noteId) {
+        setViewingNoteDetail({
+          ...viewingNoteDetail,
+          transcript_segments: updatedSegments
+        });
+      }
+
+      toast.success(person ? `Speaker assigned` : 'Speaker removed');
+    } catch (error) {
+      console.error('Error updating speaker:', error);
+      toast.error('Failed to update speaker');
+    }
+  };
 
   const downloadNotes = (notesData) => {
     if (!notesData) return;
@@ -1321,7 +1357,8 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                             onDownload={() => downloadNotes(note)}
                             staffResults={staffForAssignment}
                             onSearchStaff={handleSearchStaffForAssignment}
-                            onAssignPerson={(actionItemIndex, person) => handleAssignActionItem(actionItemIndex, person)}
+                            onAssignPerson={(idx, person) => handleAssignActionItem(idx, person)}
+                            onViewDetails={() => setViewingNoteDetail(note)}
                           />
                         </motion.div>
                       ))}
@@ -1601,6 +1638,18 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
               })()}
             </DialogContent>
           </Dialog>
+
+          {/* Detailed Notes Modal */}
+          <DetailedMeetingNotesModal
+            open={!!viewingNoteDetail}
+            onOpenChange={(open) => !open && setViewingNoteDetail(null)}
+            note={viewingNoteDetail}
+            onUpdateSegmentSpeaker={(segmentIndex, person) =>
+              handleUpdateSegmentSpeaker(viewingNoteDetail.id, segmentIndex, person)
+            }
+            staffResults={staffForAssignment}
+            onSearchStaff={handleSearchStaffForAssignment}
+          />
 
           {/* NEW: Booking Modal with Person Search */}
           <Dialog open={showBookingModal} onOpenChange={(isOpen) => {

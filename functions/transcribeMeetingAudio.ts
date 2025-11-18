@@ -93,7 +93,8 @@ Provide:
 2. Key discussion points (bullet points)
 3. A structured outline of topics discussed
 4. Action items with specific assignments to attendees (match names from attendee list when possible)
-5. Identify speakers and try to match them to attendees based on context`;
+5. Identify speakers and try to match them to attendees based on context
+6. Break the transcript into logical segments with speaker assignments where possible`;
 
     const analysisResponse = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,
@@ -135,6 +136,17 @@ Provide:
                 email: { type: "string" }
               }
             }
+          },
+          transcript_segments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                text: { type: "string" },
+                speaker_name: { type: "string" },
+                speaker_email: { type: "string" }
+              }
+            }
           }
         }
       }
@@ -150,6 +162,7 @@ Provide:
       outline: analysisResponse.outline || [],
       action_items: analysisResponse.action_items || [],
       speakers: analysisResponse.speakers || [],
+      transcript_segments: analysisResponse.transcript_segments || [],
       meeting_subject,
       meeting_date
     });

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { 
   FileText, 
   Download, 
@@ -13,7 +12,8 @@ import {
   CheckCircle2,
   User,
   Search,
-  X
+  X,
+  Eye
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -30,7 +30,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export default function EnhancedMeetingNotes({ notes, onDownload, staffResults = [], onSearchStaff, onAssignPerson }) {
+export default function EnhancedMeetingNotes({ 
+  notes, 
+  onDownload, 
+  staffResults = [], 
+  onSearchStaff, 
+  onAssignPerson,
+  onViewDetails 
+}) {
   const [assigningIndex, setAssigningIndex] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -62,14 +69,26 @@ export default function EnhancedMeetingNotes({ notes, onDownload, staffResults =
             </div>
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onDownload}
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download
-        </Button>
+        <div className="flex gap-2">
+          {onViewDetails && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onViewDetails}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View Transcript
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDownload}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
       </div>
 
       {/* Speakers */}
@@ -170,8 +189,10 @@ export default function EnhancedMeetingNotes({ notes, onDownload, staffResults =
               {notes.action_items.map((item, idx) => (
                 <div key={idx} className="flex items-start justify-between gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
                   <div className="flex-1">
-                    <p className="text-slate-900 font-medium mb-1">{item.task}</p>
-                    {item.assigned_to ? (
+                    <p className="text-slate-900 font-medium mb-1">
+                      {typeof item === 'string' ? item : item.task}
+                    </p>
+                    {(typeof item === 'object' && item.assigned_to) ? (
                       <div className="flex items-center gap-2">
                         <Badge className="bg-green-100 text-green-700 border-green-300">
                           <User className="w-3 h-3 mr-1" />
@@ -235,22 +256,6 @@ export default function EnhancedMeetingNotes({ notes, onDownload, staffResults =
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Full Transcript */}
-      {notes.transcript && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Full Transcript</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 bg-slate-50 rounded-lg max-h-96 overflow-y-auto">
-              <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed">
-                {notes.transcript}
-              </p>
             </div>
           </CardContent>
         </Card>
