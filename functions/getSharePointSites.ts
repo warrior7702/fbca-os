@@ -10,10 +10,12 @@ Deno.serve(async (req) => {
     }
 
     const ssoToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+    console.log('SSO Token retrieved:', !!ssoToken);
+    
     if (!ssoToken) {
       return Response.json({ 
         success: false, 
-        error: 'Microsoft 365 not connected' 
+        error: 'Microsoft 365 not connected. Please connect Microsoft in Settings.' 
       }, { status: 403 });
     }
 
@@ -29,7 +31,9 @@ Deno.serve(async (req) => {
     );
 
     if (!sitesResponse.ok) {
-      throw new Error(`SharePoint API error: ${sitesResponse.status}`);
+      const errorText = await sitesResponse.text();
+      console.error('SharePoint API error:', sitesResponse.status, errorText);
+      throw new Error(`SharePoint API error: ${sitesResponse.status} - ${errorText}`);
     }
 
     const sitesData = await sitesResponse.json();
