@@ -57,9 +57,13 @@ export default function SharePointPage() {
   const [loadingSiteData, setLoadingSiteData] = useState({});
   const [expandedSite, setExpandedSite] = useState(null);
   const [siteLibraries, setSiteLibraries] = useState({});
+  const [siteFiles, setSiteFiles] = useState({});
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [categorizingSites, setCategorizingSites] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -172,12 +176,70 @@ export default function SharePointPage() {
       if (response.data.success) {
         setSiteLibraries({ ...siteLibraries, [site.id]: response.data.libraries });
         setExpandedSite(site.id);
+        
+        // Auto-load files for first library
+        if (response.data.libraries.length > 0) {
+          loadLibraryFiles(site.id, response.data.libraries[0].id);
+        }
       }
     } catch (error) {
       console.error('Error loading libraries:', error);
       toast.error('Failed to load libraries');
     } finally {
       setLoadingSiteData({ ...loadingSiteData, [site.id]: false });
+    }
+  };
+
+  const loadLibraryFiles = async (siteId, driveId) => {
+    const key = `${siteId}_${driveId}`;
+    if (siteFiles[key]) return;
+
+    try {
+      const response = await base44.functions.invoke('getSharePointFiles', {
+        siteId,
+        driveId
+      });
+
+      if (response.data.success) {
+        setSiteFiles({ ...siteFiles, [key]: response.data.files });
+      }
+    } catch (error) {
+      console.error('Error loading files:', error);
+    }
+  };
+
+  const categorizeAllSites = async () => {
+    if (!sites.length) return;
+    
+    setCategorizingSites(true);
+    toast.info('AI is analyzing your sites...');
+    
+    try {
+      const uncategorized = sites.filter(site => {
+        const access = getSiteAccessData(site.id);
+        return !access?.ai_category;
+      });
+
+      for (const site of uncategorized) {
+        await base44.functions.invoke('categorizeSharePointSite', {
+          siteId: site.id,
+          siteName: site.displayName,
+          siteUrl: site.webUrl
+        });
+      }
+
+      // Reload site access data
+      const accessData = await base44.entities.SharePointSiteAccess.filter({ 
+        user_email: user.email 
+      });
+      setSiteAccess(accessData);
+      
+      toast.success('Sites categorized successfully!');
+    } catch (error) {
+      console.error('Error categorizing sites:', error);
+      toast.error('Failed to categorize some sites');
+    } finally {
+      setCategorizingSites(false);
     }
   };
 
@@ -227,14 +289,51 @@ export default function SharePointPage() {
     return !access?.is_favorited && (!access || access.access_count === 0);
   });
 
+  const getAvailableCategories = () => {
+    const categories = new Set();
+    siteAccess.forEach(access => {
+      if (access.ai_category) categories.add(access.ai_category);
+    });
+    return Array.from(categories).sort();
+  };
+
+  const getFilteredAndSortedSites = (sitesList) => {
+    let filtered = sitesList;
+
+    // Filter by category
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(site => {
+        const access = getSiteAccessData(site.id);
+        return access?.ai_category === categoryFilter;
+      });
+    }
+
+    // Sort
+    return filtered.sort((a, b) => {
+      const accessA = getSiteAccessData(a.id);
+      const accessB = getSiteAccessData(b.id);
+
+      switch (sortBy) {
+        case 'name':
+          return a.displayName.localeCompare(b.displayName);
+        case 'access':
+          return (accessB?.access_count || 0) - (accessA?.access_count || 0);
+        case 'recent':
+          return new Date(accessB?.last_accessed || 0) - new Date(accessA?.last_accessed || 0);
+        default:
+          return 0;
+      }
+    });
+  };
+
   const getFileIcon = (file) => {
-    if (file.folder) return <FolderOpen className="w-8 h-8 text-blue-500" />;
+    if (file.folder) return <FolderOpen className="w-4 h-4 text-blue-500" />;
     
     const name = file.name.toLowerCase();
-    if (name.match(/\.(jpg|jpeg|png|gif|bmp)$/)) return <Image className="w-8 h-8 text-green-500" />;
-    if (name.match(/\.(mp4|mov|avi|wmv)$/)) return <Video className="w-8 h-8 text-purple-500" />;
-    if (name.match(/\.(mp3|wav|m4a)$/)) return <Music className="w-8 h-8 text-pink-500" />;
-    return <FileText className="w-8 h-8 text-slate-500" />;
+    if (name.match(/\.(jpg|jpeg|png|gif|bmp)$/)) return <Image className="w-4 h-4 text-green-500" />;
+    if (name.match(/\.(mp4|mov|avi|wmv)$/)) return <Video className="w-4 h-4 text-purple-500" />;
+    if (name.match(/\.(mp3|wav|m4a)$/)) return <Music className="w-4 h-4 text-pink-500" />;
+    return <FileText className="w-4 h-4 text-slate-500" />;
   };
 
   if (loading) {
@@ -523,71 +622,172 @@ export default function SharePointPage() {
 
           {/* All Other Sites */}
           {otherSites.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Library className="w-5 h-5 text-slate-600" />
-                All Sites
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {otherSites.map(site => (
-                  <Card key={site.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Library className="w-6 h-6 text-slate-500" />
-                          <p className="font-medium text-sm truncate">{site.displayName}</p>
-                        </div>
-                        <button onClick={() => toggleSiteFavorite(site)}>
-                          <Star className="w-4 h-4 text-slate-400" />
-                        </button>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-3"
-                        onClick={() => loadSiteLibraries(site)}
-                        disabled={loadingSiteData[site.id]}
-                      >
-                        {loadingSiteData[site.id] ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        ) : (
-                          <>View Folders</>
-                        )}
-                      </Button>
-
-                      {/* Expanded Libraries */}
-                      {expandedSite === site.id && siteLibraries[site.id] && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mt-3 pt-3 border-t space-y-2"
-                        >
-                          {siteLibraries[site.id].map(library => (
-                            <div
-                              key={library.id}
-                              className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100"
-                            >
-                              <div className="flex items-center gap-2">
-                                <FolderOpen className="w-4 h-4 text-blue-500" />
-                                <span className="text-xs">{library.name}</span>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => window.open(library.webUrl, '_blank')}
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </motion.div>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Library className="w-5 h-5 text-slate-600" />
+                    All Sites
+                  </CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      onClick={categorizeAllSites}
+                      disabled={categorizingSites}
+                      variant="outline"
+                    >
+                      {categorizingSites ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          AI Categorizing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          AI Categorize
+                        </>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+                    </Button>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Filter by category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {getAvailableCategories().map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="access">Most Used</SelectItem>
+                        <SelectItem value="recent">Recent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {getFilteredAndSortedSites(otherSites).map(site => {
+                  const accessData = getSiteAccessData(site.id);
+                  return (
+                    <Card key={site.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Library className="w-6 h-6 text-slate-500" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{site.displayName}</p>
+                              {accessData?.ai_category && (
+                                <Badge variant="outline" className="text-xs mt-1">
+                                  {accessData.ai_category}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <button onClick={() => toggleSiteFavorite(site)}>
+                            <Star className="w-4 h-4 text-slate-400" />
+                          </button>
+                        </div>
+
+                        {accessData?.ai_description && (
+                          <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                            {accessData.ai_description}
+                          </p>
+                        )}
+
+                        {accessData?.ai_tags && accessData.ai_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {accessData.ai_tags.slice(0, 3).map((tag, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => loadSiteLibraries(site)}
+                          disabled={loadingSiteData[site.id]}
+                        >
+                          {loadingSiteData[site.id] ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <>View Content</>
+                          )}
+                        </Button>
+
+                        {/* Expanded Libraries with Files */}
+                        {expandedSite === site.id && siteLibraries[site.id] && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-3 pt-3 border-t space-y-3"
+                          >
+                            {siteLibraries[site.id].map(library => {
+                              const fileKey = `${site.id}_${library.id}`;
+                              const files = siteFiles[fileKey] || [];
+                              
+                              return (
+                                <div key={library.id} className="space-y-2">
+                                  <div className="flex items-center justify-between p-2 bg-slate-100 rounded">
+                                    <div className="flex items-center gap-2">
+                                      <FolderOpen className="w-4 h-4 text-blue-600" />
+                                      <span className="text-xs font-semibold">{library.name}</span>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => loadLibraryFiles(site.id, library.id)}
+                                    >
+                                      {files.length > 0 ? (
+                                        <ExternalLink className="w-3 h-3" />
+                                      ) : (
+                                        'Load'
+                                      )}
+                                    </Button>
+                                  </div>
+
+                                  {files.length > 0 && (
+                                    <div className="pl-4 space-y-1">
+                                      {files.slice(0, 5).map(file => (
+                                        <div
+                                          key={file.id}
+                                          className="flex items-center justify-between p-2 bg-white rounded hover:bg-slate-50 cursor-pointer"
+                                          onClick={() => window.open(file.webUrl, '_blank')}
+                                        >
+                                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            {getFileIcon(file)}
+                                            <span className="text-xs truncate">{file.name}</span>
+                                          </div>
+                                          <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                        </div>
+                                      ))}
+                                      {files.length > 5 && (
+                                        <p className="text-xs text-slate-500 text-center py-1">
+                                          +{files.length - 5} more files
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
