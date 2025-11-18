@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       'https://graph.microsoft.com/v1.0/sites?search=*',
       {
         headers: {
-          'Authorization': `Bearer ${ssoToken}`,
+          'Authorization': ssoToken,
           'Content-Type': 'application/json'
         }
       }
