@@ -390,7 +390,7 @@ export default function MyMeetings() {
       toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
 
       console.log('🤖 Step 2: Generating meeting notes with AI...');
-      console.log('Calling generateMeetingNotes with:', {
+      console.log('Calling transcribeMeetingAudio with:', {
         audio_url: uploadResponse.file_url,
         meeting_subject: selectedMeeting?.subject || 'Meeting',
         meeting_date: selectedMeeting?.start
@@ -401,7 +401,7 @@ export default function MyMeetings() {
         setTimeout(() => reject(new Error('AI processing timed out after 2 minutes. Please try again or with a shorter recording.')), 120000)
       );
 
-      const notesPromise = base44.functions.invoke('generateMeetingNotes', {
+      const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
         audio_url: uploadResponse.file_url,
         meeting_subject: selectedMeeting?.subject || 'Meeting',
         meeting_date: selectedMeeting?.start
@@ -414,7 +414,7 @@ export default function MyMeetings() {
 
       if (!notesResponse.data) {
         console.error('❌ No data in response');
-        throw new Error('No data returned from generateMeetingNotes');
+        throw new Error('No data returned from transcribeMeetingAudio');
       }
 
       if (notesResponse.data.error) {
