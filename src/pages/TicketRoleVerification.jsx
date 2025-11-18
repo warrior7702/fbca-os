@@ -20,6 +20,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function TicketRoleVerification() {
     const navigate = useNavigate();
@@ -32,6 +38,7 @@ export default function TicketRoleVerification() {
     const [sortBy, setSortBy] = useState("name");
     const [departmentFilter, setDepartmentFilter] = useState("all");
     const [addingUser, setAddingUser] = useState(false);
+    const [selectedDepartment, setSelectedDepartment] = useState(null);
 
     useEffect(() => {
         loadUser();
@@ -258,44 +265,48 @@ export default function TicketRoleVerification() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                        {Object.entries(data.departmentStats)
-                                            .sort(([a], [b]) => a.localeCompare(b))
-                                            .map(([dept, stats]) => (
-                                                <div key={dept} className="p-3 bg-slate-50 rounded-lg border hover:shadow-md transition-shadow">
-                                                    <p className="font-semibold text-slate-900 mb-2 flex items-center gap-1">
-                                                        <Building2 className="w-4 h-4 text-purple-600" />
-                                                        {dept}
-                                                    </p>
-                                                    <div className="text-xs text-slate-600 space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="flex items-center gap-1">
-                                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                                Workers:
-                                                            </span>
-                                                            <span className="font-semibold">{stats.workers}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="flex items-center gap-1">
-                                                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                                Admins:
-                                                            </span>
-                                                            <span className="font-semibold">{stats.admins || stats.viewers}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="flex items-center gap-1">
-                                                                <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
-                                                                Requesters:
-                                                            </span>
-                                                            <span className="font-semibold">{stats.requesters || 0}</span>
-                                                        </div>
+                                       {Object.entries(data.departmentStats)
+                                           .sort(([a], [b]) => a.localeCompare(b))
+                                           .map(([dept, stats]) => (
+                                               <div 
+                                                   key={dept} 
+                                                   className="p-3 bg-slate-50 rounded-lg border hover:shadow-md transition-all cursor-pointer hover:bg-slate-100"
+                                                   onClick={() => setSelectedDepartment(dept)}
+                                               >
+                                                   <p className="font-semibold text-slate-900 mb-2 flex items-center gap-1">
+                                                       <Building2 className="w-4 h-4 text-purple-600" />
+                                                       {dept}
+                                                   </p>
+                                                   <div className="text-xs text-slate-600 space-y-1">
+                                                       <div className="flex items-center justify-between">
+                                                           <span className="flex items-center gap-1">
+                                                               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                               Workers:
+                                                           </span>
+                                                           <span className="font-semibold">{stats.workers}</span>
+                                                       </div>
+                                                       <div className="flex items-center justify-between">
+                                                           <span className="flex items-center gap-1">
+                                                               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                               Admins:
+                                                           </span>
+                                                           <span className="font-semibold">{stats.admins || stats.viewers}</span>
+                                                       </div>
+                                                       <div className="flex items-center justify-between">
+                                                           <span className="flex items-center gap-1">
+                                                               <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
+                                                               Requesters:
+                                                           </span>
+                                                           <span className="font-semibold">{stats.requesters || 0}</span>
+                                                       </div>
 
-                                                        <div className="flex items-center justify-between border-t pt-1 mt-1">
-                                                            <span>Total:</span>
-                                                            <span className="font-bold">{stats.total}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                       <div className="flex items-center justify-between border-t pt-1 mt-1">
+                                                           <span>Total:</span>
+                                                           <span className="font-bold">{stats.total}</span>
+                                                       </div>
+                                                   </div>
+                                               </div>
+                                           ))}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -377,6 +388,142 @@ export default function TicketRoleVerification() {
                         </Tabs>
                     </>
                 )}
+
+                {/* Department Detail Modal */}
+                <Dialog open={!!selectedDepartment} onOpenChange={(open) => !open && setSelectedDepartment(null)}>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-purple-600" />
+                                {selectedDepartment} - Team Members
+                            </DialogTitle>
+                        </DialogHeader>
+                        
+                        {selectedDepartment && data && (
+                            <div className="space-y-4">
+                                {/* Stats */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                                        <p className="text-xs text-green-600 mb-1">Workers</p>
+                                        <p className="text-2xl font-bold text-green-700">
+                                            {data.departmentStats[selectedDepartment]?.workers || 0}
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                        <p className="text-xs text-blue-600 mb-1">Admins</p>
+                                        <p className="text-2xl font-bold text-blue-700">
+                                            {data.departmentStats[selectedDepartment]?.admins || 0}
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <p className="text-xs text-slate-600 mb-1">Requesters</p>
+                                        <p className="text-2xl font-bold text-slate-700">
+                                            {data.departmentStats[selectedDepartment]?.requesters || 0}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Admins */}
+                                {data.allUsers.filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'admin').length > 0 && (
+                                    <div>
+                                        <h3 className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
+                                            <Eye className="w-4 h-4" />
+                                            Admins
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {data.allUsers
+                                                .filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'admin')
+                                                .map(user => (
+                                                    <div key={user.id} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                                                                <span className="text-white text-xs font-bold">
+                                                                    {user.user_name?.[0]?.toUpperCase() || 'U'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium text-slate-900 truncate">{user.user_name}</p>
+                                                                <p className="text-xs text-slate-600 truncate">{user.user_email}</p>
+                                                            </div>
+                                                            <Badge className="bg-blue-100 text-blue-700 border border-blue-300">
+                                                                <Eye className="w-3 h-3 mr-1" />
+                                                                Admin
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Workers */}
+                                {data.allUsers.filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'worker').length > 0 && (
+                                    <div>
+                                        <h3 className="font-semibold text-green-700 mb-2 flex items-center gap-2">
+                                            <UserCheck className="w-4 h-4" />
+                                            Workers
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {data.allUsers
+                                                .filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'worker')
+                                                .map(user => (
+                                                    <div key={user.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                                                                <span className="text-white text-xs font-bold">
+                                                                    {user.user_name?.[0]?.toUpperCase() || 'U'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium text-slate-900 truncate">{user.user_name}</p>
+                                                                <p className="text-xs text-slate-600 truncate">{user.user_email}</p>
+                                                            </div>
+                                                            <Badge className="bg-green-100 text-green-700 border border-green-300">
+                                                                <UserCheck className="w-3 h-3 mr-1" />
+                                                                Worker
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Requesters */}
+                                {data.allUsers.filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'requester').length > 0 && (
+                                    <div>
+                                        <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                            <Users className="w-4 h-4" />
+                                            Requesters
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {data.allUsers
+                                                .filter(u => u.departments?.includes(selectedDepartment) && u.ticket_role === 'requester')
+                                                .map(user => (
+                                                    <div key={user.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 flex items-center justify-center flex-shrink-0">
+                                                                <span className="text-white text-xs font-bold">
+                                                                    {user.user_name?.[0]?.toUpperCase() || 'U'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium text-slate-900 truncate">{user.user_name}</p>
+                                                                <p className="text-xs text-slate-600 truncate">{user.user_email}</p>
+                                                            </div>
+                                                            <Badge className="bg-slate-100 text-slate-700 border border-slate-300">
+                                                                Requester
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );
