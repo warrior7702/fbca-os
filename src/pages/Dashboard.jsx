@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -329,10 +328,6 @@ export default function Dashboard() {
     // Placeholders that don't have pages yet
     if (app.id === 'planningtool') {
       toast.info('Planning Tool - Coming Soon!');
-      return;
-    }
-    if (app.id === 'sharepoint') {
-      toast.info('SharePoint - Coming Soon!');
       return;
     }
     
