@@ -37,32 +37,56 @@ Deno.serve(async (req) => {
     console.log('📎 Audio URL:', audio_url);
     console.log('📋 Meeting:', meeting_subject);
 
-    // Use InvokeLLM with audio file
-    console.log('3️⃣ Processing audio with InvokeLLM...');
-    
-    const prompt = `You are analyzing an audio recording of a meeting. Please provide:
+    // Step 1: Transcribe with Whisper
+    console.log('3️⃣ Fetching audio file...');
+    const audioResponse = await fetch(audio_url);
+    if (!audioResponse.ok) {
+      throw new Error(`Failed to fetch audio: ${audioResponse.statusText}`);
+    }
+    const audioBlob = await audioResponse.blob();
+    console.log('✅ Audio fetched:', audioBlob.size, 'bytes');
 
-1. A full transcript of what was said
-2. A concise summary (2-3 sentences)
-3. A list of action items (if any)
+    console.log('4️⃣ Transcribing with Whisper...');
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
+      },
+      body: formData
+    });
+
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      console.error('❌ Whisper API error:', whisperResponse.status, errorText);
+      throw new Error(`Whisper API error (${whisperResponse.status}): ${errorText}`);
+    }
+
+    const whisperData = await whisperResponse.json();
+    const transcript = whisperData.text;
+    console.log('✅ Transcription complete:', transcript.substring(0, 100) + '...');
+
+    // Step 2: Analyze with LLM
+    console.log('5️⃣ Analyzing with LLM...');
+    const prompt = `Analyze this meeting transcript and provide:
+
+1. A concise summary (2-3 sentences)
+2. A list of action items (if any)
 
 Meeting: ${meeting_subject || 'Meeting'}
 Date: ${meeting_date || 'N/A'}
 
-Respond in JSON format with this structure:
-{
-  "transcript": "full transcript here",
-  "summary": "your summary here",
-  "action_items": ["action 1", "action 2"]
-}`;
+Transcript:
+${transcript}`;
 
-    const response = await base44.integrations.Core.InvokeLLM({
+    const analysisResponse = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,
-      file_urls: [audio_url],
       response_json_schema: {
         type: "object",
         properties: {
-          transcript: { type: "string" },
           summary: { type: "string" },
           action_items: { 
             type: "array",
@@ -73,13 +97,12 @@ Respond in JSON format with this structure:
     });
 
     console.log('✅ Analysis complete');
-    console.log('📊 Response:', response);
 
     return Response.json({
       success: true,
-      transcript: response.transcript || '',
-      summary: response.summary || '',
-      action_items: response.action_items || [],
+      transcript: transcript,
+      summary: analysisResponse.summary || '',
+      action_items: analysisResponse.action_items || [],
       meeting_subject,
       meeting_date
     });
@@ -94,9 +117,8 @@ Respond in JSON format with this structure:
     return Response.json({ 
       success: false,
       error: error.message || 'Failed to transcribe meeting audio',
-      step: 'llm_processing',
-      details: error.stack,
-      errorType: error.constructor.name
+      step: 'processing',
+      details: error.stack
     }, { status: 500 });
   }
 });
