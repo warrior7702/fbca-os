@@ -20,7 +20,9 @@ import {
   Download,
   FileText,
   Search,
-  Trash2
+  Trash2,
+  User, // Added for ad-hoc attendees
+  X // Added for ad-hoc attendees
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +46,19 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import EnhancedMeetingNotes from "../components/meetings/EnhancedMeetingNotes";
 import DetailedMeetingNotesModal from "../components/meetings/DetailedMeetingNotesModal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 
 export default function MyMeetings() {
   const navigate = useNavigate();
@@ -100,6 +115,13 @@ export default function MyMeetings() {
   const [staffForAssignment, setStaffForAssignment] = useState([]);
   // New state for viewing detailed notes
   const [viewingNoteDetail, setViewingNoteDetail] = useState(null);
+
+  // Ad-hoc recording states
+  const [showAdHocRecording, setShowAdHocRecording] = useState(false);
+  const [adHocMeetingTitle, setAdHocMeetingTitle] = useState('');
+  const [adHocAttendees, setAdHocAttendees] = useState([]);
+  const [adHocSearchQuery, setAdHocSearchQuery] = useState('');
+  const [adHocSearchResults, setAdHocSearchResults] = useState([]);
 
   useEffect(() => {
     const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -958,6 +980,127 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
     }
   };
 
+  const handleAdHocStaffSearch = async (query) => {
+    if (!query || query.length < 2) {
+      setAdHocSearchResults([]);
+      return;
+    }
+
+    try {
+      const response = await base44.functions.invoke('getMicrosoftUsers', {
+        searchQuery: query
+      });
+      if (response.data.success && response.data.users) {
+        setAdHocSearchResults(response.data.users);
+      }
+    } catch (error) {
+      console.error('Error searching staff:', error);
+    }
+  };
+
+  const handleAddAdHocAttendee = (person) => {
+    if (!adHocAttendees.find(a => a.email === (person.mail || person.userPrincipalName))) {
+      setAdHocAttendees([...adHocAttendees, {
+        name: person.displayName,
+        email: person.mail || person.userPrincipalName
+      }]);
+    }
+    setAdHocSearchQuery('');
+    setAdHocSearchResults([]);
+  };
+
+  const handleRemoveAdHocAttendee = (email) => {
+    setAdHocAttendees(adHocAttendees.filter(a => a.email !== email));
+  };
+
+  const handleStartAdHocRecording = () => {
+    if (!adHocMeetingTitle.trim()) {
+      toast.error('Please enter a meeting title');
+      return;
+    }
+    startRecording();
+  };
+
+  const handleGenerateAdHocNotes = async () => {
+    if (!audioBlob || !user) {
+      toast.error("Missing required data");
+      return;
+    }
+
+    setProcessingNotes(true);
+    const processingToast = toast.loading("Starting AI processing...");
+
+    try {
+      toast.loading("Uploading audio...", { id: processingToast });
+
+      const uploadResponse = await base44.integrations.Core.UploadFile({
+        file: new File([audioBlob], 'meeting-recording.mp3', { type: 'audio/mpeg' })
+      });
+
+      toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
+
+      const attendeesData = adHocAttendees.map(a => ({
+        name: a.name,
+        email: a.email
+      }));
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('AI processing timed out after 2 minutes.')), 120000)
+      );
+
+      const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
+        audio_url: uploadResponse.file_url,
+        meeting_subject: adHocMeetingTitle,
+        meeting_date: new Date().toISOString(),
+        attendees: attendeesData
+      });
+
+      const notesResponse = await Promise.race([notesPromise, timeoutPromise]);
+
+      if (!notesResponse.data || notesResponse.data.error) {
+        throw new Error(notesResponse.data?.error || 'Failed to generate notes');
+      }
+
+      toast.loading("Saving notes...", { id: processingToast });
+
+      const savedNote = await base44.entities.MeetingNote.create({
+        meeting_id: 'adhoc-' + Date.now(),
+        meeting_subject: adHocMeetingTitle,
+        meeting_date: new Date().toISOString(),
+        user_email: user.email,
+        audio_url: uploadResponse.file_url,
+        summary: notesResponse.data.summary || '',
+        key_points: notesResponse.data.key_points || [],
+        outline: notesResponse.data.outline || [],
+        action_items: notesResponse.data.action_items || [],
+        speakers: notesResponse.data.speakers || [],
+        transcript: notesResponse.data.transcript || '',
+        transcript_segments: notesResponse.data.transcript_segments || [],
+        recording_duration: recordingTime
+      });
+
+      setMeetingNotes(notesResponse.data);
+      setSavedNotes(savedNote);
+      await loadAllMeetingNotes(user);
+
+      toast.success("Meeting notes generated and saved!", { id: processingToast });
+      setActiveTab('notes');
+      setShowAdHocRecording(false);
+
+      // Reset ad-hoc state
+      setAdHocMeetingTitle('');
+      setAdHocAttendees([]);
+      setAudioBlob(null);
+      setIsRecording(false);
+      setRecordingTime(0);
+
+    } catch (error) {
+      console.error("Error generating notes:", error);
+      toast.error(`Failed: ${error.message}`, { id: processingToast });
+    } finally {
+      setProcessingNotes(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -989,6 +1132,15 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
           iconColor="from-purple-500 to-pink-500"
           action={
             <div className="flex gap-2">
+              <Button
+                onClick={() => setShowAdHocRecording(true)}
+                variant="outline"
+                size="sm"
+                className="bg-white hover:bg-slate-50"
+              >
+                <Mic className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Record Now</span>
+              </Button>
               <Button
                 onClick={() => setShowBookingModal(true)}
                 variant="outline"
@@ -1912,6 +2064,180 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
               )}
             </DialogContent>
           </Dialog>
+
+        {/* Ad-Hoc Recording Modal */}
+        <Dialog open={showAdHocRecording} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setShowAdHocRecording(false);
+            setAdHocMeetingTitle('');
+            setAdHocAttendees([]);
+            setAudioBlob(null);
+            setIsRecording(false);
+            setRecordingTime(0);
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              mediaRecorderRef.current.stop();
+            }
+            if (recordingIntervalRef.current) {
+              clearInterval(recordingIntervalRef.current);
+            }
+            if (audioContextRef.current) {
+              audioContextRef.current.close();
+              audioContextRef.current = null;
+              analyserRef.current = null;
+            }
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Record Ad-Hoc Meeting</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Meeting Title */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Meeting Title *</label>
+                <Input
+                  placeholder="e.g., Quick Team Sync"
+                  value={adHocMeetingTitle}
+                  onChange={(e) => setAdHocMeetingTitle(e.target.value)}
+                  disabled={isRecording}
+                />
+              </div>
+
+              {/* Attendees */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Attendees (optional)</label>
+                <div className="space-y-2">
+                  {adHocAttendees.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {adHocAttendees.map((attendee) => (
+                        <Badge key={attendee.email} variant="outline" className="gap-1">
+                          <User className="w-3 h-3" />
+                          {attendee.name}
+                          <button
+                            onClick={() => handleRemoveAdHocAttendee(attendee.email)}
+                            className="ml-1 hover:text-red-600"
+                            disabled={isRecording}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isRecording}>
+                        <User className="w-3 h-3 mr-2" />
+                        Add Attendee
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search staff..."
+                          value={adHocSearchQuery}
+                          onValueChange={(value) => {
+                            setAdHocSearchQuery(value);
+                            handleAdHocStaffSearch(value);
+                          }}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No staff found</CommandEmpty>
+                          <CommandGroup>
+                            {adHocSearchResults.map((person) => (
+                              <CommandItem
+                                key={person.id}
+                                onSelect={() => handleAddAdHocAttendee(person)}
+                              >
+                                <User className="w-4 h-4 mr-2" />
+                                <div>
+                                  <p className="font-medium">{person.displayName}</p>
+                                  <p className="text-xs text-slate-500">{person.mail || person.userPrincipalName}</p>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Recording Controls */}
+              <Card className="border-2 border-blue-200 bg-blue-50">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {!isRecording && !audioBlob && (
+                      <Button
+                        onClick={handleStartAdHocRecording}
+                        className="bg-red-600 hover:bg-red-700"
+                        disabled={!adHocMeetingTitle.trim()}
+                      >
+                        <Mic className="w-4 h-4 mr-2" />
+                        Start Recording
+                      </Button>
+                    )}
+
+                    {isRecording && (
+                      <>
+                        <Button
+                          onClick={stopRecording}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          <Square className="w-4 h-4 mr-2" />
+                          Stop Recording
+                        </Button>
+                        <Badge className="bg-red-500 text-white animate-pulse">
+                          <div className="w-2 h-2 bg-white rounded-full mr-2" />
+                          Recording: {formatRecordingTime(recordingTime)}
+                        </Badge>
+                        {audioLevel > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600">Level:</span>
+                            <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 transition-all duration-100"
+                                style={{ width: `${Math.min(audioLevel / 2.5, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {audioBlob && !meetingNotes && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-green-500 text-white">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Recording saved ({formatRecordingTime(recordingTime)})
+                        </Badge>
+                        <Button
+                          onClick={handleGenerateAdHocNotes}
+                          disabled={processingNotes}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {processingNotes ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate Notes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </DialogContent>
+        </Dialog>
         </Tabs>
       </div>
     </div>
