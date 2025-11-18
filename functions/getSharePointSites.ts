@@ -22,10 +22,10 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    // Get all SharePoint sites
+    // Get sites the user follows/has access to
     console.log('Calling Microsoft Graph API for SharePoint sites...');
     const sitesResponse = await fetch(
-      'https://graph.microsoft.com/v1.0/sites?search=*',
+      'https://graph.microsoft.com/v1.0/me/followedSites',
       {
         headers: {
           'Authorization': ssoToken,
