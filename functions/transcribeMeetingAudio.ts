@@ -37,140 +37,49 @@ Deno.serve(async (req) => {
     console.log('📎 Audio URL:', audio_url);
     console.log('📋 Meeting:', meeting_subject);
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      console.error('❌ OPENAI_API_KEY not configured');
-      return Response.json({ 
-        success: false,
-        error: 'OPENAI_API_KEY not configured in environment variables',
-        step: 'configuration'
-      }, { status: 500 });
-    }
-    console.log('✅ OpenAI API key found');
-
-    // Step 1: Download the audio file
-    console.log('3️⃣ Downloading audio file from:', audio_url);
-    let audioResponse;
-    try {
-      audioResponse = await fetch(audio_url);
-      if (!audioResponse.ok) {
-        throw new Error(`HTTP ${audioResponse.status}: ${audioResponse.statusText}`);
-      }
-    } catch (downloadError) {
-      console.error('❌ Download failed:', downloadError);
-      return Response.json({ 
-        success: false,
-        error: `Failed to download audio: ${downloadError.message}`,
-        step: 'download',
-        audio_url
-      }, { status: 500 });
-    }
+    // Use InvokeLLM with audio file
+    console.log('3️⃣ Processing audio with InvokeLLM...');
     
-    const audioBlob = await audioResponse.blob();
-    console.log('✅ Audio downloaded:', audioBlob.size, 'bytes, type:', audioBlob.type);
+    const prompt = `You are analyzing an audio recording of a meeting. Please provide:
 
-    // Step 2: Transcribe with Whisper
-    console.log('4️⃣ Transcribing with Whisper...');
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-
-    let transcriptionResponse;
-    try {
-      transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: formData
-      });
-
-      if (!transcriptionResponse.ok) {
-        const errorText = await transcriptionResponse.text();
-        console.error('❌ Whisper API error response:', errorText);
-        throw new Error(`Whisper API returned ${transcriptionResponse.status}: ${errorText}`);
-      }
-    } catch (whisperError) {
-      console.error('❌ Whisper request failed:', whisperError);
-      return Response.json({ 
-        success: false,
-        error: `Whisper transcription failed: ${whisperError.message}`,
-        step: 'whisper',
-        details: whisperError.toString()
-      }, { status: 500 });
-    }
-
-    const transcriptionData = await transcriptionResponse.json();
-    const transcript = transcriptionData.text;
-    console.log('✅ Transcription complete:', transcript.length, 'characters');
-    console.log('📝 Transcript preview:', transcript.substring(0, 100));
-
-    // Step 3: Generate summary and action items with GPT
-    console.log('5️⃣ Generating summary with GPT...');
-    const prompt = `You are analyzing a meeting transcript. Please provide:
-
-1. A concise summary (2-3 sentences)
-2. A list of action items (if any)
+1. A full transcript of what was said
+2. A concise summary (2-3 sentences)
+3. A list of action items (if any)
 
 Meeting: ${meeting_subject || 'Meeting'}
 Date: ${meeting_date || 'N/A'}
 
-Transcript:
-${transcript}
-
-Respond in JSON format:
+Respond in JSON format with this structure:
 {
+  "transcript": "full transcript here",
   "summary": "your summary here",
   "action_items": ["action 1", "action 2"]
 }`;
 
-    let gptResponse;
-    try {
-      gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a helpful meeting assistant that summarizes meetings and extracts action items.' },
-            { role: 'user', content: prompt }
-          ],
-          response_format: { type: 'json_object' }
-        })
-      });
-
-      if (!gptResponse.ok) {
-        const errorText = await gptResponse.text();
-        console.error('❌ GPT API error response:', errorText);
-        throw new Error(`GPT API returned ${gptResponse.status}: ${errorText}`);
+    const response = await base44.integrations.Core.InvokeLLM({
+      prompt: prompt,
+      file_urls: [audio_url],
+      response_json_schema: {
+        type: "object",
+        properties: {
+          transcript: { type: "string" },
+          summary: { type: "string" },
+          action_items: { 
+            type: "array",
+            items: { type: "string" }
+          }
+        }
       }
-    } catch (gptError) {
-      console.error('❌ GPT request failed:', gptError);
-      return Response.json({ 
-        success: false,
-        error: `GPT summarization failed: ${gptError.message}`,
-        step: 'gpt',
-        transcript: transcript,
-        details: gptError.toString()
-      }, { status: 500 });
-    }
+    });
 
-    const gptData = await gptResponse.json();
-    const analysisText = gptData.choices[0].message.content;
-    const analysis = JSON.parse(analysisText);
-    
     console.log('✅ Analysis complete');
-    console.log('📊 Summary length:', analysis.summary?.length || 0);
-    console.log('📋 Action items:', analysis.action_items?.length || 0);
+    console.log('📊 Response:', response);
 
     return Response.json({
       success: true,
-      transcript: transcript,
-      summary: analysis.summary || '',
-      action_items: analysis.action_items || [],
+      transcript: response.transcript || '',
+      summary: response.summary || '',
+      action_items: response.action_items || [],
       meeting_subject,
       meeting_date
     });
@@ -185,7 +94,7 @@ Respond in JSON format:
     return Response.json({ 
       success: false,
       error: error.message || 'Failed to transcribe meeting audio',
-      step: 'unknown',
+      step: 'llm_processing',
       details: error.stack,
       errorType: error.constructor.name
     }, { status: 500 });
