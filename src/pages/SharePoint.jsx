@@ -75,13 +75,18 @@ export default function SharePointPage() {
       }
 
       const response = await base44.functions.invoke('getSharePointSites');
+      console.log('SharePoint response:', response.data);
+      
       if (response.data.success) {
         setSites(response.data.sites);
         toast.success(`Loaded ${response.data.sites.length} SharePoint sites`);
+      } else {
+        toast.error(response.data.error || 'Failed to load SharePoint sites');
       }
     } catch (error) {
       console.error('Error loading SharePoint:', error);
-      toast.error('Failed to load SharePoint sites');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to load SharePoint sites';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
