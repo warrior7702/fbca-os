@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -65,7 +64,7 @@ const apps = [
   {
     name: "Meetings",
     path: "MyMeetings",
-    icon: CalendarIcon, // Reusing CalendarIcon, consider a specific icon if available
+    icon: CalendarIcon,
     color: "text-purple-500"
   },
   {
@@ -79,6 +78,12 @@ const apps = [
     path: "Calendar",
     icon: CalendarIcon,
     color: "text-blue-600"
+  },
+  {
+    name: "SharePoint",
+    path: "SharePoint",
+    icon: Folder,
+    color: "text-cyan-500"
   },
   {
     name: "Documents",
