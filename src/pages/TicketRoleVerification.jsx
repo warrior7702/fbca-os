@@ -37,6 +37,8 @@ export default function TicketRoleVerification() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
     const [activeTab, setActiveTab] = useState("workers");
+    const [sortBy, setSortBy] = useState("name");
+    const [departmentFilter, setDepartmentFilter] = useState("all");
 
     useEffect(() => {
         loadUser();
@@ -75,14 +77,39 @@ export default function TicketRoleVerification() {
     };
 
     const filterUsers = (users) => {
-        if (!searchQuery) return users;
-        const query = searchQuery.toLowerCase();
-        return users.filter(u =>
-            u.displayName?.toLowerCase().includes(query) ||
-            u.email?.toLowerCase().includes(query) ||
-            u.osDept?.toLowerCase().includes(query) ||
-            u.department?.toLowerCase().includes(query)
-        );
+        let filtered = users;
+
+        // Filter by search
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(u =>
+                u.displayName?.toLowerCase().includes(query) ||
+                u.email?.toLowerCase().includes(query) ||
+                u.osDept?.toLowerCase().includes(query) ||
+                u.department?.toLowerCase().includes(query)
+            );
+        }
+
+        // Filter by department
+        if (departmentFilter !== "all") {
+            filtered = filtered.filter(u => u.osDept === departmentFilter);
+        }
+
+        // Sort
+        filtered = [...filtered].sort((a, b) => {
+            switch (sortBy) {
+                case "name":
+                    return (a.displayName || "").localeCompare(b.displayName || "");
+                case "email":
+                    return (a.email || "").localeCompare(b.email || "");
+                case "department":
+                    return (a.osDept || "").localeCompare(b.osDept || "");
+                default:
+                    return 0;
+            }
+        });
+
+        return filtered;
     };
 
     if (loading) {
@@ -327,19 +354,50 @@ export default function TicketRoleVerification() {
                             </Card>
                         )}
 
-                        {/* Search */}
-                        <div className="mb-4">
-                            <div className="relative max-w-md">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search by name, email, or department..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
-                                />
-                            </div>
-                        </div>
+                        {/* Search & Filters */}
+                        <Card className="mb-4">
+                            <CardContent className="p-4">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="relative flex-1 min-w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <Input
+                                            type="text"
+                                            placeholder="Search by name, email, or department..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm text-slate-600 font-medium">Department:</label>
+                                        <select
+                                            value={departmentFilter}
+                                            onChange={(e) => setDepartmentFilter(e.target.value)}
+                                            className="px-3 py-2 border rounded-md text-sm"
+                                        >
+                                            <option value="all">All Departments</option>
+                                            {data?.departmentList?.map(dept => (
+                                                <option key={dept} value={dept}>{dept}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm text-slate-600 font-medium">Sort by:</label>
+                                        <select
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value)}
+                                            className="px-3 py-2 border rounded-md text-sm"
+                                        >
+                                            <option value="name">Name</option>
+                                            <option value="email">Email</option>
+                                            <option value="department">Department</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* User Lists */}
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
