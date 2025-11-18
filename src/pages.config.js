@@ -47,6 +47,7 @@ import Buildings from './pages/Buildings';
 import AkitaFetch from './pages/AkitaFetch';
 import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
 import MeetingNotes from './pages/MeetingNotes';
+import TestTranscription from './pages/TestTranscription';
 import __Layout from './Layout.jsx';
 
 
@@ -100,6 +101,7 @@ export const PAGES = {
     "AkitaFetch": AkitaFetch,
     "AkitaBoxExplorer": AkitaBoxExplorer,
     "MeetingNotes": MeetingNotes,
+    "TestTranscription": TestTranscription,
 }
 
 export const pagesConfig = {
