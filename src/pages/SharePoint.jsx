@@ -521,6 +521,102 @@ export default function SharePointPage() {
                 )}
               </div>
             )}
+                </TabsContent>
+
+                <TabsContent value="lists" className="mt-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-slate-900">
+                        SharePoint Lists in {selectedSite.displayName}
+                      </h3>
+                      <Button
+                        onClick={() => setShowCreateListModal(true)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create List
+                      </Button>
+                    </div>
+
+                    {loadingLists ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                      </div>
+                    ) : lists.length === 0 ? (
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <List className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                          <p className="text-slate-600">No lists found in this site</p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {lists.map(list => (
+                          <motion.div
+                            key={list.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                          >
+                            <Card>
+                              <CardHeader>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <CardTitle className="flex items-center gap-2">
+                                      <List className="w-5 h-5 text-blue-600" />
+                                      {list.displayName}
+                                    </CardTitle>
+                                    {list.description && (
+                                      <p className="text-sm text-slate-600 mt-1">{list.description}</p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedList(list);
+                                      setShowAddColumnModal(true);
+                                    }}
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Column
+                                  </Button>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                {list.columns && list.columns.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-600 mb-2">Columns:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {list.columns.map((col, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs">
+                                          {col.displayName}
+                                          {col.required && <span className="text-red-500 ml-1">*</span>}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {list.webUrl && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-3"
+                                    onClick={() => window.open(list.webUrl, '_blank')}
+                                  >
+                                    <ExternalLink className="w-3 h-3 mr-2" />
+                                    Open in SharePoint
+                                  </Button>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
         </div>
 
