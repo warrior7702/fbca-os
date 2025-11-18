@@ -80,7 +80,7 @@ export default function MyMeetings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [staffResults, setStaffResults] = useState([]);
   const [searchingStaff, setSearchingStaff] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [selectedPerson, setSelectedPerson] = null);
   const [hasBookings, setHasBookings] = useState(false);
   const [bookingBusiness, setBookingBusiness] = useState(null);
   const [bookingServices, setBookingServices] = useState([]);
@@ -382,7 +382,7 @@ export default function MyMeetings() {
       toast.loading("Uploading audio...", { id: processingToast });
 
       const uploadResponse = await base44.integrations.Core.UploadFile({
-        file: new File([audioBlob], 'meeting-recording.mp3', { type: 'audio/mpeg' })
+        file: new File([audioBlob], 'meeting-recording.webm', { type: audioBlob.type })
       });
 
       console.log('✅ Audio uploaded successfully');
