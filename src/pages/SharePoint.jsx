@@ -51,39 +51,15 @@ const MINISTRY_COLORS = {
 
 export default function SharePointPage() {
   const [sites, setSites] = useState([]);
-  const [libraries, setLibraries] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [selectedSite, setSelectedSite] = useState(null);
-  const [selectedLibrary, setSelectedLibrary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingLibraries, setLoadingLibraries] = useState(false);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [aiTagging, setAiTagging] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState(null);
-  const [activeTab, setActiveTab] = useState('libraries');
-  const [lists, setLists] = useState([]);
-  const [loadingLists, setLoadingLists] = useState(false);
-  const [showCreateListModal, setShowCreateListModal] = useState(false);
-  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
-  const [selectedList, setSelectedList] = useState(null);
-  const [newListData, setNewListData] = useState({ displayName: '', description: '', template: 'genericList' });
-  const [newColumnData, setNewColumnData] = useState({ columnName: '', columnType: 'text', required: false, description: '' });
-  const [creatingList, setCreatingList] = useState(false);
-  const [addingColumn, setAddingColumn] = useState(false);
-  const [recentFiles, setRecentFiles] = useState([]);
-  const [loadingRecent, setLoadingRecent] = useState(false);
-  const [favorites, setFavorites] = useState([]);
-  const [loadingFavorites, setLoadingFavorites] = useState(false);
-  const [ministryFilter, setMinistryFilter] = useState('all');
+  const [siteAccess, setSiteAccess] = useState([]);
+  const [loadingSiteData, setLoadingSiteData] = useState({});
+  const [expandedSite, setExpandedSite] = useState(null);
+  const [siteLibraries, setSiteLibraries] = useState({});
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [viewMode, setViewMode] = useState('browse'); // browse, recent, favorites, search
 
   useEffect(() => {
     loadData();
@@ -100,88 +76,108 @@ export default function SharePointPage() {
         return;
       }
 
-      const response = await base44.functions.invoke('getSharePointSites');
-      console.log('SharePoint response:', response.data);
-      
-      if (response.data.success) {
-        setSites(response.data.sites);
-        toast.success(`Loaded ${response.data.sites.length} SharePoint sites`);
-      } else {
-        toast.error(response.data.error || 'Failed to load SharePoint sites');
-      }
-
-      // Load recent files and favorites
-      await Promise.all([
-        loadRecentFiles(),
-        loadFavorites()
+      const [sitesResponse, accessData] = await Promise.all([
+        base44.functions.invoke('getSharePointSites'),
+        base44.entities.SharePointSiteAccess.filter({ user_email: currentUser.email })
       ]);
+      
+      if (sitesResponse.data.success) {
+        setSites(sitesResponse.data.sites);
+        setSiteAccess(accessData);
+      } else {
+        toast.error(sitesResponse.data.error || 'Failed to load SharePoint sites');
+      }
     } catch (error) {
       console.error('Error loading SharePoint:', error);
-      const errorMsg = error.response?.data?.error || error.message || 'Failed to load SharePoint sites';
-      toast.error(errorMsg);
+      toast.error('Failed to load SharePoint');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRecentFiles = async () => {
-    setLoadingRecent(true);
-    try {
-      const response = await base44.functions.invoke('getRecentSharePointFiles');
-      if (response.data.success) {
-        setRecentFiles(response.data.files);
-      }
-    } catch (error) {
-      console.error('Error loading recent files:', error);
-    } finally {
-      setLoadingRecent(false);
-    }
-  };
-
-  const loadFavorites = async () => {
-    if (!user) return;
-    setLoadingFavorites(true);
-    try {
-      const favs = await base44.entities.SharePointFavorite.filter({
-        user_email: user.email
-      });
-      setFavorites(favs);
-    } catch (error) {
-      console.error('Error loading favorites:', error);
-    } finally {
-      setLoadingFavorites(false);
-    }
-  };
-
-  const toggleFavorite = async (file, site, drive) => {
+  const trackSiteAccess = async (site) => {
     if (!user) return;
 
-    const existingFav = favorites.find(f => f.file_id === file.id);
+    const existing = siteAccess.find(s => s.site_id === site.id);
 
     try {
-      if (existingFav) {
-        await base44.entities.SharePointFavorite.delete(existingFav.id);
-        setFavorites(favorites.filter(f => f.id !== existingFav.id));
-        toast.success('Removed from favorites');
-      } else {
-        const newFav = await base44.entities.SharePointFavorite.create({
-          user_email: user.email,
-          site_id: site?.id || '',
-          site_name: site?.displayName || '',
-          drive_id: drive?.id || '',
-          drive_name: drive?.name || '',
-          file_id: file.id,
-          file_name: file.name,
-          file_url: file.webUrl,
-          ministry: 'Other',
+      if (existing) {
+        const updated = await base44.entities.SharePointSiteAccess.update(existing.id, {
+          access_count: existing.access_count + 1,
           last_accessed: new Date().toISOString()
         });
-        setFavorites([...favorites, newFav]);
+        setSiteAccess(siteAccess.map(s => s.id === existing.id ? updated : s));
+      } else {
+        const newAccess = await base44.entities.SharePointSiteAccess.create({
+          user_email: user.email,
+          site_id: site.id,
+          site_name: site.displayName,
+          site_url: site.webUrl,
+          access_count: 1,
+          is_favorited: false,
+          last_accessed: new Date().toISOString()
+        });
+        setSiteAccess([...siteAccess, newAccess]);
+      }
+    } catch (error) {
+      console.error('Error tracking site access:', error);
+    }
+  };
+
+  const toggleSiteFavorite = async (site) => {
+    if (!user) return;
+
+    const existing = siteAccess.find(s => s.site_id === site.id);
+
+    try {
+      if (existing) {
+        const updated = await base44.entities.SharePointSiteAccess.update(existing.id, {
+          is_favorited: !existing.is_favorited
+        });
+        setSiteAccess(siteAccess.map(s => s.id === existing.id ? updated : s));
+        toast.success(updated.is_favorited ? 'Added to favorites' : 'Removed from favorites');
+      } else {
+        const newAccess = await base44.entities.SharePointSiteAccess.create({
+          user_email: user.email,
+          site_id: site.id,
+          site_name: site.displayName,
+          site_url: site.webUrl,
+          access_count: 0,
+          is_favorited: true,
+          last_accessed: new Date().toISOString()
+        });
+        setSiteAccess([...siteAccess, newAccess]);
         toast.success('Added to favorites');
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      toast.error('Failed to update favorites');
+      toast.error('Failed to update favorite');
+    }
+  };
+
+  const loadSiteLibraries = async (site) => {
+    if (siteLibraries[site.id]) {
+      setExpandedSite(expandedSite === site.id ? null : site.id);
+      return;
+    }
+
+    setLoadingSiteData({ ...loadingSiteData, [site.id]: true });
+    await trackSiteAccess(site);
+
+    try {
+      const response = await base44.functions.invoke('getSharePointLibraries', {
+        siteId: site.id
+      });
+
+      if (response.data.success) {
+        setSiteLibraries({ ...siteLibraries, [site.id]: response.data.libraries });
+        setExpandedSite(site.id);
+      }
+    } catch (error) {
+      console.error('Error loading libraries:', error);
+      toast.error('Failed to load libraries');
+    } finally {
+      setLoadingSiteData({ ...loadingSiteData, [site.id]: false });
     }
   };
 
@@ -196,7 +192,6 @@ export default function SharePointPage() {
 
       if (response.data.success) {
         setSearchResults(response.data.results);
-        setViewMode('search');
       }
     } catch (error) {
       console.error('Error searching:', error);
@@ -206,9 +201,31 @@ export default function SharePointPage() {
     }
   };
 
-  const isFavorited = (fileId) => {
-    return favorites.some(f => f.file_id === fileId);
+  const getSiteAccessData = (siteId) => {
+    return siteAccess.find(s => s.site_id === siteId);
   };
+
+  const favoritedSites = sites.filter(site => {
+    const access = getSiteAccessData(site.id);
+    return access?.is_favorited;
+  });
+
+  const frequentSites = sites
+    .filter(site => {
+      const access = getSiteAccessData(site.id);
+      return access && access.access_count > 0 && !access.is_favorited;
+    })
+    .sort((a, b) => {
+      const accessA = getSiteAccessData(a.id);
+      const accessB = getSiteAccessData(b.id);
+      return (accessB?.access_count || 0) - (accessA?.access_count || 0);
+    })
+    .slice(0, 5);
+
+  const otherSites = sites.filter(site => {
+    const access = getSiteAccessData(site.id);
+    return !access?.is_favorited && (!access || access.access_count === 0);
+  });
 
   const loadLibraries = async (site) => {
     setLoadingLibraries(true);
@@ -451,82 +468,29 @@ export default function SharePointPage() {
 
         <AppHeader
           icon={Library}
-          title="SharePoint Media Hub"
-          description="Smart media archive and document management"
+          title="SharePoint"
+          description="Quick access to your sites and shared folders"
           iconColor="from-blue-500 to-indigo-500"
         />
 
-        {/* Quick Access Bar */}
-        <Card className="border-2 border-blue-200">
+        {/* Global Search */}
+        <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <Button
-                variant={viewMode === 'browse' ? 'default' : 'outline'}
-                onClick={() => setViewMode('browse')}
-                size="sm"
-              >
-                <Library className="w-4 h-4 mr-2" />
-                Browse Sites
-              </Button>
-              <Button
-                variant={viewMode === 'recent' ? 'default' : 'outline'}
-                onClick={() => setViewMode('recent')}
-                size="sm"
-              >
-                <Clock className="w-4 h-4 mr-2" />
-                Recent Files
-                {recentFiles.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">{recentFiles.length}</Badge>
-                )}
-              </Button>
-              <Button
-                variant={viewMode === 'favorites' ? 'default' : 'outline'}
-                onClick={() => setViewMode('favorites')}
-                size="sm"
-              >
-                <Star className="w-4 h-4 mr-2" />
-                Favorites
-                {favorites.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">{favorites.length}</Badge>
-                )}
-              </Button>
-
-              <div className="flex-1" />
-
-              {/* Ministry Filter */}
-              <Select value={ministryFilter} onValueChange={setMinistryFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Ministries</SelectItem>
-                  <SelectItem value="Youth">Youth</SelectItem>
-                  <SelectItem value="Worship">Worship</SelectItem>
-                  <SelectItem value="Pastoral">Pastoral</SelectItem>
-                  <SelectItem value="Children">Children</SelectItem>
-                  <SelectItem value="Outreach">Outreach</SelectItem>
-                  <SelectItem value="Events">Events</SelectItem>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Facilities">Facilities</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Global Search */}
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                  placeholder="Search all files..."
+                  placeholder="Search across all SharePoint sites..."
                   value={globalSearchQuery}
                   onChange={(e) => setGlobalSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleGlobalSearch()}
-                  className="pl-9"
+                  className="pl-11 h-12"
                 />
               </div>
               <Button
                 onClick={handleGlobalSearch}
                 disabled={searching || !globalSearchQuery.trim()}
-                size="sm"
+                className="h-12"
               >
                 {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
               </Button>
@@ -534,500 +498,293 @@ export default function SharePointPage() {
           </CardContent>
         </Card>
 
-        {/* Main Content Area */}
-        {viewMode === 'recent' && (
+        {/* Search Results */}
+        {searchResults.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-600" />
-                Recently Accessed Files
-              </CardTitle>
+              <CardTitle>Search Results ({searchResults.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              {loadingRecent ? (
-                <div className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                </div>
-              ) : recentFiles.length === 0 ? (
-                <p className="text-center text-slate-600 py-8">No recent files</p>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-3">
-                  {recentFiles.map(file => (
-                    <motion.div
-                      key={file.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                    >
-                      <Card className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            {getFileIcon(file)}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="font-medium text-sm truncate">{file.name}</p>
-                                <button
-                                  onClick={() => toggleFavorite(file, null, null)}
-                                  className="flex-shrink-0"
-                                >
-                                  <Star
-                                    className={`w-4 h-4 ${
-                                      isFavorited(file.id)
-                                        ? 'fill-yellow-400 text-yellow-400'
-                                        : 'text-slate-400'
-                                    }`}
-                                  />
-                                </button>
-                              </div>
-                              {file.size && (
-                                <p className="text-xs text-slate-500">
-                                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              )}
-                              {file.lastModifiedDateTime && (
-                                <p className="text-xs text-slate-400">
-                                  {format(new Date(file.lastModifiedDateTime), 'MMM d, yyyy')}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {file.webUrl && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full mt-3"
-                              onClick={() => window.open(file.webUrl, '_blank')}
-                            >
-                              <ExternalLink className="w-3 h-3 mr-2" />
-                              Open
-                            </Button>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {searchResults.map(file => (
+                  <Card key={file.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {getFileIcon(file)}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{file.name}</p>
+                          {file.size && (
+                            <p className="text-xs text-slate-500">
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
                           )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+                        </div>
+                      </div>
+                      {file.webUrl && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-3"
+                          onClick={() => window.open(file.webUrl, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-2" />
+                          Open
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
 
-        {viewMode === 'favorites' && (
+        {/* Favorited Sites */}
+        {favoritedSites.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Star className="w-5 h-5 text-yellow-500" />
-                Your Favorites
+                Your Favorite Sites
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {loadingFavorites ? (
-                <div className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                </div>
-              ) : favorites.length === 0 ? (
-                <p className="text-center text-slate-600 py-8">
-                  No favorites yet. Click the star icon on any file to add it here.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {favorites
-                    .filter(fav => ministryFilter === 'all' || fav.ministry === ministryFilter)
-                    .map(fav => (
-                      <motion.div
-                        key={fav.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 bg-slate-50 rounded-lg border border-slate-200 hover:shadow-md transition-shadow"
-                      >
+              <div className="space-y-3">
+                {favoritedSites.map(site => {
+                  const accessData = getSiteAccessData(site.id);
+                  return (
+                    <Card key={site.id} className="border-2 border-yellow-200">
+                      <CardContent className="p-4">
                         <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <FileText className="w-8 h-8 text-blue-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{fav.file_name}</p>
+                          <div className="flex items-center gap-3 flex-1">
+                            <Library className="w-8 h-8 text-yellow-600" />
+                            <div>
+                              <p className="font-semibold">{site.displayName}</p>
                               <p className="text-xs text-slate-500">
-                                {fav.site_name} / {fav.drive_name}
+                                Accessed {accessData?.access_count || 0} times
                               </p>
-                              <Badge className={MINISTRY_COLORS[fav.ministry] || 'bg-slate-100'}>
-                                {fav.ministry}
-                              </Badge>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {fav.file_url && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => window.open(fav.file_url, '_blank')}
-                              >
-                                <ExternalLink className="w-3 h-3 mr-2" />
-                                Open
-                              </Button>
-                            )}
-                            <button
-                              onClick={async () => {
-                                await base44.entities.SharePointFavorite.delete(fav.id);
-                                setFavorites(favorites.filter(f => f.id !== fav.id));
-                                toast.success('Removed from favorites');
-                              }}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => loadSiteLibraries(site)}
+                              disabled={loadingSiteData[site.id]}
                             >
+                              {loadingSiteData[site.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : expandedSite === site.id ? (
+                                'Hide'
+                              ) : (
+                                'View Folders'
+                              )}
+                            </Button>
+                            <button onClick={() => toggleSiteFavorite(site)}>
                               <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                             </button>
                           </div>
                         </div>
-                      </motion.div>
-                    ))}
-                </div>
-              )}
+
+                        {/* Expanded Libraries */}
+                        {expandedSite === site.id && siteLibraries[site.id] && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-4 pt-4 border-t space-y-2"
+                          >
+                            {siteLibraries[site.id].map(library => (
+                              <div
+                                key={library.id}
+                                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FolderOpen className="w-5 h-5 text-blue-500" />
+                                  <span className="text-sm font-medium">{library.name}</span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => window.open(library.webUrl, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
-        )}
+          )}
 
-        {viewMode === 'search' && (
+          {/* Frequently Visited Sites */}
+          {frequentSites.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5 text-blue-600" />
-                Search Results for "{globalSearchQuery}"
+                <Clock className="w-5 h-5 text-blue-600" />
+                Frequently Visited
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {searchResults.length === 0 ? (
-                <p className="text-center text-slate-600 py-8">No results found</p>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-3">
-                  {searchResults.map(file => (
-                    <motion.div
-                      key={file.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                    >
-                      <Card className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            {getFileIcon(file)}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="font-medium text-sm truncate">{file.name}</p>
-                                <button
-                                  onClick={() => toggleFavorite(file, null, null)}
-                                  className="flex-shrink-0"
-                                >
-                                  <Star
-                                    className={`w-4 h-4 ${
-                                      isFavorited(file.id)
-                                        ? 'fill-yellow-400 text-yellow-400'
-                                        : 'text-slate-400'
-                                    }`}
-                                  />
-                                </button>
-                              </div>
-                              {file.size && (
-                                <p className="text-xs text-slate-500">
-                                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              )}
+              <div className="space-y-3">
+                {frequentSites.map(site => {
+                  const accessData = getSiteAccessData(site.id);
+                  return (
+                    <Card key={site.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1">
+                            <Library className="w-8 h-8 text-blue-600" />
+                            <div>
+                              <p className="font-semibold">{site.displayName}</p>
+                              <p className="text-xs text-slate-500">
+                                Accessed {accessData?.access_count || 0} times
+                              </p>
                             </div>
                           </div>
-                          {file.webUrl && (
+                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="w-full mt-3"
-                              onClick={() => window.open(file.webUrl, '_blank')}
+                              onClick={() => loadSiteLibraries(site)}
+                              disabled={loadingSiteData[site.id]}
                             >
-                              <ExternalLink className="w-3 h-3 mr-2" />
-                              Open
+                              {loadingSiteData[site.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : expandedSite === site.id ? (
+                                'Hide'
+                              ) : (
+                                'View Folders'
+                              )}
                             </Button>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {viewMode === 'browse' && (
-          <div className="grid grid-cols-12 gap-6">
-            {/* Sites Sidebar */}
-            <div className="col-span-3 space-y-3">
-              <h3 className="font-semibold text-slate-900">SharePoint Sites</h3>
-              <div className="space-y-2">
-                {sites.map(site => (
-                  <button
-                    key={site.id}
-                    onClick={() => loadLibraries(site)}
-                    className={`w-full p-3 rounded-lg text-left transition-all ${
-                      selectedSite?.id === site.id
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-white hover:bg-slate-50 border border-slate-200'
-                    }`}
-                  >
-                    <p className="font-medium truncate">{site.displayName}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="col-span-9 space-y-4">
-            {!selectedSite ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Library className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                    Select a SharePoint Site
-                  </h3>
-                  <p className="text-slate-600">
-                    Choose a site from the sidebar to view document libraries and lists
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="libraries" onClick={() => loadLibraries(selectedSite)}>
-                    <FolderOpen className="w-4 h-4 mr-2" />
-                    Libraries
-                  </TabsTrigger>
-                  <TabsTrigger value="lists" onClick={() => loadLists(selectedSite)}>
-                    <List className="w-4 h-4 mr-2" />
-                    Lists
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="libraries" className="mt-4">
-                  {!selectedLibrary ? (
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-4">
-                  Document Libraries in {selectedSite.displayName}
-                </h3>
-                {loadingLibraries ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {libraries.map(library => (
-                      <motion.div
-                        key={library.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                      >
-                        <Card 
-                          className="cursor-pointer hover:shadow-lg transition-shadow"
-                          onClick={() => loadFiles(library)}
-                        >
-                          <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                              <FolderOpen className="w-5 h-5 text-blue-600" />
-                              {library.name}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-slate-600">
-                              {library.description || 'No description'}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Search Bar */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <Input
-                    placeholder="Search files..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-11"
-                  />
-                </div>
-
-                {/* Files Grid */}
-                {loadingFiles ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                  </div>
-                ) : filteredFiles.length === 0 ? (
-                  <Card>
-                    <CardContent className="p-12 text-center">
-                      <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No files found</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {filteredFiles.map(file => (
-                      <motion.div
-                        key={file.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                      >
-                        <Card className="hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                            {getFileIcon(file)}
-                            <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm truncate">
-                              {file.name}
-                            </p>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavorite(file, selectedSite, selectedLibrary);
-                              }}
-                              className="flex-shrink-0"
-                            >
+                            <button onClick={() => toggleSiteFavorite(site)}>
                               <Star
-                                className={`w-4 h-4 ${
-                                  isFavorited(file.id)
+                                className={`w-5 h-5 ${
+                                  accessData?.is_favorited
                                     ? 'fill-yellow-400 text-yellow-400'
                                     : 'text-slate-400'
                                 }`}
                               />
                             </button>
-                            </div>
-                                {file.size && (
-                                  <p className="text-xs text-slate-500">
-                                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                                  </p>
-                                )}
-                                {file.lastModifiedDateTime && (
-                                  <p className="text-xs text-slate-400">
-                                    {format(new Date(file.lastModifiedDateTime), 'MMM d, yyyy')}
-                                  </p>
-                                )}
+                          </div>
+                        </div>
+
+                        {/* Expanded Libraries */}
+                        {expandedSite === site.id && siteLibraries[site.id] && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-4 pt-4 border-t space-y-2"
+                          >
+                            {siteLibraries[site.id].map(library => (
+                              <div
+                                key={library.id}
+                                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FolderOpen className="w-5 h-5 text-blue-500" />
+                                  <span className="text-sm font-medium">{library.name}</span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => window.open(library.webUrl, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
                               </div>
-                            </div>
-                            {file.webUrl && (
+                            ))}
+                          </motion.div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+          )}
+
+          {/* All Other Sites */}
+          {otherSites.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Library className="w-5 h-5 text-slate-600" />
+                All Sites
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {otherSites.map(site => (
+                  <Card key={site.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Library className="w-6 h-6 text-slate-500" />
+                          <p className="font-medium text-sm truncate">{site.displayName}</p>
+                        </div>
+                        <button onClick={() => toggleSiteFavorite(site)}>
+                          <Star className="w-4 h-4 text-slate-400" />
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-3"
+                        onClick={() => loadSiteLibraries(site)}
+                        disabled={loadingSiteData[site.id]}
+                      >
+                        {loadingSiteData[site.id] ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <>View Folders</>
+                        )}
+                      </Button>
+
+                      {/* Expanded Libraries */}
+                      {expandedSite === site.id && siteLibraries[site.id] && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="mt-3 pt-3 border-t space-y-2"
+                        >
+                          {siteLibraries[site.id].map(library => (
+                            <div
+                              key={library.id}
+                              className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="w-4 h-4 text-blue-500" />
+                                <span className="text-xs">{library.name}</span>
+                              </div>
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="w-full mt-3"
-                                onClick={() => window.open(file.webUrl, '_blank')}
+                                variant="ghost"
+                                onClick={() => window.open(library.webUrl, '_blank')}
                               >
-                                <ExternalLink className="w-3 h-3 mr-2" />
-                                Open
+                                <ExternalLink className="w-3 h-3" />
                               </Button>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="lists" className="mt-4">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-slate-900">
-                        SharePoint Lists in {selectedSite.displayName}
-                      </h3>
-                      <Button
-                        onClick={() => setShowCreateListModal(true)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create List
-                      </Button>
-                    </div>
-
-                    {loadingLists ? (
-                      <div className="text-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                      </div>
-                    ) : lists.length === 0 ? (
-                      <Card>
-                        <CardContent className="p-12 text-center">
-                          <List className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-600">No lists found in this site</p>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <div className="space-y-4">
-                        {lists.map(list => (
-                          <motion.div
-                            key={list.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                          >
-                            <Card>
-                              <CardHeader>
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <CardTitle className="flex items-center gap-2">
-                                      <List className="w-5 h-5 text-blue-600" />
-                                      {list.displayName}
-                                    </CardTitle>
-                                    {list.description && (
-                                      <p className="text-sm text-slate-600 mt-1">{list.description}</p>
-                                    )}
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setSelectedList(list);
-                                      setShowAddColumnModal(true);
-                                    }}
-                                  >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Column
-                                  </Button>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                {list.columns && list.columns.length > 0 && (
-                                  <div>
-                                    <p className="text-xs font-semibold text-slate-600 mb-2">Columns:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {list.columns.map((col, idx) => (
-                                        <Badge key={idx} variant="secondary" className="text-xs">
-                                          {col.displayName}
-                                          {col.required && <span className="text-red-500 ml-1">*</span>}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {list.webUrl && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="mt-3"
-                                    onClick={() => window.open(list.webUrl, '_blank')}
-                                  >
-                                    <ExternalLink className="w-3 h-3 mr-2" />
-                                    Open in SharePoint
-                                  </Button>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Create List Modal */}
-        <Dialog open={showCreateListModal} onOpenChange={setShowCreateListModal}>
+        {/* Removed modals - no longer needed */}
+        <Dialog open={false}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New SharePoint List</DialogTitle>
@@ -1086,8 +843,7 @@ export default function SharePointPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Column Modal */}
-        <Dialog open={showAddColumnModal} onOpenChange={setShowAddColumnModal}>
+        <Dialog open={false}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Column to {selectedList?.displayName}</DialogTitle>
@@ -1155,8 +911,7 @@ export default function SharePointPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Upload Modal */}
-        <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+        <Dialog open={false}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Upload to {selectedLibrary?.name}</DialogTitle>
