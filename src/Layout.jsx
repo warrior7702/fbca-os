@@ -137,7 +137,7 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [notifications] = useState(3);
+  const [notifications, setNotifications] = useState([]);
   const [hasConnectionAlert, setHasConnectionAlert] = useState(false);
   const [showLightBubble, setShowLightBubble] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -158,6 +158,14 @@ export default function Layout({ children, currentPageName }) {
         if (missingConnections && !sessionStorage.getItem('lightBubbleDismissed')) {
           setTimeout(() => setShowLightBubble(true), 2000);
         }
+
+        // Load notifications
+        const userNotifications = await base44.entities.Notification.filter(
+          { user_email: currentUser.email, read: false },
+          '-created_date',
+          10
+        );
+        setNotifications(userNotifications);
       } catch (error) {
         console.error("Error loading user:", error);
         setHasConnectionAlert(true);
@@ -172,7 +180,25 @@ export default function Layout({ children, currentPageName }) {
       setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(timer);
+    // Refresh notifications every 30 seconds
+    const notificationTimer = setInterval(async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        const userNotifications = await base44.entities.Notification.filter(
+          { user_email: currentUser.email, read: false },
+          '-created_date',
+          10
+        );
+        setNotifications(userNotifications);
+      } catch (error) {
+        console.error("Error refreshing notifications:", error);
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(notificationTimer);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -459,19 +485,47 @@ export default function Layout({ children, currentPageName }) {
                   className="relative w-8 h-8 hidden xs:flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   <Bell className="w-4 h-4 text-white/80" />
-                  {notifications > 0 && (
+                  {notifications.length > 0 && (
                     <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs border-2 border-slate-900">
-                      {notifications}
+                      {notifications.length}
                     </Badge>
                   )}
                 </motion.div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 mb-2">
-                <DropdownMenuLabel className="font-semibold">Notifications</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-80 mb-2 max-h-96 overflow-y-auto">
+                <DropdownMenuLabel className="font-semibold flex items-center justify-between">
+                  Notifications
+                  <Link to={createPageUrl("Notifications")}>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs">
+                      View All
+                    </Button>
+                  </Link>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-4 text-center text-sm text-slate-500">
-                  No new notifications
-                </div>
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">
+                    No new notifications
+                  </div>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.slice(0, 5).map((notification) => (
+                      <Link 
+                        key={notification.id}
+                        to={notification.action_url || createPageUrl("Notifications")}
+                      >
+                        <DropdownMenuItem className="flex-col items-start p-3 cursor-pointer">
+                          <p className="font-semibold text-sm text-slate-900 mb-1">
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {notification.message.substring(0, 80)}
+                            {notification.message.length > 80 ? '...' : ''}
+                          </p>
+                        </DropdownMenuItem>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 

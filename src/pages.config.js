@@ -50,6 +50,7 @@ import MeetingNotes from './pages/MeetingNotes';
 import TestTranscription from './pages/TestTranscription';
 import VoiceProfiles from './pages/VoiceProfiles';
 import SharePoint from './pages/SharePoint';
+import Notifications from './pages/Notifications';
 import __Layout from './Layout.jsx';
 
 
@@ -106,6 +107,7 @@ export const PAGES = {
     "TestTranscription": TestTranscription,
     "VoiceProfiles": VoiceProfiles,
     "SharePoint": SharePoint,
+    "Notifications": Notifications,
 }
 
 export const pagesConfig = {
