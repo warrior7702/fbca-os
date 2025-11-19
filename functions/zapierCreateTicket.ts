@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const ticketCategory = categoryMap[deptNormalized] || "maintenance";
 
     // Generate sequential ticket number
-    const allTickets = await base44.asServiceRole.entities.Ticket.list();
+    const allTickets = await base44.entities.Ticket.list();
     const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, "0")}`;
 
     // Confidence tag (safe)
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       : [];
 
     // Create ticket
-    const ticket = await base44.asServiceRole.entities.Ticket.create({
+    const ticket = await base44.entities.Ticket.create({
       ticket_number: ticketNumber,
       subject: subject,
       description: body,
