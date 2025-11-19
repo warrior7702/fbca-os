@@ -2,7 +2,8 @@ import { createClient } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClient().asServiceRole;
+    const appId = Deno.env.get('BASE44_APP_ID');
+    const base44 = createClient({ appId }).asServiceRole;
 
     // Incoming JSON payload from Zapier
     const {
