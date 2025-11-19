@@ -506,19 +506,32 @@ export default function MyDepartment() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${!isPreviewMode ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <TabsTrigger value="overview">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Overview
+              {userRole === 'requester' || userRole === 'worker' ? (
+                <>
+                  <Ticket className="w-4 h-4 mr-2" />
+                  My Tickets
+                </>
+              ) : (
+                <>
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Overview
+                </>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="insights">
-              <Target className="w-4 h-4 mr-2" />
-              Insights
+            <TabsTrigger value="department">
+              <Building2 className="w-4 h-4 mr-2" />
+              Department Info
             </TabsTrigger>
-            <TabsTrigger value="activity">
-              <Activity className="w-4 h-4 mr-2" />
-              Activity
-            </TabsTrigger>
+            {isPreviewMode && (
+              <>
+                <TabsTrigger value="insights">
+                  <Target className="w-4 h-4 mr-2" />
+                  Insights
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -619,7 +632,45 @@ export default function MyDepartment() {
               </Card>
             </div>
 
-            {escalations.length > 0 && (
+            {/* Department Info Tab */}
+            <TabsContent value="department" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-violet-600" />
+                    Department Resources
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {userDepartments.length > 0 ? (
+                      userDepartments.map((dept, index) => (
+                        <div key={index} className="p-4 bg-violet-50 rounded-lg border border-violet-200">
+                          <h3 className="font-semibold text-slate-900 mb-2">{dept}</h3>
+                          <p className="text-sm text-slate-600 mb-3">
+                            Welcome to your department page! More features coming soon.
+                          </p>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline">
+                              Team Directory
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              Resources
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-slate-500 py-8">
+                        No department assigned yet
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {isPreviewMode && escalations.length > 0 && (
               <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-red-900">
@@ -667,6 +718,7 @@ export default function MyDepartment() {
               </Card>
             )}
 
+            {isPreviewMode && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -767,7 +819,9 @@ export default function MyDepartment() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
+            {isPreviewMode && (
             <div className="space-y-4">
               {departments.map((dept) => {
                 const deptTickets = ticketsByDept[dept.id];
@@ -916,8 +970,10 @@ export default function MyDepartment() {
                 );
               })}
             </div>
+            )}
           </TabsContent>
 
+          {isPreviewMode && (
           <TabsContent value="insights" className="space-y-6">
             <Card>
               <CardHeader>
@@ -1029,8 +1085,8 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="activity" className="space-y-6">
+          )}
+        </Tabs>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
