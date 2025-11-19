@@ -3,10 +3,10 @@ import { createClient } from 'npm:@base44/sdk@0.8.4';
 Deno.serve(async (req) => {
   try {
     // Initialize with proper app ID from environment
-    const appId = Deno.env.get('BASE44_APP_ID');
+    const appId = Deno.env.get('APP_ID');
     if (!appId) {
       return Response.json({
-        error: 'BASE44_APP_ID not configured'
+        error: 'APP_ID not configured'
       }, { status: 500 });
     }
 
