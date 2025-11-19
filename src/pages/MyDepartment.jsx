@@ -58,6 +58,8 @@ export default function MyDepartment() {
   const [expandedDepts, setExpandedDepts] = useState(['it', 'facilities', 'comms', 'print_shop', 'hospitality']);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [userRole, setUserRole] = useState(null);
+  const [userDepartments, setUserDepartments] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -68,6 +70,19 @@ export default function MyDepartment() {
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
+
+      // Fetch user's role and departments from security groups
+      const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
+      if (rolesResponse.data.success) {
+        const userData = rolesResponse.data.allUsers.find(u => 
+          u.user_email === currentUser.email
+        );
+        
+        if (userData) {
+          setUserRole(userData.ticket_role);
+          setUserDepartments(userData.departments || []);
+        }
+      }
 
       const isOperationsManager = currentUser.email?.toLowerCase().includes('andy') || 
                                    currentUser.role === 'admin' || 
@@ -310,6 +325,26 @@ export default function MyDepartment() {
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
     const matchesSource = sourceFilter === "all" || ticket.source === sourceFilter;
+    
+    // Filter based on user role
+    if (userRole === 'requester') {
+      // Requesters only see their own tickets
+      return matchesStatus && matchesPriority && matchesSource && 
+             ticket.requester_email === user?.email;
+    } else if (userRole === 'worker') {
+      // Workers see tickets assigned to them + their own tickets
+      return matchesStatus && matchesPriority && matchesSource &&
+             (ticket.assigned_to === user?.email || ticket.requester_email === user?.email);
+    } else if (userRole === 'admin') {
+      // Admins see everything in their departments
+      const ticketDept = getDepartment(ticket.category);
+      const isInUserDept = userDepartments.some(dept => 
+        ticketDept === dept.toLowerCase().replace(' ', '_')
+      );
+      return matchesStatus && matchesPriority && matchesSource && isInUserDept;
+    }
+    
+    // Default (operations manager, etc.)
     return matchesStatus && matchesPriority && matchesSource;
   });
 
@@ -420,15 +455,39 @@ export default function MyDepartment() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-6 h-6 sm:w-7 sm:h-7 text-violet-600" />
-                Operations Dashboard
+                {userRole === 'admin' ? 'Department Admin' : 
+                 userRole === 'worker' ? 'My Department' :
+                 userRole === 'requester' ? 'My Department' :
+                 'Operations Dashboard'}
                 {(user?.role === 'admin' || user?.role === 'super_user') && (
                   <Crown className={`w-5 h-5 ${user?.role === 'super_user' ? 'text-purple-500' : 'text-orange-500'}`} />
                 )}
               </h1>
-              <p className="text-sm text-slate-600">Command center for Operations Manager</p>
+              <p className="text-sm text-slate-600">
+                {userRole === 'admin' ? `Department Management • ${userDepartments.join(', ')}` :
+                 userRole === 'worker' ? `Worker • ${userDepartments.join(', ')}` :
+                 userRole === 'requester' ? `Team Member • ${userDepartments.join(', ')}` :
+                 'Command center for Operations Manager'}
+              </p>
             </div>
           </div>
         </div>
+
+        {!userRole && (
+          <Card className="mb-6 border-2 border-blue-300 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-blue-900">No Department Access</p>
+                  <p className="text-sm text-blue-700">
+                    You're not currently assigned to any security groups. Contact IT to get access.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isPreviewMode && (
           <Card className="mb-6 border-2 border-amber-300 bg-amber-50">
@@ -468,22 +527,33 @@ export default function MyDepartment() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="text-xs sm:text-sm text-slate-600">Total Tickets</p>
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        {userRole === 'requester' ? 'My Tickets' : 
+                         userRole === 'worker' ? 'My Tickets' : 
+                         'Total Tickets'}
+                      </p>
                       <p className="text-xl sm:text-2xl font-bold text-slate-900">{filteredTickets.length}</p>
                     </div>
                     <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-violet-500" />
                   </div>
-                  <div className="flex items-center gap-1 text-xs">
-                    {weeklyTrends.isIncrease ? (
-                      <TrendingUp className="w-3 h-3 text-red-500" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3 text-green-500" />
-                    )}
-                    <span className={weeklyTrends.isIncrease ? 'text-red-600' : 'text-green-600'}>
-                      {Math.abs(weeklyTrends.percentChange)}%
-                    </span>
-                    <span className="text-slate-500">vs last week</span>
-                  </div>
+                  {userRole === 'worker' && (
+                    <p className="text-xs text-slate-500">
+                      {filteredTickets.filter(t => t.assigned_to === user?.email).length} assigned to me
+                    </p>
+                  )}
+                  {!userRole && (
+                    <div className="flex items-center gap-1 text-xs">
+                      {weeklyTrends.isIncrease ? (
+                        <TrendingUp className="w-3 h-3 text-red-500" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 text-green-500" />
+                      )}
+                      <span className={weeklyTrends.isIncrease ? 'text-red-600' : 'text-green-600'}>
+                        {Math.abs(weeklyTrends.percentChange)}%
+                      </span>
+                      <span className="text-slate-500">vs last week</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -499,7 +569,9 @@ export default function MyDepartment() {
                     <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {filteredTickets.filter(t => t.status === 'open' && !t.assigned_to).length} unassigned
+                    {userRole === 'requester' ? 'Awaiting response' :
+                     userRole === 'worker' ? `${filteredTickets.filter(t => t.status === 'open' && t.assigned_to === user?.email).length} need my attention` :
+                     `${filteredTickets.filter(t => t.status === 'open' && !t.assigned_to).length} unassigned`}
                   </p>
                 </CardContent>
               </Card>
@@ -508,12 +580,20 @@ export default function MyDepartment() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="text-xs sm:text-sm text-slate-600">Escalations</p>
-                      <p className="text-xl sm:text-2xl font-bold text-red-700">{escalations.length}</p>
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        {userRole === 'worker' ? 'In Progress' : 'Escalations'}
+                      </p>
+                      <p className="text-xl sm:text-2xl font-bold text-red-700">
+                        {userRole === 'worker' ? 
+                          filteredTickets.filter(t => t.status === 'in_progress' && t.assigned_to === user?.email).length :
+                          escalations.length}
+                      </p>
                     </div>
                     <Flame className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
                   </div>
-                  <p className="text-xs text-red-600">Needs immediate attention</p>
+                  <p className="text-xs text-red-600">
+                    {userRole === 'worker' ? 'Currently working' : 'Needs immediate attention'}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -521,12 +601,20 @@ export default function MyDepartment() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="text-xs sm:text-sm text-slate-600">Cross-Dept</p>
-                      <p className="text-xl sm:text-2xl font-bold text-purple-700">{crossDeptTickets.length}</p>
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        {userRole === 'requester' || userRole === 'worker' ? 'Resolved' : 'Cross-Dept'}
+                      </p>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-700">
+                        {userRole === 'requester' || userRole === 'worker' ?
+                          filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length :
+                          crossDeptTickets.length}
+                      </p>
                     </div>
-                    <GitBranch className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
+                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
                   </div>
-                  <p className="text-xs text-slate-500">Coordination needed</p>
+                  <p className="text-xs text-slate-500">
+                    {userRole === 'requester' || userRole === 'worker' ? 'Completed' : 'Coordination needed'}
+                  </p>
                 </CardContent>
               </Card>
             </div>
