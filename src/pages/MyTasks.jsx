@@ -413,7 +413,14 @@ export default function MyTasks() {
                 </Badge>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Support Tickets</p>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-xs text-slate-500">
+                  {supportTickets.filter(t => isToday(new Date(t.created_date))).length} due today
+                </p>
+                <p className="text-xs text-slate-500">
+                  Open in my dept
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -451,6 +458,78 @@ export default function MyTasks() {
             )}
           </CardContent>
         </Card>
+
+        {supportTickets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TicketIcon className="w-5 h-5 text-purple-600" />
+                  My Support Tickets ({supportTickets.length})
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {supportTickets.slice(0, 5).map((ticket) => (
+                <motion.div
+                  key={ticket.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-slate-900 truncate">
+                        {ticket.subject}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.status}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                      {ticket.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-mono">{ticket.ticket_number}</span>
+                      {ticket.category && (
+                        <>
+                          <span>•</span>
+                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
+                        </>
+                      )}
+                      {ticket.created_date && (
+                        <>
+                          <span>•</span>
+                          <span>{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                        </>
+                      )}
+                    </div>
+                    {ticket.suggested_solution && (
+                      <div className="mt-2 flex items-start gap-1 text-xs text-purple-600">
+                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">AI suggested solution available</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              {supportTickets.length > 5 && (
+                <p className="text-xs text-slate-500 text-center pt-2">
+                  +{supportTickets.length - 5} more tickets
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
