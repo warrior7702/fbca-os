@@ -1,8 +1,15 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClient } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
+    const appId = Deno.env.get('BASE44_APP_ID');
+    if (!appId) {
+      return Response.json({
+        error: 'BASE44_APP_ID not configured'
+      }, { status: 500 });
+    }
+
+    const base44 = createClient({ appId }).asServiceRole;
     
     const { subject, body } = await req.json();
     
@@ -12,49 +19,23 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    const prompt = `You are a ticket classification system for FBCA. You receive an email subject and body. 
-Your job is to classify it into exactly ONE of the following categories:
+    const prompt = `You are a ticket classification system for FBCA. Classify this email into exactly ONE category:
 
 - Cleaning
 - Maintenance
 - Technology
 
-Rules:
-1. Classification depends ONLY on the request content, NOT on the requester.
-2. Choose the category that best matches the intent and keywords.
-3. You must always return valid JSON. No extra text.
-
-CATEGORY DEFINITIONS:
-
-Cleaning:
-- spills, stains, trash, dirty areas, bathrooms, mopping, sweeping
-- janitorial tasks, sanitation, "needs to be cleaned", odor issues
-
-Maintenance:
-- repairs, broken items, HVAC, lights out, leaks, plumbing, electrical
-- furniture fixes, building issues, doors, windows, general facility upkeep
-
-Technology:
-- computer issues, network, email, logins, printers, phones, software
-- audio/video problems, projectors, tech booths, streaming, worship tech
-
-EMAIL TO CLASSIFY:
+EMAIL:
 Subject: ${subject}
 Body: ${body}
 
-OUTPUT FORMAT:
-Return only this JSON. Do not add comments or extra words.
-
+Return only JSON:
 {
   "category": "Cleaning | Maintenance | Technology",
   "confidence": 0.00
-}
+}`;
 
-Where:
-- category is exactly one of the three strings.
-- confidence is between 0 and 1 using your best estimate.`;
-
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const result = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,
       response_json_schema: {
         type: "object",
@@ -73,13 +54,15 @@ Where:
       }
     });
 
+    // Return with dept field for Zapier
     return Response.json({
       success: true,
+      dept: result.category,
       classification: result
     });
 
   } catch (error) {
-    console.error('Classification error:', error);
+    console.error('Error:', error);
     return Response.json({
       error: error.message
     }, { status: 500 });
