@@ -17,16 +17,26 @@ Deno.serve(async (req) => {
     
     try {
       const body = await req.json();
+      console.log('📦 Raw request body:', JSON.stringify(body, null, 2));
       type = body.type;
       buildingId = body.buildingId;
       levelId = body.levelId;
-      console.log('📥 Request:', { type, buildingId, levelId });
+      console.log('📥 Parsed params:', { type, buildingId, levelId });
     } catch (e) {
       console.error('❌ Failed to parse request body:', e);
       return Response.json({ 
         success: false,
         error: 'Invalid request body',
         details: e.message 
+      }, { status: 400 });
+    }
+    
+    if (!type) {
+      console.error('❌ No type provided in request');
+      return Response.json({ 
+        success: false,
+        error: 'Missing required parameter: type',
+        details: 'Request must include a "type" field (buildings, levels, rooms, or assets)'
       }, { status: 400 });
     }
     
