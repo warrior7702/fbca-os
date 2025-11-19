@@ -2,47 +2,59 @@ import { createClient } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
   try {
+    // Initialize with proper app ID from environment
     const appId = Deno.env.get('BASE44_APP_ID');
-    const base44 = createClient({ appId }).asServiceRole;
+    if (!appId) {
+      return Response.json({
+        error: 'BASE44_APP_ID not configured'
+      }, { status: 500 });
+    }
 
-    // Incoming JSON payload from Zapier
+    const base44 = createClient({ appId }).asServiceRole;
+    
+    const payload = await req.json();
+    
+    // Accept both 'dept' and 'department' field names
     const {
       subject,
       body,
       sender,
+      dept,
       department,
       classification
-    } = await req.json();
-
-    // Basic validation
+    } = payload;
+    
     if (!subject || !body || !sender) {
       return Response.json({
-        error: "Missing required fields: subject, body, sender"
+        error: 'Missing required fields: subject, body, sender'
       }, { status: 400 });
     }
 
-    // Normalize department input
-    const deptNormalized = (department || "").toLowerCase();
+    // Use dept or department, fallback to empty string
+    const deptValue = dept || department || '';
+    const deptNormalized = deptValue.toLowerCase();
 
+    // Map department/category to ticket category
     const categoryMap = {
-      "technology": "technology",
-      "tech": "technology",
-      "cleaning": "cleaning",
-      "maintenance": "maintenance",
-      "maint": "maintenance",
-      "facilities": "maintenance"
+      'technology': 'technology',
+      'tech': 'technology',
+      'cleaning': 'cleaning',
+      'maintenance': 'maintenance',
+      'maint': 'maintenance',
+      'facilities': 'maintenance'
     };
 
-    const ticketCategory = categoryMap[deptNormalized] || "maintenance";
+    const ticketCategory = categoryMap[deptNormalized] || 'maintenance';
 
-    // Generate sequential ticket number
+    // Generate ticket number
     const allTickets = await base44.entities.Ticket.list();
-    const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, "0")}`;
+    const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, '0')}`;
 
-    // Confidence tag (safe)
-    const confidenceTag = classification?.confidence
-      ? [`ai_confidence_${Math.round((classification.confidence || 0) * 100)}`]
-      : [];
+    // Handle classification if provided
+    const tags = [];
+    if (classification && typeof classification === 'object' && classification.confidence) {
+      tags.push(`ai_confidence_${Math.round(classification.confidence * 100)}`);
+    }
 
     // Create ticket
     const ticket = await base44.entities.Ticket.create({
@@ -50,26 +62,24 @@ Deno.serve(async (req) => {
       subject: subject,
       description: body,
       category: ticketCategory,
-      source: "email",
-      status: "open",
-      priority: "medium",
+      source: 'email',
+      status: 'open',
+      priority: 'medium',
       requester_email: sender,
       requester_name: sender,
-      created_date: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
-      tags: confidenceTag
+      tags: tags
     });
 
-    // Try auto-assign (optional)
+    // Try auto-assign
     try {
-      await base44.functions.invoke("autoAssignTicket", {
+      await base44.functions.invoke('autoAssignTicket', {
         ticket_id: ticket.id
       });
-    } catch (assignError) {
-      console.log("Auto-assign skipped:", assignError.message);
+    } catch (error) {
+      console.log('Auto-assign skipped:', error.message);
     }
 
-    // Success response
     return Response.json({
       success: true,
       ticket: {
@@ -81,9 +91,10 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Ticket creation error:", error);
+    console.error('Error:', error);
     return Response.json({
-      error: error.message
+      error: error.message,
+      stack: error.stack
     }, { status: 500 });
   }
 });
