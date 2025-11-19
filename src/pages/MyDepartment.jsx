@@ -632,8 +632,76 @@ export default function MyDepartment() {
               </Card>
             </div>
 
-            {/* Department Info Tab */}
-            <TabsContent value="department" className="space-y-6">
+            {!isPreviewMode && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-violet-600" />
+                  {userRole === 'worker' ? 'My Assigned Tickets' : 'My Tickets'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredTickets.length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredTickets.map((ticket) => {
+                      const { Icon, config } = getSourceBadge(ticket.source || 'manual_request');
+                      return (
+                        <div
+                          key={ticket.id}
+                          className="p-3 bg-white rounded-lg border hover:shadow-md transition-all cursor-pointer"
+                          onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 text-sm truncate">
+                                {ticket.subject}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-1">
+                                {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Badge className={`text-xs ${
+                                ticket.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                                ticket.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
+                                ticket.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {ticket.status}
+                              </Badge>
+                              <Badge className={`text-xs ${
+                                ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {ticket.priority}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Ticket className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500">No tickets yet</p>
+                    <Button 
+                      className="mt-4"
+                      onClick={() => navigate(createPageUrl('CreateTicket'))}
+                    >
+                      Create Your First Ticket
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            )}
+          </TabsContent>
+
+          {/* Department Info Tab */}
+          <TabsContent value="department" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1086,56 +1154,6 @@ export default function MyDepartment() {
             </Card>
           </TabsContent>
           )}
-        </Tabs>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-violet-600" />
-                  Real-Time Activity Feed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {activityFeed.map((activity, index) => {
-                    const timeAgo = differenceInHours(new Date(), activity.timestamp);
-                    const timeDisplay = timeAgo < 1 
-                      ? `${Math.floor(differenceInHours(new Date(), activity.timestamp) * 60)}m ago`
-                      : `${timeAgo}h ago`;
-
-                    return (
-                      <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          activity.type === 'created' ? 'bg-blue-100' :
-                          activity.type === 'assigned' ? 'bg-purple-100' :
-                          activity.type === 'resolved' ? 'bg-green-100' :
-                          'bg-orange-100'
-                        }`}>
-                          {activity.type === 'created' && <Ticket className="w-4 h-4 text-blue-600" />}
-                          {activity.type === 'assigned' && <Users className="w-4 h-4 text-purple-600" />}
-                          {activity.type === 'resolved' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                          {activity.type === 'comment' && <Activity className="w-4 h-4 text-orange-600" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-900">
-                            <span className="font-semibold">{activity.user}</span> {activity.message}
-                          </p>
-                          <p className="text-xs text-slate-600 mt-1">
-                            {activity.ticket.ticket_number} • {activity.ticket.subject}
-                          </p>
-                          {activity.comment && (
-                            <p className="text-xs text-slate-500 mt-1 italic line-clamp-2">
-                              "{activity.comment}"
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-xs text-slate-500 flex-shrink-0">{timeDisplay}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>
