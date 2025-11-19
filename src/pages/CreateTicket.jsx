@@ -56,7 +56,23 @@ export default function CreateTicket() {
 
   useEffect(() => {
     loadBuildings();
+    loadCurrentUser();
   }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      if (currentUser) {
+        setTicket(prev => ({
+          ...prev,
+          requester_name: currentUser.full_name || '',
+          requester_email: currentUser.email || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
 
   useEffect(() => {
     if (selectedBuilding && selectedLevel) {
