@@ -155,6 +155,8 @@ export default function SupportTickets() {
     let matchesTab = true;
     if (activeTab === "active") {
       matchesTab = ['open', 'pending', 'in_progress'].includes(ticket.status);
+    } else if (activeTab === "pool") {
+      matchesTab = !ticket.assigned_to && ['open', 'pending', 'in_progress'].includes(ticket.status);
     } else if (activeTab === "resolved") {
       matchesTab = ['resolved', 'closed'].includes(ticket.status);
     }
@@ -294,11 +296,19 @@ export default function SupportTickets() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="active" className="gap-2">
-              Active Tickets
+              Active
               {stats.active > 0 && (
                 <Badge variant="secondary" className="ml-1">{stats.active}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="pool" className="gap-2">
+              Unassigned Pool
+              {tickets.filter(t => !t.assigned_to && ['open', 'pending', 'in_progress'].includes(t.status)).length > 0 && (
+                <Badge className="ml-1 bg-orange-500">
+                  {tickets.filter(t => !t.assigned_to && ['open', 'pending', 'in_progress'].includes(t.status)).length}
+                </Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="resolved" className="gap-2">

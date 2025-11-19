@@ -326,9 +326,18 @@ export default function MyDepartment() {
       return matchesStatus && matchesPriority && matchesSource && 
              ticket.requester_email === user?.email;
     } else if (userRole === 'worker') {
-      // Workers see tickets assigned to them + their own tickets
+      // Workers see tickets assigned to them + unassigned pool tickets in their department + their own tickets
+      const ticketDept = getDepartment(ticket.category);
+      const isInUserDept = userDepartments.some(dept => 
+        ticketDept === dept.toLowerCase().replace(' ', '_')
+      );
+      const isUnassignedInDept = !ticket.assigned_to && isInUserDept && 
+                                  !['resolved', 'closed'].includes(ticket.status);
+      
       return matchesStatus && matchesPriority && matchesSource &&
-             (ticket.assigned_to === user?.email || ticket.requester_email === user?.email);
+             (ticket.assigned_to === user?.email || 
+              ticket.requester_email === user?.email ||
+              isUnassignedInDept);
     } else if (userRole === 'admin') {
       // Admins see everything in their departments
       const ticketDept = getDepartment(ticket.category);
