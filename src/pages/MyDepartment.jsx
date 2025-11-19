@@ -124,19 +124,13 @@ export default function MyDepartment() {
 
   const getDepartment = (category) => {
     const deptMap = {
-      'technical': 'it',
-      'access': 'it',
-      'facility': 'facilities',
-      'facility_cleaning': 'facilities',
+      'technology': 'it',
+      'maintenance': 'facilities',
+      'cleaning': 'facilities',
       'av_production': 'comms',
       'marketing': 'comms',
-      'graphics': 'print_shop',
       'social_media': 'comms',
-      'communications': 'comms',
-      'event_setup': 'facilities',
-      'room_setup': 'facilities',
-      'catering': 'hospitality',
-      'hospitality': 'hospitality'
+      'communications': 'comms'
     };
     return deptMap[category] || 'other';
   };
