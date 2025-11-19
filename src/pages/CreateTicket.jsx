@@ -435,20 +435,15 @@ Keep response concise and actionable.`;
                       Building<span className="text-red-500">*</span>
                     </label>
                     <Select 
-                      value={ticket.building} 
-                      onValueChange={handleBuildingChange}
-                      disabled={loadingBuildings}
+                      value={ticket.building || "wade_pcb"} 
+                      onValueChange={(value) => setTicket({...ticket, building: value, building_name: "WADE PCB SC FBC"})}
                       required
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={loadingBuildings ? "Loading..." : "Select building..."} />
+                        <SelectValue placeholder="Select building..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {buildings.map(building => (
-                          <SelectItem key={building.id} value={building.id}>
-                            {building.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="wade_pcb">WADE PCB SC FBC</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
