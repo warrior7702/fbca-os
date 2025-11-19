@@ -1,55 +1,39 @@
-import { createClient } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClient().asServiceRole;
+    const base44 = createClientFromRequest(req);
     
-    const payload = await req.json();
-    
-    // Accept both 'dept' and 'department' field names
     const {
       subject,
       body,
-      sender,
-      dept,
-      department,
-      classification
-    } = payload;
+      from_email,
+      from_name,
+      category,
+      confidence
+    } = await req.json();
     
-    if (!subject || !body || !sender) {
+    if (!subject || !body || !from_email) {
       return Response.json({
-        error: 'Missing required fields: subject, body, sender'
+        error: 'Missing required fields: subject, body, from_email'
       }, { status: 400 });
     }
 
-    // Use dept or department, fallback to empty string
-    const deptValue = dept || department || '';
-    const deptNormalized = deptValue.toLowerCase();
-
-    // Map department/category to ticket category
+    // Map category to ticket category
     const categoryMap = {
-      'technology': 'technology',
-      'tech': 'technology',
-      'cleaning': 'cleaning',
-      'maintenance': 'maintenance',
-      'maint': 'maintenance',
-      'facilities': 'maintenance'
+      'Cleaning': 'cleaning',
+      'Maintenance': 'maintenance',
+      'Technology': 'technology'
     };
-
-    const ticketCategory = categoryMap[deptNormalized] || 'maintenance';
-
+    
+    const ticketCategory = categoryMap[category] || 'maintenance';
+    
     // Generate ticket number
-    const allTickets = await base44.entities.Ticket.list();
+    const allTickets = await base44.asServiceRole.entities.Ticket.list();
     const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, '0')}`;
-
-    // Handle classification if provided
-    const tags = [];
-    if (classification && typeof classification === 'object' && classification.confidence) {
-      tags.push(`ai_confidence_${Math.round(classification.confidence * 100)}`);
-    }
-
+    
     // Create ticket
-    const ticket = await base44.entities.Ticket.create({
+    const ticket = await base44.asServiceRole.entities.Ticket.create({
       ticket_number: ticketNumber,
       subject: subject,
       description: body,
@@ -57,15 +41,16 @@ Deno.serve(async (req) => {
       source: 'email',
       status: 'open',
       priority: 'medium',
-      requester_email: sender,
-      requester_name: sender,
+      requester_email: from_email,
+      requester_name: from_name || from_email,
+      created_date: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
-      tags: tags
+      tags: confidence ? [`ai_confidence_${Math.round(confidence * 100)}`] : []
     });
-
-    // Try auto-assign
+    
+    // Auto-assign based on category
     try {
-      await base44.functions.invoke('autoAssignTicket', {
+      await base44.asServiceRole.functions.invoke('autoAssignTicket', {
         ticket_id: ticket.id
       });
     } catch (error) {
@@ -83,10 +68,9 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Ticket creation error:', error);
     return Response.json({
-      error: error.message,
-      stack: error.stack
+      error: error.message
     }, { status: 500 });
   }
 });
