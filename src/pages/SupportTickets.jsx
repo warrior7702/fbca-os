@@ -38,6 +38,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function SupportTickets() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export default function SupportTickets() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("active");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -150,25 +151,32 @@ export default function SupportTickets() {
       ticket.ticket_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.description?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
+    // Tab filtering
+    let matchesTab = true;
+    if (activeTab === "active") {
+      matchesTab = ['open', 'pending', 'in_progress'].includes(ticket.status);
+    } else if (activeTab === "resolved") {
+      matchesTab = ['resolved', 'closed'].includes(ticket.status);
+    }
+    
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
     const matchesCategory = categoryFilter === "all" || ticket.category === categoryFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
+    return matchesSearch && matchesTab && matchesPriority && matchesCategory;
   });
 
   const stats = {
     total: tickets.length,
+    active: tickets.filter(t => ['open', 'pending', 'in_progress'].includes(t.status)).length,
     open: tickets.filter(t => t.status === 'open').length,
     in_progress: tickets.filter(t => t.status === 'in_progress').length,
     resolved: tickets.filter(t => ['resolved', 'closed'].includes(t.status)).length
   };
 
-  const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
+  const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
 
   const clearFilters = () => {
     setSearchQuery("");
-    setStatusFilter("all");
     setPriorityFilter("all");
     setCategoryFilter("all");
   };
@@ -285,88 +293,93 @@ export default function SupportTickets() {
           </div>
         )}
 
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
-                Filters
-              </CardTitle>
-              {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="w-4 h-4 mr-1" />
-                  Clear
-                </Button>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="active" className="gap-2">
+              Active Tickets
+              {stats.active > 0 && (
+                <Badge variant="secondary" className="ml-1">{stats.active}</Badge>
               )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              <Input
-                placeholder="Search tickets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-sm"
-              />
-              
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+            </TabsTrigger>
+            <TabsTrigger value="resolved" className="gap-2">
+              Resolved
+              {stats.resolved > 0 && (
+                <Badge variant="secondary" className="ml-1">{stats.resolved}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="All Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Filters
+                </CardTitle>
+                {hasFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="w-4 h-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                <Input
+                  placeholder="Search tickets..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="text-sm"
+                />
 
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technical">Technical/IT</SelectItem>
-                  <SelectItem value="access">Access/Keys</SelectItem>
-                  <SelectItem value="facility">Facility Maintenance</SelectItem>
-                  <SelectItem value="facility_cleaning">Cleaning</SelectItem>
-                  <SelectItem value="av_production">AV/Production</SelectItem>
-                  <SelectItem value="worship_production">Worship Production</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="graphics">Graphics Design</SelectItem>
-                  <SelectItem value="social_media">Social Media</SelectItem>
-                  <SelectItem value="communications">Communications</SelectItem>
-                  <SelectItem value="event_setup">Event Setup</SelectItem>
-                  <SelectItem value="room_setup">Room Setup</SelectItem>
-                  <SelectItem value="catering">Catering</SelectItem>
-                  <SelectItem value="hospitality">Hospitality</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="transportation">Transportation</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="All Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
 
-        <div className="space-y-3">
-          {filteredTickets.map((ticket) => (
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="technology">Technology</SelectItem>
+                    <SelectItem value="cleaning">Cleaning</SelectItem>
+                    <SelectItem value="technical">Technical/IT</SelectItem>
+                    <SelectItem value="access">Access/Keys</SelectItem>
+                    <SelectItem value="facility">Facility Maintenance</SelectItem>
+                    <SelectItem value="facility_cleaning">Facility Cleaning</SelectItem>
+                    <SelectItem value="av_production">AV/Production</SelectItem>
+                    <SelectItem value="worship_production">Worship Production</SelectItem>
+                    <SelectItem value="marketing">Marketing</SelectItem>
+                    <SelectItem value="graphics">Graphics Design</SelectItem>
+                    <SelectItem value="social_media">Social Media</SelectItem>
+                    <SelectItem value="communications">Communications</SelectItem>
+                    <SelectItem value="event_setup">Event Setup</SelectItem>
+                    <SelectItem value="room_setup">Room Setup</SelectItem>
+                    <SelectItem value="catering">Catering</SelectItem>
+                    <SelectItem value="hospitality">Hospitality</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                    <SelectItem value="transportation">Transportation</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <TabsContent value={activeTab} className="space-y-3">
+            {filteredTickets.map((ticket) => (
             <motion.div
               key={ticket.id}
               initial={{ opacity: 0, y: 10 }}
@@ -435,29 +448,30 @@ export default function SupportTickets() {
             </motion.div>
           ))}
 
-          {filteredTickets.length === 0 && !loading && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Ticket className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                  {hasFilters ? 'No tickets match your filters' : 'No tickets yet'}
-                </h3>
-                <p className="text-slate-600 mb-6">
-                  {hasFilters ? 'Try adjusting your search or filters' : 'Create your first support ticket to get started'}
-                </p>
-                {!hasFilters && (
-                  <Button
-                    onClick={() => navigate(createPageUrl('CreateTicket'))}
-                    className="bg-gradient-to-r from-amber-600 to-yellow-600"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Ticket
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            {filteredTickets.length === 0 && !loading && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Ticket className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                    {hasFilters ? 'No tickets match your filters' : activeTab === 'active' ? 'No active tickets' : 'No resolved tickets'}
+                  </h3>
+                  <p className="text-slate-600 mb-6">
+                    {hasFilters ? 'Try adjusting your search or filters' : activeTab === 'active' ? 'Create your first support ticket to get started' : 'Resolved tickets will appear here'}
+                  </p>
+                  {!hasFilters && activeTab === 'active' && (
+                    <Button
+                      onClick={() => navigate(createPageUrl('CreateTicket'))}
+                      className="bg-gradient-to-r from-amber-600 to-yellow-600"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Ticket
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

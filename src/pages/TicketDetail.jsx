@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -10,7 +9,9 @@ import {
   Send,
   Paperclip,
   User,
+  Users as UsersIcon,
   Clock,
+  Building2,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -57,6 +58,8 @@ export default function TicketDetail() {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [staffMembers, setStaffMembers] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [isWorker, setIsWorker] = useState(false);
+  const [teams, setTeams] = useState([]);
 
   const commentsEndRef = useRef(null);
 
@@ -85,6 +88,13 @@ export default function TicketDetail() {
       
       const adminStatus = currentUser?.role === 'admin' || currentUser?.role === 'super_user';
       setIsAdmin(adminStatus);
+      
+      // Check if user is a ticket worker
+      const ticketRoles = await base44.entities.TicketRoleAssignment.filter({
+        user_email: currentUser.email
+      });
+      const workerStatus = ticketRoles.some(r => r.ticket_role === 'worker');
+      setIsWorker(workerStatus);
 
       const tickets = await base44.entities.Ticket.filter({ id: ticketId });
       if (tickets && tickets.length > 0) {
@@ -105,8 +115,8 @@ export default function TicketDetail() {
         navigate(createPageUrl('SupportTickets'));
       }
 
-      // Load staff members for assignment
-      if (adminStatus) {
+      // Load staff members and teams for assignment
+      if (adminStatus || workerStatus) {
         const staff = await base44.entities.StaffContact.list();
         setStaffMembers(staff);
       }
@@ -216,6 +226,50 @@ export default function TicketDetail() {
     }
   };
 
+  const handleCategoryChange = async (newCategory) => {
+    try {
+      const updateData = {
+        category: newCategory,
+        last_activity_at: new Date().toISOString()
+      };
+      
+      // Auto-assign team based on category
+      const categoryTeamMap = {
+        maintenance: 'facilities',
+        technology: 'it',
+        technical: 'it',
+        cleaning: 'facilities',
+        facility: 'facilities',
+        facility_cleaning: 'facilities',
+        av_production: 'av_production',
+        worship_production: 'av_production',
+        marketing: 'marketing',
+        graphics: 'marketing',
+        social_media: 'marketing',
+        communications: 'marketing',
+        event_setup: 'hospitality',
+        room_setup: 'hospitality',
+        catering: 'hospitality',
+        hospitality: 'hospitality',
+        access: 'admin',
+        security: 'admin',
+        transportation: 'admin'
+      };
+      
+      const team = categoryTeamMap[newCategory];
+      if (team) {
+        updateData.team = team;
+      }
+      
+      await base44.entities.Ticket.update(ticketId, updateData);
+      setTicket({ ...ticket, ...updateData });
+      toast.success('Category updated');
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Failed to update category');
+    }
+  };
+
   const handleAssignment = async (staffEmail) => {
     try {
       const staffMember = staffMembers.find(s => s.email === staffEmail);
@@ -244,6 +298,56 @@ export default function TicketDetail() {
     } catch (error) {
       console.error('Error assigning ticket:', error);
       toast.error('Failed to assign ticket');
+    }
+  };
+
+  const handleTeamChange = async (newTeam) => {
+    try {
+      await base44.entities.Ticket.update(ticketId, {
+        team: newTeam,
+        last_activity_at: new Date().toISOString()
+      });
+      setTicket({ ...ticket, team: newTeam });
+      toast.success('Team updated');
+    } catch (error) {
+      console.error('Error updating team:', error);
+      toast.error('Failed to update team');
+    }
+  };
+
+  const handleAddCollaboratingTeam = async (additionalTeam) => {
+    try {
+      const currentTeams = ticket.collaborating_teams || [];
+      if (currentTeams.includes(additionalTeam)) {
+        toast.error('Team already added');
+        return;
+      }
+      
+      const updatedTeams = [...currentTeams, additionalTeam];
+      await base44.entities.Ticket.update(ticketId, {
+        collaborating_teams: updatedTeams,
+        last_activity_at: new Date().toISOString()
+      });
+      setTicket({ ...ticket, collaborating_teams: updatedTeams });
+      toast.success('Collaborating team added');
+    } catch (error) {
+      console.error('Error adding team:', error);
+      toast.error('Failed to add team');
+    }
+  };
+
+  const handleRemoveCollaboratingTeam = async (teamToRemove) => {
+    try {
+      const updatedTeams = (ticket.collaborating_teams || []).filter(t => t !== teamToRemove);
+      await base44.entities.Ticket.update(ticketId, {
+        collaborating_teams: updatedTeams,
+        last_activity_at: new Date().toISOString()
+      });
+      setTicket({ ...ticket, collaborating_teams: updatedTeams });
+      toast.success('Team removed');
+    } catch (error) {
+      console.error('Error removing team:', error);
+      toast.error('Failed to remove team');
     }
   };
 
@@ -346,7 +450,8 @@ export default function TicketDetail() {
 
   if (!ticket) return null;
 
-  const canEdit = isAdmin || ticket.requester_email === user?.email;
+  const canEdit = isAdmin || isWorker || ticket.requester_email === user?.email;
+  const canManage = isAdmin || isWorker;
   const slaBreached = ticket.time_to_first_response && ticket.time_to_first_response > 60;
 
   return (
@@ -560,7 +665,7 @@ export default function TicketDetail() {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-slate-600 mb-2 block">Status</label>
-                  {isAdmin ? (
+                  {canManage ? (
                     <Select 
                       value={ticket.status} 
                       onValueChange={handleStatusChange}
@@ -585,8 +690,38 @@ export default function TicketDetail() {
                 </div>
 
                 <div>
+                  <label className="text-sm font-medium text-slate-600 mb-2 block">Category</label>
+                  {canManage ? (
+                    <Select 
+                      value={ticket.category} 
+                      onValueChange={handleCategoryChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="technology">Technology</SelectItem>
+                        <SelectItem value="cleaning">Cleaning</SelectItem>
+                        <SelectItem value="technical">Technical/IT</SelectItem>
+                        <SelectItem value="access">Access/Keys</SelectItem>
+                        <SelectItem value="facility">Facility</SelectItem>
+                        <SelectItem value="av_production">AV/Production</SelectItem>
+                        <SelectItem value="marketing">Marketing</SelectItem>
+                        <SelectItem value="hospitality">Hospitality</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="secondary">
+                      {ticket.category?.replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
+
+                <div>
                   <label className="text-sm font-medium text-slate-600 mb-2 block">Priority</label>
-                  {isAdmin ? (
+                  {canManage ? (
                     <Select 
                       value={ticket.priority} 
                       onValueChange={handlePriorityChange}
@@ -608,32 +743,91 @@ export default function TicketDetail() {
                   )}
                 </div>
 
-                {isAdmin && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
-                    <Select 
-                      value={ticket.assigned_to || "unassigned"} 
-                      onValueChange={handleAssignment}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {staffMembers.map(staff => (
-                          <SelectItem key={staff.email} value={staff.email}>
-                            {staff.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {canManage && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 mb-2 block">Primary Team</label>
+                      <Select 
+                        value={ticket.team || "none"} 
+                        onValueChange={handleTeamChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select team" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="facilities">Facilities</SelectItem>
+                          <SelectItem value="it">IT/Technology</SelectItem>
+                          <SelectItem value="av_production">AV/Production</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                          <SelectItem value="hospitality">Hospitality</SelectItem>
+                          <SelectItem value="admin">Administration</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
+                      <Select 
+                        value={ticket.assigned_to || "unassigned"} 
+                        onValueChange={handleAssignment}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {staffMembers.map(staff => (
+                            <SelectItem key={staff.email} value={staff.email}>
+                              {staff.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 )}
 
-                {ticket.assigned_to_name && !isAdmin && (
+                {!canManage && ticket.assigned_to_name && (
                   <div>
                     <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
                     <p className="text-sm text-slate-900">{ticket.assigned_to_name}</p>
+                  </div>
+                )}
+
+                {canManage && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600 mb-2 block">
+                      <UsersIcon className="w-4 h-4 inline mr-1" />
+                      Collaborating Teams
+                    </label>
+                    <div className="space-y-2">
+                      {(ticket.collaborating_teams || []).map((team) => (
+                        <div key={team} className="flex items-center justify-between bg-slate-50 p-2 rounded">
+                          <Badge variant="outline" className="capitalize">{team}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveCollaboratingTeam(team)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Select onValueChange={handleAddCollaboratingTeam}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Add team..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="facilities">Facilities</SelectItem>
+                          <SelectItem value="it">IT/Technology</SelectItem>
+                          <SelectItem value="av_production">AV/Production</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                          <SelectItem value="hospitality">Hospitality</SelectItem>
+                          <SelectItem value="admin">Administration</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 )}
               </CardContent>
