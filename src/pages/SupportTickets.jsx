@@ -53,6 +53,7 @@ export default function SupportTickets() {
   const [activeTab, setActiveTab] = useState("active");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [claiming, setClaiming] = useState(null);
 
   useEffect(() => {
     if (ticketId) {
@@ -181,6 +182,27 @@ export default function SupportTickets() {
     setSearchQuery("");
     setPriorityFilter("all");
     setCategoryFilter("all");
+  };
+
+  const handleClaimTicket = async (e, ticketId) => {
+    e.stopPropagation();
+    setClaiming(ticketId);
+    try {
+      await base44.entities.Ticket.update(ticketId, {
+        assigned_to: user.email,
+        assigned_to_name: user.full_name,
+        status: 'in_progress',
+        last_activity_at: new Date().toISOString()
+      });
+      
+      toast.success('Ticket claimed!');
+      loadData();
+    } catch (error) {
+      console.error('Failed to claim ticket:', error);
+      toast.error('Failed to claim ticket');
+    } finally {
+      setClaiming(null);
+    }
   };
 
   if (loading) {
@@ -445,14 +467,32 @@ export default function SupportTickets() {
                           </Badge>
                         )}
                         {ticket.comments && ticket.comments.length > 0 && (
-                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3" />
-                            {ticket.comments.length}
-                          </Badge>
+                         <Badge variant="outline" className="text-xs flex items-center gap-1">
+                           <MessageSquare className="w-3 h-3" />
+                           {ticket.comments.length}
+                         </Badge>
                         )}
-                      </div>
-                    </div>
-                  </div>
+                        </div>
+                        </div>
+
+                        {activeTab === 'pool' && !ticket.assigned_to && (
+                        <Button
+                        onClick={(e) => handleClaimTicket(e, ticket.id)}
+                        disabled={claiming === ticket.id}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-shrink-0"
+                        size="sm"
+                        >
+                        {claiming === ticket.id ? (
+                         <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                         <>
+                           <Users className="w-4 h-4 mr-2" />
+                           Claim
+                         </>
+                        )}
+                        </Button>
+                        )}
+                        </div>
                 </CardContent>
               </Card>
             </motion.div>
