@@ -63,9 +63,18 @@ export default function CreateTicket() {
     try {
       const currentUser = await base44.auth.me();
       if (currentUser) {
+        // Format name properly: "First Last" instead of "first.last"
+        let displayName = currentUser.full_name || '';
+        if (!displayName && currentUser.email) {
+          const namePart = currentUser.email.split('@')[0];
+          displayName = namePart.split('.').map(part => 
+            part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+          ).join(' ');
+        }
+        
         setTicket(prev => ({
           ...prev,
-          requester_name: currentUser.full_name || '',
+          requester_name: displayName,
           requester_email: currentUser.email || ''
         }));
       }
@@ -142,8 +151,7 @@ export default function CreateTicket() {
     { value: 'av_production', label: 'AV/Production' },
     { value: 'marketing', label: 'Marketing' },
     { value: 'social_media', label: 'Social Media' },
-    { value: 'communications', label: 'Communications' },
-    { value: 'other', label: 'Other' }
+    { value: 'communications', label: 'Communications' }
   ];
 
   const generateTicketNumber = () => {
