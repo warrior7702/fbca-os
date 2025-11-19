@@ -2,14 +2,7 @@ import { createClient } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
   try {
-    const appId = Deno.env.get('APP_ID');
-    if (!appId) {
-      return Response.json({
-        error: 'APP_ID not configured'
-      }, { status: 500 });
-    }
-
-    const base44 = createClient({ appId }).asServiceRole;
+    const base44 = createClient().asServiceRole;
     
     const { subject, body } = await req.json();
     
