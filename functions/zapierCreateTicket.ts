@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
     // Try auto-assign (optional)
     try {
-      await base44.asServiceRole.functions.invoke("autoAssignTicket", {
+      await base44.functions.invoke("autoAssignTicket", {
         ticket_id: ticket.id
       });
     } catch (assignError) {
