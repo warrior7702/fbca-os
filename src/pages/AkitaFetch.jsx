@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -44,12 +43,13 @@ export default function AkitaFetch() {
     loadBuildings();
   }, []);
 
-  // New useEffect to load levels when a building is selected and its levels are not yet loaded
+  // Load levels when a building is selected
   useEffect(() => {
-    if (selectedBuilding && (!selectedBuilding.levels || selectedBuilding.levels.length === 0)) {
+    if (selectedBuilding?.id && (!selectedBuilding.levels || selectedBuilding.levels.length === 0)) {
+      console.log('🔄 Triggering loadLevels for building:', selectedBuilding.id, selectedBuilding.name);
       loadLevels();
     }
-  }, [selectedBuilding]);
+  }, [selectedBuilding?.id]);
 
   useEffect(() => {
     if (selectedBuilding && selectedLevel) {
