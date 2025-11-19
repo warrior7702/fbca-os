@@ -60,6 +60,9 @@ export default function TicketDetail() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [isWorker, setIsWorker] = useState(false);
   const [teams, setTeams] = useState([]);
+  const [aiDraftResponse, setAiDraftResponse] = useState("");
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [showAIDraft, setShowAIDraft] = useState(false);
 
   const commentsEndRef = useRef(null);
 
@@ -351,6 +354,33 @@ export default function TicketDetail() {
     }
   };
 
+  const handleGenerateAIResponse = async (type = 'response') => {
+    setGeneratingAI(true);
+    try {
+      const response = await base44.functions.invoke('generateAITicketResponse', {
+        ticket_id: ticketId,
+        response_type: type
+      });
+      
+      if (response.data.success) {
+        setAiDraftResponse(response.data.response);
+        setShowAIDraft(true);
+        toast.success('AI draft generated');
+      }
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      toast.error('Failed to generate AI response');
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const handleUseAIDraft = () => {
+    setNewComment(aiDraftResponse);
+    setShowAIDraft(false);
+    toast.success('AI draft copied to comment');
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -567,6 +597,45 @@ export default function TicketDetail() {
               </Card>
             )}
 
+            {/* AI Draft Response */}
+            <AnimatePresence>
+              {showAIDraft && aiDraftResponse && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <Card className="border-2 border-blue-200 bg-blue-50">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-blue-900 text-base sm:text-lg">
+                          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                          AI Draft Response
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAIDraft(false)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{aiDraftResponse}</p>
+                      <Button
+                        onClick={handleUseAIDraft}
+                        size="sm"
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        Use This Draft
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Comments */}
             <Card>
               <CardHeader>
@@ -615,6 +684,38 @@ export default function TicketDetail() {
                 {/* Add Comment */}
                 {canEdit && (
                   <div className="space-y-2">
+                    {canManage && (
+                      <div className="flex gap-2 mb-2">
+                        <Button
+                          onClick={() => handleGenerateAIResponse('response')}
+                          disabled={generatingAI}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {generatingAI ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 mr-2" />
+                          )}
+                          Draft Response
+                        </Button>
+                        <Button
+                          onClick={() => handleGenerateAIResponse('solution')}
+                          disabled={generatingAI}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {generatingAI ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 mr-2" />
+                          )}
+                          Draft Solution
+                        </Button>
+                      </div>
+                    )}
                     <Textarea
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
