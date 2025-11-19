@@ -13,8 +13,22 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { type, buildingId, levelId } = await req.json();
-    console.log('Request:', { type, buildingId, levelId });
+    let type, buildingId, levelId;
+    
+    try {
+      const body = await req.json();
+      type = body.type;
+      buildingId = body.buildingId;
+      levelId = body.levelId;
+      console.log('📥 Request:', { type, buildingId, levelId });
+    } catch (e) {
+      console.error('❌ Failed to parse request body:', e);
+      return Response.json({ 
+        success: false,
+        error: 'Invalid request body',
+        details: e.message 
+      }, { status: 400 });
+    }
     
     const jwt = Deno.env.get('AKITABOX_JWT');
 
