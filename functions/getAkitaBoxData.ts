@@ -23,10 +23,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'AkitaBox JWT not configured' }, { status: 500 });
     }
 
+    console.log('JWT exists, length:', jwt.length);
+    console.log('JWT starts with:', jwt.substring(0, 20));
+
     const headers = {
-      'Cookie': `abx_jwt=${jwt}`,
+      'Authorization': `Bearer ${jwt}`,
       'Accept': 'application/json',
-      'Origin': 'https://fbca.akitabox.com'
+      'Content-Type': 'application/json'
     };
 
     let url, data;
