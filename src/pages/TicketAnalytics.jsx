@@ -18,6 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ export default function TicketAnalytics() {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
   const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     loadData();
@@ -86,8 +88,16 @@ export default function TicketAnalytics() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="insights">AI Insights</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Card>
               <CardContent className="p-6">
@@ -253,58 +263,67 @@ export default function TicketAnalytics() {
           </Card>
         </div>
 
-        {/* Staff Performance */}
-        {staff_performance.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Staff Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left p-3 text-sm font-semibold text-slate-700">Staff Member</th>
-                      <th className="text-center p-3 text-sm font-semibold text-slate-700">Total Assigned</th>
-                      <th className="text-center p-3 text-sm font-semibold text-slate-700">Resolved</th>
-                      <th className="text-center p-3 text-sm font-semibold text-slate-700">Resolution Rate</th>
-                      <th className="text-center p-3 text-sm font-semibold text-slate-700">Avg Resolution Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staff_performance.map(staff => {
-                      const resolutionRate = staff.total > 0 ? ((staff.resolved / staff.total) * 100).toFixed(1) : 0;
-                      return (
-                        <tr key={staff.email} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="p-3">
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{staff.name}</p>
-                              <p className="text-xs text-slate-500">{staff.email}</p>
-                            </div>
-                          </td>
-                          <td className="text-center p-3">
-                            <Badge variant="secondary">{staff.total}</Badge>
-                          </td>
-                          <td className="text-center p-3">
-                            <Badge className="bg-green-100 text-green-700">{staff.resolved}</Badge>
-                          </td>
-                          <td className="text-center p-3">
-                            <span className="text-sm font-semibold text-slate-900">{resolutionRate}%</span>
-                          </td>
-                          <td className="text-center p-3">
-                            <span className="text-sm text-slate-700">
-                              {staff.avg_resolution_time > 0 ? `${Math.round(staff.avg_resolution_time)}m` : 'N/A'}
-                            </span>
-                          </td>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            {/* Staff Performance */}
+            {staff_performance.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Staff Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left p-3 text-sm font-semibold text-slate-700">Staff Member</th>
+                          <th className="text-center p-3 text-sm font-semibold text-slate-700">Total Assigned</th>
+                          <th className="text-center p-3 text-sm font-semibold text-slate-700">Resolved</th>
+                          <th className="text-center p-3 text-sm font-semibold text-slate-700">Resolution Rate</th>
+                          <th className="text-center p-3 text-sm font-semibold text-slate-700">Avg Resolution Time</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                      </thead>
+                      <tbody>
+                        {staff_performance.map(staff => {
+                          const resolutionRate = staff.total > 0 ? ((staff.resolved / staff.total) * 100).toFixed(1) : 0;
+                          return (
+                            <tr key={staff.email} className="border-b border-slate-100 hover:bg-slate-50">
+                              <td className="p-3">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900">{staff.name}</p>
+                                  <p className="text-xs text-slate-500">{staff.email}</p>
+                                </div>
+                              </td>
+                              <td className="text-center p-3">
+                                <Badge variant="secondary">{staff.total}</Badge>
+                              </td>
+                              <td className="text-center p-3">
+                                <Badge className="bg-green-100 text-green-700">{staff.resolved}</Badge>
+                              </td>
+                              <td className="text-center p-3">
+                                <span className="text-sm font-semibold text-slate-900">{resolutionRate}%</span>
+                              </td>
+                              <td className="text-center p-3">
+                                <span className="text-sm text-slate-700">
+                                  {staff.avg_resolution_time > 0 ? `${Math.round(staff.avg_resolution_time)}m` : 'N/A'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6">
+            <AITrendsInsights />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
