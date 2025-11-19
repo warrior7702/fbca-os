@@ -70,6 +70,8 @@ export default function MyTasks() {
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [selectedScheduleEvent, setSelectedScheduleEvent] = useState(null);
   const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
+  const [userDepartments, setUserDepartments] = useState([]);
+  const [deptTickets, setDeptTickets] = useState([]);
 
   const navigate = useNavigate();
 
@@ -243,6 +245,48 @@ export default function MyTasks() {
           status: { $in: ['open', 'in_progress', 'pending'] }
         });
         setSupportTickets(allTickets);
+        
+        // Load user's departments and department tickets
+        try {
+          const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
+          if (rolesResponse.data.success) {
+            const userData = rolesResponse.data.allUsers.find(u => u.user_email === user.email);
+            if (userData) {
+              setUserDepartments(userData.departments || []);
+              
+              // Get all tickets for department
+              const allDeptTickets = await base44.entities.Ticket.list('-created_date');
+              
+              // Filter for department tickets
+              const getDepartment = (category) => {
+                const deptMap = {
+                  'technology': 'it',
+                  'technical': 'it',
+                  'maintenance': 'facilities',
+                  'cleaning': 'facilities',
+                  'facility': 'facilities',
+                  'facility_cleaning': 'facilities',
+                  'av_production': 'comms',
+                  'marketing': 'comms',
+                  'social_media': 'comms',
+                  'communications': 'comms'
+                };
+                return deptMap[category] || 'other';
+              };
+              
+              const deptFiltered = allDeptTickets.filter(t => {
+                const ticketDept = getDepartment(t.category);
+                return userData.departments.some(dept => 
+                  ticketDept === dept.toLowerCase().replace(' ', '_')
+                ) && ['open', 'in_progress', 'pending'].includes(t.status);
+              });
+              
+              setDeptTickets(deptFiltered);
+            }
+          }
+        } catch (err) {
+          console.error('Error loading department tickets:', err);
+        }
       }
     } catch (error) {
       console.error('Error loading support tickets:', error);
@@ -379,7 +423,7 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 sm:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
@@ -413,7 +457,38 @@ export default function MyTasks() {
                 </Badge>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Support Tickets</p>
+              <p className="text-xs sm:text-sm text-slate-600">My Tickets</p>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow col-span-2 cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium">Dept Support Tickets</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{deptTickets.length}</p>
+                  <p className="text-xs text-slate-500">Open in my dept</p>
+                </div>
+                <div className="h-8 w-px bg-slate-200" />
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-700">
+                    {deptTickets.filter(t => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const tomorrow = new Date(today);
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      const createdDate = new Date(t.created_date);
+                      return createdDate >= today && createdDate < tomorrow;
+                    }).length}
+                  </p>
+                  <p className="text-xs text-slate-500">Due today</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -451,6 +526,78 @@ export default function MyTasks() {
             )}
           </CardContent>
         </Card>
+
+        {supportTickets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TicketIcon className="w-5 h-5 text-purple-600" />
+                  My Support Tickets ({supportTickets.length})
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {supportTickets.slice(0, 5).map((ticket) => (
+                <motion.div
+                  key={ticket.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                >
+                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-slate-900 truncate">
+                        {ticket.subject}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.status}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                      {ticket.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className="font-mono">{ticket.ticket_number}</span>
+                      {ticket.category && (
+                        <>
+                          <span>•</span>
+                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
+                        </>
+                      )}
+                      {ticket.created_date && (
+                        <>
+                          <span>•</span>
+                          <span>{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                        </>
+                      )}
+                    </div>
+                    {ticket.suggested_solution && (
+                      <div className="mt-2 flex items-start gap-1 text-xs text-purple-600">
+                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-1">AI suggested solution available</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              {supportTickets.length > 5 && (
+                <p className="text-xs text-slate-500 text-center pt-2">
+                  +{supportTickets.length - 5} more tickets
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
