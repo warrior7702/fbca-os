@@ -473,25 +473,6 @@ export default function CreateTicket() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    Describe Your Issue<span className="text-red-500">*</span>
-                  </label>
-                  <Textarea
-                    value={issueDescription}
-                    onChange={(e) => {
-                      setIssueDescription(e.target.value);
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value) generateTicketTitle(e.target.value);
-                    }}
-                    placeholder="Describe what's wrong or what you need help with..."
-                    rows={4}
-                    required
-                  />
-
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
                     Category<span className="text-red-500">*</span>
                   </label>
                   <Select 
@@ -510,6 +491,24 @@ export default function CreateTicket() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Describe Your Issue<span className="text-red-500">*</span>
+                  </label>
+                  <Textarea
+                    value={issueDescription}
+                    onChange={(e) => {
+                      setIssueDescription(e.target.value);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value) generateTicketTitle(e.target.value);
+                    }}
+                    placeholder="Describe what's wrong or what you need help with..."
+                    rows={4}
+                    required
+                  />
                 </div>
 
                 <div className="space-y-2">
