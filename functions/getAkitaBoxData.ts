@@ -20,16 +20,21 @@ Deno.serve(async (req) => {
 
     if (!jwt) {
       console.error('AKITABOX_JWT not found in environment');
-      return Response.json({ error: 'AkitaBox JWT not configured' }, { status: 500 });
+      return Response.json({ 
+        success: false,
+        error: 'AkitaBox JWT not configured',
+        details: 'Please add AKITABOX_JWT secret in Settings'
+      }, { status: 500 });
     }
 
-    console.log('JWT exists, length:', jwt.length);
-    console.log('JWT starts with:', jwt.substring(0, 20));
+    console.log('🔑 JWT exists, length:', jwt.length);
+    console.log('🔑 JWT preview:', jwt.substring(0, 30) + '...');
 
+    // Try Cookie authentication (original method)
     const headers = {
-      'Authorization': `Bearer ${jwt}`,
+      'Cookie': `abx_jwt=${jwt}`,
       'Accept': 'application/json',
-      'Content-Type': 'application/json'
+      'Origin': 'https://fbca.akitabox.com'
     };
 
     let url, data;
@@ -40,14 +45,19 @@ Deno.serve(async (req) => {
         console.log('Fetching buildings from:', url);
         
         const buildingsResponse = await fetch(url, { headers });
-        console.log('Buildings response status:', buildingsResponse.status);
+        console.log('🏢 Buildings response status:', buildingsResponse.status);
+        console.log('🏢 Response headers:', Object.fromEntries(buildingsResponse.headers));
         
         if (!buildingsResponse.ok) {
           const errorText = await buildingsResponse.text();
-          console.error('Buildings API Error:', errorText);
+          console.error('❌ Buildings API Error:', buildingsResponse.status, errorText);
+          
           return Response.json({ 
-            error: `AkitaBox API error: ${buildingsResponse.status}`,
-            details: errorText
+            success: false,
+            error: `AkitaBox API returned ${buildingsResponse.status}`,
+            details: `Status: ${buildingsResponse.status}\n\nResponse: ${errorText}\n\nThis usually means the JWT token is expired or invalid. Please update AKITABOX_JWT in Settings.`,
+            statusCode: buildingsResponse.status,
+            response: errorText
           }, { status: 500 });
         }
         
