@@ -698,11 +698,9 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
             )}
-          </TabsContent>
 
-          {/* Department Info Tab */}
-          <TabsContent value="department" className="space-y-6">
-              <Card>
+            {isPreviewMode && escalations.length > 0 && (
+              <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Building2 className="w-5 h-5 text-violet-600" />
@@ -736,9 +734,11 @@ export default function MyDepartment() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+          </TabsContent>
 
-            {isPreviewMode && escalations.length > 0 && (
+          {/* Department Info Tab */}
+          <TabsContent value="department" className="space-y-6">
+            <Card>
               <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-red-900">
