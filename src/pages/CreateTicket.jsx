@@ -57,7 +57,33 @@ export default function CreateTicket() {
   useEffect(() => {
     loadBuildings();
     loadCurrentUser();
+    loadURLParams();
   }, []);
+
+  const loadURLParams = () => {
+    const params = new URLSearchParams(window.location.search);
+    const buildingId = params.get('building_id');
+    const buildingName = params.get('building_name');
+    const level = params.get('level');
+    const room = params.get('room');
+    const asset = params.get('asset');
+    
+    if (buildingName) {
+      setTicket(prev => ({
+        ...prev,
+        building: buildingName,
+        room_number: room || level || ''
+      }));
+    }
+    
+    if (asset) {
+      setTicket(prev => ({
+        ...prev,
+        subject: `Asset Issue: ${asset}`,
+        description: `Issue with asset: ${asset}${room ? ` in ${room}` : ''}${level ? ` (${level})` : ''}`
+      }));
+    }
+  };
 
   const loadCurrentUser = async () => {
     try {
