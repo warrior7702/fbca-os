@@ -849,6 +849,10 @@ export default function Settings() {
                         <Shield className="w-4 h-4 mr-2" />
                         Role Management
                       </Button>
+                      <Button onClick={() => navigate(createPageUrl('AssignmentRules'))} variant="outline">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Assignment Rules
+                      </Button>
                       <Button onClick={() => navigate(createPageUrl('TicketRoleVerification'))} variant="outline">
                         <Shield className="w-4 h-4 mr-2" />
                         Ticket Roles

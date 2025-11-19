@@ -52,6 +52,7 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import SharePoint from './pages/SharePoint';
 import Notifications from './pages/Notifications';
 import RoleManagement from './pages/RoleManagement';
+import AssignmentRules from './pages/AssignmentRules';
 import __Layout from './Layout.jsx';
 
 
@@ -110,6 +111,7 @@ export const PAGES = {
     "SharePoint": SharePoint,
     "Notifications": Notifications,
     "RoleManagement": RoleManagement,
+    "AssignmentRules": AssignmentRules,
 }
 
 export const pagesConfig = {

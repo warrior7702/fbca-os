@@ -285,8 +285,18 @@ export default function CreateTicket() {
         console.error("Error generating AI solution:", error);
       }
 
-      await base44.entities.Ticket.create(ticketData);
-      
+      const createdTicket = await base44.entities.Ticket.create(ticketData);
+
+      // Auto-assign ticket based on category
+      try {
+        await base44.functions.invoke('autoAssignTicket', {
+          ticket_id: createdTicket.id
+        });
+      } catch (assignError) {
+        console.warn('Auto-assignment failed:', assignError);
+        // Don't fail ticket creation if assignment fails
+      }
+
       setTicketNumber(newTicketNumber);
       setSubmitted(true);
       toast.success("Ticket submitted successfully!");
