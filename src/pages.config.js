@@ -51,6 +51,7 @@ import TestTranscription from './pages/TestTranscription';
 import VoiceProfiles from './pages/VoiceProfiles';
 import SharePoint from './pages/SharePoint';
 import Notifications from './pages/Notifications';
+import RoleManagement from './pages/RoleManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -108,6 +109,7 @@ export const PAGES = {
     "VoiceProfiles": VoiceProfiles,
     "SharePoint": SharePoint,
     "Notifications": Notifications,
+    "RoleManagement": RoleManagement,
 }
 
 export const pagesConfig = {

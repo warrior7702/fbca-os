@@ -845,6 +845,10 @@ export default function Settings() {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                      <Button onClick={() => navigate(createPageUrl('RoleManagement'))} variant="outline">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Role Management
+                      </Button>
                       <Button onClick={() => navigate(createPageUrl('TicketRoleVerification'))} variant="outline">
                         <Shield className="w-4 h-4 mr-2" />
                         Ticket Roles
