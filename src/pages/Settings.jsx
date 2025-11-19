@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, Info, Link as LinkIcon, Image, Mail, Bug, Shield, Database, Plus, Edit2, Save, X, Users, Crown, CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -10,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
+import NotificationPreferencesSection from "../components/settings/NotificationPreferencesSection";
 import { Calendar, Briefcase } from "lucide-react";
 import { CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
@@ -710,35 +710,7 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Choose what notifications you receive</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Email Notifications</p>
-                    <p className="text-sm text-slate-500">Receive email updates</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Task Reminders</p>
-                    <p className="text-sm text-slate-500">Get reminded about pending tasks</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Approval Requests</p>
-                    <p className="text-sm text-slate-500">Notifications for approval workflows</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
+            <NotificationPreferencesSection user={user} />
           </TabsContent>
 
           <TabsContent value="appearance" className="space-y-4">
