@@ -435,15 +435,18 @@ Keep response concise and actionable.`;
                       Building<span className="text-red-500">*</span>
                     </label>
                     <Select 
-                      value={ticket.building || "wade_pcb"} 
-                      onValueChange={(value) => setTicket({...ticket, building: value, building_name: "WADE PCB SC FBC"})}
+                      value={ticket.building} 
+                      onValueChange={(value) => setTicket({...ticket, building: value})}
                       required
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select building..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="wade_pcb">WADE PCB SC FBC</SelectItem>
+                        <SelectItem value="main_campus">Main Campus</SelectItem>
+                        <SelectItem value="worship_center">Worship Center</SelectItem>
+                        <SelectItem value="education_building">Education Building</SelectItem>
+                        <SelectItem value="family_life_center">Family Life Center</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
