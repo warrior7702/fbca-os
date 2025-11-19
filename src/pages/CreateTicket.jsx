@@ -443,10 +443,10 @@ Keep response concise and actionable.`;
                         <SelectValue placeholder="Select building..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="WADE">WADE</SelectItem>
-                        <SelectItem value="FBC">FBC</SelectItem>
-                        <SelectItem value="PCB">PCB</SelectItem>
-                        <SelectItem value="SC">SC</SelectItem>
+                        <SelectItem value="main_campus">Main Campus</SelectItem>
+                        <SelectItem value="worship_center">Worship Center</SelectItem>
+                        <SelectItem value="education_building">Education Building</SelectItem>
+                        <SelectItem value="family_life_center">Family Life Center</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
