@@ -146,9 +146,9 @@ export default function CreateTicket() {
   };
 
   const availableCategories = [
-    { value: 'technology', label: 'Technology' },
     { value: 'maintenance', label: 'Maintenance' },
-    { value: 'communications', label: 'Communications' }
+    { value: 'technology', label: 'Technology' },
+    { value: 'cleaning', label: 'Cleaning' }
   ];
 
   const generateTicketNumber = () => {
