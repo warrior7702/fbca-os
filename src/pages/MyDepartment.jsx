@@ -525,12 +525,10 @@ export default function MyDepartment() {
               Department Info
             </TabsTrigger>
             {isPreviewMode && (
-              <>
-                <TabsTrigger value="insights">
-                  <Target className="w-4 h-4 mr-2" />
-                  Insights
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="insights">
+                <Target className="w-4 h-4 mr-2" />
+                Insights
+              </TabsTrigger>
             )}
           </TabsList>
 
@@ -702,45 +700,6 @@ export default function MyDepartment() {
             {isPreviewMode && escalations.length > 0 && (
               <Card className="border-2 border-red-300 bg-red-50">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-violet-600" />
-                    Department Resources
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {userDepartments.length > 0 ? (
-                      userDepartments.map((dept, index) => (
-                        <div key={index} className="p-4 bg-violet-50 rounded-lg border border-violet-200">
-                          <h3 className="font-semibold text-slate-900 mb-2">{dept}</h3>
-                          <p className="text-sm text-slate-600 mb-3">
-                            Welcome to your department page! More features coming soon.
-                          </p>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              Team Directory
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              Resources
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-slate-500 py-8">
-                        No department assigned yet
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-          </TabsContent>
-
-          {/* Department Info Tab */}
-          <TabsContent value="department" className="space-y-6">
-            <Card>
-              <Card className="border-2 border-red-300 bg-red-50">
-                <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-red-900">
                     <AlertCircle className="w-5 h-5" />
                     🚨 Escalation Alerts ({escalations.length})
@@ -787,6 +746,7 @@ export default function MyDepartment() {
             )}
 
             {isPreviewMode && (
+            <>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -887,9 +847,7 @@ export default function MyDepartment() {
                 </div>
               </CardContent>
             </Card>
-            )}
 
-            {isPreviewMode && (
             <div className="space-y-4">
               {departments.map((dept) => {
                 const deptTickets = ticketsByDept[dept.id];
@@ -1038,7 +996,45 @@ export default function MyDepartment() {
                 );
               })}
             </div>
+            </>
             )}
+          </TabsContent>
+
+          <TabsContent value="department" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-violet-600" />
+                  Department Resources
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {userDepartments.length > 0 ? (
+                    userDepartments.map((dept, index) => (
+                      <div key={index} className="p-4 bg-violet-50 rounded-lg border border-violet-200">
+                        <h3 className="font-semibold text-slate-900 mb-2">{dept}</h3>
+                        <p className="text-sm text-slate-600 mb-3">
+                          Welcome to your department page! More features coming soon.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline">
+                            Team Directory
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            Resources
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-slate-500 py-8">
+                      No department assigned yet
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {isPreviewMode && (
