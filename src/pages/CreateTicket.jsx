@@ -64,10 +64,11 @@ export default function CreateTicket() {
       const currentUser = await base44.auth.me();
       if (currentUser) {
         // Format name properly: "First Last" instead of "first.last"
-        let displayName = currentUser.full_name || '';
-        if (!displayName && currentUser.email) {
-          const namePart = currentUser.email.split('@')[0];
-          displayName = namePart.split('.').map(part => 
+        let displayName = currentUser.full_name || currentUser.email?.split('@')[0] || '';
+        
+        // If name has dots or is lowercase, format it
+        if (displayName.includes('.') || displayName === displayName.toLowerCase()) {
+          displayName = displayName.split('.').map(part => 
             part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
           ).join(' ');
         }
@@ -147,10 +148,6 @@ export default function CreateTicket() {
   const availableCategories = [
     { value: 'technology', label: 'Technology' },
     { value: 'maintenance', label: 'Maintenance' },
-    { value: 'cleaning', label: 'Cleaning' },
-    { value: 'av_production', label: 'AV/Production' },
-    { value: 'marketing', label: 'Marketing' },
-    { value: 'social_media', label: 'Social Media' },
     { value: 'communications', label: 'Communications' }
   ];
 
