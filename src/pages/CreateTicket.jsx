@@ -429,7 +429,7 @@ Keep response concise and actionable.`;
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
                       Building<span className="text-red-500">*</span>
@@ -450,58 +450,14 @@ Keep response concise and actionable.`;
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Floor/Level</label>
-                    <Select 
-                      value={selectedLevel} 
-                      onValueChange={setSelectedLevel}
-                      disabled={!selectedBuilding || levels.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select floor..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {levels.map(level => (
-                          <SelectItem key={level._id} value={level._id}>
-                            {level.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Room</label>
-                    {loadingRooms ? (
-                      <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-slate-50">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm text-slate-500">Loading rooms...</span>
-                      </div>
-                    ) : rooms.length > 0 ? (
-                      <Select 
-                        value={ticket.room_number} 
-                        onValueChange={(value) => setTicket({...ticket, room_number: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select room..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {rooms.map(room => (
-                            <SelectItem key={room._id} value={room.name || room.number || room._id}>
-                              {room.name || room.number || 'Unnamed Room'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        value={ticket.room_number}
-                        onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
-                        placeholder="Room number or name"
-                        disabled={!selectedBuilding}
-                      />
-                    )}
+                    <Input
+                      value={ticket.room_number}
+                      onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
+                      placeholder="Room number or name"
+                    />
                   </div>
                 </div>
 
