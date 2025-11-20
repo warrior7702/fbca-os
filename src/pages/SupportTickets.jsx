@@ -86,7 +86,7 @@ export default function SupportTickets() {
       // Exclude workflow/communications tickets and archived tickets
       ticketsData = ticketsData.filter(t => 
         t.category && 
-        ['technology', 'technical', 'cleaning', 'maintenance', 'facility', 'facility_cleaning'].includes(t.category) && 
+        ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
         t.status !== 'archived'
       );
       
