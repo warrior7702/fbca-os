@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import {
@@ -46,6 +45,7 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import EnhancedMeetingNotes from "../components/meetings/EnhancedMeetingNotes";
 import DetailedMeetingNotesModal from "../components/meetings/DetailedMeetingNotesModal";
+import QuickActions from "../components/meetings/QuickActions";
 import {
   Popover,
   PopoverContent,
@@ -1227,6 +1227,9 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
           </TabsList>
 
           <TabsContent value="meetings" className="space-y-6 mt-6">
+            {/* Quick Actions */}
+            <QuickActions />
+
             {/* Next Meeting Countdown */}
             {nextMeeting && (() => {
               const start = parseMeetingDate(nextMeeting.start);
