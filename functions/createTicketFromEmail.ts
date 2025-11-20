@@ -126,12 +126,15 @@ Deno.serve(async (req) => {
         // Smart assignment
         const assignment = determineAssignment(subject, body);
 
-        // Extract building and room using AI
+        // Extract building and room using AI + find similar tickets (parallel)
         let building = '';
         let room_number = '';
+        let suggestedSolution = null;
         
         try {
-            const locationPrompt = `Extract the building and room number from this text. Return ONLY a JSON object with "building" and "room_number" fields. If not found, use empty strings.
+            const [locationData, solution] = await Promise.all([
+                base44.integrations.Core.InvokeLLM({
+                    prompt: `Extract the building and room number from this text. Return ONLY a JSON object with "building" and "room_number" fields. If not found, use empty strings.
 
 Valid buildings are: wade, fbc, pcb, sc
 
@@ -142,28 +145,25 @@ Examples:
 - "FBC hallway needs cleaning" -> {"building": "fbc", "room_number": ""}
 - "Room 205 at PCB" -> {"building": "pcb", "room_number": "205"}
 
-Return JSON only:`;
-
-            const locationData = await base44.integrations.Core.InvokeLLM({
-                prompt: locationPrompt,
-                add_context_from_internet: false,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        building: { type: "string" },
-                        room_number: { type: "string" }
+Return JSON only:`,
+                    add_context_from_internet: false,
+                    response_json_schema: {
+                        type: "object",
+                        properties: {
+                            building: { type: "string" },
+                            room_number: { type: "string" }
+                        }
                     }
-                }
-            });
+                }),
+                findSimilarTickets(base44, `${subject}: ${body}`)
+            ]);
 
             if (locationData?.building) building = locationData.building.toLowerCase();
             if (locationData?.room_number) room_number = locationData.room_number;
+            suggestedSolution = solution;
         } catch (error) {
-            console.warn('Could not extract location:', error);
+            console.warn('Error in AI processing:', error);
         }
-
-        // Find similar tickets and get AI suggestions
-        const suggestedSolution = await findSimilarTickets(base44, `${subject}: ${body}`);
 
         // Create ticket
         const ticketData = {
