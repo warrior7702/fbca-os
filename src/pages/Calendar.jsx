@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks } from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, isSameDay, parseISO, addWeeks, isBefore, isAfter } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Select,
@@ -35,7 +35,7 @@ export default function Calendar() {
   const [roomSearch, setRoomSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTag, setSelectedTag] = useState("all");
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [startDate, setStartDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedDayEvents, setSelectedDayEvents] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -191,17 +191,15 @@ export default function Calendar() {
 
   console.log(`📊 Total: ${events.length}, Filtered: ${filteredEvents.length}, Category: ${selectedCategory}, Tag: ${selectedTag}`);
 
-  // Calendar grid generation
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  // Calendar grid generation - show today + 4 weeks (5 weeks total)
+  const calendarStart = startOfWeek(startDate);
+  const calendarEnd = endOfWeek(addWeeks(startDate, 4));
 
   const generateCalendarDays = () => {
     const days = [];
-    let day = startDate;
+    let day = calendarStart;
 
-    while (day <= endDate) {
+    while (day <= calendarEnd) {
       days.push(day);
       day = addDays(day, 1);
     }
@@ -210,18 +208,15 @@ export default function Calendar() {
   };
 
   const getEventsForDay = (day) => {
-    const dayEvents = filteredEvents.filter(event => {
+    return filteredEvents.filter(event => {
       try {
         const eventDate = parseISO(event.starts_at);
-        const match = isSameDay(eventDate, day);
-        return match;
+        return isSameDay(eventDate, day);
       } catch (error) {
         console.error('Error parsing event date:', event.starts_at, error);
         return false;
       }
     });
-    
-    return dayEvents;
   };
 
   const handleShowAllDayEvents = (day, dayEvents) => {
@@ -361,18 +356,18 @@ export default function Calendar() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                      onClick={() => setStartDate(addWeeks(startDate, -1))}
                       className="h-8 w-8 sm:h-10 sm:w-10"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                      {format(currentMonth, 'MMMM yyyy')}
+                      {format(startDate, 'MMM d')} - {format(addWeeks(startDate, 4), 'MMM d, yyyy')}
                     </h2>
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                      onClick={() => setStartDate(addWeeks(startDate, 1))}
                       className="h-8 w-8 sm:h-10 sm:w-10"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -380,7 +375,7 @@ export default function Calendar() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => setCurrentMonth(new Date())}
+                    onClick={() => setStartDate(new Date())}
                     size="sm"
                   >
                     Today
@@ -397,7 +392,7 @@ export default function Calendar() {
 
               {calendarDays.map((day, index) => {
                 const dayEvents = getEventsForDay(day);
-                const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isInRange = !isBefore(day, startDate) && !isAfter(day, addWeeks(startDate, 4));
                 const isToday = isSameDay(day, new Date());
 
                 return (
@@ -407,7 +402,7 @@ export default function Calendar() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.005 }}
                     className={`min-h-20 sm:min-h-32 border border-slate-200 p-1 sm:p-2 ${
-                      !isCurrentMonth ? 'bg-slate-50 text-slate-400' : 'bg-white'
+                      !isInRange ? 'bg-slate-50 text-slate-400' : 'bg-white'
                     } ${isToday ? 'ring-2 ring-blue-500' : ''} hover:bg-slate-50 transition-colors`}
                   >
                     <div className={`text-xs sm:text-sm font-semibold mb-1 ${
