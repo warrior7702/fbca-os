@@ -580,10 +580,19 @@ export default function MyTasks() {
                           <span className="capitalize hidden sm:inline">{ticket.category.replace('_', ' ')}</span>
                         </>
                       )}
+                      {ticket.due_date && (
+                        <>
+                          <span>•</span>
+                          <span className={`flex items-center gap-1 ${isToday(new Date(ticket.due_date)) ? 'text-orange-600 font-semibold' : ''}`}>
+                            <Clock className="w-3 h-3" />
+                            Due {format(new Date(ticket.due_date), 'MMM d')}
+                          </span>
+                        </>
+                      )}
                       {ticket.created_date && (
                         <>
                           <span className="hidden sm:inline">•</span>
-                          <span className="hidden sm:inline">{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                          <span className="hidden sm:inline">{format(new Date(ticket.created_date), 'MMM d')}</span>
                         </>
                       )}
                     </div>
