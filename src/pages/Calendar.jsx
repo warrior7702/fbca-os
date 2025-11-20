@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Calendar as CalendarIcon, RefreshCw, Loader2, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import AppHeader from "../components/shared/AppHeader";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO, addWeeks, subWeeks } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Select,
@@ -42,9 +41,19 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [roomsExpanded, setRoomsExpanded] = useState(true);
   const [resourcesExpanded, setResourcesExpanded] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [currentWeek, setCurrentWeek] = useState(new Date());
 
   useEffect(() => {
     loadData();
+    
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadData = async () => {
@@ -221,6 +230,18 @@ export default function Calendar() {
   };
 
   const calendarDays = generateCalendarDays();
+  
+  // Generate 7 days for mobile view
+  const generate7Days = () => {
+    const days = [];
+    const start = startOfWeek(currentWeek);
+    for (let i = 0; i < 7; i++) {
+      days.push(addDays(start, i));
+    }
+    return days;
+  };
+  
+  const weekDays = generate7Days();
 
   const stripHtml = (html) => {
     if (!html) return '';
@@ -333,38 +354,41 @@ export default function Calendar() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  className="h-8 w-8 sm:h-10 sm:w-10"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  {format(currentMonth, 'MMMM yyyy')}
-                </h2>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  className="h-8 w-8 sm:h-10 sm:w-10"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentMonth(new Date())}
-                size="sm"
-              >
-                Today
-              </Button>
-            </div>
+            {/* Desktop: Full Month Grid */}
+            {!isMobile && (
+              <>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                      className="h-8 w-8 sm:h-10 sm:w-10"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {format(currentMonth, 'MMMM yyyy')}
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                      className="h-8 w-8 sm:h-10 sm:w-10"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentMonth(new Date())}
+                    size="sm"
+                  >
+                    Today
+                  </Button>
+                </div>
 
-            <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+                <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                 <div key={day} className="text-center font-semibold text-slate-600 py-2 text-xs sm:text-sm">
                   <span className="hidden sm:inline">{day}</span>
@@ -424,7 +448,111 @@ export default function Calendar() {
                   </motion.div>
                 );
               })}
-            </div>
+                </div>
+              </>
+            )}
+
+            {/* Mobile: Compact 7-Day View */}
+            {isMobile && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+                      className="h-8 w-8"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {format(startOfWeek(currentWeek), 'MMM d')} - {format(addDays(startOfWeek(currentWeek), 6), 'MMM d')}
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+                      className="h-8 w-8"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentWeek(new Date())}
+                    size="sm"
+                  >
+                    Today
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {weekDays.map((day, index) => {
+                    const dayEvents = getEventsForDay(day);
+                    const isToday = isSameDay(day, new Date());
+
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={`border border-slate-200 rounded-lg p-3 bg-white ${
+                          isToday ? 'ring-2 ring-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {format(day, 'EEEE')}
+                            </p>
+                            <p className={`text-xs ${isToday ? 'text-blue-600 font-semibold' : 'text-slate-500'}`}>
+                              {format(day, 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                          <Badge variant={dayEvents.length > 0 ? "default" : "outline"}>
+                            {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                          </Badge>
+                        </div>
+
+                        {dayEvents.length > 0 ? (
+                          <div className="space-y-2">
+                            {dayEvents.map((event) => (
+                              <div
+                                key={event.id}
+                                onClick={() => setSelectedEvent(event)}
+                                className="p-2 bg-blue-50 border border-blue-200 rounded cursor-pointer hover:bg-blue-100 transition-colors"
+                              >
+                                <p className="text-sm font-medium text-blue-900 mb-1">{event.name}</p>
+                                <p className="text-xs text-blue-700">
+                                  {format(parseISO(event.starts_at), 'h:mm a')} - {format(parseISO(event.ends_at), 'h:mm a')}
+                                </p>
+                                {event.resources && event.resources.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {event.resources.slice(0, 2).map(resource => (
+                                      <Badge key={resource.id} variant="secondary" className="text-[10px]">
+                                        {resource.name}
+                                      </Badge>
+                                    ))}
+                                    {event.resources.length > 2 && (
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        +{event.resources.length - 2}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400 text-center py-2">No events scheduled</p>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
