@@ -22,7 +22,8 @@ import {
   MousePointerClick,
   Zap,
   Mail,
-  Workflow
+  Workflow,
+  CalendarDays
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -384,25 +385,9 @@ export default function SupportTickets() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
                     <SelectItem value="technology">Technology</SelectItem>
                     <SelectItem value="cleaning">Cleaning</SelectItem>
-                    <SelectItem value="technical">Technical/IT</SelectItem>
-                    <SelectItem value="access">Access/Keys</SelectItem>
-                    <SelectItem value="facility">Facility Maintenance</SelectItem>
-                    <SelectItem value="facility_cleaning">Facility Cleaning</SelectItem>
-                    <SelectItem value="av_production">AV/Production</SelectItem>
-                    <SelectItem value="worship_production">Worship Production</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="graphics">Graphics Design</SelectItem>
-                    <SelectItem value="social_media">Social Media</SelectItem>
-                    <SelectItem value="communications">Communications</SelectItem>
-                    <SelectItem value="event_setup">Event Setup</SelectItem>
-                    <SelectItem value="room_setup">Room Setup</SelectItem>
-                    <SelectItem value="catering">Catering</SelectItem>
-                    <SelectItem value="hospitality">Hospitality</SelectItem>
-                    <SelectItem value="security">Security</SelectItem>
-                    <SelectItem value="transportation">Transportation</SelectItem>
+                    <SelectItem value="janitorial">Janitorial</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -433,7 +418,7 @@ export default function SupportTickets() {
                         {ticket.description}
                       </p>
                       
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
                         <span className="font-mono">{ticket.ticket_number}</span>
                         <span>•</span>
                         <Calendar className="w-3 h-3" />
@@ -443,6 +428,15 @@ export default function SupportTickets() {
                             <span>•</span>
                             <UserIcon className="w-3 h-3" />
                             {ticket.requester_name}
+                          </>
+                        )}
+                        {ticket.due_date && (
+                          <>
+                            <span>•</span>
+                            <CalendarDays className="w-3 h-3 text-orange-600" />
+                            <span className="text-orange-600 font-medium">
+                              Due {format(new Date(ticket.due_date), 'MMM d')}
+                            </span>
                           </>
                         )}
                       </div>
