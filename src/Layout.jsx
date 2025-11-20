@@ -270,7 +270,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
 
               <p className="text-slate-700 text-sm mb-3 leading-relaxed">
-                Click here to connect your accounts and get started!
+                Click here to connect your accounts and get started! After connecting, enable push notifications from your profile menu for mobile alerts.
               </p>
 
               <Link to={createPageUrl("Settings") + "?tab=integrations"} onClick={handleDismissLightBubble}>
