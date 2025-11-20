@@ -21,16 +21,14 @@ Deno.serve(async (req) => {
 
     // Map category to ticket category (case-insensitive)
     const categoryLower = (category || '').toLowerCase();
-    let ticketCategory = 'maintenance'; // default
+    let ticketCategory = 'other'; // default
     
-    if (categoryLower.includes('clean')) {
-      ticketCategory = 'cleaning';
-    } else if (categoryLower.includes('tech') || categoryLower.includes('it')) {
+    if (categoryLower.includes('tech') || categoryLower.includes('it')) {
       ticketCategory = 'technology';
-    } else if (categoryLower.includes('cross') || categoryLower.includes('department')) {
-      ticketCategory = 'other'; // Cross-dept tickets stay unassigned
-    } else if (categoryLower.includes('maintain') || categoryLower.includes('facility')) {
-      ticketCategory = 'maintenance';
+    } else if (categoryLower.includes('clean')) {
+      ticketCategory = 'cleaning';
+    } else if (categoryLower.includes('janitor')) {
+      ticketCategory = 'janitorial';
     }
     
     // Generate ticket number

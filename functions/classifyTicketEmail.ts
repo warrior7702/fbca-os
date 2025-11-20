@@ -15,38 +15,40 @@ Deno.serve(async (req) => {
     const prompt = `You are a ticket classification system for FBCA. You receive an email subject and body. 
 Your job is to classify it into exactly ONE of the following categories:
 
-- Cleaning
-- Maintenance
 - Technology
-- Cross-Department (when unclear or involves multiple departments)
+- Cleaning
+- Janitorial
+- Other (when unclear or doesn't fit above categories)
 
 Rules:
 1. Classification depends ONLY on the request content, NOT on the requester.
 2. Choose the category that best matches the intent and keywords.
-3. When in doubt or if multiple departments are involved, choose Cross-Department.
+3. When in doubt or if it doesn't clearly fit Technology/Cleaning/Janitorial, choose Other.
 4. You must always return valid JSON. No extra text.
 
 CATEGORY DEFINITIONS:
 
-Cleaning:
-- spills, stains, trash, dirty areas, bathrooms, mopping, sweeping
-- janitorial tasks, sanitation, "needs to be cleaned", odor issues
-
-Maintenance:
-- repairs, broken items, HVAC, lights out, leaks, plumbing, electrical
-- furniture fixes, building issues, doors, windows, general facility upkeep
-- mechanical issues, physical repairs to equipment or structures
-
 Technology:
 - computer issues, network, email, logins, printers, phones, software
 - audio/video problems, projectors, tech booths, streaming, worship tech
-- DOOR CODES and access control issues
-- digital/electronic systems
+- DOOR CODES and access control issues (critical: these are always Technology)
+- digital/electronic systems, apps, software
 
-Cross-Department:
-- requests that involve multiple teams or are unclear
-- issues that could reasonably fall into 2+ categories
-- when confidence is low, default to this
+Cleaning:
+- routine cleaning, spills, stains, trash removal
+- bathroom cleaning, mopping, sweeping
+- general tidying up
+
+Janitorial:
+- deeper cleaning tasks, maintenance of janitorial equipment
+- floor care, window washing, carpet cleaning
+- sanitation projects, odor treatment
+
+Other:
+- mechanical repairs, HVAC, plumbing, electrical
+- furniture fixes, building maintenance
+- event setup, communications requests
+- anything that doesn't fit the above three categories
 
 EMAIL TO CLASSIFY:
 Subject: ${subject}
@@ -56,7 +58,7 @@ OUTPUT FORMAT:
 Return only this JSON. Do not add comments or extra words.
 
 {
-  "category": "Cleaning | Maintenance | Technology | Cross-Department",
+  "category": "Technology | Cleaning | Janitorial | Other",
   "confidence": 0.00
 }
 
@@ -71,7 +73,7 @@ Where:
         properties: {
           category: {
             type: "string",
-            enum: ["Cleaning", "Maintenance", "Technology", "Cross-Department"]
+            enum: ["Technology", "Cleaning", "Janitorial", "Other"]
           },
           confidence: {
             type: "number",
