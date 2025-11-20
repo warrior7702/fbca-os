@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +13,12 @@ import {
   ArrowLeft,
   Loader2,
   FolderOpen,
-  AlertCircle
+  AlertCircle,
+  File,
+  FileSpreadsheet,
+  FileCode,
+  Music,
+  Film
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,9 +95,14 @@ export default function Documents() {
 
   const getFileIcon = (name) => {
     const ext = name.split('.').pop().toLowerCase();
-    if (ext.match(/jpg|jpeg|png|gif|svg|webp/)) return FileImage;
-    if (ext.match(/mp4|mov|avi|mkv/)) return FileVideo;
-    if (ext.match(/zip|rar|7z|tar|gz/)) return FileArchive;
+    if (ext.match(/jpg|jpeg|png|gif|svg|webp|bmp|tiff?/)) return FileImage;
+    if (ext.match(/mp4|mov|avi|mkv|webm|flv|wmv/)) return Film;
+    if (ext.match(/mp3|wav|flac|aac|ogg|wma/)) return Music;
+    if (ext.match(/zip|rar|7z|tar|gz|bz2/)) return FileArchive;
+    if (ext.match(/xlsx?|csv|xlsm/)) return FileSpreadsheet;
+    if (ext.match(/docx?|txt|rtf/)) return FileText;
+    if (ext.match(/pptx?|key/)) return File;
+    if (ext.match(/js|jsx|ts|tsx|py|java|cpp|c|h|css|html|json|xml|yaml|yml/)) return FileCode;
     return FileText;
   };
 
@@ -129,10 +138,23 @@ export default function Documents() {
     }
   };
 
+  const getFileColor = (name) => {
+    const ext = name.split('.').pop().toLowerCase();
+    if (ext.match(/jpg|jpeg|png|gif|svg|webp|bmp|tiff?/)) return { bg: 'bg-pink-100', text: 'text-pink-600' };
+    if (ext.match(/mp4|mov|avi|mkv|webm|flv|wmv/)) return { bg: 'bg-purple-100', text: 'text-purple-600' };
+    if (ext.match(/mp3|wav|flac|aac|ogg|wma/)) return { bg: 'bg-indigo-100', text: 'text-indigo-600' };
+    if (ext.match(/zip|rar|7z|tar|gz|bz2/)) return { bg: 'bg-orange-100', text: 'text-orange-600' };
+    if (ext.match(/xlsx?|csv|xlsm/)) return { bg: 'bg-green-100', text: 'text-green-600' };
+    if (ext.match(/docx?|txt|rtf/)) return { bg: 'bg-blue-100', text: 'text-blue-600' };
+    if (ext.match(/pptx?|key/)) return { bg: 'bg-red-100', text: 'text-red-600' };
+    if (ext.match(/js|jsx|ts|tsx|py|java|cpp|c|h|css|html|json|xml|yaml|yml/)) return { bg: 'bg-slate-100', text: 'text-slate-600' };
+    return { bg: 'bg-slate-100', text: 'text-slate-600' };
+  };
+
   return (
-    <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 p-6">
+    <div className="h-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 sm:p-6 overflow-auto">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -141,9 +163,12 @@ export default function Documents() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex items-center gap-2">
-              <FolderOpen className="w-6 h-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-slate-900">Documents</h1>
+            <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
+              <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Documents</h1>
+              <p className="text-sm text-slate-600">Browse your OneDrive files</p>
             </div>
           </div>
         </div>
@@ -175,14 +200,16 @@ export default function Documents() {
 
         {/* Only show breadcrumbs and file browser if connected */}
         {user?.microsoft_access_token && !error && (
-          <div className="flex items-center gap-2 mb-4 text-sm">
+          <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-white rounded-lg shadow-sm border border-slate-200">
             {breadcrumbs.map((crumb, index) => (
               <React.Fragment key={crumb.id}>
-                {index > 0 && <span className="text-slate-400">/</span>}
+                {index > 0 && <span className="text-slate-300 font-medium">/</span>}
                 <button
                   onClick={() => navigateToBreadcrumb(index)}
-                  className={`hover:text-blue-600 transition-colors ${
-                    index === breadcrumbs.length - 1 ? 'text-blue-600 font-medium' : 'text-slate-600'
+                  className={`px-2 py-1 rounded-md transition-all text-sm font-medium ${
+                    index === breadcrumbs.length - 1 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
                   }`}
                 >
                   {crumb.name}
@@ -197,74 +224,75 @@ export default function Documents() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         ) : user?.microsoft_access_token && !error && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {items.map((item) => {
               const Icon = item.isFolder ? Folder : getFileIcon(item.name);
+              const colors = item.isFolder ? { bg: 'bg-gradient-to-br from-blue-500 to-indigo-500', text: 'text-white' } : getFileColor(item.name);
               
               return (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{ scale: 1.03, y: -4 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
                   <Card 
-                    className="hover:shadow-lg transition-all cursor-pointer"
+                    className="hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-blue-200 overflow-hidden group"
                     onClick={() => {
                       if (item.isFolder) {
                         openFolder(item);
                       }
                     }}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center text-center gap-3">
-                        <div className={`p-3 rounded-xl ${
-                          item.isFolder ? 'bg-blue-100' : 'bg-slate-100'
-                        }`}>
-                          <Icon className={`w-8 h-8 ${
-                            item.isFolder ? 'text-blue-600' : 'text-slate-600'
-                          }`} />
+                    <CardContent className="p-0">
+                      <div className="flex flex-col">
+                        {/* Icon Header */}
+                        <div className={`${item.isFolder ? colors.bg : colors.bg} p-6 flex items-center justify-center`}>
+                          <Icon className={`w-12 h-12 ${item.isFolder ? colors.text : colors.text} drop-shadow-lg`} />
                         </div>
-                        <div className="w-full">
-                          <p className="font-medium text-sm text-slate-900 truncate">
+                        
+                        {/* File Info */}
+                        <div className="p-3 bg-white">
+                          <p className="font-semibold text-sm text-slate-900 truncate mb-1" title={item.name}>
                             {item.name}
                           </p>
                           {!item.isFolder && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-slate-500">
                               {formatFileSize(item.size)}
                             </p>
                           )}
-                        </div>
-                        {!item.isFolder && (
-                          <div className="flex gap-1 w-full">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openInNativeApp(item);
-                              }}
-                            >
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              Open
-                            </Button>
-                            {item.downloadUrl && (
+                          
+                          {/* Action Buttons */}
+                          {!item.isFolder && (
+                            <div className="flex gap-1 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="flex-1 text-xs"
+                                className="flex-1 text-xs h-8 bg-blue-600 hover:bg-blue-700"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  window.open(item.downloadUrl, '_blank');
+                                  openInNativeApp(item);
                                 }}
                               >
-                                <Download className="w-3 h-3 mr-1" />
-                                Save
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Open
                               </Button>
-                            )}
-                          </div>
-                        )}
+                              {item.downloadUrl && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(item.downloadUrl, '_blank');
+                                  }}
+                                >
+                                  <Download className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -275,10 +303,15 @@ export default function Documents() {
         )}
 
         {user?.microsoft_access_token && items.length === 0 && !loading && !error && (
-          <div className="text-center py-20">
-            <FolderOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500">This folder is empty</p>
-          </div>
+          <Card className="border-2 border-dashed border-slate-200">
+            <CardContent className="p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FolderOpen className="w-10 h-10 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">This folder is empty</h3>
+              <p className="text-slate-500">No files or folders to display</p>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
