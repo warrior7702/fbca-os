@@ -14,8 +14,12 @@ import {
   Search,
   X,
   Eye,
-  Trash2 // Added Trash2 icon
+  Trash2,
+  Mail,
+  Loader2
 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import {
   Command,
@@ -42,6 +46,8 @@ export default function EnhancedMeetingNotes({
 }) {
   const [assigningIndex, setAssigningIndex] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sendingSummary, setSendingSummary] = useState(false);
+  const [creatingTasks, setCreatingTasks] = useState(false);
 
   const handleAssign = (actionItemIndex, person) => {
     if (onAssignPerson) {
@@ -49,6 +55,73 @@ export default function EnhancedMeetingNotes({
     }
     setAssigningIndex(null);
     setSearchQuery('');
+  };
+
+  const handleSendSummary = async () => {
+    setSendingSummary(true);
+    try {
+      const attendees = notes.speakers?.map(s => s.email).filter(Boolean) || [];
+      
+      if (attendees.length === 0) {
+        toast.error('No attendees with email addresses found');
+        setSendingSummary(false);
+        return;
+      }
+
+      const response = await base44.functions.invoke('sendMeetingSummary', {
+        attendees,
+        meetingSubject: notes.meeting_subject,
+        meetingDate: notes.meeting_date,
+        summary: notes.summary,
+        keyPoints: notes.key_points,
+        actionItems: notes.action_items
+      });
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+      } else {
+        toast.error('Failed to send summary');
+      }
+    } catch (error) {
+      console.error('Error sending summary:', error);
+      toast.error('Failed to send summary');
+    } finally {
+      setSendingSummary(false);
+    }
+  };
+
+  const handleCreateTasks = async () => {
+    setCreatingTasks(true);
+    try {
+      const user = await base44.auth.me();
+      
+      // Determine which platform to use
+      const platform = user.microsoft_access_token ? 'microsoft' : 
+                       user.clickup_access_token ? 'clickup' : null;
+
+      if (!platform) {
+        toast.error('Connect ClickUp or Microsoft in Settings to create tasks');
+        setCreatingTasks(false);
+        return;
+      }
+
+      const response = await base44.functions.invoke('createTasksFromActionItems', {
+        actionItems: notes.action_items,
+        meetingSubject: notes.meeting_subject,
+        platform
+      });
+
+      if (response.data.success) {
+        toast.success(`Created ${response.data.tasksCreated} task(s) in ${platform === 'microsoft' ? 'Microsoft To Do' : 'ClickUp'}`);
+      } else {
+        toast.error(response.data.error || 'Failed to create tasks');
+      }
+    } catch (error) {
+      console.error('Error creating tasks:', error);
+      toast.error('Failed to create tasks');
+    } finally {
+      setCreatingTasks(false);
+    }
   };
 
   return (
@@ -71,7 +144,35 @@ export default function EnhancedMeetingNotes({
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button 
+            onClick={handleSendSummary} 
+            disabled={sendingSummary}
+            className="bg-blue-600 hover:bg-blue-700" 
+            size="sm"
+          >
+            {sendingSummary ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Mail className="w-4 h-4 mr-2" />
+            )}
+            Send Summary
+          </Button>
+          {notes.action_items && notes.action_items.length > 0 && (
+            <Button 
+              onClick={handleCreateTasks}
+              disabled={creatingTasks}
+              className="bg-green-600 hover:bg-green-700" 
+              size="sm"
+            >
+              {creatingTasks ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ListChecks className="w-4 h-4 mr-2" />
+              )}
+              Create Tasks
+            </Button>
+          )}
           {onViewDetails && (
             <Button
               size="sm"
