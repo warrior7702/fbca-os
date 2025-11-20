@@ -142,10 +142,10 @@ export default function SupportTickets() {
   const getStatusColor = (status) => {
     const colors = {
       open: "bg-blue-100 text-blue-700",
-      pending: "bg-yellow-100 text-yellow-700",
-      in_progress: "bg-purple-100 text-purple-700",
+      awaiting_information: "bg-yellow-100 text-yellow-700",
+      awaiting_parts: "bg-orange-100 text-orange-700",
       resolved: "bg-green-100 text-green-700",
-      closed: "bg-slate-100 text-slate-700"
+      archived: "bg-slate-100 text-slate-700"
     };
     return colors[status] || colors.open;
   };
@@ -159,11 +159,11 @@ export default function SupportTickets() {
     // Tab filtering
     let matchesTab = true;
     if (activeTab === "active") {
-      matchesTab = ['open', 'pending', 'in_progress'].includes(ticket.status);
+      matchesTab = ['open', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "pool") {
-      matchesTab = !ticket.assigned_to && ['open', 'pending', 'in_progress'].includes(ticket.status);
+      matchesTab = !ticket.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "resolved") {
-      matchesTab = ['resolved', 'closed'].includes(ticket.status);
+      matchesTab = ['resolved', 'archived'].includes(ticket.status);
     }
     
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
@@ -174,10 +174,10 @@ export default function SupportTickets() {
 
   const stats = {
     total: tickets.length,
-    active: tickets.filter(t => ['open', 'pending', 'in_progress'].includes(t.status)).length,
+    active: tickets.filter(t => ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
     open: tickets.filter(t => t.status === 'open').length,
-    in_progress: tickets.filter(t => t.status === 'in_progress').length,
-    resolved: tickets.filter(t => ['resolved', 'closed'].includes(t.status)).length
+    awaiting: tickets.filter(t => ['awaiting_information', 'awaiting_parts'].includes(t.status)).length,
+    resolved: tickets.filter(t => ['resolved', 'archived'].includes(t.status)).length
   };
 
   const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
@@ -195,7 +195,7 @@ export default function SupportTickets() {
       await base44.entities.Ticket.update(ticketId, {
         assigned_to: user.email,
         assigned_to_name: user.full_name,
-        status: 'in_progress',
+        status: 'open',
         last_activity_at: new Date().toISOString()
       });
       
@@ -299,10 +299,10 @@ export default function SupportTickets() {
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm text-slate-600">In Progress</p>
-                    <p className="text-xl sm:text-2xl font-bold text-purple-700">{stats.in_progress}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Awaiting</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-700">{stats.awaiting}</p>
                   </div>
-                  <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
+                  <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
                 </div>
               </CardContent>
             </Card>
@@ -331,9 +331,9 @@ export default function SupportTickets() {
             </TabsTrigger>
             <TabsTrigger value="pool" className="gap-2">
               Unassigned Pool
-              {tickets.filter(t => !t.assigned_to && ['open', 'pending', 'in_progress'].includes(t.status)).length > 0 && (
+              {tickets.filter(t => !t.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length > 0 && (
                 <Badge className="ml-1 bg-orange-500">
-                  {tickets.filter(t => !t.assigned_to && ['open', 'pending', 'in_progress'].includes(t.status)).length}
+                  {tickets.filter(t => !t.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -480,16 +480,16 @@ export default function SupportTickets() {
                         disabled={claiming === ticket.id}
                         className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-shrink-0"
                         size="sm"
-                        >
+                      >
                         {claiming === ticket.id ? (
-                         <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                         <>
-                           <Users className="w-4 h-4 mr-2" />
-                           Claim
-                         </>
+                          <>
+                            <Users className="w-4 h-4 mr-2" />
+                            Claim
+                          </>
                         )}
-                        </Button>
+                      </Button>
                         )}
                         </div>
                 </CardContent>

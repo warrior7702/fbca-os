@@ -214,8 +214,8 @@ export default function TicketDetail() {
         updateData.time_to_resolution = Math.round(resolutionTime);
       }
 
-      if (newStatus === 'closed') {
-        updateData.closed_at = new Date().toISOString();
+      if (newStatus === 'archived') {
+        updateData.archived_at = new Date().toISOString();
       }
 
       await base44.entities.Ticket.update(ticketId, updateData);
@@ -456,10 +456,10 @@ export default function TicketDetail() {
   const getStatusColor = (status) => {
     const colors = {
       open: "bg-blue-100 text-blue-700",
-      pending: "bg-yellow-100 text-yellow-700",
-      in_progress: "bg-purple-100 text-purple-700",
+      awaiting_information: "bg-yellow-100 text-yellow-700",
+      awaiting_parts: "bg-orange-100 text-orange-700",
       resolved: "bg-green-100 text-green-700",
-      closed: "bg-slate-100 text-slate-700"
+      archived: "bg-slate-100 text-slate-700"
     };
     return colors[status] || colors.open;
   };
@@ -783,10 +783,10 @@ export default function TicketDetail() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="awaiting_information">Awaiting Information</SelectItem>
+                        <SelectItem value="awaiting_parts">Awaiting Parts</SelectItem>
                         <SelectItem value="resolved">Resolved</SelectItem>
-                        <SelectItem value="closed">Closed</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
