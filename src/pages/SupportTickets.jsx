@@ -83,7 +83,11 @@ export default function SupportTickets() {
       }
       
       // Filter out workflow/communications tickets and archived tickets
-      ticketsData = ticketsData.filter(t => t.source !== 'workflow' && t.status !== 'archived');
+      // Keep only web_form, email, bot sources (technology, cleaning, maintenance tickets)
+      ticketsData = ticketsData.filter(t => 
+        (!t.source || t.source === 'web_form' || t.source === 'email' || t.source === 'bot') && 
+        t.status !== 'archived'
+      );
       
       setTickets(ticketsData);
     } catch (error) {
