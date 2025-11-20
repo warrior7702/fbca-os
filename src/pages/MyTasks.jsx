@@ -401,8 +401,8 @@ export default function MyTasks() {
   const displayName = user?.display_name || user?.full_name;
 
   return (
-    <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto">
-      <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="h-full bg-gradient-to-br from-blue-50 to-slate-50 overflow-auto pb-20">
+      <div className="max-w-7xl mx-auto p-2 sm:p-6 space-y-3 sm:space-y-6">
         {(!user?.clickup_access_token && !user?.microsoft_access_token) && <ConnectionWarning />}
 
         <AppHeader
@@ -433,50 +433,50 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex items-center justify-between mb-1">
+                <CalendarIcon className="w-4 h-4 text-green-600" />
                 <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
                   {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : eventsToday}
                 </Badge>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900">{eventsToday}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Events Today</p>
+              <p className="text-lg sm:text-2xl font-bold text-slate-900">{eventsToday}</p>
+              <p className="text-[10px] sm:text-sm text-slate-600">Events Today</p>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex items-center justify-between mb-1">
+                <CalendarIcon className="w-4 h-4 text-blue-600" />
                 <Badge className="bg-blue-100 text-blue-700 border-blue-300 text-xs">
                   {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : meetingsToday}
                 </Badge>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900">{meetingsToday}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Meetings Today</p>
+              <p className="text-lg sm:text-2xl font-bold text-slate-900">{meetingsToday}</p>
+              <p className="text-[10px] sm:text-sm text-slate-600">Meetings Today</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer col-span-2 sm:col-span-1" onClick={() => navigate(createPageUrl('SupportTickets'))}>
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex items-center justify-between mb-1">
+                <TicketIcon className="w-4 h-4 text-purple-600" />
+                <p className="text-[10px] sm:text-xs text-slate-500">My Tickets</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div>
-                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-                  <p className="text-xs text-slate-600">Open</p>
+                  <p className="text-lg sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-600">Open</p>
                 </div>
-                <div className="h-8 w-px bg-slate-200" />
+                <div className="h-6 sm:h-8 w-px bg-slate-200" />
                 <div>
-                  <p className="text-xl sm:text-2xl font-bold text-orange-700">{ticketsDueToday}</p>
-                  <p className="text-xs text-slate-600">Due Today</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-700">{ticketsDueToday}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-600">Due Today</p>
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mt-1">My Tickets</p>
             </CardContent>
           </Card>
         </div>
@@ -534,47 +534,47 @@ export default function MyTasks() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 sm:space-y-3">
               {supportTickets.slice(0, 5).map((ticket) => (
                 <motion.div
                   key={ticket.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  className="flex items-start gap-2 p-2 sm:p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
                   onClick={() => navigate(createPageUrl('SupportTickets'))}
                 >
                   <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-sm text-slate-900 truncate">
+                      <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
                         {ticket.subject}
                       </p>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-[10px] sm:text-xs">
                         {ticket.status}
                       </Badge>
                     </div>
-                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">
+                    <p className="text-[10px] sm:text-xs text-slate-600 line-clamp-2 mb-1 sm:mb-2">
                       {ticket.description}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-slate-500 flex-wrap">
                       <span className="font-mono">{ticket.ticket_number}</span>
                       {ticket.category && (
                         <>
-                          <span>•</span>
-                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="capitalize hidden sm:inline">{ticket.category.replace('_', ' ')}</span>
                         </>
                       )}
                       {ticket.created_date && (
                         <>
-                          <span>•</span>
-                          <span>{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="hidden sm:inline">{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
                         </>
                       )}
                     </div>
                     {ticket.suggested_solution && (
-                      <div className="mt-2 flex items-start gap-1 text-xs text-purple-600">
+                      <div className="mt-1 sm:mt-2 flex items-start gap-1 text-[10px] sm:text-xs text-purple-600">
                         <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-1">AI suggested solution available</span>
+                        <span className="line-clamp-1">AI solution</span>
                       </div>
                     )}
                   </div>
@@ -754,26 +754,26 @@ export default function MyTasks() {
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {Object.entries(emails.categorized).map(([category, categoryEmails]) => {
                   const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
 
                   return (
                     <Card key={category} className="bg-slate-50">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm flex items-center justify-between">
-                          <span className="flex items-center gap-2">
+                      <CardHeader className="pb-2 sm:pb-3">
+                        <CardTitle className="text-xs sm:text-sm flex items-center justify-between">
+                          <span className="flex items-center gap-1 sm:gap-2">
                             <span
-                              className="h-3 w-3 rounded-full flex-shrink-0"
+                              className="h-2 w-2 sm:h-3 sm:w-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: categoryColor }}
                             />
-                            {category}
+                            <span className="truncate">{category}</span>
                           </span>
-                          <Badge variant="secondary">{categoryEmails.length}</Badge>
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs">{categoryEmails.length}</Badge>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                        <div className="space-y-1.5 sm:space-y-2 max-h-[180px] sm:max-h-[200px] overflow-y-auto pr-1 sm:pr-2">
                           {categoryEmails.slice(0, 5).map((email, idx) => (
                             <motion.div
                               key={email.messageId || email.id}
@@ -782,27 +782,27 @@ export default function MyTasks() {
                                 setSelectedEmail(email);
                                 setShowEmailDetail(true);
                               }}
-                              className="group cursor-pointer w-full p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                              className="group cursor-pointer w-full p-1.5 sm:p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                             >
-                              <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
-                                  <p className={`text-xs truncate ${
+                                  <p className={`text-[10px] sm:text-xs truncate ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
                                   }`}>
                                     {email.subject || '(No Subject)'}
                                   </p>
-                                  <p className="text-[10px] text-slate-500 truncate mt-1">
-                                    From: {email.fromName || email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown Sender"}
+                                  <p className="text-[9px] sm:text-[10px] text-slate-500 truncate mt-0.5 sm:mt-1">
+                                    {email.fromName || email.from?.emailAddress?.name || "Unknown"}
                                   </p>
                                   {email.bodyPreview && (
-                                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                                    <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 line-clamp-1 hidden sm:block">
                                       {email.bodyPreview}
                                     </p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                   {email.hasAttachments && (
-                                    <Paperclip className="w-4 h-4 text-slate-400" />
+                                    <Paperclip className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400" />
                                   )}
                                 </div>
                               </div>
