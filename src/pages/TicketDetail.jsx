@@ -786,7 +786,6 @@ export default function TicketDetail() {
                         <SelectItem value="awaiting_information">Awaiting Information</SelectItem>
                         <SelectItem value="awaiting_parts">Awaiting Parts</SelectItem>
                         <SelectItem value="resolved">Resolved</SelectItem>
-                        <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (

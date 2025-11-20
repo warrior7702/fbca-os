@@ -82,8 +82,8 @@ export default function SupportTickets() {
         });
       }
       
-      // Filter out workflow/communications tickets
-      ticketsData = ticketsData.filter(t => t.source !== 'workflow');
+      // Filter out workflow/communications tickets and archived tickets
+      ticketsData = ticketsData.filter(t => t.source !== 'workflow' && t.status !== 'archived');
       
       setTickets(ticketsData);
     } catch (error) {
@@ -163,7 +163,7 @@ export default function SupportTickets() {
     } else if (activeTab === "pool") {
       matchesTab = !ticket.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "resolved") {
-      matchesTab = ['resolved', 'archived'].includes(ticket.status);
+      matchesTab = ticket.status === 'resolved';
     }
     
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
@@ -177,7 +177,7 @@ export default function SupportTickets() {
     active: tickets.filter(t => ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
     open: tickets.filter(t => t.status === 'open').length,
     awaiting: tickets.filter(t => ['awaiting_information', 'awaiting_parts'].includes(t.status)).length,
-    resolved: tickets.filter(t => ['resolved', 'archived'].includes(t.status)).length
+    resolved: tickets.filter(t => t.status === 'resolved').length
   };
 
   const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
