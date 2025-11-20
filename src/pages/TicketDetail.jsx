@@ -180,17 +180,63 @@ export default function TicketDetail() {
       setNewComment("");
       toast.success('Comment added');
 
-      // Send email notification to requester (unless internal comment)
+      // Send notifications
       if (!isInternalComment) {
+        // Notify requester about comment
         try {
-          await base44.functions.invoke('sendTicketNotification', {
-            ticket_id: ticketId,
-            notification_type: 'comment_added',
-            comment: comment.content
+          await base44.functions.invoke('createNotification', {
+            user_email: ticket.requester_email,
+            type: 'ticket_comment',
+            title: `New comment on ${ticket.ticket_number}`,
+            message: comment.content,
+            related_ticket_id: ticketId,
+            related_ticket_number: ticket.ticket_number,
+            action_url: `/support-tickets?id=${ticketId}`,
+            send_email: true
           });
-        } catch (emailError) {
-          console.warn('Email notification failed:', emailError);
+        } catch (notifyError) {
+          console.warn('Requester notification failed:', notifyError);
         }
+      }
+
+      // Notify workers in department about new comment
+      try {
+        const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
+        if (rolesResponse.data.success) {
+          const getDepartment = (category) => {
+            const deptMap = {
+              'technology': 'IT',
+              'cleaning': 'Facilities',
+              'maintenance': 'Facilities'
+            };
+            return deptMap[category] || null;
+          };
+
+          const department = getDepartment(ticket.category);
+          if (department) {
+            const departmentWorkers = rolesResponse.data.allUsers.filter(user => 
+              user.ticket_role === 'worker' && 
+              user.departments && 
+              user.departments.includes(department) &&
+              user.user_email !== user.email // Don't notify the commenter
+            );
+
+            for (const worker of departmentWorkers) {
+              await base44.functions.invoke('createNotification', {
+                user_email: worker.user_email,
+                type: 'ticket_comment',
+                title: `Comment on ${ticket.ticket_number}`,
+                message: `${comment.author_name}: ${comment.content.substring(0, 100)}...`,
+                related_ticket_id: ticketId,
+                related_ticket_number: ticket.ticket_number,
+                action_url: `/support-tickets?id=${ticketId}`,
+                send_email: false // Only in-app notification for workers
+              });
+            }
+          }
+        }
+      } catch (workerNotifyError) {
+        console.warn('Worker notification failed:', workerNotifyError);
       }
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -222,15 +268,28 @@ export default function TicketDetail() {
       setTicket({ ...ticket, ...updateData });
       toast.success(`Ticket ${newStatus}`);
 
-      // Send notification
-      try {
-        await base44.functions.invoke('sendTicketNotification', {
-          ticket_id: ticketId,
-          notification_type: 'status_changed',
-          new_status: newStatus
-        });
-      } catch (emailError) {
-        console.warn('Email notification failed:', emailError);
+      // Send notification to requester about status change
+      const statusMessages = {
+        'awaiting_information': 'needs more information from you',
+        'awaiting_parts': 'is waiting for parts to arrive',
+        'resolved': 'has been resolved'
+      };
+
+      if (statusMessages[newStatus]) {
+        try {
+          await base44.functions.invoke('createNotification', {
+            user_email: ticket.requester_email,
+            type: 'ticket_status_change',
+            title: `Ticket ${ticket.ticket_number} status updated`,
+            message: `Your ticket ${statusMessages[newStatus]}`,
+            related_ticket_id: ticketId,
+            related_ticket_number: ticket.ticket_number,
+            action_url: `/support-tickets?id=${ticketId}`,
+            send_email: true
+          });
+        } catch (notifyError) {
+          console.warn('Status notification failed:', notifyError);
+        }
       }
     } catch (error) {
       console.error('Error updating status:', error);
