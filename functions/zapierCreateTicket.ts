@@ -10,7 +10,9 @@ Deno.serve(async (req) => {
       from_email,
       from_name,
       category,
-      confidence
+      confidence,
+      building,
+      room_number
     } = await req.json();
     
     if (!subject || !body || !from_email) {
@@ -34,9 +36,9 @@ Deno.serve(async (req) => {
     // Generate ticket number
     const allTickets = await base44.asServiceRole.entities.Ticket.list();
     const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, '0')}`;
-    
+
     // Create ticket
-    const ticket = await base44.asServiceRole.entities.Ticket.create({
+    const ticketData = {
       ticket_number: ticketNumber,
       subject: subject,
       description: body,
@@ -49,7 +51,13 @@ Deno.serve(async (req) => {
       created_date: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
       tags: confidence ? [`ai_confidence_${Math.round(confidence * 100)}`] : []
-    });
+    };
+
+    // Add building and room if provided
+    if (building) ticketData.building = building;
+    if (room_number) ticketData.room_number = room_number;
+
+    const ticket = await base44.asServiceRole.entities.Ticket.create(ticketData);
     
     // Auto-assign based on category
     try {

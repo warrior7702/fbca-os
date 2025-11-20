@@ -53,6 +53,7 @@ import SharePoint from './pages/SharePoint';
 import Notifications from './pages/Notifications';
 import RoleManagement from './pages/RoleManagement';
 import AssignmentRules from './pages/AssignmentRules';
+import Knowledgebase from './pages/Knowledgebase';
 import __Layout from './Layout.jsx';
 
 
@@ -112,6 +113,7 @@ export const PAGES = {
     "Notifications": Notifications,
     "RoleManagement": RoleManagement,
     "AssignmentRules": AssignmentRules,
+    "Knowledgebase": Knowledgebase,
 }
 
 export const pagesConfig = {

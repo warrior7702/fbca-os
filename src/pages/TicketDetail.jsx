@@ -78,6 +78,9 @@ export default function TicketDetail() {
   const [showAIDraft, setShowAIDraft] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [tempBuilding, setTempBuilding] = useState("");
+  const [tempRoomNumber, setTempRoomNumber] = useState("");
 
   const commentsEndRef = useRef(null);
 
@@ -320,6 +323,28 @@ export default function TicketDetail() {
       console.error('Error deleting ticket:', error);
       toast.error('Failed to delete ticket');
       setDeleting(false);
+    }
+  };
+
+  const handleStartEditLocation = () => {
+    setTempBuilding(ticket.building || "");
+    setTempRoomNumber(ticket.room_number || "");
+    setEditingLocation(true);
+  };
+
+  const handleSaveLocation = async () => {
+    try {
+      await base44.entities.Ticket.update(ticketId, {
+        building: tempBuilding,
+        room_number: tempRoomNumber,
+        last_activity_at: new Date().toISOString()
+      });
+      setTicket({ ...ticket, building: tempBuilding, room_number: tempRoomNumber });
+      setEditingLocation(false);
+      toast.success('Location updated');
+    } catch (error) {
+      console.error('Error updating location:', error);
+      toast.error('Failed to update location');
     }
   };
 
@@ -891,18 +916,69 @@ export default function TicketDetail() {
             {/* Location */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm sm:text-base">Location</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Building</p>
-                  <p className="text-sm text-slate-900 capitalize">{ticket.building?.replace('_', ' ')}</p>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm sm:text-base">Location</CardTitle>
+                  {canManage && !editingLocation && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleStartEditLocation}
+                    >
+                      Edit
+                    </Button>
+                  )}
                 </div>
-                {ticket.room_number && (
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Room</p>
-                    <p className="text-sm text-slate-900">{ticket.room_number}</p>
-                  </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {editingLocation ? (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 mb-1 block">Building</label>
+                      <Input
+                        value={tempBuilding}
+                        onChange={(e) => setTempBuilding(e.target.value)}
+                        placeholder="Enter building"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 mb-1 block">Room Number</label>
+                      <Input
+                        value={tempRoomNumber}
+                        onChange={(e) => setTempRoomNumber(e.target.value)}
+                        placeholder="Enter room number"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveLocation}
+                        size="sm"
+                        className="flex-1"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        onClick={() => setEditingLocation(false)}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Building</p>
+                      <p className="text-sm text-slate-900 capitalize">{ticket.building?.replace('_', ' ') || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Room</p>
+                      <p className="text-sm text-slate-900">{ticket.room_number || 'Not set'}</p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
