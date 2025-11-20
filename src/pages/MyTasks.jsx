@@ -377,6 +377,16 @@ export default function MyTasks() {
     return isToday(eventDate);
   }).length;
 
+  const meetingsToday = myScheduleEvents.filter(event => {
+    const eventDate = new Date(event.starts_at);
+    return isToday(eventDate) && event.source === 'microsoft';
+  }).length;
+
+  const ticketsDueToday = supportTickets.filter(ticket => {
+    if (!ticket.due_date) return false;
+    return isToday(new Date(ticket.due_date));
+  }).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -423,18 +433,7 @@ export default function MyTasks() {
           }
         />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 sm:gap-4">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
-                <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 text-xs">Today</Badge>
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900">{myDayTasks.length}</p>
-              <p className="text-xs sm:text-sm text-slate-600">Tasks Due</p>
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           <Card className="hover:shadow-lg transition-shadow">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
@@ -448,47 +447,36 @@ export default function MyTasks() {
             </CardContent>
           </Card>
 
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-2">
+                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <Badge className="bg-blue-100 text-blue-700 border-blue-300 text-xs">
+                  {loadingSchedule ? <Loader2 className="h-3 w-3 animate-spin" /> : meetingsToday}
+                </Badge>
+              </div>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{meetingsToday}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Meetings Today</p>
+            </CardContent>
+          </Card>
+
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2">
                 <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs">
-                  {loadingTickets ? <Loader2 className="h-3 w-3 animate-spin" /> : supportTickets.length}
-                </Badge>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
-              <p className="text-xs sm:text-sm text-slate-600">My Tickets</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow col-span-2 cursor-pointer" onClick={() => navigate(createPageUrl('SupportTickets'))}>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
-                  <p className="text-xs sm:text-sm text-slate-600 font-medium">Dept Support Tickets</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div>
-                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{deptTickets.length}</p>
-                  <p className="text-xs text-slate-500">Open in my dept</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900">{supportTickets.length}</p>
+                  <p className="text-xs text-slate-600">Open</p>
                 </div>
                 <div className="h-8 w-px bg-slate-200" />
                 <div>
-                  <p className="text-xl sm:text-2xl font-bold text-orange-700">
-                    {deptTickets.filter(t => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const tomorrow = new Date(today);
-                      tomorrow.setDate(tomorrow.getDate() + 1);
-                      const createdDate = new Date(t.created_date);
-                      return createdDate >= today && createdDate < tomorrow;
-                    }).length}
-                  </p>
-                  <p className="text-xs text-slate-500">Due today</p>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-700">{ticketsDueToday}</p>
+                  <p className="text-xs text-slate-600">Due Today</p>
                 </div>
               </div>
+              <p className="text-xs text-slate-500 mt-1">My Tickets</p>
             </CardContent>
           </Card>
         </div>
