@@ -82,10 +82,11 @@ export default function SupportTickets() {
         });
       }
       
-      // Filter out workflow/communications tickets and archived tickets
-      // Keep only web_form, email, bot sources (technology, cleaning, maintenance tickets)
+      // Filter to show only support request tickets (technology, cleaning, maintenance)
+      // Exclude workflow/communications tickets and archived tickets
       ticketsData = ticketsData.filter(t => 
-        (!t.source || t.source === 'web_form' || t.source === 'email' || t.source === 'bot') && 
+        t.category && 
+        ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
         t.status !== 'archived'
       );
       
