@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/sheet";
 import { SheetTrigger } from "@/components/ui/sheet";
 import AISearchBar from "@/components/shared/AISearchBar";
+import PushNotificationSetup from "@/components/shared/PushNotificationSetup";
 
 const apps = [
   {
@@ -574,6 +575,10 @@ export default function Layout({ children, currentPageName }) {
                     Settings
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5">
+                  <PushNotificationSetup />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
                   <LogOut className="w-4 h-4 mr-2" />
