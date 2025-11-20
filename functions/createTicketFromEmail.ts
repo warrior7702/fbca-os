@@ -162,8 +162,13 @@ Return JSON only:`;
             console.warn('Could not extract location:', error);
         }
 
-        // Find similar tickets and get AI suggestions
-        const suggestedSolution = await findSimilarTickets(base44, `${subject}: ${body}`);
+        // Wait for AI suggestion
+        const suggestedSolution = await suggestedSolutionPromise;
+
+        // Set due date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
         // Create ticket
         const ticketData = {
@@ -172,6 +177,7 @@ Return JSON only:`;
             description: body,
             building: building || undefined,
             room_number: room_number || undefined,
+            due_date: tomorrowStr,
             status: 'open',
             priority: priority,
             category: assignment.category,
