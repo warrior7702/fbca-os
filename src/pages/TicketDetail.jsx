@@ -27,7 +27,8 @@ import {
   MousePointerClick,
   Zap,
   Workflow,
-  CalendarDays
+  CalendarDays,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -65,6 +76,8 @@ export default function TicketDetail() {
   const [aiDraftResponse, setAiDraftResponse] = useState("");
   const [generatingAI, setGeneratingAI] = useState(false);
   const [showAIDraft, setShowAIDraft] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const commentsEndRef = useRef(null);
 
@@ -297,6 +310,19 @@ export default function TicketDetail() {
     }
   };
 
+  const handleDeleteTicket = async () => {
+    setDeleting(true);
+    try {
+      await base44.entities.Ticket.delete(ticketId);
+      toast.success('Ticket deleted');
+      navigate(createPageUrl('SupportTickets'));
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+      toast.error('Failed to delete ticket');
+      setDeleting(false);
+    }
+  };
+
   const handleGenerateAIResponse = async (type = 'response') => {
     setGeneratingAI(true);
     try {
@@ -432,7 +458,7 @@ export default function TicketDetail() {
       <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 flex-1">
             <Button
               variant="ghost"
               size="icon"
@@ -452,6 +478,18 @@ export default function TicketDetail() {
               </div>
             </div>
           </div>
+          
+          {canManage && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
+            >
+              <Trash2 className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
@@ -930,6 +968,36 @@ export default function TicketDetail() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete ticket <strong>{ticket.ticket_number}</strong> - "{ticket.subject}". 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTicket}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Ticket'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
