@@ -71,7 +71,7 @@ Where:
         properties: {
           category: {
             type: "string",
-            enum: ["Cleaning", "Maintenance", "Technology"]
+            enum: ["Cleaning", "Maintenance", "Technology", "Cross-Department"]
           },
           confidence: {
             type: "number",
