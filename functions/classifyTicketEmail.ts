@@ -18,11 +18,13 @@ Your job is to classify it into exactly ONE of the following categories:
 - Cleaning
 - Maintenance
 - Technology
+- Cross-Department (when unclear or involves multiple departments)
 
 Rules:
 1. Classification depends ONLY on the request content, NOT on the requester.
 2. Choose the category that best matches the intent and keywords.
-3. You must always return valid JSON. No extra text.
+3. When in doubt or if multiple departments are involved, choose Cross-Department.
+4. You must always return valid JSON. No extra text.
 
 CATEGORY DEFINITIONS:
 
@@ -33,10 +35,18 @@ Cleaning:
 Maintenance:
 - repairs, broken items, HVAC, lights out, leaks, plumbing, electrical
 - furniture fixes, building issues, doors, windows, general facility upkeep
+- mechanical issues, physical repairs to equipment or structures
 
 Technology:
 - computer issues, network, email, logins, printers, phones, software
 - audio/video problems, projectors, tech booths, streaming, worship tech
+- DOOR CODES and access control issues
+- digital/electronic systems
+
+Cross-Department:
+- requests that involve multiple teams or are unclear
+- issues that could reasonably fall into 2+ categories
+- when confidence is low, default to this
 
 EMAIL TO CLASSIFY:
 Subject: ${subject}
