@@ -850,7 +850,7 @@ export default function TicketDetail() {
                     </Select>
                   ) : (
                     <Badge className={getStatusColor(ticket.status)}>
-                      {ticket.status?.replace('_', ' ')}
+                      {ticket.status?.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </Badge>
                   )}
                 </div>
@@ -873,7 +873,7 @@ export default function TicketDetail() {
                     </Select>
                   ) : (
                     <Badge variant="secondary">
-                      {ticket.category?.replace('_', ' ')}
+                      {ticket.category?.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </Badge>
                   )}
                 </div>
@@ -897,7 +897,7 @@ export default function TicketDetail() {
                     </Select>
                   ) : (
                     <Badge className={getPriorityColor(ticket.priority)}>
-                      {ticket.priority}
+                      {ticket.priority?.charAt(0).toUpperCase() + ticket.priority?.slice(1)}
                     </Badge>
                   )}
                 </div>
