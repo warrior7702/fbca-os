@@ -19,14 +19,17 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    // Map category to ticket category
-    const categoryMap = {
-      'Cleaning': 'cleaning',
-      'Maintenance': 'maintenance',
-      'Technology': 'technology'
-    };
+    // Map category to ticket category (case-insensitive)
+    const categoryLower = (category || '').toLowerCase();
+    let ticketCategory = 'maintenance'; // default
     
-    const ticketCategory = categoryMap[category] || 'maintenance';
+    if (categoryLower.includes('clean')) {
+      ticketCategory = 'cleaning';
+    } else if (categoryLower.includes('tech') || categoryLower.includes('it')) {
+      ticketCategory = 'technology';
+    } else if (categoryLower.includes('maintain') || categoryLower.includes('facility')) {
+      ticketCategory = 'maintenance';
+    }
     
     // Generate ticket number
     const allTickets = await base44.asServiceRole.entities.Ticket.list();
