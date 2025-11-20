@@ -164,9 +164,9 @@ export default function SupportTickets() {
     // Tab filtering
     let matchesTab = true;
     if (activeTab === "active") {
-      matchesTab = ['open', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
+      matchesTab = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "pool") {
-      matchesTab = !ticket.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
+      matchesTab = !ticket.assigned_to && ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "resolved") {
       matchesTab = ticket.status === 'resolved';
     }
@@ -179,9 +179,9 @@ export default function SupportTickets() {
 
   const stats = {
     total: tickets.length,
-    active: tickets.filter(t => ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
+    active: tickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
     open: tickets.filter(t => t.status === 'open').length,
-    awaiting: tickets.filter(t => ['awaiting_information', 'awaiting_parts'].includes(t.status)).length,
+    awaiting: tickets.filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
     resolved: tickets.filter(t => t.status === 'resolved').length
   };
 
@@ -338,7 +338,7 @@ export default function SupportTickets() {
               Unassigned Pool
               {tickets.filter(t => !t.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length > 0 && (
                 <Badge className="ml-1 bg-orange-500">
-                  {tickets.filter(t => !t.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length}
+                  {tickets.filter(t => !t.assigned_to && ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -485,7 +485,7 @@ export default function SupportTickets() {
                         disabled={claiming === ticket.id}
                         className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-shrink-0"
                         size="sm"
-                      >
+                        >
                         {claiming === ticket.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
@@ -494,8 +494,9 @@ export default function SupportTickets() {
                             Claim
                           </>
                         )}
-                      </Button>
+                        </Button>
                         )}
+                        </div>
                         </div>
                 </CardContent>
               </Card>
