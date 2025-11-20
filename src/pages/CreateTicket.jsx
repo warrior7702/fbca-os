@@ -303,6 +303,45 @@ export default function CreateTicket() {
         // Don't fail ticket creation if assignment fails
       }
 
+      // Notify workers about new ticket
+      try {
+        const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
+        if (rolesResponse.data.success) {
+          const getDepartment = (category) => {
+            const deptMap = {
+              'technology': 'IT',
+              'cleaning': 'Facilities',
+              'maintenance': 'Facilities'
+            };
+            return deptMap[category] || null;
+          };
+
+          const department = getDepartment(ticket.category);
+          if (department) {
+            const departmentWorkers = rolesResponse.data.allUsers.filter(user => 
+              user.ticket_role === 'worker' && 
+              user.departments && 
+              user.departments.includes(department)
+            );
+
+            for (const worker of departmentWorkers) {
+              await base44.functions.invoke('createNotification', {
+                user_email: worker.user_email,
+                type: 'ticket_assigned',
+                title: `New Ticket: ${newTicketNumber}`,
+                message: ticketData.subject,
+                related_ticket_id: createdTicket.id,
+                related_ticket_number: newTicketNumber,
+                action_url: `/support-tickets?id=${createdTicket.id}`,
+                send_email: true
+              });
+            }
+          }
+        }
+      } catch (notifyError) {
+        console.warn('Worker notification failed:', notifyError);
+      }
+
       setTicketNumber(newTicketNumber);
       setSubmitted(true);
       toast.success("Ticket submitted successfully!");
