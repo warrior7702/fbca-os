@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import ConnectionStatusCard from "../components/settings/ConnectionStatusCard";
 import NotificationPreferencesSection from "../components/settings/NotificationPreferencesSection";
+import InitializeAchievementsButton from "../components/settings/InitializeAchievementsButton";
 import { Calendar, Briefcase } from "lucide-react";
 import { CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
