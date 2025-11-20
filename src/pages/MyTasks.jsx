@@ -34,6 +34,7 @@ import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import ScheduleCalendar from "../components/tasks/ScheduleCalendar";
+import MobileScheduleView from "../components/tasks/MobileScheduleView";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
@@ -506,13 +507,28 @@ export default function MyTasks() {
                 <p className="text-slate-600 text-sm">No upcoming events found</p>
               </div>
             ) : (
-              <ScheduleCalendar 
-                events={myScheduleEvents}
-                tickets={supportTickets}
-                weekCount={1}
-                onEventClick={handleScheduleEventClick}
-                onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
-              />
+              <>
+                {/* Desktop View */}
+                <div className="hidden sm:block">
+                  <ScheduleCalendar 
+                    events={myScheduleEvents}
+                    tickets={supportTickets}
+                    weekCount={1}
+                    onEventClick={handleScheduleEventClick}
+                    onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
+                  />
+                </div>
+                
+                {/* Mobile View */}
+                <div className="block sm:hidden">
+                  <MobileScheduleView
+                    events={myScheduleEvents}
+                    tickets={supportTickets}
+                    onEventClick={handleScheduleEventClick}
+                    onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
