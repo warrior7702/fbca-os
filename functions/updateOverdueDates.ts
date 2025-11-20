@@ -33,10 +33,17 @@ Deno.serve(async (req) => {
     // Update each overdue ticket
     const updates = [];
     for (const ticket of overdueTickets) {
-      const updatePromise = base44.asServiceRole.entities.Ticket.update(ticket.id, {
+      const updateData = {
         due_date: today.toISOString().split('T')[0],
         last_activity_at: new Date().toISOString()
-      });
+      };
+      
+      // Set original_due_date if not already set
+      if (!ticket.original_due_date) {
+        updateData.original_due_date = ticket.due_date;
+      }
+      
+      const updatePromise = base44.asServiceRole.entities.Ticket.update(ticket.id, updateData);
       updates.push(updatePromise);
     }
 
