@@ -27,6 +27,8 @@ Deno.serve(async (req) => {
       ticketCategory = 'cleaning';
     } else if (categoryLower.includes('tech') || categoryLower.includes('it')) {
       ticketCategory = 'technology';
+    } else if (categoryLower.includes('cross') || categoryLower.includes('department')) {
+      ticketCategory = 'other'; // Cross-dept tickets stay unassigned
     } else if (categoryLower.includes('maintain') || categoryLower.includes('facility')) {
       ticketCategory = 'maintenance';
     }
