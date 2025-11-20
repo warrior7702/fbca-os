@@ -231,12 +231,11 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
   
-  // Generate 7 days for mobile view
+  // Generate 7 days for mobile view (starting from current date)
   const generate7Days = () => {
     const days = [];
-    const start = startOfWeek(currentWeek);
     for (let i = 0; i < 7; i++) {
-      days.push(addDays(start, i));
+      days.push(addDays(currentWeek, i));
     }
     return days;
   };
@@ -460,18 +459,18 @@ export default function Calendar() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+                      onClick={() => setCurrentWeek(addDays(currentWeek, -7))}
                       className="h-8 w-8"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <h2 className="text-lg font-bold text-slate-900">
-                      {format(startOfWeek(currentWeek), 'MMM d')} - {format(addDays(startOfWeek(currentWeek), 6), 'MMM d')}
+                      {format(currentWeek, 'MMM d')} - {format(addDays(currentWeek, 6), 'MMM d')}
                     </h2>
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+                      onClick={() => setCurrentWeek(addDays(currentWeek, 7))}
                       className="h-8 w-8"
                     >
                       <ChevronRight className="w-4 h-4" />
