@@ -493,6 +493,15 @@ export default function MyTasks() {
                   Upcoming events • {myScheduleEvents.length} event{myScheduleEvents.length !== 1 ? 's' : ''}
                 </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFullCalendar(true)}
+                className="hidden sm:flex"
+              >
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                Full View
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -506,13 +515,59 @@ export default function MyTasks() {
                 <p className="text-slate-600 text-sm">No upcoming events found</p>
               </div>
             ) : (
-              <ScheduleCalendar 
-                events={myScheduleEvents}
-                tickets={supportTickets}
-                weekCount={1}
-                onEventClick={handleScheduleEventClick}
-                onTicketClick={(ticket) => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
-              />
+              <>
+                {/* Mobile: List view */}
+                <div className="block sm:hidden space-y-2">
+                  {myScheduleEvents.slice(0, 5).map((event) => (
+                    <div
+                      key={event.id}
+                      onClick={() => handleScheduleEventClick(event)}
+                      className="p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                    >
+                      <div className="flex items-start gap-2">
+                        {event.source === 'microsoft' ? (
+                          <Badge className="bg-purple-100 text-purple-700 text-[10px]">Meeting</Badge>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-700 text-[10px]">Event</Badge>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-slate-900 truncate">{event.name}</p>
+                          <p className="text-xs text-slate-600">
+                            {format(new Date(event.starts_at), 'MMM d, h:mm a')}
+                          </p>
+                          {event.posted_door_code && (
+                            <div className="mt-1 flex items-center gap-1 text-[10px] text-green-700">
+                              <Key className="w-3 h-3" />
+                              {event.posted_door_code === 'Unlock' ? 'Unlock' : 'Code available'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {myScheduleEvents.length > 5 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFullCalendar(true)}
+                      className="w-full"
+                    >
+                      View All {myScheduleEvents.length} Events
+                    </Button>
+                  )}
+                </div>
+
+                {/* Desktop: Calendar view */}
+                <div className="hidden sm:block">
+                  <ScheduleCalendar 
+                    events={myScheduleEvents}
+                    tickets={supportTickets}
+                    weekCount={1}
+                    onEventClick={handleScheduleEventClick}
+                    onTicketClick={(ticket) => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -521,9 +576,9 @@ export default function MyTasks() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <TicketIcon className="w-5 h-5 text-purple-600" />
-                  My Support Tickets ({supportTickets.length})
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <TicketIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                  My Tickets ({supportTickets.length})
                 </CardTitle>
                 <Button
                   variant="outline"
@@ -540,41 +595,35 @@ export default function MyTasks() {
                   key={ticket.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-2 p-2 sm:p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                  className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
                 >
-                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className={`w-1 flex-shrink-0 self-stretch rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
+                    <div className="flex items-start gap-2 mb-1">
+                      <p className="font-semibold text-sm sm:text-base text-slate-900 line-clamp-1 flex-1">
                         {ticket.subject}
                       </p>
-                      <Badge variant="outline" className="text-[10px] sm:text-xs">
-                        {ticket.status}
+                      <Badge variant="outline" className="text-[10px] flex-shrink-0">
+                        {ticket.status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    <p className="text-[10px] sm:text-xs text-slate-600 line-clamp-2 mb-1 sm:mb-2">
+                    <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-2">
                       {ticket.description}
                     </p>
-                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-slate-500 flex-wrap">
+                    <div className="flex items-center gap-2 text-[10px] sm:text-xs text-slate-500">
                       <span className="font-mono">{ticket.ticket_number}</span>
                       {ticket.category && (
                         <>
-                          <span className="hidden sm:inline">•</span>
-                          <span className="capitalize hidden sm:inline">{ticket.category.replace('_', ' ')}</span>
-                        </>
-                      )}
-                      {ticket.created_date && (
-                        <>
-                          <span className="hidden sm:inline">•</span>
-                          <span className="hidden sm:inline">{format(new Date(ticket.created_date), 'MMM d, h:mm a')}</span>
+                          <span>•</span>
+                          <span className="capitalize">{ticket.category.replace('_', ' ')}</span>
                         </>
                       )}
                     </div>
                     {ticket.suggested_solution && (
-                      <div className="mt-1 sm:mt-2 flex items-start gap-1 text-[10px] sm:text-xs text-purple-600">
-                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-1">AI solution</span>
+                      <div className="mt-2 flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded w-fit">
+                        <Sparkles className="w-3 h-3 flex-shrink-0" />
+                        <span>AI solution available</span>
                       </div>
                     )}
                   </div>
