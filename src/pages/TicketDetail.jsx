@@ -26,7 +26,8 @@ import {
   ExternalLink,
   MousePointerClick,
   Zap,
-  Workflow
+  Workflow,
+  CalendarDays
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -118,10 +120,17 @@ export default function TicketDetail() {
         navigate(createPageUrl('SupportTickets'));
       }
 
-      // Load staff members and teams for assignment
+      // Load workers with ticket roles for assignment
       if (adminStatus || workerStatus) {
+        const ticketWorkers = await base44.entities.TicketRoleAssignment.filter({
+          ticket_role: 'worker'
+        });
+        
+        // Get staff details for these workers
+        const workerEmails = ticketWorkers.map(w => w.user_email);
         const staff = await base44.entities.StaffContact.list();
-        setStaffMembers(staff);
+        const workers = staff.filter(s => workerEmails.includes(s.email));
+        setStaffMembers(workers);
       }
     } catch (error) {
       console.error('Error loading ticket:', error);
@@ -231,41 +240,11 @@ export default function TicketDetail() {
 
   const handleCategoryChange = async (newCategory) => {
     try {
-      const updateData = {
+      await base44.entities.Ticket.update(ticketId, {
         category: newCategory,
         last_activity_at: new Date().toISOString()
-      };
-      
-      // Auto-assign team based on category
-      const categoryTeamMap = {
-        maintenance: 'facilities',
-        technology: 'it',
-        technical: 'it',
-        cleaning: 'facilities',
-        facility: 'facilities',
-        facility_cleaning: 'facilities',
-        av_production: 'av_production',
-        worship_production: 'av_production',
-        marketing: 'marketing',
-        graphics: 'marketing',
-        social_media: 'marketing',
-        communications: 'marketing',
-        event_setup: 'hospitality',
-        room_setup: 'hospitality',
-        catering: 'hospitality',
-        hospitality: 'hospitality',
-        access: 'admin',
-        security: 'admin',
-        transportation: 'admin'
-      };
-      
-      const team = categoryTeamMap[newCategory];
-      if (team) {
-        updateData.team = team;
-      }
-      
-      await base44.entities.Ticket.update(ticketId, updateData);
-      setTicket({ ...ticket, ...updateData });
+      });
+      setTicket({ ...ticket, category: newCategory });
       toast.success('Category updated');
     } catch (error) {
       console.error('Error updating category:', error);
@@ -304,53 +283,17 @@ export default function TicketDetail() {
     }
   };
 
-  const handleTeamChange = async (newTeam) => {
+  const handleDueDateChange = async (newDueDate) => {
     try {
       await base44.entities.Ticket.update(ticketId, {
-        team: newTeam,
+        due_date: newDueDate,
         last_activity_at: new Date().toISOString()
       });
-      setTicket({ ...ticket, team: newTeam });
-      toast.success('Team updated');
+      setTicket({ ...ticket, due_date: newDueDate });
+      toast.success('Due date updated');
     } catch (error) {
-      console.error('Error updating team:', error);
-      toast.error('Failed to update team');
-    }
-  };
-
-  const handleAddCollaboratingTeam = async (additionalTeam) => {
-    try {
-      const currentTeams = ticket.collaborating_teams || [];
-      if (currentTeams.includes(additionalTeam)) {
-        toast.error('Team already added');
-        return;
-      }
-      
-      const updatedTeams = [...currentTeams, additionalTeam];
-      await base44.entities.Ticket.update(ticketId, {
-        collaborating_teams: updatedTeams,
-        last_activity_at: new Date().toISOString()
-      });
-      setTicket({ ...ticket, collaborating_teams: updatedTeams });
-      toast.success('Collaborating team added');
-    } catch (error) {
-      console.error('Error adding team:', error);
-      toast.error('Failed to add team');
-    }
-  };
-
-  const handleRemoveCollaboratingTeam = async (teamToRemove) => {
-    try {
-      const updatedTeams = (ticket.collaborating_teams || []).filter(t => t !== teamToRemove);
-      await base44.entities.Ticket.update(ticketId, {
-        collaborating_teams: updatedTeams,
-        last_activity_at: new Date().toISOString()
-      });
-      setTicket({ ...ticket, collaborating_teams: updatedTeams });
-      toast.success('Team removed');
-    } catch (error) {
-      console.error('Error removing team:', error);
-      toast.error('Failed to remove team');
+      console.error('Error updating due date:', error);
+      toast.error('Failed to update due date');
     }
   };
 
@@ -838,91 +781,52 @@ export default function TicketDetail() {
                   )}
                 </div>
 
+                <div>
+                  <label className="text-sm font-medium text-slate-600 mb-2 block">Due Date</label>
+                  {canManage ? (
+                    <Input
+                      type="date"
+                      value={ticket.due_date || ''}
+                      onChange={(e) => handleDueDateChange(e.target.value)}
+                      className="text-sm"
+                    />
+                  ) : (
+                    ticket.due_date ? (
+                      <p className="text-sm text-slate-900">
+                        {format(new Date(ticket.due_date), 'MMM d, yyyy')}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-500">Not set</p>
+                    )
+                  )}
+                </div>
+
                 {canManage && (
-                  <>
-                    <div>
-                      <label className="text-sm font-medium text-slate-600 mb-2 block">Primary Team</label>
-                      <Select 
-                        value={ticket.team || "none"} 
-                        onValueChange={handleTeamChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select team" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="facilities">Facilities</SelectItem>
-                          <SelectItem value="it">IT/Technology</SelectItem>
-                          <SelectItem value="av_production">AV/Production</SelectItem>
-                          <SelectItem value="marketing">Marketing</SelectItem>
-                          <SelectItem value="hospitality">Hospitality</SelectItem>
-                          <SelectItem value="admin">Administration</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
-                      <Select 
-                        value={ticket.assigned_to || "unassigned"} 
-                        onValueChange={handleAssignment}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Unassigned" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {staffMembers.map(staff => (
-                            <SelectItem key={staff.email} value={staff.email}>
-                              {staff.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
+                    <Select 
+                      value={ticket.assigned_to || "unassigned"} 
+                      onValueChange={handleAssignment}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {staffMembers.map(staff => (
+                          <SelectItem key={staff.email} value={staff.email}>
+                            {staff.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
 
                 {!canManage && ticket.assigned_to_name && (
                   <div>
                     <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>
                     <p className="text-sm text-slate-900">{ticket.assigned_to_name}</p>
-                  </div>
-                )}
-
-                {canManage && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600 mb-2 block">
-                      <UsersIcon className="w-4 h-4 inline mr-1" />
-                      Collaborating Teams
-                    </label>
-                    <div className="space-y-2">
-                      {(ticket.collaborating_teams || []).map((team) => (
-                        <div key={team} className="flex items-center justify-between bg-slate-50 p-2 rounded">
-                          <Badge variant="outline" className="capitalize">{team}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveCollaboratingTeam(team)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Select onValueChange={handleAddCollaboratingTeam}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Add team..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="facilities">Facilities</SelectItem>
-                          <SelectItem value="it">IT/Technology</SelectItem>
-                          <SelectItem value="av_production">AV/Production</SelectItem>
-                          <SelectItem value="marketing">Marketing</SelectItem>
-                          <SelectItem value="hospitality">Hospitality</SelectItem>
-                          <SelectItem value="admin">Administration</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                 )}
               </CardContent>
