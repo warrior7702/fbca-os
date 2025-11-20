@@ -83,9 +83,43 @@ Deno.serve(async (req) => {
       from_name: 'FBCA Support System'
     });
 
+    // Send push notification
+    try {
+      await base44.asServiceRole.functions.invoke('sendPushNotification', {
+        recipient_email: recipient,
+        title: subject,
+        body: `${ticket.subject} - Click to view details`,
+        data: {
+          url: `/support-tickets?id=${ticket_id}`,
+          ticket_id: ticket_id
+        }
+      });
+    } catch (pushError) {
+      console.warn('Push notification failed:', pushError);
+      // Don't fail the whole request if push fails
+    }
+
+    // Create in-app notification
+    try {
+      await base44.asServiceRole.entities.Notification.create({
+        user_email: recipient,
+        type: notification_type === 'assigned' ? 'ticket_assigned' : notification_type === 'status_changed' ? 'ticket_status_change' : 'ticket_comment',
+        title: subject,
+        message: notification_type === 'comment_added' ? comment : `Status: ${new_status || ticket.status}`,
+        related_ticket_id: ticket_id,
+        related_ticket_number: ticket.ticket_number,
+        action_url: `/support-tickets?id=${ticket_id}`,
+        read: false
+      });
+    } catch (notifError) {
+      console.warn('In-app notification failed:', notifError);
+    }
+
     return Response.json({ 
       success: true,
-      email_sent_to: recipient 
+      email_sent_to: recipient,
+      push_sent: true,
+      notification_created: true
     });
 
   } catch (error) {
