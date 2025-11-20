@@ -30,6 +30,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import ConfettiCelebration from "../components/achievements/ConfettiCelebration";
 
 const ICON_MAP = {
   Trophy, Star, Zap, Target, Award, Crown, Sparkles, CheckCircle2,
@@ -53,6 +54,7 @@ export default function Achievements() {
   const [stats, setStats] = useState({ total: 0, unlocked: 0, points: 0 });
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showUnlockedAnimation, setShowUnlockedAnimation] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -110,7 +112,12 @@ export default function Achievements() {
         // Show notification for first newly unlocked achievement
         const newAchievement = response.data.newlyUnlocked[0];
         setShowUnlockedAnimation(newAchievement);
-        setTimeout(() => setShowUnlockedAnimation(null), 5000);
+        setShowConfetti(true);
+        
+        setTimeout(() => {
+          setShowUnlockedAnimation(null);
+          setShowConfetti(false);
+        }, 5000);
         
         // Reload data to show updated progress
         await loadData();
@@ -156,6 +163,7 @@ export default function Achievements() {
 
   return (
     <div className="h-full bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 overflow-auto">
+      <ConfettiCelebration show={showConfetti} />
       <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-6 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
