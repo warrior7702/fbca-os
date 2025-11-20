@@ -34,6 +34,7 @@ import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TaskCalendar from "../components/tasks/TaskCalendar";
 import ScheduleCalendar from "../components/tasks/ScheduleCalendar";
+import MobileScheduleView from "../components/tasks/MobileScheduleView";
 import FullCalendarModal from "../components/tasks/FullCalendarModal";
 import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
@@ -516,45 +517,14 @@ export default function MyTasks() {
               </div>
             ) : (
               <>
-                {/* Mobile: List view */}
-                <div className="block sm:hidden space-y-2">
-                  {myScheduleEvents.slice(0, 5).map((event) => (
-                    <div
-                      key={event.id}
-                      onClick={() => handleScheduleEventClick(event)}
-                      className="p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
-                    >
-                      <div className="flex items-start gap-2">
-                        {event.source === 'microsoft' ? (
-                          <Badge className="bg-purple-100 text-purple-700 text-[10px]">Meeting</Badge>
-                        ) : (
-                          <Badge className="bg-green-100 text-green-700 text-[10px]">Event</Badge>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-slate-900 truncate">{event.name}</p>
-                          <p className="text-xs text-slate-600">
-                            {format(new Date(event.starts_at), 'MMM d, h:mm a')}
-                          </p>
-                          {event.posted_door_code && (
-                            <div className="mt-1 flex items-center gap-1 text-[10px] text-green-700">
-                              <Key className="w-3 h-3" />
-                              {event.posted_door_code === 'Unlock' ? 'Unlock' : 'Code available'}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {myScheduleEvents.length > 5 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowFullCalendar(true)}
-                      className="w-full"
-                    >
-                      View All {myScheduleEvents.length} Events
-                    </Button>
-                  )}
+                {/* Mobile: Horizontal day strip + agenda */}
+                <div className="block sm:hidden">
+                  <MobileScheduleView
+                    events={myScheduleEvents}
+                    tickets={supportTickets}
+                    onEventClick={handleScheduleEventClick}
+                    onTicketClick={(ticket) => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                  />
                 </div>
 
                 {/* Desktop: Calendar view */}
