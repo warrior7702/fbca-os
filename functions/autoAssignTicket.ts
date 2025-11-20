@@ -21,17 +21,13 @@ Deno.serve(async (req) => {
     const assignmentRules = {
       // Technology tickets go to Billy Nelms
       technology: { email: 'billy.nelms@fbca.org', name: 'Billy Nelms' },
-      technical: { email: 'billy.nelms@fbca.org', name: 'Billy Nelms' },
       
-      // Cleaning tickets go to Kenny
-      cleaning: { email: 'kenny@fbca.org', name: 'Kenny' },
-      facility_cleaning: { email: 'kenny@fbca.org', name: 'Kenny' },
+      // Cleaning and janitorial - leave unassigned for pool pickup
+      cleaning: null,
+      janitorial: null,
       
-      // Maintenance and setup tickets - leave unassigned for pool pickup
-      maintenance: null,
-      facility: null,
-      event_setup: null,
-      room_setup: null
+      // Other tickets - leave unassigned
+      other: null
     };
 
     const rule = assignmentRules[ticket.category];
