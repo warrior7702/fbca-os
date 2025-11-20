@@ -301,8 +301,9 @@ export default function TicketDetail() {
 
   const handleDueDateChange = async (newDueDate) => {
     try {
+      // Store the date value directly without converting to Date object
       await base44.entities.Ticket.update(ticketId, {
-        due_date: newDueDate,
+        due_date: newDueDate, // Keep as YYYY-MM-DD string
         last_activity_at: new Date().toISOString()
       });
       setTicket({ ...ticket, due_date: newDueDate });
@@ -847,7 +848,7 @@ export default function TicketDetail() {
                   {canManage ? (
                     <Input
                       type="date"
-                      value={ticket.due_date || ''}
+                      value={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
                       onChange={(e) => handleDueDateChange(e.target.value)}
                       className="text-sm"
                     />

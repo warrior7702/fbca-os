@@ -256,6 +256,11 @@ export default function CreateTicket() {
     try {
       const newTicketNumber = generateTicketNumber();
       
+      // Set due date to tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
       const ticketData = {
         ticket_number: newTicketNumber,
         requester_email: ticket.requester_email,
@@ -268,6 +273,7 @@ export default function CreateTicket() {
         priority: ticket.priority,
         category: ticket.category,
         source: "web_form",
+        due_date: tomorrowStr,
         attachments: ticket.attachments,
         last_activity_at: new Date().toISOString()
       };
