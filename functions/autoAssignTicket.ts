@@ -45,19 +45,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if staff member exists
-    const staffMembers = await base44.asServiceRole.entities.StaffContact.filter({
-      email: rule.email
-    });
-
-    if (staffMembers.length === 0) {
-      return Response.json({ 
-        success: true,
-        assigned: false,
-        reason: 'Staff member not found'
-      });
-    }
-
     // Assign the ticket
     await base44.asServiceRole.entities.Ticket.update(ticket_id, {
       assigned_to: rule.email,
