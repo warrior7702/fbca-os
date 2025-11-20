@@ -17,14 +17,12 @@ Your job is to classify it into exactly ONE of the following categories:
 
 - Technology
 - Cleaning
-- Janitorial
-- Other (when unclear or doesn't fit above categories)
+- Maintenance
 
 Rules:
 1. Classification depends ONLY on the request content, NOT on the requester.
 2. Choose the category that best matches the intent and keywords.
-3. When in doubt or if it doesn't clearly fit Technology/Cleaning/Janitorial, choose Other.
-4. You must always return valid JSON. No extra text.
+3. You must always return valid JSON. No extra text.
 
 CATEGORY DEFINITIONS:
 
@@ -37,18 +35,13 @@ Technology:
 Cleaning:
 - routine cleaning, spills, stains, trash removal
 - bathroom cleaning, mopping, sweeping
-- general tidying up
+- general tidying up, janitorial tasks
 
-Janitorial:
-- deeper cleaning tasks, maintenance of janitorial equipment
-- floor care, window washing, carpet cleaning
-- sanitation projects, odor treatment
-
-Other:
+Maintenance:
 - mechanical repairs, HVAC, plumbing, electrical
 - furniture fixes, building maintenance
-- event setup, communications requests
-- anything that doesn't fit the above three categories
+- facility repairs, equipment maintenance
+- anything that requires maintenance or repair work
 
 EMAIL TO CLASSIFY:
 Subject: ${subject}
@@ -58,12 +51,12 @@ OUTPUT FORMAT:
 Return only this JSON. Do not add comments or extra words.
 
 {
-  "category": "Technology | Cleaning | Janitorial | Other",
+  "category": "Technology | Cleaning | Maintenance",
   "confidence": 0.00
 }
 
 Where:
-- category is exactly one of the four strings.
+- category is exactly one of the three strings.
 - confidence is between 0 and 1 using your best estimate.`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
@@ -73,7 +66,7 @@ Where:
         properties: {
           category: {
             type: "string",
-            enum: ["Technology", "Cleaning", "Janitorial", "Other"]
+            enum: ["Technology", "Cleaning", "Maintenance"]
           },
           confidence: {
             type: "number",

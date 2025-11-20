@@ -387,8 +387,7 @@ export default function SupportTickets() {
                     <SelectItem value="all">All Categories</SelectItem>
                     <SelectItem value="technology">Technology</SelectItem>
                     <SelectItem value="cleaning">Cleaning</SelectItem>
-                    <SelectItem value="janitorial">Janitorial</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

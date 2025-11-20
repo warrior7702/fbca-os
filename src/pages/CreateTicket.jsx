@@ -176,7 +176,7 @@ export default function CreateTicket() {
   const availableCategories = [
     { value: 'technology', label: 'Technology' },
     { value: 'cleaning', label: 'Cleaning' },
-    { value: 'janitorial', label: 'Janitorial' }
+    { value: 'maintenance', label: 'Maintenance' }
   ];
 
   const generateTicketTitle = async (description) => {
