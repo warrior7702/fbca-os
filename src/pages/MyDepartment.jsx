@@ -60,6 +60,9 @@ export default function MyDepartment() {
   const [activeTab, setActiveTab] = useState("overview");
   const [userRole, setUserRole] = useState(null);
   const [userDepartments, setUserDepartments] = useState([]);
+  const [todayApprovals, setTodayApprovals] = useState([]);
+  const [todayEvents, setTodayEvents] = useState([]);
+  const [loadingToday, setLoadingToday] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -94,11 +97,55 @@ export default function MyDepartment() {
 
       const allTickets = await base44.entities.Ticket.list('-created_date');
       setTickets(allTickets);
+
+      // Load today's data if user has PCO access
+      if (currentUser.pco_access_token) {
+        loadTodayData();
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load department data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTodayData = async () => {
+    setLoadingToday(true);
+    try {
+      // Get today's pending approvals
+      const approvalsResponse = await base44.functions.invoke('getMyPendingApprovals');
+      if (approvalsResponse.data?.approvals) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const todaysApprovals = approvalsResponse.data.approvals.filter(approval => {
+          const eventDate = new Date(approval.event_starts_at);
+          return eventDate >= today && eventDate < tomorrow;
+        });
+        setTodayApprovals(todaysApprovals);
+      }
+
+      // Get today's schedule
+      const scheduleResponse = await base44.functions.invoke('getMySchedule');
+      if (scheduleResponse.data?.events) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const todaysEvents = scheduleResponse.data.events.filter(event => {
+          const eventDate = new Date(event.starts_at);
+          return eventDate >= today && eventDate < tomorrow;
+        });
+        setTodayEvents(todaysEvents);
+      }
+    } catch (error) {
+      console.error('Error loading today data:', error);
+    } finally {
+      setLoadingToday(false);
     }
   };
 
@@ -536,6 +583,96 @@ export default function MyDepartment() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
+            {user?.pco_access_token && (userRole === 'worker' || userRole === 'admin' || !userRole) && (
+              <Card className="border-2 border-blue-300 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    Today's Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingToday ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {/* Today's Approvals */}
+                      <div className="bg-white rounded-lg p-4 border border-blue-200">
+                        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                          Pending Approvals ({todayApprovals.length})
+                        </h3>
+                        {todayApprovals.length > 0 ? (
+                          <div className="space-y-2">
+                            {todayApprovals.slice(0, 3).map((approval) => (
+                              <div
+                                key={approval.request_id}
+                                className="p-2 bg-blue-50 rounded border border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors"
+                                onClick={() => navigate(createPageUrl('MyApprovals'))}
+                              >
+                                <p className="text-sm font-medium text-slate-900 truncate">
+                                  {approval.event_name}
+                                </p>
+                                <p className="text-xs text-slate-600">
+                                  {approval.resource_name} • {format(new Date(approval.event_starts_at), 'h:mm a')}
+                                </p>
+                              </div>
+                            ))}
+                            {todayApprovals.length > 3 && (
+                              <p className="text-xs text-blue-600 text-center pt-1">
+                                +{todayApprovals.length - 3} more
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 text-center py-2">No approvals due today</p>
+                        )}
+                      </div>
+
+                      {/* Today's Events */}
+                      <div className="bg-white rounded-lg p-4 border border-blue-200">
+                        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-blue-600" />
+                          Today's Events ({todayEvents.length})
+                        </h3>
+                        {todayEvents.length > 0 ? (
+                          <div className="space-y-2">
+                            {todayEvents.slice(0, 3).map((event) => (
+                              <div
+                                key={event.id}
+                                className="p-2 bg-blue-50 rounded border border-blue-200"
+                              >
+                                <p className="text-sm font-medium text-slate-900 truncate">
+                                  {event.name}
+                                </p>
+                                <p className="text-xs text-slate-600">
+                                  {format(new Date(event.starts_at), 'h:mm a')}
+                                  {event.posted_door_code && (
+                                    <Badge variant="outline" className="ml-2 text-[10px]">
+                                      Code: {event.posted_door_code}
+                                    </Badge>
+                                  )}
+                                </p>
+                              </div>
+                            ))}
+                            {todayEvents.length > 3 && (
+                              <p className="text-xs text-blue-600 text-center pt-1">
+                                +{todayEvents.length - 3} more
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 text-center py-2">No events scheduled</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Card>
                 <CardContent className="p-4">
