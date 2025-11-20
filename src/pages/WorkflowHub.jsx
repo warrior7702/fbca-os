@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -19,11 +18,13 @@ import {
   Sparkles,
   Users,
   TrendingUp,
-  Crown
+  Crown,
+  ListChecks
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -46,6 +47,8 @@ export default function WorkflowHub() {
   const [viewMode, setViewMode] = useState("kanban");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [activeTab, setActiveTab] = useState("requests");
+  const [myTasks, setMyTasks] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -74,6 +77,61 @@ export default function WorkflowHub() {
         const allData = await base44.entities.WorkflowRequest.list('-created_date');
         setAllRequests(allData);
       }
+
+      // Load tasks assigned to user from all active requests
+      const allActiveRequests = await base44.entities.WorkflowRequest.filter({
+        status: { $ne: 'completed' }
+      });
+      
+      const tasksForUser = [];
+      allActiveRequests.forEach(request => {
+        // Check goal_review_data for tasks
+        if (request.goal_review_data?.tasks) {
+          request.goal_review_data.tasks.forEach(task => {
+            if (task.assigned_to === currentUser.email) {
+              tasksForUser.push({
+                ...task,
+                request_id: request.id,
+                request_title: request.title,
+                request_number: request.request_number,
+                request_status: request.status
+              });
+            }
+          });
+        }
+        
+        // Check project_review_data for tasks
+        if (request.project_review_data?.tasks) {
+          request.project_review_data.tasks.forEach(task => {
+            if (task.assigned_to === currentUser.email) {
+              tasksForUser.push({
+                ...task,
+                request_id: request.id,
+                request_title: request.title,
+                request_number: request.request_number,
+                request_status: request.status
+              });
+            }
+          });
+        }
+        
+        // Check campaign_data for tasks
+        if (request.campaign_data?.tasks) {
+          request.campaign_data.tasks.forEach(task => {
+            if (task.assigned_to === currentUser.email) {
+              tasksForUser.push({
+                ...task,
+                request_id: request.id,
+                request_title: request.title,
+                request_number: request.request_number,
+                request_status: request.status
+              });
+            }
+          });
+        }
+      });
+      
+      setMyTasks(tasksForUser);
     } catch (error) {
       console.error('Failed to load data:', error);
       toast.error('Failed to load requests');
@@ -330,7 +388,7 @@ export default function WorkflowHub() {
   };
 
   return (
-    <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 p-3 sm:p-6 overflow-auto">
+    <div className="h-full bg-gradient-to-br from-purple-50 to-pink-50 p-3 sm:p-6 overflow-auto pb-20">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
@@ -402,7 +460,20 @@ export default function WorkflowHub() {
           </div>
         </div>
 
-        {isAdmin && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="requests">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Requests
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              <ListChecks className="w-4 h-4 mr-2" />
+              My Tasks ({myTasks.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="requests" className="mt-6">
+            {isAdmin && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <Card 
               className="cursor-pointer hover:shadow-lg transition-all"
@@ -584,6 +655,74 @@ export default function WorkflowHub() {
             )}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="tasks" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ListChecks className="w-5 h-5 text-purple-600" />
+                  Tasks Assigned to Me
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {myTasks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <ListChecks className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-600">No tasks assigned to you yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {myTasks.map((task, index) => (
+                      <motion.div
+                        key={`${task.request_id}-${index}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-white rounded-lg border hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => navigate(createPageUrl('WorkflowDetail') + `?id=${task.request_id}`)}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                {task.request_number}
+                              </Badge>
+                              <Badge className={getStatusColor(task.request_status)}>
+                                {formatStatus(task.request_status)}
+                              </Badge>
+                            </div>
+                            <h3 className="font-semibold text-slate-900 mb-1">
+                              {task.title || task.name || 'Untitled Task'}
+                            </h3>
+                            <p className="text-sm text-slate-600 mb-2">
+                              From: {task.request_title}
+                            </p>
+                            {task.description && (
+                              <p className="text-xs text-slate-500 line-clamp-2">
+                                {task.description}
+                              </p>
+                            )}
+                            {task.due_date && (
+                              <div className="flex items-center gap-1 mt-2 text-xs text-slate-500">
+                                <Clock className="w-3 h-3" />
+                                Due: {format(new Date(task.due_date), 'MMM d, yyyy')}
+                              </div>
+                            )}
+                          </div>
+                          {task.status && (
+                            <Badge variant={task.status === 'completed' ? 'default' : 'outline'}>
+                              {task.status}
+                            </Badge>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
