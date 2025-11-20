@@ -2,9 +2,9 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock, Unlock, Video, Users } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }) {
+export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, onEventClick }) {
   const today = new Date();
   const startDate = today;
 
@@ -25,6 +25,14 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
     });
   };
 
+  const getTicketsForDay = (day) => {
+    return tickets.filter(ticket => {
+      if (!ticket.due_date) return false;
+      const ticketDate = new Date(ticket.due_date);
+      return isSameDay(ticketDate, day);
+    });
+  };
+
   return (
     <div className="space-y-6">
       {weeks.map((week, weekIndex) => (
@@ -35,6 +43,7 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
           <div className="grid grid-cols-7 gap-2">
             {week.map((day, dayIndex) => {
               const dayEvents = getEventsForDay(day);
+              const dayTickets = getTicketsForDay(day);
               const isToday = isSameDay(day, today);
               const isPast = day < today && !isToday;
 
@@ -176,8 +185,29 @@ export default function ScheduleCalendar({ events, weekCount = 2, onEventClick }
                             </CardContent>
                           </Card>
                         );
-                      })}
-                    </div>
+                        })}
+
+                        {/* Tickets */}
+                        {dayTickets.map((ticket) => (
+                        <Card 
+                          key={`ticket-${ticket.id}`} 
+                          className="border border-purple-300 bg-purple-50 hover:bg-purple-100 hover:shadow-md transition-all cursor-pointer"
+                          onClick={() => window.location.href = `/support-tickets?id=${ticket.id}`}
+                        >
+                          <CardContent className="p-2 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Ticket className="w-3 h-3 text-purple-600" />
+                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                {ticket.subject}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-[9px] bg-purple-100 border-purple-300 text-purple-700">
+                              {ticket.category?.replace('_', ' ') || 'Ticket'}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                        ))}
+                        </div>
                   </div>
                 </div>
               );

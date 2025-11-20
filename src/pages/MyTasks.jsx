@@ -242,7 +242,7 @@ export default function MyTasks() {
       if (user?.email) {
         const allTickets = await base44.entities.Ticket.filter({
           assigned_to: user.email,
-          status: { $in: ['open', 'in_progress', 'pending'] }
+          status: { $in: ['open', 'awaiting_information', 'awaiting_parts'] }
         });
         setSupportTickets(allTickets);
         
@@ -278,7 +278,7 @@ export default function MyTasks() {
                 const ticketDept = getDepartment(t.category);
                 return userData.departments.some(dept => 
                   ticketDept === dept.toLowerCase().replace(' ', '_')
-                ) && ['open', 'in_progress', 'pending'].includes(t.status);
+                ) && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status);
               });
               
               setDeptTickets(deptFiltered);
@@ -507,7 +507,8 @@ export default function MyTasks() {
               </div>
             ) : (
               <ScheduleCalendar 
-                events={myScheduleEvents} 
+                events={myScheduleEvents}
+                tickets={supportTickets}
                 weekCount={1}
                 onEventClick={handleScheduleEventClick}
               />
