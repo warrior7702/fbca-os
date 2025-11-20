@@ -511,7 +511,7 @@ export default function MyTasks() {
                 tickets={supportTickets}
                 weekCount={1}
                 onEventClick={handleScheduleEventClick}
-                onTicketClick={(ticket) => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
               />
             )}
           </CardContent>
