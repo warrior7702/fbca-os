@@ -181,7 +181,8 @@ export default function SupportTickets() {
     total: tickets.length,
     active: tickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
     open: tickets.filter(t => t.status === 'open').length,
-    awaiting: tickets.filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
+    awaiting_info: tickets.filter(t => t.status === 'awaiting_information').length,
+    awaiting_parts: tickets.filter(t => t.status === 'awaiting_parts').length,
     resolved: tickets.filter(t => t.status === 'resolved').length
   };
 
@@ -280,18 +281,6 @@ export default function SupportTickets() {
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm text-slate-600">Total</p>
-                    <p className="text-xl sm:text-2xl font-bold text-slate-900">{stats.total}</p>
-                  </div>
-                  <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-amber-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between">
-                  <div>
                     <p className="text-xs sm:text-sm text-slate-600">Open</p>
                     <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.open}</p>
                   </div>
@@ -304,8 +293,20 @@ export default function SupportTickets() {
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm text-slate-600">Awaiting</p>
-                    <p className="text-xl sm:text-2xl font-bold text-orange-700">{stats.awaiting}</p>
+                    <p className="text-xs sm:text-sm text-slate-600">Awaiting Info</p>
+                    <p className="text-xl sm:text-2xl font-bold text-yellow-700">{stats.awaiting_info}</p>
+                  </div>
+                  <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs sm:text-sm text-slate-600">Awaiting Parts</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-700">{stats.awaiting_parts}</p>
                   </div>
                   <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
                 </div>
