@@ -497,7 +497,6 @@ export default function SupportTickets() {
                         </Button>
                         )}
                         </div>
-                        </div>
                 </CardContent>
               </Card>
             </motion.div>
