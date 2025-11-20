@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, isSameDay, addWeeks, subWeeks } from "date-fns";
 
 const statusStages = [
   { value: "minister_goal_review", label: "Minister Review", color: "bg-purple-100 text-purple-700" },
@@ -49,6 +49,8 @@ export default function WorkflowHub() {
   const [showArchived, setShowArchived] = useState(false);
   const [activeTab, setActiveTab] = useState("requests");
   const [myTasks, setMyTasks] = useState([]);
+  const [calendarWeekStart, setCalendarWeekStart] = useState(new Date());
+  const [draggedTask, setDraggedTask] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -455,7 +457,7 @@ export default function WorkflowHub() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="requests">
               <MessageSquare className="w-4 h-4 mr-2" />
               Requests
@@ -463,6 +465,10 @@ export default function WorkflowHub() {
             <TabsTrigger value="tasks">
               <ListChecks className="w-4 h-4 mr-2" />
               Tasks ({myTasks.length})
+            </TabsTrigger>
+            <TabsTrigger value="calendar">
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Calendar
             </TabsTrigger>
           </TabsList>
 
@@ -721,6 +727,165 @@ export default function WorkflowHub() {
                         </div>
                       </motion.div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-purple-600" />
+                    Task Calendar
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCalendarWeekStart(subWeeks(calendarWeekStart, 1))}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCalendarWeekStart(new Date())}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCalendarWeekStart(addWeeks(calendarWeekStart, 1))}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {myTasks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CalendarIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-600">No tasks to display</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-7 gap-2">
+                    {Array.from({ length: 7 }, (_, i) => {
+                      const day = addDays(startOfWeek(calendarWeekStart), i);
+                      const dayTasks = myTasks.filter(task => 
+                        task.due_date && isSameDay(new Date(task.due_date), day)
+                      );
+                      const isToday = isSameDay(day, new Date());
+
+                      return (
+                        <div
+                          key={i}
+                          className={`min-h-64 rounded-lg border-2 p-3 ${
+                            isToday ? 'bg-purple-50 border-purple-300' : 'bg-white border-slate-200'
+                          }`}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={async (e) => {
+                            e.preventDefault();
+                            if (!draggedTask) return;
+
+                            const newDueDate = day.toISOString().split('T')[0];
+                            
+                            try {
+                              // Find the request and update the task
+                              const request = await base44.entities.WorkflowRequest.filter({
+                                id: draggedTask.request_id
+                              });
+                              
+                              if (request.length > 0) {
+                                const req = request[0];
+                                let updated = false;
+
+                                // Update in goal_review_data
+                                if (req.goal_review_data?.tasks) {
+                                  req.goal_review_data.tasks = req.goal_review_data.tasks.map(t => 
+                                    t === draggedTask ? { ...t, due_date: newDueDate } : t
+                                  );
+                                  updated = true;
+                                }
+
+                                // Update in project_review_data
+                                if (req.project_review_data?.tasks) {
+                                  req.project_review_data.tasks = req.project_review_data.tasks.map(t =>
+                                    t === draggedTask ? { ...t, due_date: newDueDate } : t
+                                  );
+                                  updated = true;
+                                }
+
+                                // Update in campaign_data
+                                if (req.campaign_data?.tasks) {
+                                  req.campaign_data.tasks = req.campaign_data.tasks.map(t =>
+                                    t === draggedTask ? { ...t, due_date: newDueDate } : t
+                                  );
+                                  updated = true;
+                                }
+
+                                if (updated) {
+                                  await base44.entities.WorkflowRequest.update(req.id, {
+                                    goal_review_data: req.goal_review_data,
+                                    project_review_data: req.project_review_data,
+                                    campaign_data: req.campaign_data
+                                  });
+                                  
+                                  toast.success('Task date updated');
+                                  loadData();
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error updating task:', error);
+                              toast.error('Failed to update task date');
+                            }
+                            
+                            setDraggedTask(null);
+                          }}
+                        >
+                          <div className="text-center mb-3">
+                            <p className="text-xs font-semibold text-slate-500">
+                              {format(day, 'EEE')}
+                            </p>
+                            <p className={`text-lg font-bold ${isToday ? 'text-purple-600' : 'text-slate-900'}`}>
+                              {format(day, 'd')}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {format(day, 'MMM')}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            {dayTasks.map((task, idx) => (
+                              <motion.div
+                                key={`${task.request_id}-${idx}`}
+                                draggable
+                                onDragStart={() => setDraggedTask(task)}
+                                onDragEnd={() => setDraggedTask(null)}
+                                whileHover={{ scale: 1.02 }}
+                                className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-lg cursor-move shadow-sm hover:shadow-md transition-all"
+                              >
+                                <p className="text-xs font-semibold line-clamp-2 mb-1">
+                                  {task.title || task.name || 'Untitled'}
+                                </p>
+                                <p className="text-[10px] opacity-90 truncate">
+                                  {task.request_number}
+                                </p>
+                                {task.assigned_to && (
+                                  <p className="text-[10px] opacity-75 truncate mt-1">
+                                    {task.assigned_to.split('@')[0]}
+                                  </p>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
