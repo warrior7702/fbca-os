@@ -801,15 +801,9 @@ export default function TicketDetail() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
                         <SelectItem value="technology">Technology</SelectItem>
                         <SelectItem value="cleaning">Cleaning</SelectItem>
-                        <SelectItem value="technical">Technical/IT</SelectItem>
-                        <SelectItem value="access">Access/Keys</SelectItem>
-                        <SelectItem value="facility">Facility</SelectItem>
-                        <SelectItem value="av_production">AV/Production</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="hospitality">Hospitality</SelectItem>
+                        <SelectItem value="janitorial">Janitorial</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
