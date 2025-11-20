@@ -461,14 +461,14 @@ export default function SupportTickets() {
                       <div className="flex flex-wrap gap-2">
                         {getSourceBadge(ticket.source || 'manual_request')}
                         <Badge className={getStatusColor(ticket.status)}>
-                          {ticket.status?.replace('_', ' ')}
+                          {ticket.status?.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                         </Badge>
                         <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
-                          {ticket.priority}
+                          {ticket.priority?.charAt(0).toUpperCase() + ticket.priority?.slice(1)}
                         </Badge>
                         {ticket.category && (
                           <Badge variant="secondary">
-                            {ticket.category.replace('_', ' ')}
+                            {ticket.category.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                           </Badge>
                         )}
                         {ticket.comments && ticket.comments.length > 0 && (
