@@ -878,6 +878,31 @@ export default function Settings() {
                 </CardHeader>
               </Card>
 
+              {/* Achievements System */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-600" />
+                    Achievements System
+                  </CardTitle>
+                  <CardDescription>
+                    Initialize the gamification system with badges and rewards
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-semibold mb-1">One-Time Setup</p>
+                        <p>Click below to create 30+ achievements across tasks, approvals, tickets, events, and hidden challenges. Once initialized, users can view their progress at /achievements.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <InitializeAchievementsButton />
+                </CardContent>
+              </Card>
+
               {/* User Management Section */}
               <Card>
                 <CardHeader>
