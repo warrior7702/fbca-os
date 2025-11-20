@@ -78,60 +78,54 @@ export default function WorkflowHub() {
         setAllRequests(allData);
       }
 
-      // Load tasks assigned to user from all active requests
+      // Load all tasks from all active requests
       const allActiveRequests = await base44.entities.WorkflowRequest.filter({
         status: { $ne: 'completed' }
       });
       
-      const tasksForUser = [];
+      const allTasks = [];
       allActiveRequests.forEach(request => {
         // Check goal_review_data for tasks
         if (request.goal_review_data?.tasks) {
           request.goal_review_data.tasks.forEach(task => {
-            if (task.assigned_to === currentUser.email) {
-              tasksForUser.push({
-                ...task,
-                request_id: request.id,
-                request_title: request.title,
-                request_number: request.request_number,
-                request_status: request.status
-              });
-            }
+            allTasks.push({
+              ...task,
+              request_id: request.id,
+              request_title: request.title,
+              request_number: request.request_number,
+              request_status: request.status
+            });
           });
         }
         
         // Check project_review_data for tasks
         if (request.project_review_data?.tasks) {
           request.project_review_data.tasks.forEach(task => {
-            if (task.assigned_to === currentUser.email) {
-              tasksForUser.push({
-                ...task,
-                request_id: request.id,
-                request_title: request.title,
-                request_number: request.request_number,
-                request_status: request.status
-              });
-            }
+            allTasks.push({
+              ...task,
+              request_id: request.id,
+              request_title: request.title,
+              request_number: request.request_number,
+              request_status: request.status
+            });
           });
         }
         
         // Check campaign_data for tasks
         if (request.campaign_data?.tasks) {
           request.campaign_data.tasks.forEach(task => {
-            if (task.assigned_to === currentUser.email) {
-              tasksForUser.push({
-                ...task,
-                request_id: request.id,
-                request_title: request.title,
-                request_number: request.request_number,
-                request_status: request.status
-              });
-            }
+            allTasks.push({
+              ...task,
+              request_id: request.id,
+              request_title: request.title,
+              request_number: request.request_number,
+              request_status: request.status
+            });
           });
         }
       });
       
-      setMyTasks(tasksForUser);
+      setMyTasks(allTasks);
     } catch (error) {
       console.error('Failed to load data:', error);
       toast.error('Failed to load requests');
@@ -468,7 +462,7 @@ export default function WorkflowHub() {
             </TabsTrigger>
             <TabsTrigger value="tasks">
               <ListChecks className="w-4 h-4 mr-2" />
-              My Tasks ({myTasks.length})
+              Tasks ({myTasks.length})
             </TabsTrigger>
           </TabsList>
 
@@ -662,14 +656,14 @@ export default function WorkflowHub() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ListChecks className="w-5 h-5 text-purple-600" />
-                  Tasks Assigned to Me
+                  All Communication Tasks
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {myTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <ListChecks className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">No tasks assigned to you yet</p>
+                    <p className="text-slate-600">No tasks in active requests yet</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -694,9 +688,19 @@ export default function WorkflowHub() {
                             <h3 className="font-semibold text-slate-900 mb-1">
                               {task.title || task.name || 'Untitled Task'}
                             </h3>
-                            <p className="text-sm text-slate-600 mb-2">
-                              From: {task.request_title}
-                            </p>
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="text-sm text-slate-600">
+                                From: {task.request_title}
+                              </p>
+                              {task.assigned_to && (
+                                <>
+                                  <span className="text-slate-400">•</span>
+                                  <p className="text-sm text-slate-500">
+                                    Assigned to: {task.assigned_to}
+                                  </p>
+                                </>
+                              )}
+                            </div>
                             {task.description && (
                               <p className="text-xs text-slate-500 line-clamp-2">
                                 {task.description}
