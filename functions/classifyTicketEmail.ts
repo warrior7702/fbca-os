@@ -56,12 +56,12 @@ OUTPUT FORMAT:
 Return only this JSON. Do not add comments or extra words.
 
 {
-  "category": "Cleaning | Maintenance | Technology",
+  "category": "Cleaning | Maintenance | Technology | Cross-Department",
   "confidence": 0.00
 }
 
 Where:
-- category is exactly one of the three strings.
+- category is exactly one of the four strings.
 - confidence is between 0 and 1 using your best estimate.`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
