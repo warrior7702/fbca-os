@@ -23,6 +23,11 @@ export default function PushNotificationSetup() {
     setIsSupported(true);
 
     try {
+      // Register service worker first if not already registered
+      if (!navigator.serviceWorker.controller) {
+        await navigator.serviceWorker.register('/sw.js');
+      }
+      
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
