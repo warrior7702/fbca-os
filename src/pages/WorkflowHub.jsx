@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format, startOfWeek, endOfWeek, addDays, isSameDay, addWeeks, subWeeks } from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 
 const statusStages = [
   { value: "minister_goal_review", label: "Minister Review", color: "bg-purple-100 text-purple-700" },
@@ -51,7 +51,7 @@ export default function WorkflowHub() {
   const [showArchived, setShowArchived] = useState(false);
   const [activeTab, setActiveTab] = useState("requests");
   const [myTasks, setMyTasks] = useState([]);
-  const [calendarWeekStart, setCalendarWeekStart] = useState(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [draggedTask, setDraggedTask] = useState(null);
 
   useEffect(() => {
@@ -747,23 +747,26 @@ export default function WorkflowHub() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setCalendarWeekStart(subWeeks(calendarWeekStart, 1))}
+                      onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
                     >
                       <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <div className="min-w-32 text-center font-semibold text-slate-900">
+                      {format(calendarMonth, 'MMMM yyyy')}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                    >
+                      <ChevronRight className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCalendarWeekStart(new Date())}
+                      onClick={() => setCalendarMonth(new Date())}
                     >
                       Today
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setCalendarWeekStart(addWeeks(calendarWeekStart, 1))}
-                    >
-                      <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -775,22 +778,47 @@ export default function WorkflowHub() {
                     <p className="text-slate-600">No tasks to display</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-7 gap-2">
-                    {Array.from({ length: 7 }, (_, i) => {
-                      const day = addDays(startOfWeek(calendarWeekStart), i);
-                      const dayTasks = myTasks.filter(task => 
-                        task.due_date && isSameDay(new Date(task.due_date), day)
-                      );
-                      const isToday = isSameDay(day, new Date());
+                  <div>
+                    {/* Day Headers */}
+                    <div className="grid grid-cols-7 gap-2 mb-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
 
-                      return (
-                        <div
-                          key={i}
-                          className={`min-h-64 rounded-lg border-2 p-3 ${
-                            isToday ? 'bg-purple-50 border-purple-300' : 'bg-white border-slate-200'
-                          }`}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={async (e) => {
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-2">
+                      {(() => {
+                        const monthStart = startOfMonth(calendarMonth);
+                        const monthEnd = endOfMonth(calendarMonth);
+                        const calendarStart = startOfWeek(monthStart);
+                        const calendarEnd = endOfWeek(monthEnd);
+                        const days = [];
+                        let day = calendarStart;
+
+                        while (day <= calendarEnd) {
+                          days.push(day);
+                          day = addDays(day, 1);
+                        }
+
+                        return days.map((day, i) => {
+                          const dayTasks = myTasks.filter(task => 
+                            task.due_date && isSameDay(new Date(task.due_date), day)
+                          );
+                          const isToday = isSameDay(day, new Date());
+                          const isCurrentMonth = day.getMonth() === calendarMonth.getMonth();
+
+                          return (
+                            <div
+                              key={i}
+                              className={`min-h-32 rounded-lg border-2 p-2 ${
+                                isToday ? 'bg-purple-50 border-purple-300' : 
+                                isCurrentMonth ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100'
+                              }`}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={async (e) => {
                             e.preventDefault();
                             if (!draggedTask) return;
 
@@ -846,48 +874,44 @@ export default function WorkflowHub() {
                               toast.error('Failed to update task date');
                             }
                             
-                            setDraggedTask(null);
-                          }}
-                        >
-                          <div className="text-center mb-3">
-                            <p className="text-xs font-semibold text-slate-500">
-                              {format(day, 'EEE')}
-                            </p>
-                            <p className={`text-lg font-bold ${isToday ? 'text-purple-600' : 'text-slate-900'}`}>
-                              {format(day, 'd')}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {format(day, 'MMM')}
-                            </p>
-                          </div>
+                                setDraggedTask(null);
+                              }}
+                            >
+                              <div className="text-center mb-2">
+                                <p className={`text-sm font-bold ${
+                                  isToday ? 'bg-purple-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto' : 
+                                  isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
+                                }`}>
+                                  {format(day, 'd')}
+                                </p>
+                              </div>
 
-                          <div className="space-y-2">
-                            {dayTasks.map((task, idx) => (
-                              <motion.div
-                                key={`${task.request_id}-${idx}`}
-                                draggable
-                                onDragStart={() => setDraggedTask(task)}
-                                onDragEnd={() => setDraggedTask(null)}
-                                whileHover={{ scale: 1.02 }}
-                                className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-lg cursor-move shadow-sm hover:shadow-md transition-all"
-                              >
-                                <p className="text-xs font-semibold line-clamp-2 mb-1">
-                                  {task.title || task.name || 'Untitled'}
-                                </p>
-                                <p className="text-[10px] opacity-90 truncate">
-                                  {task.request_number}
-                                </p>
-                                {task.assigned_to && (
-                                  <p className="text-[10px] opacity-75 truncate mt-1">
-                                    {task.assigned_to.split('@')[0]}
-                                  </p>
+                              <div className="space-y-1">
+                                {dayTasks.slice(0, 3).map((task, idx) => (
+                                  <motion.div
+                                    key={`${task.request_id}-${idx}`}
+                                    draggable
+                                    onDragStart={() => setDraggedTask(task)}
+                                    onDragEnd={() => setDraggedTask(null)}
+                                    whileHover={{ scale: 1.02 }}
+                                    className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded cursor-move shadow-sm hover:shadow-md transition-all"
+                                  >
+                                    <p className="text-[10px] font-semibold line-clamp-1">
+                                      {task.title || task.name || 'Untitled'}
+                                    </p>
+                                  </motion.div>
+                                ))}
+                                {dayTasks.length > 3 && (
+                                  <div className="text-[10px] text-purple-600 font-medium pl-1">
+                                    +{dayTasks.length - 3} more
+                                  </div>
                                 )}
-                              </motion.div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 )}
               </CardContent>
