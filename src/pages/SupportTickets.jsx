@@ -254,26 +254,15 @@ export default function SupportTickets() {
 
           <div className="flex gap-2 w-full sm:w-auto">
             {isAdmin && (
-              <>
-                <Button
-                  onClick={() => navigate(createPageUrl('TicketReporting'))}
-                  variant="outline"
-                  className="gap-2 flex-1 sm:flex-none"
-                  size="sm"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Reports</span>
-                </Button>
-                <Button
-                  onClick={() => navigate(createPageUrl('TicketAnalytics'))}
-                  variant="outline"
-                  className="gap-2 flex-1 sm:flex-none"
-                  size="sm"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">AI Insights</span>
-                </Button>
-              </>
+              <Button
+                onClick={() => navigate(createPageUrl('TicketReporting'))}
+                variant="outline"
+                className="gap-2 flex-1 sm:flex-none"
+                size="sm"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Reports & Analytics</span>
+              </Button>
             )}
             <Button
               onClick={() => navigate(createPageUrl('CreateTicket'))}
