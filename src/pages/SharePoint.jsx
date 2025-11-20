@@ -375,253 +375,207 @@ export default function SharePointPage() {
           </Card>
         )}
 
-        <AppHeader
-          icon={Library}
-          title="SharePoint"
-          description="Quick access to your sites and shared folders"
-          iconColor="from-blue-500 to-indigo-500"
-        />
+        <Tabs defaultValue="my-sites" className="mb-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+            <TabsTrigger value="my-sites">
+              <Star className="w-4 h-4 mr-2" />
+              My Sites
+            </TabsTrigger>
+            <TabsTrigger value="browse">
+              <Library className="w-4 h-4 mr-2" />
+              Browse All
+            </TabsTrigger>
+            <TabsTrigger value="search">
+              <Search className="w-4 h-4 mr-2" />
+              Search
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Global Search */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <Input
-                  placeholder="Search across all SharePoint sites..."
-                  value={globalSearchQuery}
-                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleGlobalSearch()}
-                  className="pl-11 h-12"
-                />
-              </div>
-              <Button
-                onClick={handleGlobalSearch}
-                disabled={searching || !globalSearchQuery.trim()}
-                className="h-12"
-              >
-                {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* My Sites Tab */}
+          <TabsContent value="my-sites" className="space-y-6 mt-6">
+            <AppHeader
+              icon={Star}
+              title="My Sites"
+              description={`${favoritedSites.length + frequentSites.length} sites you use regularly`}
+              iconColor="from-yellow-500 to-orange-500"
+            />
 
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Search Results ({searchResults.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {searchResults.map(file => (
-                  <Card key={file.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {getFileIcon(file)}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{file.name}</p>
-                          {file.size && (
-                            <p className="text-xs text-slate-500">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {file.webUrl && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full mt-3"
-                          onClick={() => window.open(file.webUrl, '_blank')}
-                        >
-                          <ExternalLink className="w-3 h-3 mr-2" />
-                          Open
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Favorited Sites */}
-        {favoritedSites.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500" />
-                Your Favorite Sites
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {favoritedSites.map(site => {
-                  const accessData = getSiteAccessData(site.id);
-                  return (
-                    <Card key={site.id} className="border-2 border-yellow-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 flex-1">
-                            <Library className="w-8 h-8 text-yellow-600" />
-                            <div>
-                              <p className="font-semibold">{site.displayName}</p>
-                              <p className="text-xs text-slate-500">
-                                Accessed {accessData?.access_count || 0} times
-                              </p>
+            {/* Favorited Sites */}
+            {favoritedSites.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-400" />
+                    Favorites
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {favoritedSites.map(site => {
+                      const accessData = getSiteAccessData(site.id);
+                      return (
+                        <Card key={site.id} className="border-2 border-yellow-200 bg-yellow-50/30 hover:shadow-lg transition-all">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between gap-4 mb-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                                  <Library className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-slate-900">{site.displayName}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {accessData?.access_count || 0} visits • Last {accessData?.last_accessed ? format(new Date(accessData.last_accessed), 'MMM d') : 'never'}
+                                  </p>
+                                </div>
+                              </div>
+                              <button onClick={() => toggleSiteFavorite(site)}>
+                                <Star className="w-5 h-5 fill-yellow-400 text-yellow-400 hover:scale-110 transition-transform" />
+                              </button>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
-                              variant="outline"
+                              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                               onClick={() => loadSiteLibraries(site)}
                               disabled={loadingSiteData[site.id]}
                             >
                               {loadingSiteData[site.id] ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : expandedSite === site.id ? (
-                                'Hide'
+                                'Hide Folders'
                               ) : (
                                 'View Folders'
                               )}
                             </Button>
-                            <button onClick={() => toggleSiteFavorite(site)}>
-                              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                            </button>
-                          </div>
-                        </div>
 
-                        {/* Expanded Libraries */}
-                        {expandedSite === site.id && siteLibraries[site.id] && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="mt-4 pt-4 border-t space-y-2"
-                          >
-                            {siteLibraries[site.id].map(library => (
-                              <div
-                                key={library.id}
-                                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                            {/* Expanded Libraries */}
+                            {expandedSite === site.id && siteLibraries[site.id] && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="mt-4 pt-4 border-t space-y-2"
                               >
-                                <div className="flex items-center gap-2">
-                                  <FolderOpen className="w-5 h-5 text-blue-500" />
-                                  <span className="text-sm font-medium">{library.name}</span>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => window.open(library.webUrl, '_blank')}
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-          )}
+                                {siteLibraries[site.id].map(library => (
+                                  <div
+                                    key={library.id}
+                                    className="flex items-center justify-between p-3 bg-white rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                    onClick={() => window.open(library.webUrl, '_blank')}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <FolderOpen className="w-5 h-5 text-blue-500" />
+                                      <span className="text-sm font-medium">{library.name}</span>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 text-slate-400" />
+                                  </div>
+                                ))}
+                              </motion.div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-2 border-dashed border-slate-200">
+                <CardContent className="p-8 text-center">
+                  <Star className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-900 mb-1">No favorites yet</h3>
+                  <p className="text-sm text-slate-500">Click the star icon on any site to add it here</p>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Frequently Visited Sites */}
-          {frequentSites.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-600" />
-                Frequently Visited
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {frequentSites.map(site => {
-                  const accessData = getSiteAccessData(site.id);
-                  return (
-                    <Card key={site.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3 flex-1">
-                            <Library className="w-8 h-8 text-blue-600" />
-                            <div>
-                              <p className="font-semibold">{site.displayName}</p>
-                              <p className="text-xs text-slate-500">
-                                Accessed {accessData?.access_count || 0} times
-                              </p>
+            {/* Frequently Visited Sites */}
+            {frequentSites.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                    Frequently Visited
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {frequentSites.map(site => {
+                      const accessData = getSiteAccessData(site.id);
+                      return (
+                        <Card key={site.id} className="hover:shadow-lg transition-all">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between gap-4 mb-3">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                                  <Library className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-slate-900">{site.displayName}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {accessData?.access_count || 0} visits
+                                  </p>
+                                </div>
+                              </div>
+                              <button onClick={() => toggleSiteFavorite(site)}>
+                                <Star className={`w-5 h-5 hover:scale-110 transition-transform ${accessData?.is_favorited ? 'fill-yellow-400 text-yellow-400' : 'text-slate-400'}`} />
+                              </button>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
+                              className="w-full"
                               onClick={() => loadSiteLibraries(site)}
                               disabled={loadingSiteData[site.id]}
                             >
                               {loadingSiteData[site.id] ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : expandedSite === site.id ? (
-                                'Hide'
+                                'Hide Folders'
                               ) : (
                                 'View Folders'
                               )}
                             </Button>
-                            <button onClick={() => toggleSiteFavorite(site)}>
-                              <Star
-                                className={`w-5 h-5 ${
-                                  accessData?.is_favorited
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'text-slate-400'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        </div>
 
-                        {/* Expanded Libraries */}
-                        {expandedSite === site.id && siteLibraries[site.id] && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="mt-4 pt-4 border-t space-y-2"
-                          >
-                            {siteLibraries[site.id].map(library => (
-                              <div
-                                key={library.id}
-                                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                            {/* Expanded Libraries */}
+                            {expandedSite === site.id && siteLibraries[site.id] && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="mt-4 pt-4 border-t space-y-2"
                               >
-                                <div className="flex items-center gap-2">
-                                  <FolderOpen className="w-5 h-5 text-blue-500" />
-                                  <span className="text-sm font-medium">{library.name}</span>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => window.open(library.webUrl, '_blank')}
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-          )}
+                                {siteLibraries[site.id].map(library => (
+                                  <div
+                                    key={library.id}
+                                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                                    onClick={() => window.open(library.webUrl, '_blank')}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <FolderOpen className="w-5 h-5 text-blue-500" />
+                                      <span className="text-sm font-medium">{library.name}</span>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 text-slate-400" />
+                                  </div>
+                                ))}
+                              </motion.div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-          {/* All Other Sites */}
-          {otherSites.length > 0 && (
+          {/* Browse All Tab */}
+          <TabsContent value="browse" className="space-y-6 mt-6">
+            <AppHeader
+              icon={Library}
+              title="Browse All Sites"
+              description={`${sites.length} SharePoint sites available`}
+              iconColor="from-blue-500 to-indigo-500"
+            />
+
+            {otherSites.length > 0 && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between flex-wrap gap-4">
@@ -792,8 +746,93 @@ export default function SharePointPage() {
             </CardContent>
           </Card>
         )}
+          </TabsContent>
 
+          {/* Search Tab */}
+          <TabsContent value="search" className="space-y-6 mt-6">
+            <AppHeader
+              icon={Search}
+              title="Search SharePoint"
+              description="Search across all sites and files"
+              iconColor="from-purple-500 to-pink-500"
+            />
 
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Input
+                      placeholder="Search files, folders, and content..."
+                      value={globalSearchQuery}
+                      onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleGlobalSearch()}
+                      className="pl-11 h-14 text-lg"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleGlobalSearch}
+                    disabled={searching || !globalSearchQuery.trim()}
+                    className="h-14 px-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {searching ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="w-5 h-5 text-purple-600" />
+                    Results ({searchResults.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {searchResults.map(file => (
+                      <Card key={file.id} className="hover:shadow-lg transition-all cursor-pointer" onClick={() => window.open(file.webUrl, '_blank')}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3 mb-3">
+                            {getFileIcon(file)}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate mb-1">{file.name}</p>
+                              {file.size && (
+                                <p className="text-xs text-slate-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <ExternalLink className="w-3 h-3 mr-2" />
+                            Open File
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {searchResults.length === 0 && globalSearchQuery && !searching && (
+              <Card className="border-2 border-dashed border-slate-200">
+                <CardContent className="p-12 text-center">
+                  <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-900 mb-1">No results found</h3>
+                  <p className="text-sm text-slate-500">Try different keywords or check your spelling</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
