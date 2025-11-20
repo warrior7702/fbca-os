@@ -82,6 +82,9 @@ export default function SupportTickets() {
         });
       }
       
+      // Filter out workflow/communications tickets
+      ticketsData = ticketsData.filter(t => t.source !== 'workflow');
+      
       setTickets(ticketsData);
     } catch (error) {
       console.error('Failed to load tickets:', error);
@@ -429,6 +432,15 @@ export default function SupportTickets() {
                             {ticket.requester_name}
                           </>
                         )}
+                        {ticket.building && (
+                          <>
+                            <span>•</span>
+                            <Badge variant="outline" className="text-xs">
+                              {ticket.building.replace('_', ' ')}
+                              {ticket.room_number && ` - ${ticket.room_number}`}
+                            </Badge>
+                          </>
+                        )}
                         {ticket.due_date && (
                           <>
                             <span>•</span>
@@ -451,12 +463,6 @@ export default function SupportTickets() {
                         {ticket.category && (
                           <Badge variant="secondary">
                             {ticket.category.replace('_', ' ')}
-                          </Badge>
-                        )}
-                        {ticket.building && (
-                          <Badge variant="outline" className="text-xs">
-                            {ticket.building.replace('_', ' ')}
-                            {ticket.room_number && ` - ${ticket.room_number}`}
                           </Badge>
                         )}
                         {ticket.comments && ticket.comments.length > 0 && (
