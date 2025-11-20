@@ -192,7 +192,10 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
                         <Card 
                           key={`ticket-${ticket.id}`} 
                           className="border border-purple-300 bg-purple-50 hover:bg-purple-100 hover:shadow-md transition-all cursor-pointer"
-                          onClick={() => onTicketClick && onTicketClick(ticket)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTicketClick && onTicketClick(ticket);
+                          }}
                         >
                           <CardContent className="p-2 space-y-1">
                             <div className="flex items-center gap-1">

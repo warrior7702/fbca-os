@@ -194,6 +194,15 @@ Return JSON only:`;
 
         const ticket = await base44.asServiceRole.entities.Ticket.create(ticketData);
 
+        // Auto-assign ticket based on category
+        try {
+            await base44.asServiceRole.functions.invoke('autoAssignTicket', {
+                ticket_id: ticket.id
+            });
+        } catch (assignError) {
+            console.warn('Auto-assignment failed:', assignError);
+        }
+
         console.log('✅ Created ticket:', ticketNumber, '| Category:', assignment.category, '| Priority:', priority);
 
         return Response.json({
