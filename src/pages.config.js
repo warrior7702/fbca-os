@@ -54,6 +54,7 @@ import Notifications from './pages/Notifications';
 import RoleManagement from './pages/RoleManagement';
 import AssignmentRules from './pages/AssignmentRules';
 import Knowledgebase from './pages/Knowledgebase';
+import TicketReporting from './pages/TicketReporting';
 import __Layout from './Layout.jsx';
 
 
@@ -114,6 +115,7 @@ export const PAGES = {
     "RoleManagement": RoleManagement,
     "AssignmentRules": AssignmentRules,
     "Knowledgebase": Knowledgebase,
+    "TicketReporting": TicketReporting,
 }
 
 export const pagesConfig = {
