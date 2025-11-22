@@ -1011,6 +1011,125 @@ export default function Settings() {
                 </CardContent>
               </Card>
 
+              {/* Hospitality App Upload Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-green-600" />
+                    Hospitality App Integration
+                  </CardTitle>
+                  <CardDescription>
+                    Upload entity JSON files from the hospitality app to integrate food service functionality
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-green-800">
+                        <p className="font-semibold mb-1">Entity Files Upload</p>
+                        <p className="mb-2">Upload the following JSON files from the hospitality app's <code>entities/</code> folder:</p>
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                          <li>Category.json</li>
+                          <li>MenuItem.json</li>
+                          <li>SavedOrder.json</li>
+                          <li>BillingAccount.json</li>
+                          <li>Any other entity files you need</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="entity-files">Select Entity JSON Files</Label>
+                    <Input
+                      id="entity-files"
+                      type="file"
+                      accept=".json"
+                      multiple
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length === 0) return;
+
+                        try {
+                          const fileContents = await Promise.all(
+                            files.map(file => {
+                              return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  try {
+                                    const content = event.target.result;
+                                    resolve({ name: file.name, content });
+                                  } catch (error) {
+                                    reject(error);
+                                  }
+                                };
+                                reader.onerror = reject;
+                                reader.readAsText(file);
+                              });
+                            })
+                          );
+
+                          // Display file contents
+                          const display = fileContents.map(f => 
+                            `=== ${f.name} ===\n${f.content}`
+                          ).join('\n\n');
+
+                          toast.success(`Loaded ${files.length} file(s). Copy the content below and paste it in chat.`, {
+                            duration: 10000
+                          });
+
+                          // Create a textarea to display content for copying
+                          const textarea = document.createElement('textarea');
+                          textarea.value = display;
+                          textarea.style.position = 'fixed';
+                          textarea.style.top = '50%';
+                          textarea.style.left = '50%';
+                          textarea.style.transform = 'translate(-50%, -50%)';
+                          textarea.style.width = '80%';
+                          textarea.style.height = '80%';
+                          textarea.style.zIndex = '9999';
+                          textarea.style.padding = '20px';
+                          textarea.style.border = '3px solid #3b82f6';
+                          textarea.style.borderRadius = '8px';
+                          textarea.style.fontSize = '12px';
+                          textarea.style.fontFamily = 'monospace';
+                          document.body.appendChild(textarea);
+                          textarea.select();
+
+                          // Add close button
+                          const closeBtn = document.createElement('button');
+                          closeBtn.textContent = '✕ Close';
+                          closeBtn.style.position = 'fixed';
+                          closeBtn.style.top = 'calc(50% - 42%)';
+                          closeBtn.style.right = 'calc(50% - 42%)';
+                          closeBtn.style.zIndex = '10000';
+                          closeBtn.style.padding = '8px 16px';
+                          closeBtn.style.background = '#ef4444';
+                          closeBtn.style.color = 'white';
+                          closeBtn.style.border = 'none';
+                          closeBtn.style.borderRadius = '4px';
+                          closeBtn.style.cursor = 'pointer';
+                          closeBtn.onclick = () => {
+                            textarea.remove();
+                            closeBtn.remove();
+                          };
+                          document.body.appendChild(closeBtn);
+
+                        } catch (error) {
+                          console.error('Error reading files:', error);
+                          toast.error('Failed to read files: ' + error.message);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-slate-500">
+                      📁 Select multiple JSON files at once. After upload, copy the displayed content and paste it in the chat.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Door Code Management Section */}
               <Card>
                 <CardHeader>
