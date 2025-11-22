@@ -688,41 +688,22 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
     setLoadingBookingInfo(true);
 
     try {
-      // Check if person has Book with Me setup
-      const response = await base44.functions.invoke('checkUserBookingAvailability', {
-        targetUserEmail: person.mail || person.userPrincipalName
+      // Get person's booking options
+      const response = await base44.functions.invoke('getUserBookingOptions', {
+        userEmail: person.mail || person.userPrincipalName
       });
 
-      if (response.data.hasBookings && response.data.bookingBusiness) {
-        setHasBookings(true);
-        setBookingBusiness(response.data.bookingBusiness);
-
-        // If it's a "Book with Me" page, open it directly
-        if (response.data.bookingType === 'bookwithme' && response.data.bookingBusiness.bookWithMeUrl) {
-          window.open(response.data.bookingBusiness.bookWithMeUrl, '_blank');
-          toast.success(`Opening ${person.displayName}'s booking page...`);
-          resetBookingModal();
-        } else {
-          // It's a formal Bookings business - load services
-          const servicesResponse = await base44.functions.invoke('getBookingServices', {
-            businessId: response.data.bookingBusiness.id
-          });
-
-          if (servicesResponse.data.success) {
-            setBookingServices(servicesResponse.data.services || []);
-          }
-
-          setBookingStep('booking-form');
-        }
+      if (response.data.success && response.data.options && response.data.options.length > 0) {
+        setBookingServices(response.data.options);
+        setBookingStep('booking-form');
       } else {
-        setHasBookings(false);
-        setBookingStep('meeting-request');
+        toast.info(`Unable to load booking options for ${person.displayName}`);
+        resetBookingModal();
       }
     } catch (error) {
-      console.error('Error checking booking availability:', error);
-      toast.error('Failed to check booking availability for this person.');
-      setHasBookings(false);
-      setBookingStep('meeting-request');
+      console.error('Error loading booking options:', error);
+      toast.error('Failed to load booking options');
+      resetBookingModal();
     } finally {
       setLoadingBookingInfo(false);
     }
@@ -730,19 +711,19 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
-    setLoadingBookingInfo(true); // Re-using loadingBookingInfo for form submission
+    setLoadingBookingInfo(true);
 
     try {
-      if (!selectedPerson || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user || !bookingBusiness) {
-        toast.error('Please fill all required fields and ensure user data is available.');
+      if (!selectedPerson || !bookingData.serviceId || !bookingData.date || !bookingData.time || !user) {
+        toast.error('Please fill all required fields');
         setLoadingBookingInfo(false);
         return;
       }
 
-      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`; // Ensure seconds are included for ISO string
+      const startDateTimeString = `${bookingData.date}T${bookingData.time}:00`;
       const startDateTime = new Date(startDateTimeString);
       const service = bookingServices.find(s => s.id === bookingData.serviceId);
-      const durationInMinutes = service ? service.defaultDuration / 60 : bookingData.duration;
+      const durationInMinutes = service ? service.duration : bookingData.duration;
       const endDateTime = addMinutes(startDateTime, durationInMinutes);
 
       if (isNaN(startDateTime.getTime())) {
@@ -751,27 +732,25 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
         return;
       }
 
-      const response = await base44.functions.invoke('createMicrosoftBooking', {
-        businessId: bookingBusiness.id,
-        serviceId: bookingData.serviceId,
-        // staffMemberId: staff members are auto-assigned by Bookings by default when not specified
+      const response = await base44.functions.invoke('bookPersonalMeeting', {
+        attendeeEmail: selectedPerson.mail || selectedPerson.userPrincipalName,
+        attendeeName: selectedPerson.displayName,
         startDateTime: startDateTime.toISOString(),
         endDateTime: endDateTime.toISOString(),
-        customerName: user.full_name || user.email.split('@')[0], // Fallback for name
-        customerEmail: user.email,
+        subject: service.name,
         notes: bookingData.notes
       });
 
       if (response.data.success) {
-        toast.success('Booking created successfully!');
+        toast.success('Meeting booked successfully!');
         resetBookingModal();
-        await loadData(); // Reload meetings to show the new booking
+        await loadData();
       } else {
-        toast.error(response.data.message || 'Failed to create booking.');
+        toast.error(response.data.message || 'Failed to book meeting.');
       }
     } catch (error) {
-      console.error('Error creating booking:', error);
-      toast.error('Failed to create booking: ' + error.message);
+      console.error('Error booking meeting:', error);
+      toast.error('Failed to book meeting: ' + error.message);
     } finally {
       setLoadingBookingInfo(false);
     }
@@ -1949,15 +1928,13 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                     <p className="text-sm">
                       <strong>Booking with:</strong> {selectedPerson.displayName}
                     </p>
-                    {bookingBusiness && (
-                      <p className="text-xs text-slate-600 mt-1">
-                        Business: {bookingBusiness.displayName}
-                      </p>
-                    )}
+                    <p className="text-xs text-slate-600 mt-1">
+                      {selectedPerson.mail || selectedPerson.userPrincipalName}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Service</label>
+                    <label className="text-sm font-medium">Meeting Duration</label>
                     <Select
                       value={bookingData.serviceId}
                       onValueChange={(value) => setBookingData({...bookingData, serviceId: value})}
@@ -1965,12 +1942,12 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                       disabled={bookingServices.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a service..." />
+                        <SelectValue placeholder="Select meeting length..." />
                       </SelectTrigger>
                       <SelectContent>
                         {bookingServices.map(service => (
                           <SelectItem key={service.id} value={service.id}>
-                            {service.displayName} ({service.defaultDuration / 60} min)
+                            {service.name} - {service.description}
                           </SelectItem>
                         ))}
                       </SelectContent>
