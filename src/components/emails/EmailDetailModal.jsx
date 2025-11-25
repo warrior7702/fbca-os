@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -8,14 +7,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Calendar, Paperclip, ExternalLink, User, FileText, CheckSquare, Loader2, Sparkles } from "lucide-react";
+import { Mail, Calendar, Paperclip, ExternalLink, User, FileText, CheckSquare, Loader2, Sparkles, Flag, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner"; // Assuming sonner is used for toasts, add this import
 
-export default function EmailDetailModal({ open, onOpenChange, email }) {
+export default function EmailDetailModal({ open, onOpenChange, email, onEmailUpdated }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [removingFlag, setRemovingFlag] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     if (open && email?.bodyPreview) {
@@ -80,6 +81,60 @@ Be concise and specific.`,
   };
 
   if (!email) return null;
+
+  const handleRemoveFlag = async () => {
+    if (!email?.messageId) {
+      toast.error('Cannot remove flag - no message ID');
+      return;
+    }
+    
+    setRemovingFlag(true);
+    try {
+      const response = await base44.functions.invoke('removeEmailFlag', {
+        messageId: email.messageId
+      });
+      
+      if (response.data.success) {
+        toast.success('Flag removed');
+        onOpenChange(false);
+        if (onEmailUpdated) onEmailUpdated();
+      } else {
+        throw new Error(response.data.error || 'Failed to remove flag');
+      }
+    } catch (error) {
+      console.error('Remove flag error:', error);
+      toast.error('Failed to remove flag: ' + (error.message || 'Unknown error'));
+    } finally {
+      setRemovingFlag(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!email?.messageId) {
+      toast.error('Cannot archive - no message ID');
+      return;
+    }
+    
+    setArchiving(true);
+    try {
+      const response = await base44.functions.invoke('archiveEmail', {
+        messageId: email.messageId
+      });
+      
+      if (response.data.success) {
+        toast.success('Email archived');
+        onOpenChange(false);
+        if (onEmailUpdated) onEmailUpdated();
+      } else {
+        throw new Error(response.data.error || 'Failed to archive');
+      }
+    } catch (error) {
+      console.error('Archive error:', error);
+      toast.error('Failed to archive: ' + (error.message || 'Unknown error'));
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleOpenInOutlook = () => {
     if (!email) return;
@@ -311,21 +366,50 @@ Be concise and specific.`,
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
-            <Button
-              onClick={handleOpenInOutlook}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Open in Outlook
-            </Button>
-            {/* The close button was removed from the outline, but keeping it makes sense for user experience unless explicitly asked to remove */}
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Close
-            </Button>
+          <div className="flex flex-col gap-2 pt-4 border-t">
+            <div className="flex gap-2">
+              <Button
+                onClick={handleOpenInOutlook}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open in Outlook
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRemoveFlag}
+                disabled={removingFlag}
+                className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+              >
+                {removingFlag ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Flag className="w-4 h-4 mr-2" />
+                )}
+                Remove Flag
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleArchive}
+                disabled={archiving}
+                className="flex-1 text-slate-600 border-slate-300 hover:bg-slate-50"
+              >
+                {archiving ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Archive className="w-4 h-4 mr-2" />
+                )}
+                Archive
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
