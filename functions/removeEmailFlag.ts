@@ -15,8 +15,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    // Get access token from SSO
-    const accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+    // Try SSO token first, then fall back to stored token
+    let accessToken = null;
+    try {
+      accessToken = await base44.asServiceRole.sso.getAccessToken(user.id);
+    } catch (e) {
+      console.log('SSO token not available, using stored token');
+    }
+    
+    if (!accessToken && user.microsoft_access_token) {
+      accessToken = user.microsoft_access_token;
+    }
     
     if (!accessToken) {
       return Response.json({ error: 'Microsoft not connected' }, { status: 401 });
