@@ -246,10 +246,13 @@ export default function InboxHelper() {
         <EmailDetailModal
           email={selectedEmail}
           open={showEmailDetail}
-          onClose={() => {
-            setShowEmailDetail(false);
-            setSelectedEmail(null);
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowEmailDetail(false);
+              setSelectedEmail(null);
+            }
           }}
+          onEmailUpdated={loadEmails}
         />
       )}
     </div>
