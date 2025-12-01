@@ -64,6 +64,17 @@ export default function SupportTickets() {
     loadData();
   }, [ticketId]);
 
+  // Refresh data when page becomes visible (returning from ticket detail)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !ticketId) {
+        loadData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [ticketId]);
+
   const loadData = async () => {
     setLoading(true);
     try {
