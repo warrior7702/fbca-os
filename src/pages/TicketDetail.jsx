@@ -122,6 +122,13 @@ export default function TicketDetail() {
       const tickets = await base44.entities.Ticket.filter({ id: ticketId });
       if (tickets && tickets.length > 0) {
         setTicket(tickets[0]);
+        // Initialize due date value
+        const dueDate = tickets[0].due_date;
+        if (dueDate) {
+          setDueDateValue(dueDate.includes('T') ? dueDate.split('T')[0] : dueDate);
+        } else {
+          setDueDateValue("");
+        }
         
         // Calculate time to first response if not set
         if (adminStatus && !tickets[0].time_to_first_response && tickets[0].comments?.length > 0) {
