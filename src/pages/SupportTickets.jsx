@@ -421,8 +421,33 @@ export default function SupportTickets() {
             </CardContent>
           </Card>
 
-          <TabsContent value={activeTab} className="space-y-3">
-            {filteredTickets.map((ticket) => (
+          <TabsContent value={activeTab} className="space-y-4">
+            {/* Group tickets by status */}
+            {['open', 'awaiting_information', 'awaiting_parts', 'resolved'].map(status => {
+              const statusTickets = filteredTickets.filter(t => t.status === status);
+              if (statusTickets.length === 0) return null;
+              
+              const statusLabels = {
+                'open': 'Open',
+                'awaiting_information': 'Awaiting Information',
+                'awaiting_parts': 'Awaiting Parts',
+                'resolved': 'Resolved'
+              };
+              const statusColors = {
+                'open': 'text-blue-700 bg-blue-50 border-blue-200',
+                'awaiting_information': 'text-yellow-700 bg-yellow-50 border-yellow-200',
+                'awaiting_parts': 'text-orange-700 bg-orange-50 border-orange-200',
+                'resolved': 'text-green-700 bg-green-50 border-green-200'
+              };
+              
+              return (
+                <div key={status} className="space-y-3">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${statusColors[status]}`}>
+                    <span className="font-semibold text-sm">{statusLabels[status]}</span>
+                    <Badge variant="secondary" className="text-xs">{statusTickets.length}</Badge>
+                  </div>
+                  
+                  {statusTickets.map((ticket) => (
             <motion.div
               key={ticket.id}
               initial={{ opacity: 0, y: 10 }}
@@ -520,6 +545,8 @@ export default function SupportTickets() {
               </Card>
             </motion.div>
           ))}
+
+            )})}
 
             {filteredTickets.length === 0 && !loading && (
               <Card>
