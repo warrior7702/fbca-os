@@ -7,10 +7,10 @@ import {
   ArrowLeft,
   RefreshCw,
   Check,
-  AlertCircle,
-  List
+  List,
+  FolderOpen
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,14 +28,17 @@ import {
 export default function ImportClickUpTickets() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingLists, setLoadingLists] = useState(false);
   const [fetchingTasks, setFetchingTasks] = useState(false);
   const [importing, setImporting] = useState(false);
+  
+  const [lists, setLists] = useState([]);
+  const [selectedList, setSelectedList] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState({});
   const [importResults, setImportResults] = useState(null);
   const [existingTickets, setExistingTickets] = useState([]);
 
-  // Category mapping
   const [categoryMapping, setCategoryMapping] = useState({});
   const categories = ["technology", "cleaning", "maintenance"];
 
@@ -48,12 +51,11 @@ export default function ImportClickUpTickets() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
 
-      // Load existing tickets to check for duplicates
       const tickets = await base44.entities.Ticket.list();
       setExistingTickets(tickets);
 
       if (currentUser.clickup_access_token) {
-        await fetchClickUpTasks();
+        await fetchLists();
       }
     } catch (error) {
       console.error("Error loading data:", error);
@@ -62,27 +64,40 @@ export default function ImportClickUpTickets() {
     }
   };
 
-  const fetchClickUpTasks = async () => {
-    setFetchingTasks(true);
+  const fetchLists = async () => {
+    setLoadingLists(true);
     try {
-      const response = await base44.functions.invoke('getMyClickUpTasks');
-      const clickupTasks = response.data.tasks || [];
-      
-      // Filter to open tasks only
-      const openTasks = clickupTasks.filter(t => 
-        t.status?.toLowerCase() !== 'closed' && 
-        t.status?.toLowerCase() !== 'complete' &&
-        t.status?.toLowerCase() !== 'done'
-      );
-      
-      setTasks(openTasks);
-      toast.success(`Found ${openTasks.length} open tasks`);
+      const response = await base44.functions.invoke('getClickUpLists');
+      setLists(response.data.lists || []);
     } catch (error) {
-      console.error("Error fetching ClickUp tasks:", error);
-      toast.error("Failed to fetch ClickUp tasks");
+      console.error("Error fetching lists:", error);
+      toast.error("Failed to fetch ClickUp lists");
+    } finally {
+      setLoadingLists(false);
+    }
+  };
+
+  const fetchTasksForList = async (listId) => {
+    setFetchingTasks(true);
+    setTasks([]);
+    setSelectedTasks({});
+    try {
+      const response = await base44.functions.invoke('getClickUpTasksByList', { listId });
+      const clickupTasks = response.data.tasks || [];
+      setTasks(clickupTasks);
+      toast.success(`Found ${clickupTasks.length} tasks`);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      toast.error("Failed to fetch tasks");
     } finally {
       setFetchingTasks(false);
     }
+  };
+
+  const handleListSelect = (listId) => {
+    const list = lists.find(l => l.id === listId);
+    setSelectedList(list);
+    fetchTasksForList(listId);
   };
 
   const toggleTask = (taskId) => {
