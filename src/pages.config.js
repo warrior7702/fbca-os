@@ -56,6 +56,7 @@ import AssignmentRules from './pages/AssignmentRules';
 import Knowledgebase from './pages/Knowledgebase';
 import TicketReporting from './pages/TicketReporting';
 import ImportClickUpTickets from './pages/ImportClickUpTickets';
+import ImportTickets from './pages/ImportTickets';
 import __Layout from './Layout.jsx';
 
 
@@ -118,6 +119,7 @@ export const PAGES = {
     "Knowledgebase": Knowledgebase,
     "TicketReporting": TicketReporting,
     "ImportClickUpTickets": ImportClickUpTickets,
+    "ImportTickets": ImportTickets,
 }
 
 export const pagesConfig = {
