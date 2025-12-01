@@ -389,6 +389,11 @@ export default function TicketDetail() {
       const refreshedTickets = await base44.entities.Ticket.filter({ id: ticket.id });
       if (refreshedTickets && refreshedTickets.length > 0) {
         setTicket(refreshedTickets[0]);
+        // Update local state too
+        const newDueDate = refreshedTickets[0].due_date;
+        if (newDueDate) {
+          setDueDateValue(newDueDate.includes('T') ? newDueDate.split('T')[0] : newDueDate);
+        }
       }
       toast.success('Due date updated');
     } catch (error) {
