@@ -370,17 +370,24 @@ export default function TicketDetail() {
   };
 
   const handleDueDateChange = async (newDueDate) => {
+    setUpdatingDueDate(true);
     try {
-      // Use ticket.id for the update (ticketId from URL params should match, but ticket.id is more reliable)
+      console.log('Updating due date to:', newDueDate, 'for ticket:', ticket.id);
       await base44.entities.Ticket.update(ticket.id, {
         due_date: newDueDate,
         last_activity_at: new Date().toISOString()
       });
-      setTicket({ ...ticket, due_date: newDueDate });
+      // Re-fetch the ticket to ensure we have the latest data
+      const refreshedTickets = await base44.entities.Ticket.filter({ id: ticket.id });
+      if (refreshedTickets && refreshedTickets.length > 0) {
+        setTicket(refreshedTickets[0]);
+      }
       toast.success('Due date updated');
     } catch (error) {
       console.error('Error updating due date:', error);
       toast.error('Failed to update due date');
+    } finally {
+      setUpdatingDueDate(false);
     }
   };
 
