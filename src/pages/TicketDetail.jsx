@@ -923,19 +923,31 @@ export default function TicketDetail() {
                 <div>
                   <label className="text-sm font-medium text-slate-600 mb-2 block">Due Date</label>
                   {canManage ? (
-                    <div className="relative">
+                    <div className="flex gap-2">
                       <Input
                         type="date"
-                        value={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
-                        onChange={(e) => handleDueDateChange(e.target.value)}
-                        className="text-sm"
+                        defaultValue={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
+                        id="due-date-input"
+                        className="text-sm flex-1"
                         disabled={updatingDueDate}
                       />
-                      {updatingDueDate && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-                        </div>
-                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const input = document.getElementById('due-date-input');
+                          if (input && input.value) {
+                            handleDueDateChange(input.value);
+                          }
+                        }}
+                        disabled={updatingDueDate}
+                        className="bg-amber-600 hover:bg-amber-700"
+                      >
+                        {updatingDueDate ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Save'
+                        )}
+                      </Button>
                     </div>
                   ) : (
                     ticket.due_date ? (
