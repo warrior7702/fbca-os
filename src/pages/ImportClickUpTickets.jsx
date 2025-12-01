@@ -250,30 +250,64 @@ export default function ImportClickUpTickets() {
     <div className="h-full bg-gradient-to-br from-purple-50 to-indigo-50 p-6 overflow-auto">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to={createPageUrl('Ticketing')}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl shadow-lg">
-              <CheckSquare className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Import from ClickUp</h1>
-              <p className="text-slate-600">Select tasks to import as tickets</p>
-            </div>
+        <div className="flex items-center gap-3 mb-2">
+          <Link to={createPageUrl('Ticketing')}>
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl shadow-lg">
+            <CheckSquare className="w-6 h-6 text-white" />
           </div>
-          <Button 
-            onClick={fetchClickUpTasks} 
-            variant="outline"
-            disabled={fetchingTasks}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${fetchingTasks ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Import from ClickUp</h1>
+            <p className="text-slate-600">Select a list, then choose tasks to import</p>
+          </div>
         </div>
+
+        {/* List Selector */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-purple-600" />
+                <span className="font-medium">Select List:</span>
+              </div>
+              {loadingLists ? (
+                <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+              ) : (
+                <Select value={selectedList?.id || ""} onValueChange={handleListSelect}>
+                  <SelectTrigger className="w-72">
+                    <SelectValue placeholder="Choose a ClickUp list..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lists.map(list => (
+                      <SelectItem key={list.id} value={list.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{list.name}</span>
+                          <span className="text-xs text-slate-400">
+                            ({list.space}{list.folder ? ` / ${list.folder}` : ''})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedList && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => fetchTasksForList(selectedList.id)}
+                  disabled={fetchingTasks}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${fetchingTasks ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Import Results */}
         {importResults && (
