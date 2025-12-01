@@ -142,10 +142,11 @@ export default function TicketDetail() {
           ticket_role: 'worker'
         });
         
-        // Get staff details for these workers
-        const workerEmails = ticketWorkers.map(w => w.user_email);
-        const staff = await base44.entities.StaffContact.list();
-        const workers = staff.filter(s => workerEmails.includes(s.email));
+        // Use the role assignments directly - they have user_name and user_email
+        const workers = ticketWorkers.map(w => ({
+          email: w.user_email,
+          full_name: w.user_name || w.user_email
+        }));
         setStaffMembers(workers);
       }
     } catch (error) {

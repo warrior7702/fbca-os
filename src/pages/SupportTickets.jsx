@@ -155,6 +155,15 @@ export default function SupportTickets() {
     return colors[status] || colors.open;
   };
 
+  // Define status order for sorting
+  const statusOrder = {
+    'open': 1,
+    'awaiting_information': 2,
+    'awaiting_parts': 3,
+    'resolved': 4,
+    'archived': 5
+  };
+
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = !searchQuery || 
       ticket.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,6 +184,15 @@ export default function SupportTickets() {
     const matchesCategory = categoryFilter === "all" || ticket.category === categoryFilter;
     
     return matchesSearch && matchesTab && matchesPriority && matchesCategory;
+  }).sort((a, b) => {
+    // First sort by status
+    const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+    if (statusDiff !== 0) return statusDiff;
+    
+    // Then by due date (earliest first, no due date last)
+    const aDue = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+    const bDue = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+    return aDue - bDue;
   });
 
   const stats = {
