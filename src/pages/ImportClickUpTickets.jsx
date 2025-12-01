@@ -371,7 +371,14 @@ export default function ImportClickUpTickets() {
         </Card>
 
         {/* Tasks List */}
-        {fetchingTasks ? (
+        {!selectedList ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-20">
+              <FolderOpen className="w-16 h-16 text-slate-300 mb-4" />
+              <p className="text-slate-500">Select a list above to view tasks</p>
+            </CardContent>
+          </Card>
+        ) : fetchingTasks ? (
           <Card>
             <CardContent className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
@@ -381,7 +388,7 @@ export default function ImportClickUpTickets() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-20">
               <List className="w-16 h-16 text-slate-300 mb-4" />
-              <p className="text-slate-500">No open tasks found in ClickUp</p>
+              <p className="text-slate-500">No open tasks found in this list</p>
             </CardContent>
           </Card>
         ) : (
