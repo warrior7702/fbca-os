@@ -183,6 +183,17 @@ export default function MyTasks() {
     }
   }, [user]);
 
+  // Refresh tickets when page becomes visible (user returns from ticket detail)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        loadSupportTickets();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
   const handleScheduleEventClick = (event) => {
     setSelectedScheduleEvent(event);
     setShowScheduleEventDetail(true);
