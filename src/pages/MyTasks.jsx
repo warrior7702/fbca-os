@@ -241,10 +241,11 @@ export default function MyTasks() {
     setLoadingTickets(true);
     try {
       if (user?.email) {
+        // Force fresh fetch by adding timestamp to avoid caching
         const allTickets = await base44.entities.Ticket.filter({
           assigned_to: user.email,
           status: { $in: ['open', 'awaiting_information', 'awaiting_parts'] }
-        });
+        }, '-updated_date');
         setSupportTickets(allTickets);
         
         // Load user's departments and department tickets
