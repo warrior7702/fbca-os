@@ -142,11 +142,20 @@ export default function TicketDetail() {
           ticket_role: 'worker'
         });
         
-        // Use the role assignments directly - they have user_name and user_email
-        const workers = ticketWorkers.map(w => ({
+        let workers = ticketWorkers.map(w => ({
           email: w.user_email,
           full_name: w.user_name || w.user_email
         }));
+        
+        // If no workers defined, fall back to all users (for initial setup)
+        if (workers.length === 0) {
+          const allUsers = await base44.entities.User.list();
+          workers = allUsers.map(u => ({
+            email: u.email,
+            full_name: u.full_name || u.email
+          }));
+        }
+        
         setStaffMembers(workers);
       }
     } catch (error) {
