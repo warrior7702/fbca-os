@@ -545,8 +545,9 @@ export default function SupportTickets() {
               </Card>
             </motion.div>
           ))}
-
-            )})}
+                </div>
+              );
+            })}
 
             {filteredTickets.length === 0 && !loading && (
               <Card>
