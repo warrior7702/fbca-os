@@ -82,6 +82,7 @@ export default function TicketDetail() {
   const [tempBuilding, setTempBuilding] = useState("");
   const [tempRoomNumber, setTempRoomNumber] = useState("");
   const [updatingDueDate, setUpdatingDueDate] = useState(false);
+  const [dueDateValue, setDueDateValue] = useState("");
 
   const commentsEndRef = useRef(null);
 
