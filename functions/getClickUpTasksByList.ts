@@ -40,7 +40,13 @@ Deno.serve(async (req) => {
       priority: task.priority?.id,
       priorityName: task.priority?.priority,
       due_date: task.due_date ? parseInt(task.due_date) : null,
-      assignees: task.assignees?.map(a => a.username) || []
+      assignees: task.assignees?.map(a => ({ id: a.id, username: a.username, email: a.email })) || [],
+      creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email } : null,
+      folder: task.folder?.name,
+      list: task.list?.name,
+      tags: task.tags?.map(t => t.name) || [],
+      custom_fields: task.custom_fields?.map(cf => ({ name: cf.name, value: cf.value, type: cf.type })) || [],
+      url: task.url
     }));
 
     return Response.json({ tasks });
