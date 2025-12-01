@@ -934,20 +934,19 @@ export default function TicketDetail() {
                     <div className="flex gap-2">
                       <Input
                         type="date"
-                        defaultValue={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
-                        id="due-date-input"
+                        value={dueDateValue}
+                        onChange={(e) => setDueDateValue(e.target.value)}
                         className="text-sm flex-1"
                         disabled={updatingDueDate}
                       />
                       <Button
                         size="sm"
                         onClick={() => {
-                          const input = document.getElementById('due-date-input');
-                          if (input && input.value) {
-                            handleDueDateChange(input.value);
+                          if (dueDateValue) {
+                            handleDueDateChange(dueDateValue);
                           }
                         }}
-                        disabled={updatingDueDate}
+                        disabled={updatingDueDate || !dueDateValue}
                         className="bg-amber-600 hover:bg-amber-700"
                       >
                         {updatingDueDate ? (
