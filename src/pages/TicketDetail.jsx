@@ -923,12 +923,20 @@ export default function TicketDetail() {
                 <div>
                   <label className="text-sm font-medium text-slate-600 mb-2 block">Due Date</label>
                   {canManage ? (
-                    <Input
-                      type="date"
-                      value={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
-                      onChange={(e) => handleDueDateChange(e.target.value)}
-                      className="text-sm"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="date"
+                        value={ticket.due_date ? (ticket.due_date.includes('T') ? ticket.due_date.split('T')[0] : ticket.due_date) : ''}
+                        onChange={(e) => handleDueDateChange(e.target.value)}
+                        className="text-sm"
+                        disabled={updatingDueDate}
+                      />
+                      {updatingDueDate && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     ticket.due_date ? (
                       <p className="text-sm text-slate-900">
