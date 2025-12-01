@@ -422,7 +422,6 @@ export default function SupportTickets() {
           </Card>
 
           <TabsContent value={activeTab} className="space-y-4">
-            {/* Group tickets by status */}
             {['open', 'awaiting_information', 'awaiting_parts', 'resolved'].map(status => {
               const statusTickets = filteredTickets.filter(t => t.status === status);
               if (statusTickets.length === 0) return null;
@@ -448,103 +447,103 @@ export default function SupportTickets() {
                   </div>
                   
                   {statusTickets.map((ticket) => (
-            <motion.div
-              key={ticket.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.01 }}
-            >
-              <Card 
-                className="cursor-pointer hover:shadow-lg transition-all"
-                onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
-              >
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-slate-900">{ticket.subject}</h3>
-                      </div>
-                      
-                      <p className="text-sm text-slate-600 line-clamp-2">
-                        {ticket.description}
-                      </p>
-                      
-                      <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-                        <span className="font-mono">{ticket.ticket_number}</span>
-                        <span>•</span>
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(ticket.created_date), 'MMM d, yyyy')}
-                        {ticket.requester_name && (
-                          <>
-                            <span>•</span>
-                            <UserIcon className="w-3 h-3" />
-                            {ticket.requester_name}
-                          </>
-                        )}
-                        {ticket.building && (
-                          <>
-                            <span>•</span>
-                            <Badge variant="outline" className="text-xs">
-                              {ticket.building.replace('_', ' ')}
-                              {ticket.room_number && ` - ${ticket.room_number}`}
-                            </Badge>
-                          </>
-                        )}
-                        {ticket.due_date && (
-                          <>
-                            <span>•</span>
-                            <CalendarDays className="w-3 h-3 text-orange-600" />
-                            <span className="text-orange-600 font-medium">
-                              Due {format(new Date(ticket.due_date), 'MMM d')}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {getSourceBadge(ticket.source || 'manual_request')}
-                        <Badge className={getStatusColor(ticket.status)}>
-                          {ticket.status?.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                        </Badge>
-                        <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
-                          {ticket.priority?.charAt(0).toUpperCase() + ticket.priority?.slice(1)}
-                        </Badge>
-                        {ticket.category && (
-                          <Badge variant="secondary">
-                            {ticket.category.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </Badge>
-                        )}
-                        {ticket.comments && ticket.comments.length > 0 && (
-                         <Badge variant="outline" className="text-xs flex items-center gap-1">
-                           <MessageSquare className="w-3 h-3" />
-                           {ticket.comments.length}
-                         </Badge>
-                        )}
-                        </div>
-                        </div>
+                    <motion.div
+                      key={ticket.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ scale: 1.01 }}
+                    >
+                      <Card 
+                        className="cursor-pointer hover:shadow-lg transition-all"
+                        onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                      >
+                        <CardContent className="p-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-slate-900">{ticket.subject}</h3>
+                              </div>
+                              
+                              <p className="text-sm text-slate-600 line-clamp-2">
+                                {ticket.description}
+                              </p>
+                              
+                              <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                                <span className="font-mono">{ticket.ticket_number}</span>
+                                <span>•</span>
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(ticket.created_date), 'MMM d, yyyy')}
+                                {ticket.requester_name && (
+                                  <>
+                                    <span>•</span>
+                                    <UserIcon className="w-3 h-3" />
+                                    {ticket.requester_name}
+                                  </>
+                                )}
+                                {ticket.building && (
+                                  <>
+                                    <span>•</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {ticket.building.replace('_', ' ')}
+                                      {ticket.room_number && ` - ${ticket.room_number}`}
+                                    </Badge>
+                                  </>
+                                )}
+                                {ticket.due_date && (
+                                  <>
+                                    <span>•</span>
+                                    <CalendarDays className="w-3 h-3 text-orange-600" />
+                                    <span className="text-orange-600 font-medium">
+                                      Due {format(new Date(ticket.due_date), 'MMM d')}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                              
+                              <div className="flex flex-wrap gap-2">
+                                {getSourceBadge(ticket.source || 'manual_request')}
+                                <Badge className={getStatusColor(ticket.status)}>
+                                  {ticket.status?.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                </Badge>
+                                <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
+                                  {ticket.priority?.charAt(0).toUpperCase() + ticket.priority?.slice(1)}
+                                </Badge>
+                                {ticket.category && (
+                                  <Badge variant="secondary">
+                                    {ticket.category.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                  </Badge>
+                                )}
+                                {ticket.comments && ticket.comments.length > 0 && (
+                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                    <MessageSquare className="w-3 h-3" />
+                                    {ticket.comments.length}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
 
-                        {activeTab === 'pool' && !ticket.assigned_to && (
-                        <Button
-                        onClick={(e) => handleClaimTicket(e, ticket.id)}
-                        disabled={claiming === ticket.id}
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-shrink-0"
-                        size="sm"
-                        >
-                        {claiming === ticket.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Users className="w-4 h-4 mr-2" />
-                            Claim
-                          </>
-                        )}
-                        </Button>
-                        )}
-                        </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                            {activeTab === 'pool' && !ticket.assigned_to && (
+                              <Button
+                                onClick={(e) => handleClaimTicket(e, ticket.id)}
+                                disabled={claiming === ticket.id}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 flex-shrink-0"
+                                size="sm"
+                              >
+                                {claiming === ticket.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Users className="w-4 h-4 mr-2" />
+                                    Claim
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
                 </div>
               );
             })}
