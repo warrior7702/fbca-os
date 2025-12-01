@@ -370,9 +370,9 @@ export default function TicketDetail() {
 
   const handleDueDateChange = async (newDueDate) => {
     try {
-      // Store the date value directly without converting to Date object
-      await base44.entities.Ticket.update(ticketId, {
-        due_date: newDueDate, // Keep as YYYY-MM-DD string
+      // Use ticket.id for the update (ticketId from URL params should match, but ticket.id is more reliable)
+      await base44.entities.Ticket.update(ticket.id, {
+        due_date: newDueDate,
         last_activity_at: new Date().toISOString()
       });
       setTicket({ ...ticket, due_date: newDueDate });
