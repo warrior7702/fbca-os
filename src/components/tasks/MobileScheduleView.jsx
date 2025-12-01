@@ -129,18 +129,18 @@ export default function MobileScheduleView({ events, tickets = [], onEventClick,
               return (
                 <Card 
                   key={`ticket-${item.id}`} 
-                  className="border border-purple-300 bg-purple-50 hover:bg-purple-100 active:scale-98 transition-all"
+                  className="border border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-98 transition-all"
                   onClick={() => onTicketClick && onTicketClick(item)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
-                      <Ticket className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <Ticket className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-1">
                           {item.subject}
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-[10px] bg-purple-100 border-purple-300 text-purple-700">
+                          <Badge variant="outline" className="text-[10px] bg-blue-100 border-blue-300 text-blue-700">
                             {item.category?.replace('_', ' ') || 'Ticket'}
                           </Badge>
                           <Badge variant="outline" className="text-[10px]">

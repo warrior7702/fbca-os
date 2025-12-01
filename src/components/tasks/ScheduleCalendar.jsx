@@ -191,17 +191,17 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
                         {dayTickets.map((ticket) => (
                         <Card 
                           key={`ticket-${ticket.id}`} 
-                          className="border border-purple-300 bg-purple-50 hover:bg-purple-100 hover:shadow-md transition-all cursor-pointer"
+                          className="border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:shadow-md transition-all cursor-pointer"
                           onClick={() => onTicketClick && onTicketClick(ticket)}
                         >
                           <CardContent className="p-2 space-y-1">
                             <div className="flex items-center gap-1">
-                              <Ticket className="w-3 h-3 text-purple-600" />
+                              <Ticket className="w-3 h-3 text-blue-600" />
                               <p className="text-xs font-semibold text-slate-900 line-clamp-2">
                                 {ticket.subject}
                               </p>
                             </div>
-                            <Badge variant="outline" className="text-[9px] bg-purple-100 border-purple-300 text-purple-700">
+                            <Badge variant="outline" className="text-[9px] bg-blue-100 border-blue-300 text-blue-700">
                               {ticket.category?.replace('_', ' ') || 'Ticket'}
                             </Badge>
                           </CardContent>
