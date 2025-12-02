@@ -151,13 +151,13 @@ export default function DeptTaskDetailModal({
             {isEditing ? (
               <Input
                 type="date"
-                value={editedTask.dueDate?.split('T')[0] || ''}
+                value={editedTask.dueDate ? (editedTask.dueDate.includes('T') ? editedTask.dueDate.split('T')[0] : editedTask.dueDate) : ''}
                 onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value })}
               />
             ) : (
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-teal-600" />
-                <span className="font-medium">{format(new Date(task.dueDate), 'EEEE, MMMM d, yyyy')}</span>
+                <span className="font-medium">{task.dueDate ? format(new Date(task.dueDate), 'EEEE, MMMM d, yyyy') : 'No due date'}</span>
               </div>
             )}
           </div>
