@@ -31,6 +31,14 @@ export default function DeptTaskDetailModal({
   const [editedTask, setEditedTask] = useState(task || {});
   const [isEditing, setIsEditing] = useState(false);
 
+  // Reset editedTask when task changes
+  React.useEffect(() => {
+    if (task) {
+      setEditedTask(task);
+      setIsEditing(false);
+    }
+  }, [task]);
+
   if (!task) return null;
 
   const handleSave = () => {
