@@ -1545,7 +1545,11 @@ export default function MyDepartment() {
                               details: newTaskDetails,
                               assignee: newTaskAssignee,
                               assigneeName: worker?.user_name || newTaskAssignee,
-                              dueDate: newTaskDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+                              dueDate: newTaskDueDate || (() => {
+                                const d = new Date();
+                                d.setDate(d.getDate() + 7);
+                                return d.toISOString().split('T')[0];
+                              })(),
                               completed: false,
                               createdBy: user?.full_name || user?.email,
                               createdAt: new Date().toISOString()
