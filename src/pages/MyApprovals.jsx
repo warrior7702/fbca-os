@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -452,12 +451,32 @@ export default function MyApprovals() {
           icon={ClipboardCheck}
           title="My Approvals"
           description={
-            <div className="flex items-center gap-2">
-              <span>{approvals.length} pending approval{approvals.length !== 1 ? 's' : ''}</span>
-              {lastSync && (
-                <span className="text-xs text-slate-500">
-                  • Last synced: {format(lastSync, 'h:mm a')}
-                </span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span>{approvals.length} pending approval{approvals.length !== 1 ? 's' : ''}</span>
+                {lastSync && (
+                  <span className="text-xs text-slate-500">
+                    • Last synced: {format(lastSync, 'h:mm a')}
+                  </span>
+                )}
+              </div>
+              {approvals.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {Object.entries(
+                    approvals.reduce((acc, a) => {
+                      const group = a.approval_group_name || 'Unknown';
+                      acc[group] = (acc[group] || 0) + 1;
+                      return acc;
+                    }, {})
+                  ).map(([groupName, count]) => {
+                    const colors = getGroupColor(groupName);
+                    return (
+                      <Badge key={groupName} className={`${colors.badge} text-xs`}>
+                        {groupName}: {count}
+                      </Badge>
+                    );
+                  })}
+                </div>
               )}
             </div>
           }
