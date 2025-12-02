@@ -30,8 +30,14 @@ import {
   BarChart3,
   AlertCircle,
   Target,
-  Flame
+  Flame,
+  Plus,
+  GripVertical,
+  UserPlus,
+  CalendarClock,
+  Send
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +67,14 @@ export default function MyDepartment() {
   const [activeTab, setActiveTab] = useState("overview");
   const [userRole, setUserRole] = useState(null);
   const [userDepartments, setUserDepartments] = useState([]);
+  const [departmentWorkers, setDepartmentWorkers] = useState([]);
+  const [unassignedTickets, setUnassignedTickets] = useState([]);
+  const [routineTasks, setRoutineTasks] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
+  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
+  const [addingTask, setAddingTask] = useState(false);
+  const [draggedTicket, setDraggedTicket] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -83,6 +97,12 @@ export default function MyDepartment() {
           setUserRole(userData.ticket_role);
           setUserDepartments(userData.departments || []);
         }
+        
+        // Get workers for user's departments
+        const workers = rolesResponse.data.allUsers.filter(u => 
+          u.ticket_role === 'worker' || u.ticket_role === 'admin'
+        );
+        setDepartmentWorkers(workers);
       }
 
       const isOperationsManager = currentUser.email?.toLowerCase().includes('andy') || 
@@ -95,6 +115,13 @@ export default function MyDepartment() {
 
       const allTickets = await base44.entities.Ticket.list('-created_date');
       setTickets(allTickets);
+      
+      // Get unassigned tickets
+      const unassigned = allTickets.filter(t => 
+        !t.assigned_to && 
+        ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)
+      );
+      setUnassignedTickets(unassigned);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load department data');
@@ -232,7 +259,9 @@ export default function MyDepartment() {
 
   const getTicketsByStatus = () => {
     const statusData = {};
-    filteredTickets.forEach(t => {
+    // Only count open statuses (not resolved/closed/archived)
+    const openStatuses = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'];
+    filteredTickets.filter(t => openStatuses.includes(t.status)).forEach(t => {
       const status = t.status || 'open';
       statusData[status] = (statusData[status] || 0) + 1;
     });
@@ -241,10 +270,7 @@ export default function MyDepartment() {
       open: '#3b82f6',
       in_progress: '#8b5cf6',
       awaiting_information: '#f59e0b',
-      awaiting_parts: '#f97316',
-      resolved: '#10b981',
-      closed: '#6b7280',
-      archived: '#94a3b8'
+      awaiting_parts: '#f97316'
     };
     
     return Object.entries(statusData).map(([name, value]) => ({
@@ -1156,40 +1182,346 @@ export default function MyDepartment() {
           </TabsContent>
 
           <TabsContent value="department" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-violet-600" />
-                  Department Resources
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {userDepartments.length > 0 ? (
-                    userDepartments.map((dept, index) => (
-                      <div key={index} className="p-4 bg-violet-50 rounded-lg border border-violet-200">
-                        <h3 className="font-semibold text-slate-900 mb-2">{dept}</h3>
-                        <p className="text-sm text-slate-600 mb-3">
-                          Welcome to your department page! More features coming soon.
-                        </p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">
-                            Team Directory
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            Resources
-                          </Button>
+            {/* Only show management features for workers and admins */}
+            {(userRole === 'worker' || userRole === 'admin' || isPreviewMode) ? (
+              <>
+                {/* Unassigned Tickets - Drag and Drop */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-orange-600" />
+                      Tickets Needing Assignment ({unassignedTickets.filter(t => {
+                        const ticketDept = getDepartment(t.category);
+                        return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                      }).length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid lg:grid-cols-2 gap-4">
+                      {/* Unassigned Tickets List */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-600 mb-2">Drag to assign:</p>
+                        {unassignedTickets.filter(t => {
+                          const ticketDept = getDepartment(t.category);
+                          return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                        }).length > 0 ? (
+                          unassignedTickets.filter(t => {
+                            const ticketDept = getDepartment(t.category);
+                            return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                          }).map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              draggable
+                              onDragStart={() => setDraggedTicket(ticket)}
+                              onDragEnd={() => setDraggedTicket(null)}
+                              className="p-3 bg-orange-50 rounded-lg border border-orange-200 cursor-grab active:cursor-grabbing hover:shadow-md transition-all flex items-start gap-2"
+                            >
+                              <GripVertical className="w-4 h-4 text-orange-400 mt-1 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                                  <span>{ticket.ticket_number}</span>
+                                  <Badge className={`text-xs ${
+                                    ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                    ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {ticket.priority}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {ticket.category?.replace(/_/g, ' ')}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-center text-slate-500 py-4 text-sm">
+                            No unassigned tickets
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Workers Drop Zones */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-slate-600 mb-2">Drop on worker to assign:</p>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {departmentWorkers.filter(w => {
+                            // Filter workers by department
+                            const workerDepts = w.departments || [];
+                            return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
+                          }).map((worker) => (
+                            <div
+                              key={worker.user_email}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={async (e) => {
+                                e.preventDefault();
+                                if (draggedTicket) {
+                                  try {
+                                    await base44.entities.Ticket.update(draggedTicket.id, {
+                                      assigned_to: worker.user_email,
+                                      assigned_to_name: worker.user_name || worker.user_email,
+                                      last_activity_at: new Date().toISOString()
+                                    });
+                                    toast.success(`Assigned to ${worker.user_name || worker.user_email}`);
+                                    setUnassignedTickets(prev => prev.filter(t => t.id !== draggedTicket.id));
+                                    setDraggedTicket(null);
+                                  } catch (error) {
+                                    toast.error('Failed to assign ticket');
+                                  }
+                                }
+                              }}
+                              className={`p-3 rounded-lg border-2 border-dashed transition-all ${
+                                draggedTicket 
+                                  ? 'border-violet-400 bg-violet-50' 
+                                  : 'border-slate-200 bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
+                                  {(worker.user_name || worker.user_email)?.[0]?.toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-900 text-sm">{worker.user_name || worker.user_email}</p>
+                                  <p className="text-xs text-slate-500">{worker.departments?.join(', ')}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-slate-500 py-8">
-                      No department assigned yet
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Quick Add Task */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Plus className="w-5 h-5 text-green-600" />
+                      Quick Add Task
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Input
+                        placeholder="Task title..."
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                        <SelectTrigger className="w-full sm:w-48">
+                          <SelectValue placeholder="Assign to..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departmentWorkers.filter(w => {
+                            const workerDepts = w.departments || [];
+                            return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
+                          }).map((worker) => (
+                            <SelectItem key={worker.user_email} value={worker.user_email}>
+                              {worker.user_name || worker.user_email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={async () => {
+                          if (!newTaskTitle.trim() || !newTaskAssignee) {
+                            toast.error('Please enter a task and select an assignee');
+                            return;
+                          }
+                          setAddingTask(true);
+                          try {
+                            const ticketNumber = `TKT-${Date.now().toString().slice(-6)}`;
+                            const worker = departmentWorkers.find(w => w.user_email === newTaskAssignee);
+                            await base44.entities.Ticket.create({
+                              ticket_number: ticketNumber,
+                              subject: newTaskTitle,
+                              description: `Quick task created by ${user?.full_name || user?.email}`,
+                              status: 'open',
+                              priority: 'medium',
+                              category: 'technology',
+                              source: 'workflow',
+                              requester_email: user?.email,
+                              requester_name: user?.full_name,
+                              assigned_to: newTaskAssignee,
+                              assigned_to_name: worker?.user_name || newTaskAssignee,
+                              due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+                            });
+                            toast.success('Task created!');
+                            setNewTaskTitle("");
+                            setNewTaskAssignee("");
+                            loadData();
+                          } catch (error) {
+                            toast.error('Failed to create task');
+                          } finally {
+                            setAddingTask(false);
+                          }
+                        }}
+                        disabled={addingTask || !newTaskTitle.trim() || !newTaskAssignee}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {addingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Monthly / Routine Tasks */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarClock className="w-5 h-5 text-blue-600" />
+                      Monthly & Routine Tasks
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Add Routine Task Form */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm font-medium text-slate-700 mb-3">Add Routine Task</p>
+                        <div className="grid sm:grid-cols-4 gap-3">
+                          <Input
+                            placeholder="Task title..."
+                            value={newRoutineTask.title}
+                            onChange={(e) => setNewRoutineTask({...newRoutineTask, title: e.target.value})}
+                            className="sm:col-span-2"
+                          />
+                          <Select 
+                            value={newRoutineTask.frequency} 
+                            onValueChange={(v) => setNewRoutineTask({...newRoutineTask, frequency: v})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="quarterly">Quarterly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select 
+                            value={newRoutineTask.assignee} 
+                            onValueChange={(v) => setNewRoutineTask({...newRoutineTask, assignee: v})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Assign to..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {departmentWorkers.filter(w => {
+                                const workerDepts = w.departments || [];
+                                return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
+                              }).map((worker) => (
+                                <SelectItem key={worker.user_email} value={worker.user_email}>
+                                  {worker.user_name || worker.user_email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            if (!newRoutineTask.title.trim()) {
+                              toast.error('Please enter a task title');
+                              return;
+                            }
+                            setRoutineTasks([...routineTasks, { 
+                              ...newRoutineTask, 
+                              id: Date.now(),
+                              assigneeName: departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee
+                            }]);
+                            setNewRoutineTask({ title: "", frequency: "monthly", assignee: "" });
+                            toast.success('Routine task added!');
+                          }}
+                          size="sm"
+                          className="mt-3 bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Routine Task
+                        </Button>
+                      </div>
+
+                      {/* Routine Tasks List */}
+                      {routineTasks.length > 0 ? (
+                        <div className="space-y-2">
+                          {routineTasks.map((task) => (
+                            <div key={task.id} className="p-3 bg-white rounded-lg border flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <RepeatIcon className="w-4 h-4 text-blue-500" />
+                                <div>
+                                  <p className="font-medium text-slate-900 text-sm">{task.title}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)} • {task.assigneeName || 'Unassigned'}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setRoutineTasks(routineTasks.filter(t => t.id !== task.id))}
+                              >
+                                <X className="w-4 h-4 text-slate-400" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center text-slate-500 py-4 text-sm">
+                          No routine tasks configured yet
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Department Resources */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-violet-600" />
+                      Department Resources
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {userDepartments.length > 0 ? (
+                        userDepartments.map((dept, index) => (
+                          <div key={index} className="p-4 bg-violet-50 rounded-lg border border-violet-200">
+                            <h3 className="font-semibold text-slate-900 mb-2">{dept}</h3>
+                            <p className="text-sm text-slate-600 mb-3">
+                              Team members: {departmentWorkers.filter(w => w.departments?.includes(dept)).length}
+                            </p>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline">
+                                Team Directory
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                Resources
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-center text-slate-500 py-8">
+                          No department assigned yet
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500">
+                    Department management features are only available to workers and admins.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {isPreviewMode && (
