@@ -733,48 +733,115 @@ export default function TicketDetail() {
               )}
             </AnimatePresence>
 
-            {/* Comments */}
+            {/* Activity Feed */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Discussion ({ticket.comments?.length || 0})
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Activity Feed
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
-                  <AnimatePresence>
-                    {ticket.comments && ticket.comments.map((comment, idx) => (
+                <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                  {(() => {
+                    // Build activity feed from all sources
+                    const activities = [];
+
+                    // Ticket created
+                    activities.push({
+                      type: 'created',
+                      timestamp: ticket.created_date,
+                      actor: ticket.requester_name || ticket.requester_email,
+                      details: `Ticket created via ${ticket.source || 'web form'}`
+                    });
+
+                    // Comments
+                    if (ticket.comments) {
+                      ticket.comments.forEach((comment, idx) => {
+                        activities.push({
+                          type: comment.is_internal ? 'internal_note' : 'comment',
+                          timestamp: comment.timestamp,
+                          actor: comment.author_name || comment.author_email,
+                          details: comment.content,
+                          is_internal: comment.is_internal
+                        });
+                      });
+                    }
+
+                    // Status changes (resolved, archived)
+                    if (ticket.resolved_at) {
+                      activities.push({
+                        type: 'status_change',
+                        timestamp: ticket.resolved_at,
+                        actor: 'System',
+                        details: 'Ticket marked as resolved'
+                      });
+                    }
+
+                    if (ticket.archived_at) {
+                      activities.push({
+                        type: 'status_change',
+                        timestamp: ticket.archived_at,
+                        actor: 'System',
+                        details: 'Ticket archived'
+                      });
+                    }
+
+                    // Sort by timestamp ascending
+                    activities.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                    const getActivityIcon = (type) => {
+                      switch (type) {
+                        case 'created': return <TicketIcon className="w-3 h-3 text-green-600" />;
+                        case 'comment': return <MessageSquare className="w-3 h-3 text-blue-600" />;
+                        case 'internal_note': return <AlertCircle className="w-3 h-3 text-amber-600" />;
+                        case 'status_change': return <CheckCircle2 className="w-3 h-3 text-purple-600" />;
+                        case 'email_sent': return <Mail className="w-3 h-3 text-cyan-600" />;
+                        default: return <Clock className="w-3 h-3 text-slate-500" />;
+                      }
+                    };
+
+                    const getActivityColor = (type) => {
+                      switch (type) {
+                        case 'created': return 'border-l-green-500 bg-green-50';
+                        case 'comment': return 'border-l-blue-500 bg-blue-50';
+                        case 'internal_note': return 'border-l-amber-500 bg-amber-50';
+                        case 'status_change': return 'border-l-purple-500 bg-purple-50';
+                        case 'email_sent': return 'border-l-cyan-500 bg-cyan-50';
+                        default: return 'border-l-slate-300 bg-slate-50';
+                      }
+                    };
+
+                    return activities.map((activity, idx) => (
                       <motion.div
                         key={idx}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`p-3 sm:p-4 rounded-lg ${
-                          comment.is_internal 
-                            ? 'bg-amber-50 border-2 border-amber-200' 
-                            : 'bg-slate-50'
-                        }`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className={`p-3 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
                       >
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                            <User className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                        <div className="flex items-start gap-2">
+                          <div className="mt-0.5 flex-shrink-0">
+                            {getActivityIcon(activity.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <p className="font-semibold text-slate-900 text-sm sm:text-base">{comment.author_name}</p>
-                              {comment.is_internal && (
-                                <Badge variant="outline" className="text-xs">Internal</Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm text-slate-900">{activity.actor}</span>
+                              {activity.is_internal && (
+                                <Badge variant="outline" className="text-xs bg-amber-100">Internal</Badge>
                               )}
                               <span className="text-xs text-slate-500">
-                                {formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}
+                                {format(new Date(activity.timestamp), 'MMM d, yyyy h:mm a')}
                               </span>
                             </div>
-                            <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap break-words">{comment.content}</p>
+                            <p className="text-sm text-slate-700 mt-1 whitespace-pre-wrap break-words">
+                              {activity.details}
+                            </p>
                           </div>
                         </div>
                       </motion.div>
-                    ))}
-                  </AnimatePresence>
+                    ));
+                  })()}
                   <div ref={commentsEndRef} />
                 </div>
 
