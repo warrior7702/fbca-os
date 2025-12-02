@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log('📦 Request body:', JSON.stringify(body, null, 2));
 
-    const { event_id, badge_code } = body;
+    const { event_id, badge_code, access_time } = body;
 
     if (!event_id) {
       console.error('❌ Missing event_id');
@@ -76,7 +76,11 @@ Deno.serve(async (req) => {
     console.log('🚪 Door Code:', formattedCode);
 
     // Create comment text for activity thread
-    const commentText = `🚪 Building Access Approved\n\nDoor Code: ${formattedCode}`;
+    let commentText = `🚪 Building Access Approved\n\n`;
+    if (access_time) {
+      commentText += `Access Time: ${access_time}\n`;
+    }
+    commentText += `Door Code: ${formattedCode}`;
 
     // Use Bearer token (user's OAuth token)
     const url = `https://api.planningcenteronline.com/calendar/v2/events/${event_id}/event_comments`;
