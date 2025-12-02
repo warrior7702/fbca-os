@@ -731,25 +731,101 @@ export default function MyApprovals() {
                           </>
                         )}
 
-                        {/* Non-building access: just show View in PCO button */}
-                        {!(approval.approval_group_name?.toLowerCase().includes('building') || 
-                           approval.approval_group_name?.toLowerCase().includes('access')) && (
-                          <div className="pt-4">
-                            <Button
-                              onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
-                              variant="outline"
-                              className="w-full"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              View in PCO
-                            </Button>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
                 );
-              })
+              })}
+
+                    {/* Grouped Event Approvals (Room Setup, Maintenance, etc.) */}
+                    {Object.values(groupedByEvent).map((eventGroup) => {
+                      const firstApproval = eventGroup.approvals[0];
+                      const colors = getGroupColor(firstApproval.approval_group_name);
+
+                      return (
+                        <motion.div
+                          key={eventGroup.event_id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          className={`border-2 rounded-lg ${colors.border} ${colors.bg} hover:shadow-lg transition-all`}
+                        >
+                          <Card className="border-0 bg-transparent">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="text-xl mb-2">{eventGroup.event_name}</CardTitle>
+                                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className={`w-4 h-4 ${colors.icon}`} />
+                                      {eventGroup.event_starts_at ? format(parseISO(eventGroup.event_starts_at), 'EEE, MMM d, yyyy') : 'Date not set'}
+                                    </div>
+                                    <span>•</span>
+                                    <div className="flex items-center gap-1">
+                                      <Clock className={`w-4 h-4 ${colors.icon}`} />
+                                      {eventGroup.event_starts_at ? format(parseISO(eventGroup.event_starts_at), 'h:mm a') : 'Time not set'}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Badge className={`${colors.badge} flex items-center gap-1`}>
+                                  <AlertCircle className="w-3 h-3" />
+                                  {eventGroup.approvals.length} Pending
+                                </Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              {/* List each room/resource in this event */}
+                              {eventGroup.approvals.map((approval) => {
+                                const approvalColors = getGroupColor(approval.approval_group_name);
+                                const previewAnswers = answerPreviews[approval.request_id] || [];
+
+                                return (
+                                  <div 
+                                    key={approval.request_id}
+                                    className="p-3 bg-white/60 rounded-lg border border-slate-200"
+                                  >
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className={`w-4 h-4 ${approvalColors.icon}`} />
+                                        <span className="font-medium text-slate-900">{approval.resource_name}</span>
+                                      </div>
+                                      <Badge className={approvalColors.badge} variant="outline">
+                                        {approval.approval_group_name}
+                                      </Badge>
+                                    </div>
+
+                                    {previewAnswers.length > 0 && (
+                                      <div className="mt-2 pl-6 space-y-1">
+                                        {previewAnswers.map((qa, idx) => (
+                                          <div key={idx} className="text-sm">
+                                            <span className="text-slate-600">{qa.question}:</span>
+                                            <span className="ml-2 text-slate-900 font-medium">{qa.answer}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              <div className="pt-2">
+                                <Button
+                                  onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${eventGroup.event_id}/approvals`, '_blank')}
+                                  variant="outline"
+                                  className="w-full"
+                                >
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  View All in PCO
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </>
+                );
+              })()
             )}
           </AnimatePresence>
         </div>
