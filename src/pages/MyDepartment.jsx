@@ -57,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import { differenceInSeconds } from "date-fns";
 
-function RoomFlowCountdown({ tickets }) {
+function RoomFlowCountdown({ pcoEvents }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -65,18 +65,14 @@ function RoomFlowCountdown({ tickets }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Find next maintenance or room setup ticket with due date
-  const upcomingEvents = tickets
-    .filter(t => {
-      const isFacilities = t.category === 'maintenance' || t.category === 'cleaning';
-      const hasDate = t.due_date;
-      const isActive = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status);
-      if (!isFacilities || !hasDate || !isActive) return false;
-      
-      const dueDate = new Date(t.due_date.split('T')[0] + 'T08:00:00');
-      return dueDate > now;
+  // Find next PCO event with Room Setup or Maintenance resource
+  const upcomingEvents = (pcoEvents || [])
+    .filter(event => {
+      if (!event.starts_at) return false;
+      const eventDate = new Date(event.starts_at);
+      return eventDate > now;
     })
-    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 
   const nextEvent = upcomingEvents[0];
 
@@ -91,12 +87,18 @@ function RoomFlowCountdown({ tickets }) {
     );
   }
 
-  const eventDate = new Date(nextEvent.due_date.split('T')[0] + 'T08:00:00');
+  const eventDate = new Date(nextEvent.starts_at);
   const totalSeconds = Math.max(0, differenceInSeconds(eventDate, now));
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+
+  // Get resource type from resources array
+  const resourceType = nextEvent.resources?.find(r => 
+    r.name?.toLowerCase().includes('room setup') || 
+    r.name?.toLowerCase().includes('maintenance')
+  )?.name || 'Room Setup';
 
   return (
     <Card className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden">
@@ -108,24 +110,20 @@ function RoomFlowCountdown({ tickets }) {
                 Next Up
               </Badge>
               <Badge variant="outline" className="text-xs">
-                {nextEvent.category?.replace(/_/g, ' ')}
+                {resourceType}
               </Badge>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">{nextEvent.subject}</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">{nextEvent.name}</h3>
             <div className="flex items-center gap-2 text-sm text-slate-600">
-              {nextEvent.building && (
+              {nextEvent.rooms && nextEvent.rooms.length > 0 && (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  {nextEvent.building.replace(/_/g, ' ')}
-                  {nextEvent.room_number && ` - ${nextEvent.room_number}`}
+                  {nextEvent.rooms.map(r => r.name).join(', ')}
                 </span>
               )}
-              <span>•</span>
-              <span>{format(eventDate, 'EEE, MMM d')}</span>
+              {nextEvent.rooms && nextEvent.rooms.length > 0 && <span>•</span>}
+              <span>{format(eventDate, 'EEE, MMM d')} at {format(eventDate, 'h:mm a')}</span>
             </div>
-            {nextEvent.assigned_to_name && (
-              <p className="text-xs text-slate-500 mt-1">Assigned to: {nextEvent.assigned_to_name}</p>
-            )}
           </div>
           
           <div className="text-right">
