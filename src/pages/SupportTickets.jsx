@@ -379,6 +379,30 @@ export default function SupportTickets() {
           </div>
         </div>
 
+        {/* Worker View Mode Toggle */}
+        {isWorker && !isAdmin && (
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant={viewMode === 'working' ? 'default' : 'outline'}
+              onClick={() => setViewMode('working')}
+              size="sm"
+              className={viewMode === 'working' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Working On ({tickets.length})
+            </Button>
+            <Button
+              variant={viewMode === 'requested' ? 'default' : 'outline'}
+              onClick={() => setViewMode('requested')}
+              size="sm"
+              className={viewMode === 'requested' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+            >
+              <UserIcon className="w-4 h-4 mr-2" />
+              My Requests ({myRequestedTickets.length})
+            </Button>
+          </div>
+        )}
+
         {isAdmin && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             <Card>
