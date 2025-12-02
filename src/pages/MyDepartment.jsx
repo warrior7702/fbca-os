@@ -839,9 +839,11 @@ export default function MyDepartment() {
                         <div className="flex items-center gap-4">
                           <div 
                             onClick={() => {
-                              setDeptTasks(prev => prev.map(t => 
+                              const updatedTasks = deptTasks.map(t => 
                                 t.id === task.id ? {...t, completed: !t.completed} : t
-                              ));
+                              );
+                              setDeptTasks(updatedTasks);
+                              localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
                               toast.success('Task completed!');
                             }}
                             className="w-6 h-6 rounded-full border-2 border-emerald-400 flex items-center justify-center cursor-pointer hover:bg-emerald-100 transition-colors"
