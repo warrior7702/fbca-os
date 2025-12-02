@@ -524,7 +524,7 @@ export default function SupportTickets() {
                                     <span>•</span>
                                     <CalendarDays className="w-3 h-3 text-orange-600" />
                                     <span className="text-orange-600 font-medium">
-                                      Due {format(new Date(ticket.due_date + 'T12:00:00'), 'MMM d')}
+                                      Due {format(new Date(ticket.due_date.split('T')[0] + 'T12:00:00'), 'MMM d')}
                                     </span>
                                   </>
                                 )}
