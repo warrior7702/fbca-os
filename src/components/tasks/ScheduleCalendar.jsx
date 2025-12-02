@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket, CheckCircle2 } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, tickets = [], deptTasks = [], weekCount = 2, onEventClick, onTicketClick }) {
+export default function ScheduleCalendar({ events, tickets = [], deptTasks = [], weekCount = 2, onEventClick, onTicketClick, onDeptTaskClick }) {
   const today = new Date();
   const startDate = today;
 
@@ -218,11 +218,12 @@ export default function ScheduleCalendar({ events, tickets = [], deptTasks = [],
                         ))}
 
                         {/* Dept Tasks - Teal/Cyan Color */}
-                        {dayDeptTasks.map((task) => (
-                        <Card 
-                          key={`task-${task.id}`} 
-                          className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 hover:shadow-md transition-all"
-                        >
+                                                    {dayDeptTasks.map((task) => (
+                                                    <Card 
+                                                      key={`task-${task.id}`} 
+                                                      className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 hover:shadow-md transition-all cursor-pointer"
+                                                      onClick={() => onDeptTaskClick && onDeptTaskClick(task)}
+                                                    >
                           <CardContent className="p-2 space-y-1">
                             <div className="flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-teal-600" />

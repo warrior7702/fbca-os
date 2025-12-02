@@ -40,6 +40,7 @@ import TaskCard from "../components/tasks/TaskCard";
 import TaskDetailModal from "../components/tasks/TaskDetailModal";
 import EmailDetailModal from "../components/emails/EmailDetailModal";
 import ScheduleEventDetailModal from "../components/tasks/ScheduleEventDetailModal";
+import DeptTaskDetailModal from "../components/tasks/DeptTaskDetailModal";
 import { toast } from "sonner";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import { useNavigate } from "react-router-dom";
@@ -74,6 +75,8 @@ export default function MyTasks() {
   const [userDepartments, setUserDepartments] = useState([]);
   const [deptTickets, setDeptTickets] = useState([]);
   const [deptTasks, setDeptTasks] = useState([]);
+  const [selectedDeptTask, setSelectedDeptTask] = useState(null);
+  const [showDeptTaskDetail, setShowDeptTaskDetail] = useState(false);
 
   const navigate = useNavigate();
 
@@ -543,6 +546,10 @@ export default function MyTasks() {
                     weekCount={1}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
+                    onDeptTaskClick={(task) => {
+                      setSelectedDeptTask(task);
+                      setShowDeptTaskDetail(true);
+                    }}
                   />
                 </div>
                 
@@ -554,6 +561,10 @@ export default function MyTasks() {
                     deptTasks={deptTasks}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
+                    onDeptTaskClick={(task) => {
+                      setSelectedDeptTask(task);
+                      setShowDeptTaskDetail(true);
+                    }}
                   />
                 </div>
               </>
@@ -823,6 +834,32 @@ export default function MyTasks() {
         open={showScheduleEventDetail}
         onOpenChange={setShowScheduleEventDetail}
         event={selectedScheduleEvent}
+      />
+
+      <DeptTaskDetailModal
+        task={selectedDeptTask}
+        isOpen={showDeptTaskDetail}
+        onClose={() => setShowDeptTaskDetail(false)}
+        workers={[]}
+        onUpdate={(updatedTask) => {
+          const storedTasks = localStorage.getItem('deptTasks');
+          if (storedTasks) {
+            const allTasks = JSON.parse(storedTasks);
+            const updated = allTasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+            localStorage.setItem('deptTasks', JSON.stringify(updated));
+            setDeptTasks(updated.filter(t => t.assignee === user?.email && !t.completed));
+          }
+          setShowDeptTaskDetail(false);
+        }}
+        onDelete={(taskId) => {
+          const storedTasks = localStorage.getItem('deptTasks');
+          if (storedTasks) {
+            const allTasks = JSON.parse(storedTasks);
+            const updated = allTasks.filter(t => t.id !== taskId);
+            localStorage.setItem('deptTasks', JSON.stringify(updated));
+            setDeptTasks(updated.filter(t => t.assignee === user?.email && !t.completed));
+          }
+        }}
       />
     </div>
   );

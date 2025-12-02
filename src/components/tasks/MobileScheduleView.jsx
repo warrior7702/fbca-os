@@ -5,7 +5,7 @@ import { format, addDays, isSameDay, parseISO, isToday } from 'date-fns';
 import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-export default function MobileScheduleView({ events, tickets = [], deptTasks = [], onEventClick, onTicketClick }) {
+export default function MobileScheduleView({ events, tickets = [], deptTasks = [], onEventClick, onTicketClick, onDeptTaskClick }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
 
