@@ -2,9 +2,9 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket, CheckSquare } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, onEventClick, onTicketClick }) {
+export default function ScheduleCalendar({ events, tickets = [], deptTasks = [], weekCount = 2, onEventClick, onTicketClick }) {
   const today = new Date();
   const startDate = today;
 
@@ -33,6 +33,14 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
     });
   };
 
+  const getTasksForDay = (day) => {
+    return deptTasks.filter(task => {
+      if (!task.dueDate) return false;
+      const taskDate = new Date(task.dueDate);
+      return isSameDay(taskDate, day);
+    });
+  };
+
   return (
     <div className="space-y-6">
       {weeks.map((week, weekIndex) => (
@@ -44,6 +52,7 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
             {week.map((day, dayIndex) => {
               const dayEvents = getEventsForDay(day);
               const dayTickets = getTicketsForDay(day);
+              const dayTasks = getTasksForDay(day);
               const isToday = isSameDay(day, today);
               const isPast = day < today && !isToday;
 
@@ -191,18 +200,38 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
                         {dayTickets.map((ticket) => (
                         <Card 
                           key={`ticket-${ticket.id}`} 
-                          className="border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:shadow-md transition-all cursor-pointer"
+                          className="border border-amber-300 bg-amber-50 hover:bg-amber-100 hover:shadow-md transition-all cursor-pointer"
                           onClick={() => onTicketClick && onTicketClick(ticket)}
                         >
                           <CardContent className="p-2 space-y-1">
                             <div className="flex items-center gap-1">
-                              <Ticket className="w-3 h-3 text-blue-600" />
+                              <Ticket className="w-3 h-3 text-amber-600" />
                               <p className="text-xs font-semibold text-slate-900 line-clamp-2">
                                 {ticket.subject}
                               </p>
                             </div>
-                            <Badge variant="outline" className="text-[9px] bg-blue-100 border-blue-300 text-blue-700">
+                            <Badge variant="outline" className="text-[9px] bg-amber-100 border-amber-300 text-amber-700">
                               {ticket.category?.replace('_', ' ') || 'Ticket'}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                        ))}
+
+                        {/* Dept Tasks */}
+                        {dayTasks.map((task) => (
+                        <Card 
+                          key={`task-${task.id}`} 
+                          className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 hover:shadow-md transition-all cursor-pointer"
+                        >
+                          <CardContent className="p-2 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <CheckSquare className="w-3 h-3 text-emerald-600" />
+                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                {task.title}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-[9px] bg-emerald-100 border-emerald-300 text-emerald-700">
+                              Task
                             </Badge>
                           </CardContent>
                         </Card>
