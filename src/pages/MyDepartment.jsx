@@ -72,6 +72,8 @@ export default function MyDepartment() {
   const [routineTasks, setRoutineTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [deptTasks, setDeptTasks] = useState([]);
   const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
@@ -1310,6 +1312,12 @@ export default function MyDepartment() {
                         onChange={(e) => setNewTaskTitle(e.target.value)}
                         className="flex-1"
                       />
+                      <Input
+                        type="date"
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        className="w-full sm:w-40"
+                      />
                       <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
                         <SelectTrigger className="w-full sm:w-48">
                           <SelectValue placeholder="Assign to..." />
@@ -1333,29 +1341,25 @@ export default function MyDepartment() {
                           }
                           setAddingTask(true);
                           try {
-                            const ticketNumber = `TKT-${Date.now().toString().slice(-6)}`;
                             const worker = departmentWorkers.find(w => w.user_email === newTaskAssignee);
-                            await base44.entities.Ticket.create({
-                              ticket_number: ticketNumber,
-                              subject: newTaskTitle,
-                              description: `Quick task created by ${user?.full_name || user?.email}`,
-                              status: 'open',
-                              priority: 'medium',
-                              category: 'technology',
-                              source: 'workflow',
-                              requester_email: user?.email,
-                              requester_name: user?.full_name,
-                              assigned_to: newTaskAssignee,
-                              assigned_to_name: worker?.user_name || newTaskAssignee,
-                              due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0]
-                            });
+                            const newTask = {
+                              id: Date.now().toString(),
+                              title: newTaskTitle,
+                              assignee: newTaskAssignee,
+                              assigneeName: worker?.user_name || newTaskAssignee,
+                              dueDate: newTaskDueDate || new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                              completed: false,
+                              createdBy: user?.full_name || user?.email,
+                              createdAt: new Date().toISOString()
+                            };
+                            setDeptTasks(prev => [...prev, newTask]);
                             toast.success('Task created!');
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
-                            loadData();
+                            setNewTaskDueDate("");
+                            setAddingTask(false);
                           } catch (error) {
                             toast.error('Failed to create task');
-                          } finally {
                             setAddingTask(false);
                           }
                         }}
