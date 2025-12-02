@@ -57,6 +57,58 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import { differenceInSeconds } from "date-fns";
 
+function ResolvedTicketsCard({ tickets, navigate, getInitials }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  return (
+    <Card className="border border-green-200 bg-green-50/50">
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-green-800 text-base">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            Resolved Tickets
+            <Badge className="bg-green-100 text-green-700 border-green-300 ml-2">
+              {tickets.length}
+            </Badge>
+          </CardTitle>
+          {expanded ? <ChevronUp className="w-5 h-5 text-green-600" /> : <ChevronDown className="w-5 h-5 text-green-600" />}
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="pt-0">
+          <div className="space-y-2">
+            {tickets.slice(0, 10).map((ticket) => (
+              <div
+                key={ticket.id}
+                className="p-3 bg-white rounded-lg border border-green-200 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '✓'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-700 text-sm truncate">{ticket.subject}</p>
+                      <p className="text-xs text-slate-500">{ticket.ticket_number}</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-green-100 text-green-700 text-xs">Resolved</Badge>
+                </div>
+              </div>
+            ))}
+            {tickets.length > 10 && (
+              <p className="text-xs text-center text-green-600 pt-2">
+                +{tickets.length - 10} more resolved tickets
+              </p>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 function RoomFlowCountdown({ tickets, navigate }) {
   const [now, setNow] = useState(new Date());
 
