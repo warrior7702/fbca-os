@@ -53,6 +53,7 @@ import { toast } from "sonner";
 import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 
 export default function MyDepartment() {
   const navigate = useNavigate();
@@ -79,6 +80,16 @@ export default function MyDepartment() {
   const [draggedTicket, setDraggedTicket] = useState(null);
   const [ticketSort, setTicketSort] = useState("due_date");
   const [taskSort, setTaskSort] = useState("due_date");
+  const [selectedTask, setSelectedTask] = useState(null);
+
+  const getInitials = (name) => {
+    if (!name) return '??';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   useEffect(() => {
     loadData();
@@ -859,11 +870,13 @@ export default function MyDepartment() {
                       .map((task) => (
                       <div
                         key={task.id}
-                        className="p-4 bg-white rounded-xl border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
+                        className="p-4 bg-white rounded-xl border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between cursor-pointer"
+                        onClick={() => setSelectedTask(task)}
                       >
                         <div className="flex items-center gap-4">
                           <div 
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const updatedTasks = deptTasks.map(t => 
                                 t.id === task.id ? {...t, completed: !t.completed} : t
                               );
@@ -875,13 +888,15 @@ export default function MyDepartment() {
                           >
                             {task.completed && <CheckCircle2 className="w-4 h-4 text-teal-600" />}
                           </div>
+                          {/* Assignee Avatar */}
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {getInitials(task.assigneeName)}
+                          </div>
                           <div className="flex-1">
                             <p className="font-semibold text-slate-900">{task.title}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <Badge className="bg-teal-100 text-teal-700 border-teal-300 text-xs flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {task.assigneeName}
-                              </Badge>
+                              <span className="text-xs text-slate-600">{task.assigneeName}</span>
+                              <span className="text-slate-300">•</span>
                               <div className="flex items-center gap-1 text-xs text-teal-600 font-medium">
                                 <Calendar className="w-3 h-3" />
                                 Due {format(new Date(task.dueDate), 'MMM d')}
@@ -892,7 +907,8 @@ export default function MyDepartment() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                          e.stopPropagation();
                           const updatedTasks = deptTasks.filter(t => t.id !== task.id);
                           setDeptTasks(updatedTasks);
                           localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
@@ -979,7 +995,7 @@ export default function MyDepartment() {
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                                   ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
                                 }`}>
-                                  {ticket.assigned_to_name ? ticket.assigned_to_name.charAt(0).toUpperCase() : '?'}
+                                  {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-slate-900 truncate">
@@ -1815,6 +1831,27 @@ export default function MyDepartment() {
           </TabsContent>
           )}
         </Tabs>
+
+        {/* Dept Task Detail Modal */}
+        <DeptTaskDetailModal
+          task={selectedTask}
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          workers={departmentWorkers}
+          onUpdate={(updatedTask) => {
+            const updatedTasks = deptTasks.map(t => 
+              t.id === updatedTask.id ? updatedTask : t
+            );
+            setDeptTasks(updatedTasks);
+            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+            setSelectedTask(null);
+          }}
+          onDelete={(taskId) => {
+            const updatedTasks = deptTasks.filter(t => t.id !== taskId);
+            setDeptTasks(updatedTasks);
+            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+          }}
+        />
       </div>
     </div>
   );
