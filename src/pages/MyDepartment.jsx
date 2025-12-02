@@ -2055,7 +2055,16 @@ export default function MyDepartment() {
 
           {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
             <TabsContent value="roomflow" className="space-y-6">
-              <RoomFlowCountdown tickets={tickets} />
+              {loadingPcoEvents ? (
+                <Card className="border-2 border-slate-200 bg-white">
+                  <CardContent className="p-6 text-center">
+                    <Loader2 className="w-10 h-10 text-emerald-500 mx-auto mb-3 animate-spin" />
+                    <p className="text-slate-500">Loading PCO events...</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <RoomFlowCountdown pcoEvents={pcoEvents} />
+              )}
               
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
                 <CardContent className="p-8 text-center">
