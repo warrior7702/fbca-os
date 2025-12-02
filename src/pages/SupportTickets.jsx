@@ -285,12 +285,12 @@ export default function SupportTickets() {
   });
 
   const stats = {
-    total: tickets.length,
-    active: tickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
-    open: tickets.filter(t => t.status === 'open').length,
-    awaiting_info: tickets.filter(t => t.status === 'awaiting_information').length,
-    awaiting_parts: tickets.filter(t => t.status === 'awaiting_parts').length,
-    resolved: tickets.filter(t => t.status === 'resolved').length
+    total: ticketsToFilter.length,
+    active: ticketsToFilter.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
+    open: ticketsToFilter.filter(t => t.status === 'open').length,
+    awaiting_info: ticketsToFilter.filter(t => t.status === 'awaiting_information').length,
+    awaiting_parts: ticketsToFilter.filter(t => t.status === 'awaiting_parts').length,
+    resolved: ticketsToFilter.filter(t => t.status === 'resolved').length
   };
 
   const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
