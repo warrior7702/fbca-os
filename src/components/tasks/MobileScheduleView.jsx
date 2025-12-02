@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO, isToday } from 'date-fns';
-import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight, CheckSquare } from 'lucide-react';
+import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-export default function MobileScheduleView({ events, tickets = [], deptTasks = [], onEventClick, onTicketClick }) {
+export default function MobileScheduleView({ events, tickets = [], onEventClick, onTicketClick }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -27,18 +27,9 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
     });
   };
 
-  const getTasksForDay = (day) => {
-    return deptTasks.filter(task => {
-      if (!task.dueDate) return false;
-      const taskDate = new Date(task.dueDate);
-      return isSameDay(taskDate, day);
-    });
-  };
-
   const selectedDayEvents = getEventsForDay(selectedDate);
   const selectedDayTickets = getTicketsForDay(selectedDate);
-  const selectedDayTasks = getTasksForDay(selectedDate);
-  const allItems = [...selectedDayEvents, ...selectedDayTickets, ...selectedDayTasks].sort((a, b) => {
+  const allItems = [...selectedDayEvents, ...selectedDayTickets].sort((a, b) => {
     const aTime = a.starts_at ? new Date(a.starts_at) : new Date(a.due_date);
     const bTime = b.starts_at ? new Date(b.starts_at) : new Date(b.due_date);
     return aTime - bTime;
@@ -64,8 +55,7 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
               const isCurrentDay = isToday(day);
               const dayEvents = getEventsForDay(day);
               const dayTickets = getTicketsForDay(day);
-              const dayTasks = getTasksForDay(day);
-              const hasItems = dayEvents.length > 0 || dayTickets.length > 0 || dayTasks.length > 0;
+              const hasItems = dayEvents.length > 0 || dayTickets.length > 0;
 
               return (
                 <button
@@ -95,10 +85,7 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
                         <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-blue-500'}`} />
                       )}
                       {dayTickets.length > 0 && (
-                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-amber-500'}`} />
-                      )}
-                      {dayTasks.length > 0 && (
-                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-emerald-500'}`} />
+                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-purple-500'}`} />
                       )}
                     </div>
                   )}
@@ -137,52 +124,23 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
         ) : (
           allItems.map((item) => {
             const isTicket = !!item.ticket_number;
-            const isTask = !!item.title && !item.ticket_number && !item.starts_at;
-            
-            if (isTask) {
-              return (
-                <Card 
-                  key={`task-${item.id}`} 
-                  className="border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:scale-98 transition-all"
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-2">
-                      <CheckSquare className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-1">
-                          {item.title}
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-[10px] bg-emerald-100 border-emerald-300 text-emerald-700">
-                            Dept Task
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            {item.assigneeName}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            }
             
             if (isTicket) {
               return (
                 <Card 
                   key={`ticket-${item.id}`} 
-                  className="border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-98 transition-all"
+                  className="border border-blue-300 bg-blue-50 hover:bg-blue-100 active:scale-98 transition-all"
                   onClick={() => onTicketClick && onTicketClick(item)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
-                      <Ticket className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <Ticket className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-1">
                           {item.subject}
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-[10px] bg-amber-100 border-amber-300 text-amber-700">
+                          <Badge variant="outline" className="text-[10px] bg-blue-100 border-blue-300 text-blue-700">
                             {item.category?.replace('_', ' ') || 'Ticket'}
                           </Badge>
                           <Badge variant="outline" className="text-[10px]">
