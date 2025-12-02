@@ -57,6 +57,7 @@ import Knowledgebase from './pages/Knowledgebase';
 import TicketReporting from './pages/TicketReporting';
 import ImportClickUpTickets from './pages/ImportClickUpTickets';
 import ImportTickets from './pages/ImportTickets';
+import NormalizeUserNames from './pages/NormalizeUserNames';
 import __Layout from './Layout.jsx';
 
 
@@ -120,6 +121,7 @@ export const PAGES = {
     "TicketReporting": TicketReporting,
     "ImportClickUpTickets": ImportClickUpTickets,
     "ImportTickets": ImportTickets,
+    "NormalizeUserNames": NormalizeUserNames,
 }
 
 export const pagesConfig = {
