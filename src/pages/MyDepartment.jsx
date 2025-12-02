@@ -1861,10 +1861,12 @@ export default function MyDepartment() {
 
           {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
             <TabsContent value="roomflow" className="space-y-6">
+              <RoomFlowCountdown tickets={tickets} />
+              
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
-                <CardContent className="p-12 text-center">
-                  <LayoutGrid className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Room Flow</h3>
+                <CardContent className="p-8 text-center">
+                  <LayoutGrid className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">More Room Flow Features</h3>
                   <p className="text-slate-600 mb-4">
                     Room setup management and coordination tools coming soon.
                   </p>
