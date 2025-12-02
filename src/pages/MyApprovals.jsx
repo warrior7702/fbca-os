@@ -595,106 +595,127 @@ export default function MyApprovals() {
                           </div>
                         )}
 
-                        {/* Smart Suggestion Badge - NOW SHOWS IF LEARNED */}
-                        {smartSuggestion && !postedCode && (
-                          <div className={`flex items-center gap-2 p-2 rounded-lg border ${
-                            smartSuggestion.learned 
-                              ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300' 
-                              : 'bg-purple-50 border-purple-200'
-                          }`}>
-                            <Sparkles className={`w-4 h-4 ${smartSuggestion.learned ? 'text-pink-600' : 'text-purple-600'}`} />
-                            <span className={`text-xs font-medium ${smartSuggestion.learned ? 'text-pink-700' : 'text-purple-700'}`}>
-                              {smartSuggestion.learned ? '🎓 Learned: ' : 'Smart: '}{smartSuggestion.reason}
-                            </span>
-                            {smartSuggestion.learned && smartSuggestion.confidence && (
-                              <Badge variant="outline" className="text-xs bg-white/50">
-                                {Math.round(smartSuggestion.confidence * 100)}% confident
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-
-                        {postedCode && (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-                            <Key className="w-4 h-4 text-green-600" />
-                            <span className="text-sm text-green-800 font-medium">
-                              Door Code Posted: <span className="font-mono font-bold">{postedCode}</span>
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="space-y-2 pt-4">
-                          <div className="relative">
-                            <Input
-                              type="text"
-                              placeholder="Type name, code, or building (PCB/FBC/WADE/SB)..."
-                              value={cardholderSearchQuery[approval.request_id] || ''}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
-                                handleCardholderSearchChange(approval.request_id, value);
-                              }}
-                              className="w-full"
-                              maxLength={50}
-                              disabled={!!postedCode}
-                            />
-                            {searchingCardholder[approval.request_id] && (
-                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
-                            )}
-                            
-                            {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                                {cardholderSearchResults[approval.request_id].map((cardholder) => (
-                                  <button
-                                    key={cardholder.id}
-                                    onClick={() => handleSelectCardholder(approval.request_id, cardholder, approval)}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
-                                  >
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-                                      <User className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-semibold text-slate-900">{cardholder.name}</p>
-                                      <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
-                                          <Key className="w-3 h-3" />
-                                          {cardholder.pin}#
-                                        </span>
-                                        {cardholder.member_id && (
-                                          <span className="text-xs text-slate-500">
-                                            • ID: {cardholder.member_id}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                ))}
+                        {/* Building Access specific UI */}
+                        {(approval.approval_group_name?.toLowerCase().includes('building') || 
+                          approval.approval_group_name?.toLowerCase().includes('access')) && (
+                          <>
+                            {/* Smart Suggestion Badge - NOW SHOWS IF LEARNED */}
+                            {smartSuggestion && !postedCode && (
+                              <div className={`flex items-center gap-2 p-2 rounded-lg border ${
+                                smartSuggestion.learned 
+                                  ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300' 
+                                  : 'bg-purple-50 border-purple-200'
+                              }`}>
+                                <Sparkles className={`w-4 h-4 ${smartSuggestion.learned ? 'text-pink-600' : 'text-purple-600'}`} />
+                                <span className={`text-xs font-medium ${smartSuggestion.learned ? 'text-pink-700' : 'text-purple-700'}`}>
+                                  {smartSuggestion.learned ? '🎓 Learned: ' : 'Smart: '}{smartSuggestion.reason}
+                                </span>
+                                {smartSuggestion.learned && smartSuggestion.confidence && (
+                                  <Badge variant="outline" className="text-xs bg-white/50">
+                                    {Math.round(smartSuggestion.confidence * 100)}% confident
+                                  </Badge>
+                                )}
                               </div>
                             )}
-                          </div>
 
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleSendCode(approval)}
-                              disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
-                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                            >
-                              {sendingCode === approval.request_id ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Key className="w-4 h-4 mr-2" />
-                              )}
-                              {postedCode ? 'Code Already Posted' : 'Send to PCO'}
-                            </Button>
+                            {postedCode && (
+                              <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                                <Key className="w-4 h-4 text-green-600" />
+                                <span className="text-sm text-green-800 font-medium">
+                                  Door Code Posted: <span className="font-mono font-bold">{postedCode}</span>
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="space-y-2 pt-4">
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  placeholder="Type name, code, or building (PCB/FBC/WADE/SB)..."
+                                  value={cardholderSearchQuery[approval.request_id] || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setDoorCodes(prev => ({ ...prev, [approval.request_id]: value }));
+                                    handleCardholderSearchChange(approval.request_id, value);
+                                  }}
+                                  className="w-full"
+                                  maxLength={50}
+                                  disabled={!!postedCode}
+                                />
+                                {searchingCardholder[approval.request_id] && (
+                                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-400" />
+                                )}
+                                
+                                {cardholderSearchResults[approval.request_id]?.length > 0 && !postedCode && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                                    {cardholderSearchResults[approval.request_id].map((cardholder) => (
+                                      <button
+                                        key={cardholder.id}
+                                        onClick={() => handleSelectCardholder(approval.request_id, cardholder, approval)}
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                                      >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                          <User className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-slate-900">{cardholder.name}</p>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-sm text-blue-600 flex items-center gap-1 font-mono font-semibold">
+                                              <Key className="w-3 h-3" />
+                                              {cardholder.pin}#
+                                            </span>
+                                            {cardholder.member_id && (
+                                              <span className="text-xs text-slate-500">
+                                                • ID: {cardholder.member_id}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleSendCode(approval)}
+                                  disabled={sendingCode === approval.request_id || !doorCodes[approval.request_id] || doorCodes[approval.request_id].trim() === '' || !!postedCode}
+                                  className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                                >
+                                  {sendingCode === approval.request_id ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Key className="w-4 h-4 mr-2" />
+                                  )}
+                                  {postedCode ? 'Code Already Posted' : 'Send to PCO'}
+                                </Button>
+                                <Button
+                                  onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
+                                  variant="outline"
+                                >
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  View in PCO
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Non-building access: just show View in PCO button */}
+                        {!(approval.approval_group_name?.toLowerCase().includes('building') || 
+                           approval.approval_group_name?.toLowerCase().includes('access')) && (
+                          <div className="pt-4">
                             <Button
                               onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
                               variant="outline"
+                              className="w-full"
                             >
                               <ExternalLink className="w-4 h-4 mr-2" />
                               View in PCO
                             </Button>
                           </div>
-                        </div>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
