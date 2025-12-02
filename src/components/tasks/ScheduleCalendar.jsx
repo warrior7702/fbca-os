@@ -150,44 +150,28 @@ export default function ScheduleCalendar({ events, tickets = [], deptTasks = [],
                               {/* PCO Event Indicators */}
                               {!isMicrosoftMeeting && (
                                 <>
-                                  {event.access_time && (
-                                    <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                                      <Lock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
-                                      <span className="line-clamp-1">{event.access_time}</span>
-                                    </div>
+                                  {/* Building Access badge + code time for events with door codes */}
+                                  {event.posted_door_code && (
+                                    <>
+                                      {event.access_time && (
+                                        <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                                          <Lock className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                          <span className="line-clamp-1">{event.access_time}</span>
+                                        </div>
+                                      )}
+                                      <Badge variant="outline" className={`text-[9px] ${isUnlock ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-green-100 border-green-300 text-green-700'}`}>
+                                        Building Access
+                                      </Badge>
+                                    </>
                                   )}
 
-                                  {event.resources && event.resources.length > 0 && (
+                                  {/* Show resources only for non-door-code events */}
+                                  {!event.posted_door_code && event.resources && event.resources.length > 0 && (
                                     <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                                      <MapPin className={`w-3 h-3 ${isUnlock ? 'text-orange-600' : 'text-green-600'}`} />
+                                      <MapPin className="w-3 h-3 text-green-600" />
                                       <span className="line-clamp-1">
                                         {event.resources[0].name}
                                         {event.resources.length > 1 && ` +${event.resources.length - 1}`}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {event.posted_door_code && (
-                                    <div className={`
-                                      mt-1 p-1 rounded flex items-center gap-1
-                                      ${isUnlock 
-                                        ? 'bg-gradient-to-r from-orange-200 to-amber-200' 
-                                        : 'bg-green-200'
-                                      }
-                                    `}>
-                                      {isUnlock ? (
-                                        <Unlock className={`w-3 h-3 ${isUnlock ? 'text-orange-700' : 'text-green-700'}`} />
-                                      ) : (
-                                        <Key className="w-3 h-3 text-green-700" />
-                                      )}
-                                      <span className={`
-                                        text-[10px] font-bold
-                                        ${isUnlock 
-                                          ? 'text-orange-700 font-sans' 
-                                          : 'text-green-700 font-mono'
-                                        }
-                                      `}>
-                                        {isUnlock ? 'Unlock' : `${event.posted_door_code}#`}
                                       </span>
                                     </div>
                                   )}
