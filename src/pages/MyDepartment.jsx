@@ -1181,140 +1181,213 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Department Tickets */}
-            <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <CardTitle className="flex items-center gap-2 text-amber-800">
-                    <div className="p-2 bg-amber-100 rounded-lg">
-                      <Ticket className="w-5 h-5 text-amber-600" />
-                    </div>
-                    Department Tickets
-                    <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
-                      {filteredTickets.length} total
-                    </Badge>
-                  </CardTitle>
-                  <Select value={ticketSort} onValueChange={setTicketSort}>
-                    <SelectTrigger className="w-36 h-8 text-xs">
-                      <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="due_date">Due Date</SelectItem>
-                      <SelectItem value="assignee">Assignee</SelectItem>
-                      <SelectItem value="building">Building</SelectItem>
-                      <SelectItem value="priority">Priority</SelectItem>
-                      <SelectItem value="category">Category</SelectItem>
-                      <SelectItem value="created">Created</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredTickets.length > 0 ? (
-                  <div className="space-y-3">
-                    {[...filteredTickets]
-                      .sort((a, b) => {
-                        if (ticketSort === 'due_date') {
-                          if (!a.due_date) return 1;
-                          if (!b.due_date) return -1;
-                          return new Date(a.due_date) - new Date(b.due_date);
-                        } else if (ticketSort === 'assignee') {
-                          return (a.assigned_to_name || 'zzz').localeCompare(b.assigned_to_name || 'zzz');
-                        } else if (ticketSort === 'building') {
-                          return (a.building || 'zzz').localeCompare(b.building || 'zzz');
-                        } else if (ticketSort === 'priority') {
-                          const order = { urgent: 0, high: 1, medium: 2, low: 3 };
-                          return (order[a.priority] || 4) - (order[b.priority] || 4);
-                        } else if (ticketSort === 'category') {
-                          return (a.category || '').localeCompare(b.category || '');
-                        } else {
-                          return new Date(b.created_date) - new Date(a.created_date);
-                        }
-                      })
-                      .map((ticket) => {
-                      const { Icon, config } = getSourceBadge(ticket.source || 'manual_request');
-                      return (
-                        <div
-                          key={ticket.id}
-                          className="p-4 bg-white rounded-xl border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                          onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start gap-3">
-                                {/* Assignee Avatar */}
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
-                                  ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
-                                }`}>
-                                  {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-slate-900 truncate">
-                                    {ticket.subject}
-                                  </p>
-                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                    {ticket.assigned_to_name ? (
-                                      <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
-                                        {ticket.assigned_to_name}
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-red-100 text-red-600 border-red-200 text-xs">
-                                        Unassigned
-                                      </Badge>
-                                    )}
-                                    {ticket.building && (
-                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                        <MapPin className="w-3 h-3" />
-                                        {ticket.building.replace(/_/g, ' ')}
-                                      </Badge>
-                                    )}
-                                    <span className="text-xs text-slate-400">{ticket.ticket_number}</span>
-                                    {ticket.due_date && (
-                                      <span className="text-xs text-orange-600 font-medium">
-                                        Due {format(new Date(ticket.due_date.split('T')[0] + 'T12:00:00'), 'MMM d')}
-                                      </span>
-                                    )}
+            {/* Department Tickets - Open Only */}
+            <div className="grid lg:grid-cols-3 gap-4">
+              <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 lg:col-span-2">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="flex items-center gap-2 text-amber-800">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <Ticket className="w-5 h-5 text-amber-600" />
+                      </div>
+                      Open Tickets
+                      <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
+                        {filteredTickets.filter(t => !['resolved', 'closed', 'archived'].includes(t.status)).length} open
+                      </Badge>
+                    </CardTitle>
+                    <Select value={ticketSort} onValueChange={setTicketSort}>
+                      <SelectTrigger className="w-36 h-8 text-xs">
+                        <SelectValue placeholder="Sort by..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="due_date">Due Date</SelectItem>
+                        <SelectItem value="assignee">Assignee</SelectItem>
+                        <SelectItem value="building">Building</SelectItem>
+                        <SelectItem value="priority">Priority</SelectItem>
+                        <SelectItem value="category">Category</SelectItem>
+                        <SelectItem value="created">Created</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {filteredTickets.filter(t => !['resolved', 'closed', 'archived'].includes(t.status)).length > 0 ? (
+                    <div className="space-y-3">
+                      {[...filteredTickets]
+                        .filter(t => !['resolved', 'closed', 'archived'].includes(t.status))
+                        .sort((a, b) => {
+                          if (ticketSort === 'due_date') {
+                            if (!a.due_date) return 1;
+                            if (!b.due_date) return -1;
+                            return new Date(a.due_date) - new Date(b.due_date);
+                          } else if (ticketSort === 'assignee') {
+                            return (a.assigned_to_name || 'zzz').localeCompare(b.assigned_to_name || 'zzz');
+                          } else if (ticketSort === 'building') {
+                            return (a.building || 'zzz').localeCompare(b.building || 'zzz');
+                          } else if (ticketSort === 'priority') {
+                            const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+                            return (order[a.priority] || 4) - (order[b.priority] || 4);
+                          } else if (ticketSort === 'category') {
+                            return (a.category || '').localeCompare(b.category || '');
+                          } else {
+                            return new Date(b.created_date) - new Date(a.created_date);
+                          }
+                        })
+                        .map((ticket) => {
+                        const { Icon, config } = getSourceBadge(ticket.source || 'manual_request');
+                        return (
+                          <div
+                            key={ticket.id}
+                            className="p-4 bg-white rounded-xl border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start gap-3">
+                                  {/* Assignee Avatar */}
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                                    ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
+                                  }`}>
+                                    {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-slate-900 truncate">
+                                      {ticket.subject}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                      {ticket.assigned_to_name ? (
+                                        <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
+                                          {ticket.assigned_to_name}
+                                        </Badge>
+                                      ) : (
+                                        <Badge className="bg-red-100 text-red-600 border-red-200 text-xs">
+                                          Unassigned
+                                        </Badge>
+                                      )}
+                                      {ticket.building && (
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                          <MapPin className="w-3 h-3" />
+                                          {ticket.building.replace(/_/g, ' ')}
+                                        </Badge>
+                                      )}
+                                      <span className="text-xs text-slate-400">{ticket.ticket_number}</span>
+                                      {ticket.due_date && (
+                                        <span className="text-xs text-orange-600 font-medium">
+                                          Due {format(new Date(ticket.due_date.split('T')[0] + 'T12:00:00'), 'MMM d')}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <Badge className={`text-xs ${
-                                ticket.status === 'open' ? 'bg-blue-100 text-blue-700' :
-                                ticket.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
-                                ticket.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                                'bg-slate-100 text-slate-700'
-                              }`}>
-                                {ticket.status?.replace(/_/g, ' ')}
-                              </Badge>
-                              <Badge className={`text-xs ${
-                                ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-blue-100 text-blue-700'
-                              }`}>
-                                {ticket.priority}
-                              </Badge>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Badge className={`text-xs ${
+                                  ticket.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                                  ticket.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
+                                  ticket.status === 'awaiting_information' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {ticket.status?.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge className={`text-xs ${
+                                  ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                  ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                  ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {ticket.priority}
+                                </Badge>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Ticket className="w-12 h-12 text-amber-200 mx-auto mb-3" />
+                      <p className="text-slate-500">No open tickets</p>
+                      <Button 
+                        className="mt-4 bg-amber-600 hover:bg-amber-700"
+                        onClick={() => navigate(createPageUrl('CreateTicket'))}
+                      >
+                        Create Ticket
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Resolved Tickets - Collapsible */}
+              <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+                <CardHeader className="pb-3">
+                  <div 
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => setShowResolvedTickets(!showResolvedTickets)}
+                  >
+                    <CardTitle className="flex items-center gap-2 text-green-800">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      </div>
+                      Resolved
+                      <Badge className="bg-green-100 text-green-700 border-green-300 ml-2">
+                        {filteredTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length}
+                      </Badge>
+                    </CardTitle>
+                    {showResolvedTickets ? (
+                      <ChevronUp className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-green-600" />
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Ticket className="w-12 h-12 text-amber-200 mx-auto mb-3" />
-                    <p className="text-slate-500">No tickets yet</p>
-                    <Button 
-                      className="mt-4 bg-amber-600 hover:bg-amber-700"
-                      onClick={() => navigate(createPageUrl('CreateTicket'))}
+                </CardHeader>
+                <AnimatePresence>
+                  {showResolvedTickets && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                     >
-                      Create Your First Ticket
-                    </Button>
-                  </div>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {filteredTickets
+                            .filter(t => ['resolved', 'closed'].includes(t.status))
+                            .sort((a, b) => new Date(b.resolved_at || b.updated_date) - new Date(a.resolved_at || a.updated_date))
+                            .slice(0, 10)
+                            .map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="p-3 bg-white rounded-lg border border-green-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                            >
+                              <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                <span>{ticket.ticket_number}</span>
+                                {ticket.resolved_at && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{format(new Date(ticket.resolved_at), 'MMM d')}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {filteredTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No resolved tickets</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {!showResolvedTickets && (
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-green-600 text-center">Click to view resolved tickets</p>
+                  </CardContent>
                 )}
-              </CardContent>
-            </Card>
+              </Card>
+            </div>
             </>
             )}
 
