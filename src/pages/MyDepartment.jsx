@@ -45,7 +45,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MyDepartment() {
@@ -230,27 +230,27 @@ export default function MyDepartment() {
       }));
   };
 
-  const getTicketsByCategory = () => {
-    const categoryData = {};
+  const getTicketsByStatus = () => {
+    const statusData = {};
     filteredTickets.forEach(t => {
-      const category = t.category || 'other';
-      categoryData[category] = (categoryData[category] || 0) + 1;
+      const status = t.status || 'open';
+      statusData[status] = (statusData[status] || 0) + 1;
     });
     
     const colors = {
-      technology: '#3b82f6',
-      cleaning: '#10b981',
-      maintenance: '#f59e0b',
-      av_production: '#8b5cf6',
-      marketing: '#ec4899',
-      communications: '#6366f1',
-      other: '#6b7280'
+      open: '#3b82f6',
+      in_progress: '#8b5cf6',
+      awaiting_information: '#f59e0b',
+      awaiting_parts: '#f97316',
+      resolved: '#10b981',
+      closed: '#6b7280',
+      archived: '#94a3b8'
     };
     
-    return Object.entries(categoryData).map(([name, value]) => ({
+    return Object.entries(statusData).map(([name, value]) => ({
       name: name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
       value,
-      color: colors[name] || colors.other
+      color: colors[name] || colors.open
     }));
   };
 
@@ -479,7 +479,7 @@ export default function MyDepartment() {
   const recurringIssues = getRecurringIssues();
   const crossDeptTickets = getCrossDepartmentTickets();
   const activityFeed = getActivityFeed();
-  const categoryData = getTicketsByCategory();
+  const statusData = getTicketsByStatus();
   const monthlyClosedData = getMonthlyClosedByDept();
 
   const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || sourceFilter !== "all";
@@ -594,21 +594,21 @@ export default function MyDepartment() {
             {/* Charts Section - Pie Chart and Monthly Tracker */}
             {(isPreviewMode || userRole === 'admin') && (
               <div className="grid md:grid-cols-2 gap-4">
-                {/* Pie Chart - Tickets by Category */}
+                {/* Pie Chart - Tickets by Status */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <BarChart3 className="w-4 h-4 text-violet-600" />
-                      Tickets by Category
+                      Tickets by Status
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {categoryData.length > 0 ? (
+                    {statusData.length > 0 ? (
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
-                              data={categoryData}
+                              data={statusData}
                               cx="50%"
                               cy="50%"
                               innerRadius={50}
@@ -618,7 +618,7 @@ export default function MyDepartment() {
                               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                               labelLine={false}
                             >
-                              {categoryData.map((entry, index) => (
+                              {statusData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
@@ -635,7 +635,7 @@ export default function MyDepartment() {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2 mt-2 justify-center">
-                      {categoryData.map((item, index) => (
+                      {statusData.map((item, index) => (
                         <div key={index} className="flex items-center gap-1 text-xs">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                           <span>{item.name}: {item.value}</span>
@@ -645,7 +645,7 @@ export default function MyDepartment() {
                   </CardContent>
                 </Card>
 
-                {/* Monthly Tracker - Tickets Closed by Dept */}
+                {/* Monthly Tracker - Tickets Closed by Dept (Line Chart) */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -656,17 +656,17 @@ export default function MyDepartment() {
                   <CardContent>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyClosedData}>
+                        <LineChart data={monthlyClosedData}>
                           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                           />
                           <Legend wrapperStyle={{ fontSize: '12px' }} />
-                          <Bar dataKey="IT" fill="#3b82f6" stackId="a" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="Facilities" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="Communications" fill="#8b5cf6" stackId="a" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
+                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 4 }} />
+                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 4 }} />
+                        </LineChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="flex justify-center gap-4 mt-2 text-xs">
