@@ -76,6 +76,8 @@ export default function TicketDetail() {
   const [aiDraftResponse, setAiDraftResponse] = useState("");
   const [generatingAI, setGeneratingAI] = useState(false);
   const [showAIDraft, setShowAIDraft] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState(null);
+  const [scanningTicket, setScanningTicket] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingLocation, setEditingLocation] = useState(false);
@@ -466,6 +468,68 @@ export default function TicketDetail() {
     toast.success('AI draft copied to comment');
   };
 
+  const handleAIScan = async () => {
+    setScanningTicket(true);
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a facilities/IT support expert at a church. Analyze this support ticket and provide actionable recommendations.
+
+Ticket Details:
+- Subject: ${ticket.subject}
+- Description: ${ticket.description}
+- Category: ${ticket.category}
+- Priority: ${ticket.priority}
+- Building: ${ticket.building || 'Not specified'}
+- Room: ${ticket.room_number || 'Not specified'}
+- Status: ${ticket.status}
+- Created: ${ticket.created_date}
+${ticket.comments?.length > 0 ? `- Recent activity: ${ticket.comments.slice(-3).map(c => c.content).join(' | ')}` : ''}
+
+Provide your analysis in this exact JSON format:
+{
+  "summary": "One sentence summary of the issue",
+  "root_cause": "Likely root cause of the problem",
+  "recommended_actions": [
+    {"action": "Specific action to take", "priority": "high/medium/low", "assignee_type": "technician/requester/vendor"},
+    {"action": "Another action", "priority": "high/medium/low", "assignee_type": "technician/requester/vendor"}
+  ],
+  "estimated_resolution_time": "e.g., 30 minutes, 2 hours, 1 day",
+  "parts_or_resources_needed": ["item1", "item2"],
+  "follow_up_questions": ["Question to ask requester if needed"]
+}`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            root_cause: { type: "string" },
+            recommended_actions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  action: { type: "string" },
+                  priority: { type: "string" },
+                  assignee_type: { type: "string" }
+                }
+              }
+            },
+            estimated_resolution_time: { type: "string" },
+            parts_or_resources_needed: { type: "array", items: { type: "string" } },
+            follow_up_questions: { type: "array", items: { type: "string" } }
+          }
+        }
+      });
+      
+      setAiRecommendations(response);
+      toast.success('AI analysis complete');
+    } catch (error) {
+      console.error('Error scanning ticket:', error);
+      toast.error('Failed to analyze ticket');
+    } finally {
+      setScanningTicket(false);
+    }
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -617,7 +681,124 @@ export default function TicketDetail() {
                 <CardTitle className="text-base sm:text-lg">Description</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
+                  <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
+
+                  {/* AI Scan Button */}
+                  {canManage && !aiRecommendations && (
+                    <Button
+                      onClick={handleAIScan}
+                      disabled={scanningTicket}
+                      variant="outline"
+                      className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      {scanningTicket ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Analyzing Ticket...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          AI Scan & Recommend Actions
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* AI Recommendations Panel */}
+                  {aiRecommendations && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="border-2 border-purple-200 rounded-lg bg-purple-50 p-4 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-purple-900 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          AI Analysis
+                        </h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAiRecommendations(null)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-purple-700 uppercase">Summary</p>
+                          <p className="text-sm text-slate-700">{aiRecommendations.summary}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-purple-700 uppercase">Likely Root Cause</p>
+                          <p className="text-sm text-slate-700">{aiRecommendations.root_cause}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-purple-700 uppercase mb-2">Recommended Actions</p>
+                          <div className="space-y-2">
+                            {aiRecommendations.recommended_actions?.map((action, idx) => (
+                              <div key={idx} className="flex items-start gap-2 bg-white rounded p-2 border border-purple-100">
+                                <Badge className={
+                                  action.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                  action.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }>
+                                  {action.priority}
+                                </Badge>
+                                <div className="flex-1">
+                                  <p className="text-sm text-slate-800">{action.action}</p>
+                                  <p className="text-xs text-slate-500">Assign to: {action.assignee_type}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-purple-700 uppercase">Est. Resolution</p>
+                            <p className="text-sm text-slate-700">{aiRecommendations.estimated_resolution_time}</p>
+                          </div>
+                          {aiRecommendations.parts_or_resources_needed?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-purple-700 uppercase">Parts/Resources</p>
+                              <div className="flex flex-wrap gap-1">
+                                {aiRecommendations.parts_or_resources_needed.map((item, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">{item}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {aiRecommendations.follow_up_questions?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-purple-700 uppercase mb-1">Follow-up Questions</p>
+                            <ul className="text-sm text-slate-700 list-disc list-inside">
+                              {aiRecommendations.follow_up_questions.map((q, idx) => (
+                                <li key={idx}>{q}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={handleAIScan}
+                          variant="ghost"
+                          size="sm"
+                          className="text-purple-600"
+                        >
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          Re-scan
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
 
                 {/* Attachments */}
                 {ticket.attachments && ticket.attachments.length > 0 && (
