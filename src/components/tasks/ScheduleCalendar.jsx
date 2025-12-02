@@ -124,6 +124,13 @@ export default function ScheduleCalendar({ events, tickets = [], deptTasks = [],
                                 <span>{format(parseISO(event.starts_at), 'h:mm a')}</span>
                               </div>
 
+                              {/* Building Access Badge - only for PCO events with posted door code */}
+                              {!isMicrosoftMeeting && event.posted_door_code && (
+                                <Badge variant="outline" className={`text-[9px] ${isUnlock ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-green-100 border-green-300 text-green-700'}`}>
+                                  Building Access
+                                </Badge>
+                              )}
+
                               {/* Microsoft Meeting Indicators */}
                               {isMicrosoftMeeting && (
                                 <>

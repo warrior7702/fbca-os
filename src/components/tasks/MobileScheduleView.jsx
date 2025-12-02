@@ -232,6 +232,13 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
                     </span>
                   </div>
 
+                  {/* Building Access Badge - only for PCO events with posted door code */}
+                  {!isMicrosoftMeeting && item.posted_door_code && (
+                    <Badge variant="outline" className={`text-[10px] w-fit ${isUnlock ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-green-100 border-green-300 text-green-700'}`}>
+                      Building Access
+                    </Badge>
+                  )}
+
                   {/* Event Name */}
                   <p className="text-sm font-semibold text-slate-900 line-clamp-2">
                     {item.name}
