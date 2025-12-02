@@ -528,7 +528,36 @@ export default function MyApprovals() {
                 </Card>
               </motion.div>
             ) : (
-              approvals.map((approval) => {
+              // Group approvals by event for non-building access, keep building access separate
+              (() => {
+                const buildingAccessApprovals = approvals.filter(a => 
+                  a.approval_group_name?.toLowerCase().includes('building') || 
+                  a.approval_group_name?.toLowerCase().includes('access')
+                );
+                const otherApprovals = approvals.filter(a => 
+                  !(a.approval_group_name?.toLowerCase().includes('building') || 
+                    a.approval_group_name?.toLowerCase().includes('access'))
+                );
+                
+                // Group other approvals by event
+                const groupedByEvent = otherApprovals.reduce((acc, approval) => {
+                  const eventKey = approval.event_id;
+                  if (!acc[eventKey]) {
+                    acc[eventKey] = {
+                      event_id: approval.event_id,
+                      event_name: approval.event_name,
+                      event_starts_at: approval.event_starts_at,
+                      approvals: []
+                    };
+                  }
+                  acc[eventKey].approvals.push(approval);
+                  return acc;
+                }, {});
+
+                return (
+                  <>
+                    {/* Building Access Approvals - Individual Cards */}
+                    {buildingAccessApprovals.map((approval) => {
                 const colors = getGroupColor(approval.approval_group_name);
                 const previewAnswers = answerPreviews[approval.request_id] || [];
                 const postedCode = postedDoorCodes[approval.request_id];
