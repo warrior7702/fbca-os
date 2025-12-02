@@ -808,45 +808,59 @@ export default function MyDepartment() {
             <>
             {/* Dept Tasks Section */}
             {deptTasks.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    Dept Tasks ({deptTasks.filter(t => !t.completed).length})
+              <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-emerald-800">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    Dept Tasks
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 ml-2">
+                      {deptTasks.filter(t => !t.completed).length} active
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {deptTasks.filter(t => !t.completed).map((task) => (
                       <div
                         key={task.id}
-                        className="p-3 bg-green-50 rounded-lg border border-green-200 flex items-center justify-between"
+                        className="p-4 bg-white rounded-xl border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
                       >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={task.completed}
-                            onChange={() => {
+                        <div className="flex items-center gap-4">
+                          <div 
+                            onClick={() => {
                               setDeptTasks(prev => prev.map(t => 
                                 t.id === task.id ? {...t, completed: !t.completed} : t
                               ));
                               toast.success('Task completed!');
                             }}
-                            className="w-4 h-4 rounded border-green-400"
-                          />
+                            className="w-6 h-6 rounded-full border-2 border-emerald-400 flex items-center justify-center cursor-pointer hover:bg-emerald-100 transition-colors"
+                          >
+                            {task.completed && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                          </div>
                           <div>
-                            <p className="font-medium text-slate-900 text-sm">{task.title}</p>
-                            <p className="text-xs text-slate-500">
-                              {task.assigneeName} • Due: {format(new Date(task.dueDate), 'MMM d')}
-                            </p>
+                            <p className="font-semibold text-slate-900">{task.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <Users className="w-3 h-3" />
+                                {task.assigneeName}
+                              </div>
+                              <span className="text-slate-300">•</span>
+                              <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                <Calendar className="w-3 h-3" />
+                                Due {format(new Date(task.dueDate), 'MMM d')}
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setDeptTasks(deptTasks.filter(t => t.id !== task.id))}
+                          className="text-slate-400 hover:text-red-500 hover:bg-red-50"
                         >
-                          <X className="w-4 h-4 text-slate-400" />
+                          <X className="w-4 h-4" />
                         </Button>
                       </div>
                     ))}
@@ -856,33 +870,48 @@ export default function MyDepartment() {
             )}
 
             {/* Department Tickets */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Ticket className="w-5 h-5 text-violet-600" />
+            <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-amber-800">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <Ticket className="w-5 h-5 text-amber-600" />
+                  </div>
                   Department Tickets
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
+                    {filteredTickets.length} total
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredTickets.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {filteredTickets.map((ticket) => {
                       const { Icon, config } = getSourceBadge(ticket.source || 'manual_request');
                       return (
                         <div
                           key={ticket.id}
-                          className="p-3 bg-white rounded-lg border hover:shadow-md transition-all cursor-pointer"
+                          className="p-4 bg-white rounded-xl border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer"
                           onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-slate-900 text-sm truncate">
+                              <p className="font-semibold text-slate-900 truncate">
                                 {ticket.subject}
                               </p>
-                              <p className="text-xs text-slate-600 mt-1">
-                                {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
-                                {ticket.assigned_to_name && ` • ${ticket.assigned_to_name}`}
-                              </p>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <span className="text-xs font-mono text-slate-500">{ticket.ticket_number}</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-xs text-slate-500">{format(new Date(ticket.created_date), 'MMM d')}</span>
+                                {ticket.assigned_to_name && (
+                                  <>
+                                    <span className="text-slate-300">•</span>
+                                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                                      <Users className="w-3 h-3" />
+                                      {ticket.assigned_to_name}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <Badge className={`text-xs ${
@@ -891,7 +920,7 @@ export default function MyDepartment() {
                                 ticket.status === 'resolved' ? 'bg-green-100 text-green-700' :
                                 'bg-slate-100 text-slate-700'
                               }`}>
-                                {ticket.status}
+                                {ticket.status?.replace(/_/g, ' ')}
                               </Badge>
                               <Badge className={`text-xs ${
                                 ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -909,10 +938,10 @@ export default function MyDepartment() {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Ticket className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <Ticket className="w-12 h-12 text-amber-200 mx-auto mb-3" />
                     <p className="text-slate-500">No tickets yet</p>
                     <Button 
-                      className="mt-4"
+                      className="mt-4 bg-amber-600 hover:bg-amber-700"
                       onClick={() => navigate(createPageUrl('CreateTicket'))}
                     >
                       Create Your First Ticket
