@@ -1859,6 +1859,23 @@ export default function MyDepartment() {
             )}
           </TabsContent>
 
+          {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+            <TabsContent value="roomflow" className="space-y-6">
+              <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
+                <CardContent className="p-12 text-center">
+                  <LayoutGrid className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Room Flow</h3>
+                  <p className="text-slate-600 mb-4">
+                    Room setup management and coordination tools coming soon.
+                  </p>
+                  <Badge className="bg-green-100 text-green-700 border-green-300">
+                    Coming Soon
+                  </Badge>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           {isPreviewMode && (
           <TabsContent value="insights" className="space-y-6">
             <Card>
