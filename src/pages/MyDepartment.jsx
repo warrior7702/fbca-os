@@ -80,6 +80,15 @@ export default function MyDepartment() {
 
   useEffect(() => {
     loadData();
+    // Load saved dept tasks from localStorage
+    const storedDeptTasks = localStorage.getItem('deptTasks');
+    if (storedDeptTasks) {
+      try {
+        setDeptTasks(JSON.parse(storedDeptTasks));
+      } catch (e) {
+        console.error('Error loading dept tasks:', e);
+      }
+    }
   }, []);
 
   const loadData = async () => {
@@ -857,7 +866,11 @@ export default function MyDepartment() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeptTasks(deptTasks.filter(t => t.id !== task.id))}
+                          onClick={() => {
+                          const updatedTasks = deptTasks.filter(t => t.id !== task.id);
+                          setDeptTasks(updatedTasks);
+                          localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                        }}
                           className="text-slate-400 hover:text-red-500 hover:bg-red-50"
                         >
                           <X className="w-4 h-4" />
@@ -1425,7 +1438,9 @@ export default function MyDepartment() {
                               createdBy: user?.full_name || user?.email,
                               createdAt: new Date().toISOString()
                             };
-                            setDeptTasks(prev => [...prev, newTask]);
+                            const updatedTasks = [...deptTasks, newTask];
+                            setDeptTasks(updatedTasks);
+                            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
                             toast.success('Task created!');
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
