@@ -401,30 +401,21 @@ export default function MyDepartment() {
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
     const matchesSource = sourceFilter === "all" || ticket.source === sourceFilter;
     
-    // Filter based on user role
+    // Filter based on user role - show ALL department tickets
+    const ticketDept = getDepartment(ticket.category);
+    const isInUserDept = userDepartments.some(dept => 
+      ticketDept === dept.toLowerCase().replace(' ', '_') ||
+      ticketDept === dept.toLowerCase()
+    );
+    
     if (userRole === 'requester') {
-      // Requesters only see their own tickets
-      return matchesStatus && matchesPriority && matchesSource && 
-             ticket.requester_email === user?.email;
+      // Requesters see all tickets in their department
+      return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     } else if (userRole === 'worker') {
-      // Workers see tickets assigned to them + unassigned pool tickets in their department + their own tickets
-      const ticketDept = getDepartment(ticket.category);
-      const isInUserDept = userDepartments.some(dept => 
-        ticketDept === dept.toLowerCase().replace(' ', '_')
-      );
-      const isUnassignedInDept = !ticket.assigned_to && isInUserDept && 
-                                  !['resolved', 'closed'].includes(ticket.status);
-      
-      return matchesStatus && matchesPriority && matchesSource &&
-             (ticket.assigned_to === user?.email || 
-              ticket.requester_email === user?.email ||
-              isUnassignedInDept);
+      // Workers see all tickets in their department
+      return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     } else if (userRole === 'admin') {
       // Admins see everything in their departments
-      const ticketDept = getDepartment(ticket.category);
-      const isInUserDept = userDepartments.some(dept => 
-        ticketDept === dept.toLowerCase().replace(' ', '_')
-      );
       return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     }
     
@@ -814,11 +805,62 @@ export default function MyDepartment() {
             </div>
 
             {!isPreviewMode && (
+            <>
+            {/* Dept Tasks Section */}
+            {deptTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    Dept Tasks ({deptTasks.filter(t => !t.completed).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {deptTasks.filter(t => !t.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        className="p-3 bg-green-50 rounded-lg border border-green-200 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => {
+                              setDeptTasks(prev => prev.map(t => 
+                                t.id === task.id ? {...t, completed: !t.completed} : t
+                              ));
+                              toast.success('Task completed!');
+                            }}
+                            className="w-4 h-4 rounded border-green-400"
+                          />
+                          <div>
+                            <p className="font-medium text-slate-900 text-sm">{task.title}</p>
+                            <p className="text-xs text-slate-500">
+                              {task.assigneeName} • Due: {format(new Date(task.dueDate), 'MMM d')}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeptTasks(deptTasks.filter(t => t.id !== task.id))}
+                        >
+                          <X className="w-4 h-4 text-slate-400" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Department Tickets */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Ticket className="w-5 h-5 text-violet-600" />
-                  {userRole === 'worker' ? 'My Assigned Tickets' : 'My Tickets'}
+                  Department Tickets
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -839,6 +881,7 @@ export default function MyDepartment() {
                               </p>
                               <p className="text-xs text-slate-600 mt-1">
                                 {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
+                                {ticket.assigned_to_name && ` • ${ticket.assigned_to_name}`}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -878,6 +921,7 @@ export default function MyDepartment() {
                 )}
               </CardContent>
             </Card>
+            </>
             )}
 
             {isPreviewMode && escalations.length > 0 && (
