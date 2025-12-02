@@ -64,16 +64,35 @@ export default function SupportTickets() {
     loadData();
   }, [ticketId]);
 
-  // Refresh data when page becomes visible (returning from ticket detail)
+  // Refresh data when page becomes visible or user navigates back
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !ticketId) {
         loadData();
       }
     };
+    
+    const handlePopState = () => {
+      if (!ticketId) {
+        loadData();
+      }
+    };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, [ticketId]);
+
+  // Also refresh when component re-renders without ticketId (navigating back)
+  useEffect(() => {
+    if (!ticketId && !loading) {
+      loadData();
+    }
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
