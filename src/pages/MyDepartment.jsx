@@ -1179,7 +1179,7 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Department Tickets */}
+            {/* Open Department Tickets */}
             <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1187,9 +1187,9 @@ export default function MyDepartment() {
                     <div className="p-2 bg-amber-100 rounded-lg">
                       <Ticket className="w-5 h-5 text-amber-600" />
                     </div>
-                    Department Tickets
+                    Open Tickets
                     <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
-                      {filteredTickets.length} total
+                      {filteredTickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length} active
                     </Badge>
                   </CardTitle>
                   <Select value={ticketSort} onValueChange={setTicketSort}>
@@ -1208,9 +1208,10 @@ export default function MyDepartment() {
                 </div>
               </CardHeader>
               <CardContent>
-                {filteredTickets.length > 0 ? (
+                {filteredTickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length > 0 ? (
                   <div className="space-y-3">
                     {[...filteredTickets]
+                      .filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status))
                       .sort((a, b) => {
                         if (ticketSort === 'due_date') {
                           if (!a.due_date) return 1;
@@ -1240,7 +1241,6 @@ export default function MyDepartment() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start gap-3">
-                                {/* Assignee Avatar */}
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                                   ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
                                 }`}>
@@ -1280,7 +1280,6 @@ export default function MyDepartment() {
                               <Badge className={`text-xs ${
                                 ticket.status === 'open' ? 'bg-blue-100 text-blue-700' :
                                 ticket.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
-                                ticket.status === 'resolved' ? 'bg-green-100 text-green-700' :
                                 'bg-slate-100 text-slate-700'
                               }`}>
                                 {ticket.status?.replace(/_/g, ' ')}
@@ -1302,17 +1301,26 @@ export default function MyDepartment() {
                 ) : (
                   <div className="text-center py-8">
                     <Ticket className="w-12 h-12 text-amber-200 mx-auto mb-3" />
-                    <p className="text-slate-500">No tickets yet</p>
+                    <p className="text-slate-500">No open tickets</p>
                     <Button 
                       className="mt-4 bg-amber-600 hover:bg-amber-700"
                       onClick={() => navigate(createPageUrl('CreateTicket'))}
                     >
-                      Create Your First Ticket
+                      Create Ticket
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Resolved Tickets - Collapsible */}
+            {filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length > 0 && (
+              <ResolvedTicketsCard 
+                tickets={filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed')}
+                navigate={navigate}
+                getInitials={getInitials}
+              />
+            )}
             </>
             )}
 
