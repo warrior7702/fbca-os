@@ -28,7 +28,9 @@ export default function ScheduleCalendar({ events, tickets = [], deptTasks = [],
   const getTicketsForDay = (day) => {
     return tickets.filter(ticket => {
       if (!ticket.due_date) return false;
-      const ticketDate = new Date(ticket.due_date);
+      // Parse date string properly - handle both date-only and datetime formats
+      const dueDateStr = ticket.due_date.split('T')[0];
+      const ticketDate = new Date(dueDateStr + 'T12:00:00');
       return isSameDay(ticketDate, day);
     });
   };
