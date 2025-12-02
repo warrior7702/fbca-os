@@ -44,7 +44,8 @@ import {
 } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek } from "date-fns";
+import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MyDepartment() {
@@ -227,6 +228,58 @@ export default function MyDepartment() {
           (t.status === 'open' || t.status === 'in_progress')
         ).length
       }));
+  };
+
+  const getTicketsByCategory = () => {
+    const categoryData = {};
+    filteredTickets.forEach(t => {
+      const category = t.category || 'other';
+      categoryData[category] = (categoryData[category] || 0) + 1;
+    });
+    
+    const colors = {
+      technology: '#3b82f6',
+      cleaning: '#10b981',
+      maintenance: '#f59e0b',
+      av_production: '#8b5cf6',
+      marketing: '#ec4899',
+      communications: '#6366f1',
+      other: '#6b7280'
+    };
+    
+    return Object.entries(categoryData).map(([name, value]) => ({
+      name: name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      value,
+      color: colors[name] || colors.other
+    }));
+  };
+
+  const getMonthlyClosedByDept = () => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = startOfMonth(subMonths(new Date(), i));
+      const monthEnd = endOfMonth(subMonths(new Date(), i));
+      months.push({
+        month: format(monthStart, 'MMM'),
+        start: monthStart,
+        end: monthEnd
+      });
+    }
+    
+    return months.map(({ month, start, end }) => {
+      const monthTickets = tickets.filter(t => {
+        if (!t.resolved_at) return false;
+        const resolvedDate = new Date(t.resolved_at);
+        return isAfter(resolvedDate, start) && isBefore(resolvedDate, end);
+      });
+      
+      return {
+        month,
+        IT: monthTickets.filter(t => getDepartment(t.category) === 'it').length,
+        Facilities: monthTickets.filter(t => getDepartment(t.category) === 'facilities').length,
+        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length
+      };
+    });
   };
 
   const getRecurringIssues = () => {
@@ -426,6 +479,8 @@ export default function MyDepartment() {
   const recurringIssues = getRecurringIssues();
   const crossDeptTickets = getCrossDepartmentTickets();
   const activityFeed = getActivityFeed();
+  const categoryData = getTicketsByCategory();
+  const monthlyClosedData = getMonthlyClosedByDept();
 
   const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || sourceFilter !== "all";
 
@@ -536,6 +591,103 @@ export default function MyDepartment() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
+            {/* Charts Section - Pie Chart and Monthly Tracker */}
+            {(isPreviewMode || userRole === 'admin') && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Pie Chart - Tickets by Category */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <BarChart3 className="w-4 h-4 text-violet-600" />
+                      Tickets by Category
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {categoryData.length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={categoryData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={50}
+                              outerRadius={80}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              labelLine={false}
+                            >
+                              {categoryData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value, name) => [value, 'Tickets']}
+                              contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-slate-500">
+                        No ticket data available
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                      {categoryData.map((item, index) => (
+                        <div key={index} className="flex items-center gap-1 text-xs">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span>{item.name}: {item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Monthly Tracker - Tickets Closed by Dept */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Calendar className="w-4 h-4 text-violet-600" />
+                      Monthly Tickets Closed by Dept
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyClosedData}>
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <Bar dataKey="IT" fill="#3b82f6" stackId="a" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="Facilities" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="Communications" fill="#8b5cf6" stackId="a" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-center gap-4 mt-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-blue-500" />
+                        <span>IT</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-emerald-500" />
+                        <span>Facilities</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-violet-500" />
+                        <span>Communications</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Card>
                 <CardContent className="p-4">
