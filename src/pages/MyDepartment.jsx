@@ -55,6 +55,107 @@ import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, end
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
+import { differenceInSeconds } from "date-fns";
+
+function RoomFlowCountdown({ tickets }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Find next maintenance or room setup ticket with due date
+  const upcomingEvents = tickets
+    .filter(t => {
+      const isFacilities = t.category === 'maintenance' || t.category === 'cleaning';
+      const hasDate = t.due_date;
+      const isActive = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status);
+      if (!isFacilities || !hasDate || !isActive) return false;
+      
+      const dueDate = new Date(t.due_date.split('T')[0] + 'T08:00:00');
+      return dueDate > now;
+    })
+    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+  const nextEvent = upcomingEvents[0];
+
+  if (!nextEvent) {
+    return (
+      <Card className="border-2 border-slate-200 bg-white">
+        <CardContent className="p-6 text-center">
+          <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500">No upcoming room setups or maintenance requests</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const eventDate = new Date(nextEvent.due_date.split('T')[0] + 'T08:00:00');
+  const totalSeconds = Math.max(0, differenceInSeconds(eventDate, now));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return (
+    <Card className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                Next Up
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {nextEvent.category?.replace(/_/g, ' ')}
+              </Badge>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">{nextEvent.subject}</h3>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              {nextEvent.building && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {nextEvent.building.replace(/_/g, ' ')}
+                  {nextEvent.room_number && ` - ${nextEvent.room_number}`}
+                </span>
+              )}
+              <span>•</span>
+              <span>{format(eventDate, 'EEE, MMM d')}</span>
+            </div>
+            {nextEvent.assigned_to_name && (
+              <p className="text-xs text-slate-500 mt-1">Assigned to: {nextEvent.assigned_to_name}</p>
+            )}
+          </div>
+          
+          <div className="text-right">
+            <p className="text-xs text-emerald-600 font-medium mb-1">COUNTDOWN</p>
+            <div className="flex items-center gap-1">
+              {days > 0 && (
+                <div className="bg-white rounded-lg px-3 py-2 shadow-sm border border-emerald-200">
+                  <p className="text-2xl font-bold text-emerald-700">{days}</p>
+                  <p className="text-[10px] text-slate-500 uppercase">Days</p>
+                </div>
+              )}
+              <div className="bg-white rounded-lg px-3 py-2 shadow-sm border border-emerald-200">
+                <p className="text-2xl font-bold text-emerald-700">{String(hours).padStart(2, '0')}</p>
+                <p className="text-[10px] text-slate-500 uppercase">Hrs</p>
+              </div>
+              <div className="bg-white rounded-lg px-3 py-2 shadow-sm border border-emerald-200">
+                <p className="text-2xl font-bold text-emerald-700">{String(minutes).padStart(2, '0')}</p>
+                <p className="text-[10px] text-slate-500 uppercase">Min</p>
+              </div>
+              <div className="bg-white rounded-lg px-3 py-2 shadow-sm border border-emerald-200">
+                <p className="text-2xl font-bold text-emerald-700">{String(seconds).padStart(2, '0')}</p>
+                <p className="text-[10px] text-slate-500 uppercase">Sec</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MyDepartment() {
   const navigate = useNavigate();
