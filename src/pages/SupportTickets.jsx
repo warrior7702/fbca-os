@@ -250,7 +250,10 @@ export default function SupportTickets() {
     'archived': 5
   };
 
-  const filteredTickets = tickets.filter(ticket => {
+  // Determine which ticket list to use based on view mode
+  const ticketsToFilter = (isWorker && !isAdmin && viewMode === 'requested') ? myRequestedTickets : tickets;
+
+  const filteredTickets = ticketsToFilter.filter(ticket => {
     const matchesSearch = !searchQuery || 
       ticket.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.ticket_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
