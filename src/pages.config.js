@@ -58,6 +58,7 @@ import TicketReporting from './pages/TicketReporting';
 import ImportClickUpTickets from './pages/ImportClickUpTickets';
 import ImportTickets from './pages/ImportTickets';
 import NormalizeUserNames from './pages/NormalizeUserNames';
+import BackfillEventCodes from './pages/BackfillEventCodes';
 import __Layout from './Layout.jsx';
 
 
@@ -122,6 +123,7 @@ export const PAGES = {
     "ImportClickUpTickets": ImportClickUpTickets,
     "ImportTickets": ImportTickets,
     "NormalizeUserNames": NormalizeUserNames,
+    "BackfillEventCodes": BackfillEventCodes,
 }
 
 export const pagesConfig = {
