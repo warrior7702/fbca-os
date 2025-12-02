@@ -353,7 +353,7 @@ export default function SupportTickets() {
                   )}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-600">
-                  {isAdmin ? 'All support tickets' : 'Your support requests'}
+                  {isAdmin ? 'All support tickets' : isWorker ? `${userDepartments.join(', ')} tickets` : 'Your support requests'}
                 </p>
               </div>
             </div>
