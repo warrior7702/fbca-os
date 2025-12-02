@@ -1182,43 +1182,43 @@ Provide your analysis in this exact JSON format:
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-slate-600 mb-2 block">Due Date</label>
-                  {canManage ? (
-                    <div className="flex gap-2">
-                      <Input
-                        type="date"
-                        value={dueDateValue}
-                        onChange={(e) => setDueDateValue(e.target.value)}
-                        className="text-sm flex-1"
-                        disabled={updatingDueDate}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (dueDateValue) {
-                            handleDueDateChange(dueDateValue);
-                          }
-                        }}
-                        disabled={updatingDueDate || !dueDateValue}
-                        className="bg-amber-600 hover:bg-amber-700"
-                      >
-                        {updatingDueDate ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Save'
-                        )}
-                      </Button>
-                    </div>
-                  ) : (
-                    ticket.due_date ? (
-                      <p className="text-sm text-slate-900">
-                        {format(new Date(ticket.due_date), 'MMM d, yyyy')}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-slate-500">Not set</p>
-                    )
-                  )}
-                </div>
+                                        <label className="text-sm font-medium text-slate-600 mb-2 block">Due Date</label>
+                                        {canManage ? (
+                                          <div className="flex gap-2">
+                                            <Input
+                                              type="date"
+                                              value={dueDateValue}
+                                              onChange={(e) => setDueDateValue(e.target.value)}
+                                              className="text-sm flex-1"
+                                              disabled={updatingDueDate}
+                                            />
+                                            <Button
+                                              size="sm"
+                                              onClick={() => {
+                                                if (dueDateValue) {
+                                                  handleDueDateChange(dueDateValue);
+                                                }
+                                              }}
+                                              disabled={updatingDueDate || !dueDateValue}
+                                              className="bg-amber-600 hover:bg-amber-700"
+                                            >
+                                              {updatingDueDate ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                              ) : (
+                                                'Save'
+                                              )}
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          ticket.due_date ? (
+                                            <p className="text-sm text-slate-900">
+                                              {format(new Date(ticket.due_date.split('T')[0] + 'T12:00:00'), 'MMM d, yyyy')}
+                                            </p>
+                                          ) : (
+                                            <p className="text-sm text-slate-500">Not set</p>
+                                          )
+                                        )}
+                                      </div>
 
                 {canManage && (
                   <div>
