@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Calendar, Users, Trash2, Save, X } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+import { CheckCircle2, Calendar, Users, Trash2, Save, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -114,6 +115,24 @@ export default function DeptTaskDetailModal({
                   <p className="font-medium text-slate-900">{task.assigneeName}</p>
                   <p className="text-xs text-slate-500">{task.assignee}</p>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">Details</label>
+            {isEditing ? (
+              <Textarea
+                value={editedTask.details || ''}
+                onChange={(e) => setEditedTask({ ...editedTask, details: e.target.value })}
+                placeholder="What needs to be done..."
+                rows={3}
+              />
+            ) : (
+              <div className="flex items-start gap-2">
+                <FileText className="w-4 h-4 text-teal-600 mt-0.5" />
+                <p className="text-slate-700">{task.details || <span className="text-slate-400 italic">No details provided</span>}</p>
               </div>
             )}
           </div>

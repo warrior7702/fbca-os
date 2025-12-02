@@ -74,6 +74,7 @@ export default function MyDepartment() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskDetails, setNewTaskDetails] = useState("");
   const [deptTasks, setDeptTasks] = useState([]);
   const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
   const [addingTask, setAddingTask] = useState(false);
@@ -1492,35 +1493,44 @@ export default function MyDepartment() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <Input
-                        placeholder="Task title..."
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        type="date"
-                        value={newTaskDueDate}
-                        onChange={(e) => setNewTaskDueDate(e.target.value)}
-                        className="w-full sm:w-40"
-                      />
-                      <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                        <SelectTrigger className="w-full sm:w-48">
-                          <SelectValue placeholder="Assign to..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departmentWorkers.filter(w => {
-                            const workerDepts = w.departments || [];
-                            return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
-                          }).map((worker) => (
-                            <SelectItem key={worker.user_email} value={worker.user_email}>
-                              {worker.user_name || worker.user_email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Input
+                          placeholder="Task title..."
+                          value={newTaskTitle}
+                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="date"
+                          value={newTaskDueDate}
+                          onChange={(e) => setNewTaskDueDate(e.target.value)}
+                          className="w-full sm:w-40"
+                        />
+                        <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                          <SelectTrigger className="w-full sm:w-48">
+                            <SelectValue placeholder="Assign to..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {departmentWorkers.filter(w => {
+                              const workerDepts = w.departments || [];
+                              return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
+                            }).map((worker) => (
+                              <SelectItem key={worker.user_email} value={worker.user_email}>
+                                {worker.user_name || worker.user_email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-3">
+                        <Input
+                          placeholder="Details - what needs to be done..."
+                          value={newTaskDetails}
+                          onChange={(e) => setNewTaskDetails(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
                         onClick={async () => {
                           if (!newTaskTitle.trim() || !newTaskAssignee) {
                             toast.error('Please enter a task and select an assignee');
@@ -1532,6 +1542,7 @@ export default function MyDepartment() {
                             const newTask = {
                               id: Date.now().toString(),
                               title: newTaskTitle,
+                              details: newTaskDetails,
                               assignee: newTaskAssignee,
                               assigneeName: worker?.user_name || newTaskAssignee,
                               dueDate: newTaskDueDate || new Date(Date.now() + 86400000).toISOString().split('T')[0],
@@ -1546,6 +1557,7 @@ export default function MyDepartment() {
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
                             setNewTaskDueDate("");
+                            setNewTaskDetails("");
                             setAddingTask(false);
                           } catch (error) {
                             toast.error('Failed to create task');
@@ -1556,7 +1568,8 @@ export default function MyDepartment() {
                         className="bg-green-600 hover:bg-green-700"
                       >
                         {addingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      </Button>
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
