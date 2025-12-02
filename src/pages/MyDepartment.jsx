@@ -633,7 +633,11 @@ export default function MyDepartment() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${!isPreviewMode ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          <TabsList className={`grid w-full ${
+            userDepartments.some(d => d.toLowerCase() === 'facilities') 
+              ? (!isPreviewMode ? 'grid-cols-3' : 'grid-cols-4')
+              : (!isPreviewMode ? 'grid-cols-2' : 'grid-cols-3')
+          }`}>
             <TabsTrigger value="overview">
               {userRole === 'requester' || userRole === 'worker' ? (
                 <>
@@ -651,6 +655,12 @@ export default function MyDepartment() {
               <Building2 className="w-4 h-4 mr-2" />
               Department Info
             </TabsTrigger>
+            {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+              <TabsTrigger value="roomflow">
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Room Flow
+              </TabsTrigger>
+            )}
             {isPreviewMode && (
               <TabsTrigger value="insights">
                 <Target className="w-4 h-4 mr-2" />
