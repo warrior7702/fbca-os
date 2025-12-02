@@ -500,11 +500,23 @@ export default function SupportTickets() {
                               
                               <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
                                 <span className="font-mono">{ticket.ticket_number}</span>
+                                <span>•</span>
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(ticket.created_date), 'MMM d, yyyy')}
                                 {ticket.requester_name && (
                                   <>
                                     <span>•</span>
                                     <UserIcon className="w-3 h-3" />
                                     {ticket.requester_name}
+                                  </>
+                                )}
+                                {ticket.building && (
+                                  <>
+                                    <span>•</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {ticket.building.replace('_', ' ')}
+                                      {ticket.room_number && ` - ${ticket.room_number}`}
+                                    </Badge>
                                   </>
                                 )}
                                 {ticket.due_date && (
