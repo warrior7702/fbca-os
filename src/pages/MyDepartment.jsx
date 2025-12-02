@@ -94,16 +94,42 @@ export default function MyDepartment() {
 
   useEffect(() => {
     loadData();
-    // Load saved dept tasks from localStorage
+    loadDeptTasks();
+  }, []);
+
+  // Refresh dept tasks when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadDeptTasks();
+      }
+    };
+    
+    const handleFocus = () => {
+      loadDeptTasks();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  const loadDeptTasks = () => {
     const storedDeptTasks = localStorage.getItem('deptTasks');
     if (storedDeptTasks) {
       try {
-        setDeptTasks(JSON.parse(storedDeptTasks));
+        const tasks = JSON.parse(storedDeptTasks);
+        console.log('Loaded dept tasks:', tasks);
+        setDeptTasks(tasks);
       } catch (e) {
         console.error('Error loading dept tasks:', e);
       }
     }
-  }, []);
+  };
 
   const loadData = async () => {
     setLoading(true);
