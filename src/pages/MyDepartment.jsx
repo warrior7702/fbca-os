@@ -1047,7 +1047,7 @@ export default function MyDepartment() {
                                     <span className="text-xs text-slate-400">{ticket.ticket_number}</span>
                                     {ticket.due_date && (
                                       <span className="text-xs text-orange-600 font-medium">
-                                        Due {format(new Date(ticket.due_date), 'MMM d')}
+                                        Due {format(new Date(ticket.due_date.split('T')[0] + 'T12:00:00'), 'MMM d')}
                                       </span>
                                     )}
                                   </div>
