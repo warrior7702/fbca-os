@@ -144,7 +144,8 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
               return (
                 <Card 
                   key={`task-${item.id}`} 
-                  className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 active:scale-98 transition-all"
+                  className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 active:scale-98 transition-all cursor-pointer"
+                  onClick={() => onDeptTaskClick && onDeptTaskClick(item)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
