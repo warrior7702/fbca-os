@@ -57,59 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import { differenceInSeconds } from "date-fns";
 
-function ResolvedTicketsCard({ tickets, navigate, getInitials }) {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <Card className="border border-green-200 bg-green-50/50">
-      <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-green-800 text-base">
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
-            Resolved Tickets
-            <Badge className="bg-green-100 text-green-700 border-green-300 ml-2">
-              {tickets.length}
-            </Badge>
-          </CardTitle>
-          {expanded ? <ChevronUp className="w-5 h-5 text-green-600" /> : <ChevronDown className="w-5 h-5 text-green-600" />}
-        </div>
-      </CardHeader>
-      {expanded && (
-        <CardContent className="pt-0">
-          <div className="space-y-2">
-            {tickets.slice(0, 10).map((ticket) => (
-              <div
-                key={ticket.id}
-                className="p-3 bg-white rounded-lg border border-green-200 hover:shadow-md transition-all cursor-pointer"
-                onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '✓'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-700 text-sm truncate">{ticket.subject}</p>
-                      <p className="text-xs text-slate-500">{ticket.ticket_number}</p>
-                    </div>
-                  </div>
-                  <Badge className="bg-green-100 text-green-700 text-xs">Resolved</Badge>
-                </div>
-              </div>
-            ))}
-            {tickets.length > 10 && (
-              <p className="text-xs text-center text-green-600 pt-2">
-                +{tickets.length - 10} more resolved tickets
-              </p>
-            )}
-          </div>
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-function RoomFlowCountdown({ tickets, navigate }) {
+function RoomFlowCountdown({ tickets }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -117,7 +65,7 @@ function RoomFlowCountdown({ tickets, navigate }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Find next maintenance or room setup ticket with due date (from our ticket system)
+  // Find next maintenance or room setup ticket with due date
   const upcomingEvents = tickets
     .filter(t => {
       const isFacilities = t.category === 'maintenance' || t.category === 'cleaning';
@@ -126,7 +74,7 @@ function RoomFlowCountdown({ tickets, navigate }) {
       if (!isFacilities || !hasDate || !isActive) return false;
       
       const dueDate = new Date(t.due_date.split('T')[0] + 'T08:00:00');
-      return dueDate >= new Date(now.toDateString()); // Include today
+      return dueDate > now;
     })
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
 
@@ -151,10 +99,7 @@ function RoomFlowCountdown({ tickets, navigate }) {
   const seconds = totalSeconds % 60;
 
   return (
-    <Card 
-      className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden cursor-pointer hover:shadow-lg transition-all"
-      onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${nextEvent.id}`)}
-    >
+    <Card className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden">
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -165,16 +110,9 @@ function RoomFlowCountdown({ tickets, navigate }) {
               <Badge variant="outline" className="text-xs">
                 {nextEvent.category?.replace(/_/g, ' ')}
               </Badge>
-              <Badge className={`text-xs ${
-                nextEvent.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                nextEvent.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
-                {nextEvent.priority}
-              </Badge>
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-1">{nextEvent.subject}</h3>
-            <div className="flex items-center gap-2 text-sm text-slate-600 flex-wrap">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
               {nextEvent.building && (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
@@ -184,8 +122,6 @@ function RoomFlowCountdown({ tickets, navigate }) {
               )}
               <span>•</span>
               <span>{format(eventDate, 'EEE, MMM d')}</span>
-              <span>•</span>
-              <span className="text-xs text-slate-500">{nextEvent.ticket_number}</span>
             </div>
             {nextEvent.assigned_to_name && (
               <p className="text-xs text-slate-500 mt-1">Assigned to: {nextEvent.assigned_to_name}</p>
@@ -216,12 +152,6 @@ function RoomFlowCountdown({ tickets, navigate }) {
             </div>
           </div>
         </div>
-        
-        {upcomingEvents.length > 1 && (
-          <div className="mt-4 pt-3 border-t border-emerald-200">
-            <p className="text-xs text-emerald-600">{upcomingEvents.length - 1} more upcoming</p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -1231,7 +1161,7 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
-            {/* Open Department Tickets */}
+            {/* Department Tickets */}
             <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1239,9 +1169,9 @@ export default function MyDepartment() {
                     <div className="p-2 bg-amber-100 rounded-lg">
                       <Ticket className="w-5 h-5 text-amber-600" />
                     </div>
-                    Open Tickets
+                    Department Tickets
                     <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
-                      {filteredTickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length} active
+                      {filteredTickets.length} total
                     </Badge>
                   </CardTitle>
                   <Select value={ticketSort} onValueChange={setTicketSort}>
@@ -1260,10 +1190,9 @@ export default function MyDepartment() {
                 </div>
               </CardHeader>
               <CardContent>
-                {filteredTickets.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length > 0 ? (
+                {filteredTickets.length > 0 ? (
                   <div className="space-y-3">
                     {[...filteredTickets]
-                      .filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status))
                       .sort((a, b) => {
                         if (ticketSort === 'due_date') {
                           if (!a.due_date) return 1;
@@ -1293,6 +1222,7 @@ export default function MyDepartment() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start gap-3">
+                                {/* Assignee Avatar */}
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                                   ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
                                 }`}>
@@ -1332,6 +1262,7 @@ export default function MyDepartment() {
                               <Badge className={`text-xs ${
                                 ticket.status === 'open' ? 'bg-blue-100 text-blue-700' :
                                 ticket.status === 'in_progress' ? 'bg-purple-100 text-purple-700' :
+                                ticket.status === 'resolved' ? 'bg-green-100 text-green-700' :
                                 'bg-slate-100 text-slate-700'
                               }`}>
                                 {ticket.status?.replace(/_/g, ' ')}
@@ -1353,26 +1284,17 @@ export default function MyDepartment() {
                 ) : (
                   <div className="text-center py-8">
                     <Ticket className="w-12 h-12 text-amber-200 mx-auto mb-3" />
-                    <p className="text-slate-500">No open tickets</p>
+                    <p className="text-slate-500">No tickets yet</p>
                     <Button 
                       className="mt-4 bg-amber-600 hover:bg-amber-700"
                       onClick={() => navigate(createPageUrl('CreateTicket'))}
                     >
-                      Create Ticket
+                      Create Your First Ticket
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
-
-            {/* Resolved Tickets - Collapsible */}
-            {filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length > 0 && (
-              <ResolvedTicketsCard 
-                tickets={filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed')}
-                navigate={navigate}
-                getInitials={getInitials}
-              />
-            )}
             </>
             )}
 
@@ -2040,7 +1962,7 @@ export default function MyDepartment() {
 
           {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
             <TabsContent value="roomflow" className="space-y-6">
-              <RoomFlowCountdown tickets={tickets} navigate={navigate} />
+              <RoomFlowCountdown tickets={tickets} />
               
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
                 <CardContent className="p-8 text-center">
