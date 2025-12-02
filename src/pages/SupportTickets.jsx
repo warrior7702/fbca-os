@@ -48,10 +48,14 @@ export default function SupportTickets() {
   
   const [user, setUser] = useState(null);
   const [tickets, setTickets] = useState([]);
+  const [myRequestedTickets, setMyRequestedTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isWorker, setIsWorker] = useState(false);
+  const [userDepartments, setUserDepartments] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("active");
+  const [viewMode, setViewMode] = useState("working"); // "working" or "requested"
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [claiming, setClaiming] = useState(null);
