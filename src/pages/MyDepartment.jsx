@@ -73,7 +73,14 @@ export default function MyDepartment() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
-  const [deptTasks, setDeptTasks] = useState([]);
+  const [deptTasks, setDeptTasks] = useState(() => {
+    try {
+      const stored = localStorage.getItem('deptTasks');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
@@ -830,9 +837,11 @@ export default function MyDepartment() {
                         <div className="flex items-center gap-4">
                           <div 
                             onClick={() => {
-                              setDeptTasks(prev => prev.map(t => 
+                              const updatedTasks = deptTasks.map(t => 
                                 t.id === task.id ? {...t, completed: !t.completed} : t
-                              ));
+                              );
+                              setDeptTasks(updatedTasks);
+                              localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
                               toast.success('Task completed!');
                             }}
                             className="w-6 h-6 rounded-full border-2 border-emerald-400 flex items-center justify-center cursor-pointer hover:bg-emerald-100 transition-colors"
@@ -857,7 +866,11 @@ export default function MyDepartment() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeptTasks(deptTasks.filter(t => t.id !== task.id))}
+                          onClick={() => {
+                          const updatedTasks = deptTasks.filter(t => t.id !== task.id);
+                          setDeptTasks(updatedTasks);
+                          localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                        }}
                           className="text-slate-400 hover:text-red-500 hover:bg-red-50"
                         >
                           <X className="w-4 h-4" />
@@ -1425,7 +1438,9 @@ export default function MyDepartment() {
                               createdBy: user?.full_name || user?.email,
                               createdAt: new Date().toISOString()
                             };
-                            setDeptTasks(prev => [...prev, newTask]);
+                            const updatedTasks = [...deptTasks, newTask];
+                            setDeptTasks(updatedTasks);
+                            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
                             toast.success('Task created!');
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
