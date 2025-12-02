@@ -392,9 +392,9 @@ export default function TicketDetail() {
       if (refreshedTickets && refreshedTickets.length > 0) {
         setTicket(refreshedTickets[0]);
         // Update local state too
-        const newDueDate = refreshedTickets[0].due_date;
-        if (newDueDate) {
-          setDueDateValue(newDueDate.includes('T') ? newDueDate.split('T')[0] : newDueDate);
+        const refreshedDueDate = refreshedTickets[0].due_date;
+        if (refreshedDueDate) {
+          setDueDateValue(refreshedDueDate.includes('T') ? refreshedDueDate.split('T')[0] : refreshedDueDate);
         }
       }
       toast.success('Due date updated');
