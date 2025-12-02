@@ -194,8 +194,20 @@ export default function MyTasks() {
         loadSupportTickets();
       }
     };
+    
+    const handleFocus = () => {
+      if (user) {
+        loadSupportTickets();
+      }
+    };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [user]);
 
   const handleScheduleEventClick = (event) => {
