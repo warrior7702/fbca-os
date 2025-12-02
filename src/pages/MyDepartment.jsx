@@ -235,6 +235,24 @@ export default function MyDepartment() {
     }
   };
 
+  const loadPcoFacilitiesEvents = async () => {
+    setLoadingPcoEvents(true);
+    try {
+      // Fetch events from PCO with Room Setup or Maintenance resources
+      const response = await base44.functions.invoke('getPCOCalendarEvents', {
+        resourceTypes: ['Room Setup', 'Maintenance', 'Facilities']
+      });
+      
+      if (response.data?.events) {
+        setPcoEvents(response.data.events);
+      }
+    } catch (error) {
+      console.error('Error loading PCO facilities events:', error);
+    } finally {
+      setLoadingPcoEvents(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
