@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO, isToday } from 'date-fns';
-import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-export default function MobileScheduleView({ events, tickets = [], onEventClick, onTicketClick }) {
+export default function MobileScheduleView({ events, tickets = [], deptTasks = [], onEventClick, onTicketClick }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -27,9 +27,18 @@ export default function MobileScheduleView({ events, tickets = [], onEventClick,
     });
   };
 
+  const getDeptTasksForDay = (day) => {
+    return deptTasks.filter(task => {
+      if (!task.dueDate && !task.due_date) return false;
+      const taskDate = new Date(task.dueDate || task.due_date);
+      return isSameDay(taskDate, day);
+    });
+  };
+
   const selectedDayEvents = getEventsForDay(selectedDate);
   const selectedDayTickets = getTicketsForDay(selectedDate);
-  const allItems = [...selectedDayEvents, ...selectedDayTickets].sort((a, b) => {
+  const selectedDayDeptTasks = getDeptTasksForDay(selectedDate);
+  const allItems = [...selectedDayEvents, ...selectedDayTickets, ...selectedDayDeptTasks.map(t => ({ ...t, isDeptTask: true }))].sort((a, b) => {
     const aTime = a.starts_at ? new Date(a.starts_at) : new Date(a.due_date);
     const bTime = b.starts_at ? new Date(b.starts_at) : new Date(b.due_date);
     return aTime - bTime;
@@ -55,7 +64,8 @@ export default function MobileScheduleView({ events, tickets = [], onEventClick,
               const isCurrentDay = isToday(day);
               const dayEvents = getEventsForDay(day);
               const dayTickets = getTicketsForDay(day);
-              const hasItems = dayEvents.length > 0 || dayTickets.length > 0;
+              const dayDeptTasks = getDeptTasksForDay(day);
+              const hasItems = dayEvents.length > 0 || dayTickets.length > 0 || dayDeptTasks.length > 0;
 
               return (
                 <button
@@ -86,6 +96,9 @@ export default function MobileScheduleView({ events, tickets = [], onEventClick,
                       )}
                       {dayTickets.length > 0 && (
                         <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-purple-500'}`} />
+                      )}
+                      {dayDeptTasks.length > 0 && (
+                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-green-600' : 'bg-teal-500'}`} />
                       )}
                     </div>
                   )}
@@ -124,6 +137,38 @@ export default function MobileScheduleView({ events, tickets = [], onEventClick,
         ) : (
           allItems.map((item) => {
             const isTicket = !!item.ticket_number;
+            const isDeptTask = !!item.isDeptTask;
+            
+            // Dept Task
+            if (isDeptTask) {
+              return (
+                <Card 
+                  key={`task-${item.id}`} 
+                  className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 active:scale-98 transition-all"
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-1">
+                          {item.title}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-[10px] bg-teal-100 border-teal-400 text-teal-700">
+                            Dept Task
+                          </Badge>
+                          {item.assigneeName && (
+                            <Badge variant="outline" className="text-[10px] border-teal-300 text-teal-600">
+                              {item.assigneeName}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
             
             if (isTicket) {
               return (

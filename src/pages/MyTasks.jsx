@@ -525,6 +525,7 @@ export default function MyTasks() {
                   <ScheduleCalendar 
                     events={myScheduleEvents}
                     tickets={supportTickets}
+                    deptTasks={deptTasks}
                     weekCount={1}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
@@ -536,6 +537,7 @@ export default function MyTasks() {
                   <MobileScheduleView
                     events={myScheduleEvents}
                     tickets={supportTickets}
+                    deptTasks={deptTasks}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
                   />

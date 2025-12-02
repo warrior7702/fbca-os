@@ -2,9 +2,9 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket, CheckCircle2 } from 'lucide-react';
 
-export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, onEventClick, onTicketClick }) {
+export default function ScheduleCalendar({ events, tickets = [], deptTasks = [], weekCount = 2, onEventClick, onTicketClick }) {
   const today = new Date();
   const startDate = today;
 
@@ -33,6 +33,14 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
     });
   };
 
+  const getDeptTasksForDay = (day) => {
+    return deptTasks.filter(task => {
+      if (!task.dueDate && !task.due_date) return false;
+      const taskDate = new Date(task.dueDate || task.due_date);
+      return isSameDay(taskDate, day);
+    });
+  };
+
   return (
     <div className="space-y-6">
       {weeks.map((week, weekIndex) => (
@@ -44,6 +52,7 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
             {week.map((day, dayIndex) => {
               const dayEvents = getEventsForDay(day);
               const dayTickets = getTicketsForDay(day);
+              const dayDeptTasks = getDeptTasksForDay(day);
               const isToday = isSameDay(day, today);
               const isPast = day < today && !isToday;
 
@@ -204,6 +213,33 @@ export default function ScheduleCalendar({ events, tickets = [], weekCount = 2, 
                             <Badge variant="outline" className="text-[9px] bg-blue-100 border-blue-300 text-blue-700">
                               {ticket.category?.replace('_', ' ') || 'Ticket'}
                             </Badge>
+                          </CardContent>
+                        </Card>
+                        ))}
+
+                        {/* Dept Tasks - Teal/Cyan Color */}
+                        {dayDeptTasks.map((task) => (
+                        <Card 
+                          key={`task-${task.id}`} 
+                          className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 hover:shadow-md transition-all"
+                        >
+                          <CardContent className="p-2 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                {task.title}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Badge variant="outline" className="text-[9px] bg-teal-100 border-teal-400 text-teal-700">
+                                Dept Task
+                              </Badge>
+                              {task.assigneeName && (
+                                <span className="text-[9px] text-teal-600 truncate">
+                                  {task.assigneeName}
+                                </span>
+                              )}
+                            </div>
                           </CardContent>
                         </Card>
                         ))}
