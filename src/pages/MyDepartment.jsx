@@ -198,6 +198,7 @@ export default function MyDepartment() {
   useEffect(() => {
     loadData();
     loadDeptTasks();
+    loadPcoFacilitiesEvents();
   }, []);
 
   // Refresh dept tasks when page becomes visible
