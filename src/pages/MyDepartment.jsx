@@ -182,6 +182,9 @@ export default function MyDepartment() {
   const [ticketSort, setTicketSort] = useState("due_date");
   const [taskSort, setTaskSort] = useState("due_date");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [pcoEvents, setPcoEvents] = useState([]);
+  const [loadingPcoEvents, setLoadingPcoEvents] = useState(false);
+  const [showResolvedTickets, setShowResolvedTickets] = useState(false);
 
   const getInitials = (name) => {
     if (!name) return '??';
