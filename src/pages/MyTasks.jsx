@@ -73,6 +73,7 @@ export default function MyTasks() {
   const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
   const [userDepartments, setUserDepartments] = useState([]);
   const [deptTickets, setDeptTickets] = useState([]);
+  const [deptTasks, setDeptTasks] = useState([]);
 
   const navigate = useNavigate();
 
@@ -295,6 +296,19 @@ export default function MyTasks() {
               });
               
               setDeptTickets(deptFiltered);
+              
+              // Load dept tasks from localStorage or state (these are created in MyDepartment)
+              const storedDeptTasks = localStorage.getItem('deptTasks');
+              if (storedDeptTasks) {
+                try {
+                  const tasks = JSON.parse(storedDeptTasks);
+                  // Filter to only show tasks assigned to current user
+                  const myTasks = tasks.filter(t => t.assignee === user.email && !t.completed);
+                  setDeptTasks(myTasks);
+                } catch (e) {
+                  console.error('Error parsing dept tasks:', e);
+                }
+              }
             }
           }
         } catch (err) {
