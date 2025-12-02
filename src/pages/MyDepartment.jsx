@@ -57,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import { differenceInSeconds } from "date-fns";
 
-function RoomFlowCountdown({ tickets }) {
+function RoomFlowCountdown({ tickets, navigate }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -65,7 +65,7 @@ function RoomFlowCountdown({ tickets }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Find next maintenance or room setup ticket with due date
+  // Find next maintenance or room setup ticket with due date (from our ticket system)
   const upcomingEvents = tickets
     .filter(t => {
       const isFacilities = t.category === 'maintenance' || t.category === 'cleaning';
@@ -74,7 +74,7 @@ function RoomFlowCountdown({ tickets }) {
       if (!isFacilities || !hasDate || !isActive) return false;
       
       const dueDate = new Date(t.due_date.split('T')[0] + 'T08:00:00');
-      return dueDate > now;
+      return dueDate >= new Date(now.toDateString()); // Include today
     })
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
 
@@ -99,7 +99,10 @@ function RoomFlowCountdown({ tickets }) {
   const seconds = totalSeconds % 60;
 
   return (
-    <Card className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden">
+    <Card 
+      className="border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-green-100 overflow-hidden cursor-pointer hover:shadow-lg transition-all"
+      onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${nextEvent.id}`)}
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -110,9 +113,16 @@ function RoomFlowCountdown({ tickets }) {
               <Badge variant="outline" className="text-xs">
                 {nextEvent.category?.replace(/_/g, ' ')}
               </Badge>
+              <Badge className={`text-xs ${
+                nextEvent.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                nextEvent.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {nextEvent.priority}
+              </Badge>
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-1">{nextEvent.subject}</h3>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="flex items-center gap-2 text-sm text-slate-600 flex-wrap">
               {nextEvent.building && (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
@@ -122,6 +132,8 @@ function RoomFlowCountdown({ tickets }) {
               )}
               <span>•</span>
               <span>{format(eventDate, 'EEE, MMM d')}</span>
+              <span>•</span>
+              <span className="text-xs text-slate-500">{nextEvent.ticket_number}</span>
             </div>
             {nextEvent.assigned_to_name && (
               <p className="text-xs text-slate-500 mt-1">Assigned to: {nextEvent.assigned_to_name}</p>
@@ -152,6 +164,12 @@ function RoomFlowCountdown({ tickets }) {
             </div>
           </div>
         </div>
+        
+        {upcomingEvents.length > 1 && (
+          <div className="mt-4 pt-3 border-t border-emerald-200">
+            <p className="text-xs text-emerald-600">{upcomingEvents.length - 1} more upcoming</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1962,7 +1980,7 @@ export default function MyDepartment() {
 
           {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
             <TabsContent value="roomflow" className="space-y-6">
-              <RoomFlowCountdown tickets={tickets} />
+              <RoomFlowCountdown tickets={tickets} navigate={navigate} />
               
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50">
                 <CardContent className="p-8 text-center">
