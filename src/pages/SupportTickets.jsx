@@ -107,10 +107,61 @@ export default function SupportTickets() {
       const adminStatus = currentUser?.role === 'admin' || currentUser?.role === 'super_user';
       setIsAdmin(adminStatus);
 
+      // Check if user is a ticket worker
+      let workerStatus = false;
+      let departments = [];
+      try {
+        const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
+        if (rolesResponse.data.success) {
+          const userData = rolesResponse.data.allUsers.find(u => u.user_email === currentUser.email);
+          if (userData) {
+            workerStatus = userData.ticket_role === 'worker';
+            departments = userData.departments || [];
+          }
+        }
+      } catch (err) {
+        console.error('Error checking ticket roles:', err);
+      }
+      setIsWorker(workerStatus);
+      setUserDepartments(departments);
+
       let ticketsData;
+      let myRequests = [];
+
       if (adminStatus) {
+        // Admins see all tickets
         ticketsData = await base44.entities.Ticket.list('-created_date');
+      } else if (workerStatus) {
+        // Workers see department tickets they're working on
+        const allTickets = await base44.entities.Ticket.list('-created_date');
+        
+        // Map category to department
+        const getDepartment = (category) => {
+          const deptMap = {
+            'technology': 'IT',
+            'cleaning': 'Facilities',
+            'maintenance': 'Facilities'
+          };
+          return deptMap[category] || null;
+        };
+        
+        // Filter to their department tickets
+        ticketsData = allTickets.filter(t => {
+          const ticketDept = getDepartment(t.category);
+          return ticketDept && departments.some(d => 
+            d.toLowerCase() === ticketDept.toLowerCase()
+          );
+        });
+        
+        // Also get tickets they personally requested (separate list)
+        myRequests = allTickets.filter(t => 
+          t.requester_email === currentUser.email &&
+          t.category && 
+          ['technology', 'cleaning', 'maintenance'].includes(t.category) &&
+          t.status !== 'archived'
+        );
       } else {
+        // Regular users only see their own requests
         ticketsData = await base44.entities.Ticket.filter({
           requester_email: currentUser.email
         });
@@ -125,6 +176,7 @@ export default function SupportTickets() {
       );
       
       setTickets(ticketsData);
+      setMyRequestedTickets(myRequests);
     } catch (error) {
       console.error('Failed to load tickets:', error);
       toast.error('Failed to load tickets');
