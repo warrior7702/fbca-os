@@ -198,6 +198,17 @@ export default function MyTasks() {
     const handleFocus = () => {
       if (user) {
         loadSupportTickets();
+        // Also refresh dept tasks from localStorage
+        const storedDeptTasks = localStorage.getItem('deptTasks');
+        if (storedDeptTasks) {
+          try {
+            const tasks = JSON.parse(storedDeptTasks);
+            const myTasks = tasks.filter(t => t.assignee === user.email && !t.completed);
+            setDeptTasks(myTasks);
+          } catch (e) {
+            console.error('Error parsing dept tasks:', e);
+          }
+        }
       }
     };
     
