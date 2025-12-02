@@ -824,9 +824,9 @@ export default function MyApprovals() {
                       );
                     })}
                   </>
-                )
+                );
               })()
-            }
+            )}
           </AnimatePresence>
         </div>
       </div>
