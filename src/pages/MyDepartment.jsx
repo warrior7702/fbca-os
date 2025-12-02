@@ -77,6 +77,8 @@ export default function MyDepartment() {
   const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
+  const [ticketSort, setTicketSort] = useState("due_date");
+  const [taskSort, setTaskSort] = useState("due_date");
 
   useEffect(() => {
     loadData();
@@ -816,25 +818,48 @@ export default function MyDepartment() {
             {!isPreviewMode && (
             <>
             {/* Dept Tasks Section */}
-            {deptTasks.length > 0 && (
-              <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-emerald-800">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <Card className="border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-cyan-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="flex items-center gap-2 text-teal-800">
+                    <div className="p-2 bg-teal-100 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-teal-600" />
                     </div>
                     Dept Tasks
-                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 ml-2">
+                    <Badge className="bg-teal-100 text-teal-700 border-teal-300 ml-2">
                       {deptTasks.filter(t => !t.completed).length} active
                     </Badge>
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
+                  <Select value={taskSort} onValueChange={setTaskSort}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="due_date">Due Date</SelectItem>
+                      <SelectItem value="assignee">Assignee</SelectItem>
+                      <SelectItem value="created">Created</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {deptTasks.filter(t => !t.completed).length > 0 ? (
                   <div className="space-y-3">
-                    {deptTasks.filter(t => !t.completed).map((task) => (
+                    {deptTasks
+                      .filter(t => !t.completed)
+                      .sort((a, b) => {
+                        if (taskSort === 'due_date') {
+                          return new Date(a.dueDate) - new Date(b.dueDate);
+                        } else if (taskSort === 'assignee') {
+                          return (a.assigneeName || '').localeCompare(b.assigneeName || '');
+                        } else {
+                          return new Date(b.createdAt) - new Date(a.createdAt);
+                        }
+                      })
+                      .map((task) => (
                       <div
                         key={task.id}
-                        className="p-4 bg-white rounded-xl border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
+                        className="p-4 bg-white rounded-xl border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
                       >
                         <div className="flex items-center gap-4">
                           <div 
@@ -846,19 +871,18 @@ export default function MyDepartment() {
                               localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
                               toast.success('Task completed!');
                             }}
-                            className="w-6 h-6 rounded-full border-2 border-emerald-400 flex items-center justify-center cursor-pointer hover:bg-emerald-100 transition-colors"
+                            className="w-6 h-6 rounded-full border-2 border-teal-400 flex items-center justify-center cursor-pointer hover:bg-teal-100 transition-colors"
                           >
-                            {task.completed && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                            {task.completed && <CheckCircle2 className="w-4 h-4 text-teal-600" />}
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className="font-semibold text-slate-900">{task.title}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <Badge className="bg-teal-100 text-teal-700 border-teal-300 text-xs flex items-center gap-1">
                                 <Users className="w-3 h-3" />
                                 {task.assigneeName}
-                              </div>
-                              <span className="text-slate-300">•</span>
-                              <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                              </Badge>
+                              <div className="flex items-center gap-1 text-xs text-teal-600 font-medium">
                                 <Calendar className="w-3 h-3" />
                                 Due {format(new Date(task.dueDate), 'MMM d')}
                               </div>
@@ -880,27 +904,67 @@ export default function MyDepartment() {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-6">
+                    <CheckCircle2 className="w-10 h-10 text-teal-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">No active tasks</p>
+                    <p className="text-xs text-slate-400">Create tasks in Department Info tab</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Department Tickets */}
             <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-amber-800">
-                  <div className="p-2 bg-amber-100 rounded-lg">
-                    <Ticket className="w-5 h-5 text-amber-600" />
-                  </div>
-                  Department Tickets
-                  <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
-                    {filteredTickets.length} total
-                  </Badge>
-                </CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="flex items-center gap-2 text-amber-800">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Ticket className="w-5 h-5 text-amber-600" />
+                    </div>
+                    Department Tickets
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">
+                      {filteredTickets.length} total
+                    </Badge>
+                  </CardTitle>
+                  <Select value={ticketSort} onValueChange={setTicketSort}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="due_date">Due Date</SelectItem>
+                      <SelectItem value="assignee">Assignee</SelectItem>
+                      <SelectItem value="building">Building</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                      <SelectItem value="category">Category</SelectItem>
+                      <SelectItem value="created">Created</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 {filteredTickets.length > 0 ? (
                   <div className="space-y-3">
-                    {filteredTickets.map((ticket) => {
+                    {[...filteredTickets]
+                      .sort((a, b) => {
+                        if (ticketSort === 'due_date') {
+                          if (!a.due_date) return 1;
+                          if (!b.due_date) return -1;
+                          return new Date(a.due_date) - new Date(b.due_date);
+                        } else if (ticketSort === 'assignee') {
+                          return (a.assigned_to_name || 'zzz').localeCompare(b.assigned_to_name || 'zzz');
+                        } else if (ticketSort === 'building') {
+                          return (a.building || 'zzz').localeCompare(b.building || 'zzz');
+                        } else if (ticketSort === 'priority') {
+                          const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+                          return (order[a.priority] || 4) - (order[b.priority] || 4);
+                        } else if (ticketSort === 'category') {
+                          return (a.category || '').localeCompare(b.category || '');
+                        } else {
+                          return new Date(b.created_date) - new Date(a.created_date);
+                        }
+                      })
+                      .map((ticket) => {
                       const { Icon, config } = getSourceBadge(ticket.source || 'manual_request');
                       return (
                         <div
@@ -910,22 +974,41 @@ export default function MyDepartment() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-slate-900 truncate">
-                                {ticket.subject}
-                              </p>
-                              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className="text-xs font-mono text-slate-500">{ticket.ticket_number}</span>
-                                <span className="text-slate-300">•</span>
-                                <span className="text-xs text-slate-500">{format(new Date(ticket.created_date), 'MMM d')}</span>
-                                {ticket.assigned_to_name && (
-                                  <>
-                                    <span className="text-slate-300">•</span>
-                                    <div className="flex items-center gap-1 text-xs text-amber-600">
-                                      <Users className="w-3 h-3" />
-                                      {ticket.assigned_to_name}
-                                    </div>
-                                  </>
-                                )}
+                              <div className="flex items-start gap-3">
+                                {/* Assignee Avatar */}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                                  ticket.assigned_to_name ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-slate-300'
+                                }`}>
+                                  {ticket.assigned_to_name ? ticket.assigned_to_name.charAt(0).toUpperCase() : '?'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-slate-900 truncate">
+                                    {ticket.subject}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    {ticket.assigned_to_name ? (
+                                      <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
+                                        {ticket.assigned_to_name}
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-red-100 text-red-600 border-red-200 text-xs">
+                                        Unassigned
+                                      </Badge>
+                                    )}
+                                    {ticket.building && (
+                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                        <MapPin className="w-3 h-3" />
+                                        {ticket.building.replace(/_/g, ' ')}
+                                      </Badge>
+                                    )}
+                                    <span className="text-xs text-slate-400">{ticket.ticket_number}</span>
+                                    {ticket.due_date && (
+                                      <span className="text-xs text-orange-600 font-medium">
+                                        Due {format(new Date(ticket.due_date), 'MMM d')}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
