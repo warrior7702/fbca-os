@@ -957,6 +957,108 @@ export default function MyDepartment() {
               </CardContent>
             </Card>
 
+            {/* Routine Tasks Section */}
+            <Card className="border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-blue-50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="flex items-center gap-2 text-teal-800">
+                    <div className="p-2 bg-teal-100 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-teal-600" />
+                    </div>
+                    Dept Tasks
+                    <Badge className="bg-teal-100 text-teal-700 border-teal-300 ml-2">
+                      {deptTasks.filter(t => !t.completed).length} active
+                    </Badge>
+                  </CardTitle>
+                  <Select value={taskSort} onValueChange={setTaskSort}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="due_date">Due Date</SelectItem>
+                      <SelectItem value="assignee">Assignee</SelectItem>
+                      <SelectItem value="created">Created</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {deptTasks.filter(t => !t.completed).length > 0 ? (
+                  <div className="space-y-3">
+                    {deptTasks
+                      .filter(t => !t.completed)
+                      .sort((a, b) => {
+                        if (taskSort === 'due_date') {
+                          return new Date(a.dueDate) - new Date(b.dueDate);
+                        } else if (taskSort === 'assignee') {
+                          return (a.assigneeName || '').localeCompare(b.assigneeName || '');
+                        } else {
+                          return new Date(b.createdAt) - new Date(a.createdAt);
+                        }
+                      })
+                      .map((task) => (
+                      <div
+                        key={task.id}
+                        className="p-4 bg-white rounded-xl border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between cursor-pointer"
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updatedTasks = deptTasks.map(t => 
+                                t.id === task.id ? {...t, completed: !t.completed} : t
+                              );
+                              setDeptTasks(updatedTasks);
+                              localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                              toast.success('Task completed!');
+                            }}
+                            className="w-6 h-6 rounded-full border-2 border-teal-400 flex items-center justify-center cursor-pointer hover:bg-teal-100 transition-colors"
+                          >
+                            {task.completed && <CheckCircle2 className="w-4 h-4 text-teal-600" />}
+                          </div>
+                          {/* Assignee Avatar */}
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {getInitials(task.assigneeName)}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-900">{task.title}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs text-slate-600">{task.assigneeName}</span>
+                              <span className="text-slate-300">•</span>
+                              <div className="flex items-center gap-1 text-xs text-teal-600 font-medium">
+                                <Calendar className="w-3 h-3" />
+                                Due {format(new Date(task.dueDate), 'MMM d')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                          e.stopPropagation();
+                          const updatedTasks = deptTasks.filter(t => t.id !== task.id);
+                          setDeptTasks(updatedTasks);
+                          localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                        }}
+                          className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <CheckCircle2 className="w-10 h-10 text-teal-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">No active tasks</p>
+                    <p className="text-xs text-slate-400">Create tasks in Department Info tab</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Department Tickets */}
             <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50">
               <CardHeader className="pb-3">
