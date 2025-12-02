@@ -73,6 +73,7 @@ export default function MyTasks() {
   const [showScheduleEventDetail, setShowScheduleEventDetail] = useState(false);
   const [userDepartments, setUserDepartments] = useState([]);
   const [deptTickets, setDeptTickets] = useState([]);
+  const [deptTasks, setDeptTasks] = useState([]);
 
   const navigate = useNavigate();
 
@@ -300,6 +301,19 @@ export default function MyTasks() {
         } catch (err) {
           console.error('Error loading department tickets:', err);
         }
+        
+        // Load dept tasks from localStorage (these are created in MyDepartment page)
+        try {
+          const storedTasks = localStorage.getItem('deptTasks');
+          if (storedTasks) {
+            const parsedTasks = JSON.parse(storedTasks);
+            // Filter for tasks assigned to current user
+            const myTasks = parsedTasks.filter(t => t.assignee === user.email && !t.completed);
+            setDeptTasks(myTasks);
+          }
+        } catch (err) {
+          console.error('Error loading dept tasks:', err);
+        }
       }
     } catch (error) {
       console.error('Error loading support tickets:', error);
@@ -525,6 +539,7 @@ export default function MyTasks() {
                   <ScheduleCalendar 
                     events={myScheduleEvents}
                     tickets={supportTickets}
+                    deptTasks={deptTasks}
                     weekCount={1}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
@@ -536,6 +551,7 @@ export default function MyTasks() {
                   <MobileScheduleView
                     events={myScheduleEvents}
                     tickets={supportTickets}
+                    deptTasks={deptTasks}
                     onEventClick={handleScheduleEventClick}
                     onTicketClick={(ticket) => navigate(`/ticketdetail?id=${ticket.id}`)}
                   />
@@ -544,6 +560,66 @@ export default function MyTasks() {
             )}
           </CardContent>
         </Card>
+
+        {/* Dept Tasks Section */}
+        {deptTasks.length > 0 && (
+          <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-emerald-800">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <CheckSquare className="w-5 h-5 text-emerald-600" />
+                </div>
+                Dept Tasks
+                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 ml-2">
+                  {deptTasks.length} active
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {deptTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-4 bg-white rounded-xl border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div 
+                        onClick={() => {
+                          const updatedTasks = deptTasks.map(t => 
+                            t.id === task.id ? {...t, completed: true} : t
+                          );
+                          setDeptTasks(updatedTasks.filter(t => !t.completed));
+                          // Update localStorage
+                          const storedTasks = JSON.parse(localStorage.getItem('deptTasks') || '[]');
+                          const newStoredTasks = storedTasks.map(t => 
+                            t.id === task.id ? {...t, completed: true} : t
+                          );
+                          localStorage.setItem('deptTasks', JSON.stringify(newStoredTasks));
+                          toast.success('Task completed!');
+                        }}
+                        className="w-6 h-6 rounded-full border-2 border-emerald-400 flex items-center justify-center cursor-pointer hover:bg-emerald-100 transition-colors"
+                      />
+                      <div>
+                        <p className="font-semibold text-slate-900">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <User className="w-3 h-3" />
+                            {task.assigneeName}
+                          </div>
+                          <span className="text-slate-300">•</span>
+                          <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                            <CalendarIcon className="w-3 h-3" />
+                            Due {format(new Date(task.dueDate), 'MMM d')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {supportTickets.length > 0 && (
           <Card>
