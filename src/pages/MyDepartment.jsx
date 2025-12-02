@@ -156,11 +156,11 @@ export default function MyDepartment() {
         setDepartmentWorkers(workers);
       }
 
+      // Only show operations dashboard (preview mode) for Andy or super_user
       const isOperationsManager = currentUser.email?.toLowerCase().includes('andy') || 
-                                   currentUser.role === 'admin' || 
                                    currentUser.role === 'super_user';
       
-      if (!isOperationsManager) {
+      if (isOperationsManager) {
         setIsPreviewMode(true);
       }
 
