@@ -2278,11 +2278,16 @@ export default function MyDepartment() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  const updatedTasks = routineTasks.filter(t => t.id !== task.id);
-                                  setRoutineTasks(updatedTasks);
-                                  localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
+                                  try {
+                                    await base44.entities.RoutineTask.delete(task.id);
+                                    const updatedTasks = routineTasks.filter(t => t.id !== task.id);
+                                    setRoutineTasks(updatedTasks);
+                                    toast.success('Task deleted');
+                                  } catch (error) {
+                                    toast.error('Failed to delete task');
+                                  }
                                 }}
                               >
                                 <X className="w-4 h-4 text-slate-400" />
