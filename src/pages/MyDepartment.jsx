@@ -983,6 +983,78 @@ export default function MyDepartment() {
                     </div>
                   </CardContent>
                 </Card>
+                
+                {/* Task Completion Log - Also in Overview for Admins */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Activity className="w-5 h-5 text-green-600" />
+                        Recent Task Completions
+                      </CardTitle>
+                      {taskCompletionLog.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            localStorage.removeItem('taskCompletionLog');
+                            setTaskCompletionLog([]);
+                            toast.success('Log cleared');
+                          }}
+                          className="text-slate-500"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {taskCompletionLog.length > 0 ? (
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {taskCompletionLog
+                          .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+                          .slice(0, 20)
+                          .map((entry, index) => (
+                          <div
+                            key={index}
+                            className={`p-2 rounded-lg border ${
+                              entry.type === 'routine_task' 
+                                ? 'bg-indigo-50 border-indigo-200' 
+                                : 'bg-teal-50 border-teal-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                {entry.type === 'routine_task' ? (
+                                  <RepeatIcon className="w-3 h-3 text-indigo-600 flex-shrink-0" />
+                                ) : (
+                                  <CheckCircle2 className="w-3 h-3 text-teal-600 flex-shrink-0" />
+                                )}
+                                <div>
+                                  <p className="font-medium text-slate-900 text-xs">{entry.taskTitle}</p>
+                                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-600">
+                                    <span>{entry.assigneeName || 'Unknown'}</span>
+                                    <span>•</span>
+                                    <span>{format(new Date(entry.completedAt), 'MMM d, h:mm a')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <Badge className={`text-[10px] ${
+                                entry.type === 'routine_task' 
+                                  ? 'bg-indigo-100 text-indigo-700' 
+                                  : 'bg-teal-100 text-teal-700'
+                              }`}>
+                                {entry.type === 'routine_task' ? entry.frequency : 'Dept'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-slate-500 py-4 text-sm">No completions logged yet</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 
