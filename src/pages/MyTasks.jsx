@@ -95,7 +95,11 @@ export default function MyTasks() {
     try {
       console.log('📞 Calling getMySchedule (PCO events with door codes)...');
       
-      const pcoResponse = await base44.functions.invoke('getMySchedule');
+      // Fetch PCO events and local codes in parallel
+      const [pcoResponse, localCodes] = await Promise.all([
+        base44.functions.invoke('getMySchedule'),
+        base44.entities.LocalEventCode.list().catch(() => [])
+      ]);
       
       console.log('✅ PCO Response:', pcoResponse.data);
       
@@ -103,7 +107,25 @@ export default function MyTasks() {
         throw new Error('No PCO data returned');
       }
       
-      const pcoEvents = pcoResponse.data.events || [];
+      // Build local codes map
+      const localCodesMap = {};
+      localCodes.forEach(code => {
+        localCodesMap[code.event_id] = code;
+      });
+      console.log(`📋 Found ${localCodes.length} local event codes`);
+      
+      // Merge local codes with PCO events
+      let pcoEvents = (pcoResponse.data.events || []).map(event => {
+        const localCode = localCodesMap[event.event_id];
+        if (localCode) {
+          return {
+            ...event,
+            posted_door_code: localCode.door_code || event.posted_door_code,
+            access_time: localCode.access_time || event.access_time
+          };
+        }
+        return event;
+      });
       
       console.log(`✅ Got ${pcoEvents.length} PCO events`);
       console.log(`📊 I'm in ${pcoResponse.data.my_groups_count || 0} approval groups`);
