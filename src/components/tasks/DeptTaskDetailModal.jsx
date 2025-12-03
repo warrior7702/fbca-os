@@ -127,6 +127,48 @@ export default function DeptTaskDetailModal({
             )}
           </div>
 
+          {/* Second Assignee */}
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">Second Assignee (Optional)</label>
+            {isEditing ? (
+              <Select 
+                value={editedTask.assignee2 || ""} 
+                onValueChange={(v) => {
+                  const worker = workers.find(w => w.user_email === v);
+                  setEditedTask({ 
+                    ...editedTask, 
+                    assignee2: v || null,
+                    assignee2Name: worker?.user_name || v || null
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>None</SelectItem>
+                  {workers.filter(w => w.user_email !== editedTask.assignee).map((worker) => (
+                    <SelectItem key={worker.user_email} value={worker.user_email}>
+                      {worker.user_name || worker.user_email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : task.assignee2Name ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white font-bold">
+                  {getInitials(task.assignee2Name)}
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">{task.assignee2Name}</p>
+                  <p className="text-xs text-slate-500">{task.assignee2}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-slate-400 italic text-sm">None</p>
+            )}
+          </div>
+
           {/* Details */}
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">Details</label>
