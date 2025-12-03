@@ -193,6 +193,7 @@ export default function MyDepartment() {
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
   const [showDeptTasks, setShowDeptTasks] = useState(false);
   const [showRoutineTasks, setShowRoutineTasks] = useState(false);
+  const [taskCompletionLog, setTaskCompletionLog] = useState([]);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -251,6 +252,17 @@ export default function MyDepartment() {
         setRoutineTasks(tasks);
       } catch (e) {
         console.error('Error loading routine tasks:', e);
+      }
+    }
+    
+    // Load task completion log
+    const storedCompletionLog = localStorage.getItem('taskCompletionLog');
+    if (storedCompletionLog) {
+      try {
+        const log = JSON.parse(storedCompletionLog);
+        setTaskCompletionLog(log);
+      } catch (e) {
+        console.error('Error loading completion log:', e);
       }
     }
   };
@@ -2436,6 +2448,91 @@ export default function MyDepartment() {
                   </div>
                 ) : (
                   <p className="text-center text-slate-500 py-4">No cross-department tickets</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Task Completion Log */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-green-600" />
+                    Task Completion Log
+                  </CardTitle>
+                  {taskCompletionLog.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        localStorage.removeItem('taskCompletionLog');
+                        setTaskCompletionLog([]);
+                        toast.success('Log cleared');
+                      }}
+                      className="text-slate-500"
+                    >
+                      Clear Log
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {taskCompletionLog.length > 0 ? (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {taskCompletionLog
+                      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+                      .slice(0, 50)
+                      .map((entry, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          entry.type === 'routine_task' 
+                            ? 'bg-indigo-50 border-indigo-200' 
+                            : 'bg-teal-50 border-teal-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            {entry.type === 'routine_task' ? (
+                              <RepeatIcon className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                            )}
+                            <div>
+                              <p className="font-medium text-slate-900 text-sm">{entry.taskTitle}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                                <span>{entry.assigneeName || entry.assignee || 'Unknown'}</span>
+                                <span>•</span>
+                                <span>{format(new Date(entry.completedAt), 'MMM d, h:mm a')}</span>
+                                {entry.type === 'routine_task' && (
+                                  <>
+                                    <span>•</span>
+                                    <Badge variant="outline" className="text-xs bg-indigo-100 text-indigo-700 border-indigo-300">
+                                      {entry.frequency}
+                                    </Badge>
+                                  </>
+                                )}
+                              </div>
+                              {entry.type === 'routine_task' && entry.nextDueDate && (
+                                <p className="text-xs text-indigo-600 mt-1">
+                                  Next due: {format(new Date(entry.nextDueDate + 'T12:00:00'), 'MMM d, yyyy')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge className={`text-xs ${
+                            entry.type === 'routine_task' 
+                              ? 'bg-indigo-100 text-indigo-700' 
+                              : 'bg-teal-100 text-teal-700'
+                          }`}>
+                            {entry.type === 'routine_task' ? 'Routine' : 'Dept Task'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-slate-500 py-4">No task completions logged yet</p>
                 )}
               </CardContent>
             </Card>
