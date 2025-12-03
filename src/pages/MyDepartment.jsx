@@ -1111,14 +1111,23 @@ export default function MyDepartment() {
                             >
                               <div className="flex items-center gap-3">
                                 <div 
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     e.stopPropagation();
-                                    const updatedTasks = deptTasks.map(t => 
-                                      t.id === task.id ? {...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : null} : t
-                                    );
-                                    setDeptTasks(updatedTasks);
-                                    localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
-                                    toast.success('Task completed!');
+                                    try {
+                                      const newCompleted = !task.completed;
+                                      await base44.entities.DeptTask.update(task.id, {
+                                        completed: newCompleted,
+                                        completed_at: newCompleted ? new Date().toISOString() : null,
+                                        completed_by: newCompleted ? user?.email : null
+                                      });
+                                      const updatedTasks = deptTasks.map(t => 
+                                        t.id === task.id ? {...t, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : null} : t
+                                      );
+                                      setDeptTasks(updatedTasks);
+                                      toast.success(newCompleted ? 'Task completed!' : 'Task reopened');
+                                    } catch (error) {
+                                      toast.error('Failed to update task');
+                                    }
                                   }}
                                   className="w-5 h-5 rounded-full border-2 border-teal-400 flex items-center justify-center cursor-pointer hover:bg-teal-100 transition-colors flex-shrink-0"
                                 >
