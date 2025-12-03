@@ -210,8 +210,7 @@ export default function MyDepartment() {
   };
 
   useEffect(() => {
-    loadDeptTasks(); // Sync - from localStorage, instant
-    loadData(); // Async - main data
+    loadData(); // Async - main data (will call loadDeptTasks after getting userDepartments)
   }, []);
 
   // Lazy load PCO events only when Room Flow tab is selected
