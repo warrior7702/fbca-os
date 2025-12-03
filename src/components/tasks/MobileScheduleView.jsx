@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO, isToday } from 'date-fns';
-import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Clock, Key, MapPin, Unlock, Users, Ticket, ChevronLeft, ChevronRight, CheckCircle2, RepeatIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export default function MobileScheduleView({ events, tickets = [], deptTasks = [], onEventClick, onTicketClick, onDeptTaskClick }) {
@@ -141,27 +141,42 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
             const isTicket = !!item.ticket_number;
             const isDeptTask = !!item.isDeptTask;
             
-            // Dept Task
+            // Dept Task or Routine Task
             if (isDeptTask) {
+              const isRoutine = item.isRoutine || item.type === 'routine';
               return (
                 <Card 
                   key={`task-${item.id}`} 
-                  className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 active:scale-98 transition-all cursor-pointer"
+                  className={`border-2 active:scale-98 transition-all cursor-pointer ${
+                    isRoutine 
+                      ? 'border-indigo-400 bg-gradient-to-br from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100'
+                      : 'border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100'
+                  }`}
                   onClick={() => onDeptTaskClick && onDeptTaskClick(item)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                      {isRoutine ? (
+                        <RepeatIcon className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-1">
                           {item.title}
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-[10px] bg-teal-100 border-teal-400 text-teal-700">
-                            Dept Task
+                          <Badge variant="outline" className={`text-[10px] ${
+                            isRoutine 
+                              ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
+                              : 'bg-teal-100 border-teal-400 text-teal-700'
+                          }`}>
+                            {isRoutine ? item.frequency?.charAt(0).toUpperCase() + item.frequency?.slice(1) : 'Dept Task'}
                           </Badge>
                           {item.assigneeName && (
-                            <Badge variant="outline" className="text-[10px] border-teal-300 text-teal-600">
+                            <Badge variant="outline" className={`text-[10px] ${
+                              isRoutine ? 'border-indigo-300 text-indigo-600' : 'border-teal-300 text-teal-600'
+                            }`}>
                               {item.assigneeName}
                             </Badge>
                           )}
