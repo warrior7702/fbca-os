@@ -2060,7 +2060,7 @@ export default function MyDepartment() {
                       {/* Add Routine Task Form */}
                       <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="text-sm font-medium text-slate-700 mb-3">Add Routine Task</p>
-                        <div className="grid sm:grid-cols-4 gap-3">
+                        <div className="grid sm:grid-cols-5 gap-3">
                           <Input
                             placeholder="Task title..."
                             value={newRoutineTask.title}
@@ -2081,6 +2081,12 @@ export default function MyDepartment() {
                               <SelectItem value="quarterly">Quarterly</SelectItem>
                             </SelectContent>
                           </Select>
+                          <Input
+                            type="date"
+                            value={newRoutineTask.dueDate}
+                            onChange={(e) => setNewRoutineTask({...newRoutineTask, dueDate: e.target.value})}
+                            placeholder="First due date"
+                          />
                           <Select 
                             value={newRoutineTask.assignee} 
                             onValueChange={(v) => setNewRoutineTask({...newRoutineTask, assignee: v})}

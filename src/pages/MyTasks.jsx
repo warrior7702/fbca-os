@@ -324,21 +324,42 @@ export default function MyTasks() {
               setDeptTickets(deptFiltered);
               
               // Load dept tasks from localStorage (these are created in MyDepartment)
-                              const storedDeptTasks = localStorage.getItem('deptTasks');
-                              if (storedDeptTasks) {
-                                try {
-                                  const tasks = JSON.parse(storedDeptTasks);
-                                  // Filter to only show tasks assigned to current user that are not completed
-                                  const myTasks = tasks.filter(t => t.assignee === user.email && !t.completed);
-                                  console.log('Loaded dept tasks for user:', user.email, myTasks);
-                                  setDeptTasks(myTasks);
-                                } catch (e) {
-                                  console.error('Error parsing dept tasks:', e);
-                                }
-                              } else {
-                                console.log('No dept tasks in localStorage');
-                                setDeptTasks([]);
-                              }
+              const storedDeptTasks = localStorage.getItem('deptTasks');
+              if (storedDeptTasks) {
+                try {
+                  const tasks = JSON.parse(storedDeptTasks);
+                  // Filter to only show tasks assigned to current user that are not completed
+                  const myTasks = tasks.filter(t => t.assignee === user.email && !t.completed);
+                  console.log('Loaded dept tasks for user:', user.email, myTasks);
+                  setDeptTasks(myTasks);
+                } catch (e) {
+                  console.error('Error parsing dept tasks:', e);
+                }
+              } else {
+                console.log('No dept tasks in localStorage');
+                setDeptTasks([]);
+              }
+
+              // Load routine tasks and add due ones to deptTasks
+              const storedRoutineTasks = localStorage.getItem('routineTasks');
+              if (storedRoutineTasks) {
+                try {
+                  const routineTasks = JSON.parse(storedRoutineTasks);
+                  // Filter to routine tasks assigned to current user that are due
+                  const myRoutineTasks = routineTasks
+                    .filter(t => t.assignee === user.email && t.nextDueDate)
+                    .map(t => ({
+                      ...t,
+                      dueDate: t.nextDueDate,
+                      isRoutine: true
+                    }));
+                  console.log('Loaded routine tasks for user:', user.email, myRoutineTasks);
+                  // Merge with dept tasks
+                  setDeptTasks(prev => [...prev, ...myRoutineTasks]);
+                } catch (e) {
+                  console.error('Error parsing routine tasks:', e);
+                }
+              }
             }
           }
         } catch (err) {
