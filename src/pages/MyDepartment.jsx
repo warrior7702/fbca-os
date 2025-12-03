@@ -973,27 +973,107 @@ export default function MyDepartment() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card 
+                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                onClick={() => {
+                  if (userRole === 'requester' || userRole === 'worker') {
+                    setShowResolvedTickets(!showResolvedTickets);
+                  }
+                }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs sm:text-sm text-slate-600">
                         {userRole === 'requester' || userRole === 'worker' ? 'Resolved' : 'Cross-Dept'}
                       </p>
-                      <p className="text-xl sm:text-2xl font-bold text-purple-700">
+                      <p className="text-xl sm:text-2xl font-bold text-green-700">
                         {userRole === 'requester' || userRole === 'worker' ?
                           filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length :
                           crossDeptTickets.length}
                       </p>
                     </div>
-                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
+                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {userRole === 'requester' || userRole === 'worker' ? 'Completed' : 'Coordination needed'}
+                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' : 'Coordination needed'}
                   </p>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Resolved Tickets - Collapsible Section */}
+            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <AnimatePresence>
+                {showResolvedTickets && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-green-800">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                              <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            </div>
+                            Resolved Tickets
+                            <Badge className="bg-green-100 text-green-700 border-green-300 ml-2">
+                              {filteredTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length}
+                            </Badge>
+                          </CardTitle>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowResolvedTickets(false)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {filteredTickets
+                            .filter(t => ['resolved', 'closed'].includes(t.status))
+                            .sort((a, b) => new Date(b.resolved_at || b.updated_date) - new Date(a.resolved_at || a.updated_date))
+                            .slice(0, 15)
+                            .map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="p-3 bg-white rounded-lg border border-green-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                  {getInitials(ticket.assigned_to_name)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <span>{ticket.ticket_number}</span>
+                                    {ticket.resolved_at && (
+                                      <>
+                                        <span>•</span>
+                                        <span>Resolved {format(new Date(ticket.resolved_at), 'MMM d')}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {filteredTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No resolved tickets</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
 
             {!isPreviewMode && (
             <>
