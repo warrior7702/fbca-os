@@ -1242,6 +1242,46 @@ Provide your analysis in this exact JSON format:
                   </div>
                 )}
 
+                {canManage && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600 mb-2 block">Second Assignee (Optional)</label>
+                    <Select 
+                      value={ticket.assigned_to_2 || "none"} 
+                      onValueChange={async (email) => {
+                        try {
+                          const staffMember = email === "none" ? null : staffMembers.find(s => s.email === email);
+                          await base44.entities.Ticket.update(ticketId, {
+                            assigned_to_2: email === "none" ? null : email,
+                            assigned_to_2_name: staffMember?.full_name || null,
+                            last_activity_at: new Date().toISOString()
+                          });
+                          setTicket({ 
+                            ...ticket, 
+                            assigned_to_2: email === "none" ? null : email,
+                            assigned_to_2_name: staffMember?.full_name || null
+                          });
+                          toast.success(email === "none" ? 'Second assignee removed' : `Second assignee: ${staffMember?.full_name || email}`);
+                        } catch (error) {
+                          console.error('Error updating second assignee:', error);
+                          toast.error('Failed to update second assignee');
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {staffMembers.filter(s => s.email !== ticket.assigned_to).map(staff => (
+                          <SelectItem key={staff.email} value={staff.email}>
+                            {staff.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {!canManage && ticket.assigned_to_name && (
                   <div>
                     <label className="text-sm font-medium text-slate-600 mb-2 block">Assigned To</label>

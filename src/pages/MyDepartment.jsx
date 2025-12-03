@@ -2238,13 +2238,26 @@ export default function MyDepartment() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <Input
                           placeholder="Details - what needs to be done..."
                           value={newTaskDetails}
                           onChange={(e) => setNewTaskDetails(e.target.value)}
                           className="flex-1"
                         />
+                        <Select value={newTaskAssignee2} onValueChange={setNewTaskAssignee2}>
+                          <SelectTrigger className="w-full sm:w-48">
+                            <SelectValue placeholder="2nd Assignee (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={null}>None</SelectItem>
+                            {departmentWorkers.filter(w => w.user_email !== newTaskAssignee).map((worker) => (
+                              <SelectItem key={worker.user_email} value={worker.user_email}>
+                                {worker.user_name || worker.user_email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                         onClick={async () => {
                           if (!newTaskTitle.trim() || !newTaskAssignee) {
@@ -2254,12 +2267,15 @@ export default function MyDepartment() {
                           setAddingTask(true);
                           try {
                             const worker = departmentWorkers.find(w => w.user_email === newTaskAssignee);
+                            const worker2 = newTaskAssignee2 ? departmentWorkers.find(w => w.user_email === newTaskAssignee2) : null;
                             const newTask = {
                               id: Date.now().toString(),
                               title: newTaskTitle,
                               details: newTaskDetails,
                               assignee: newTaskAssignee,
                               assigneeName: worker?.user_name || newTaskAssignee,
+                              assignee2: newTaskAssignee2 || null,
+                              assignee2Name: worker2?.user_name || newTaskAssignee2 || null,
                               dueDate: newTaskDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
                               completed: false,
                               createdBy: user?.full_name || user?.email,
@@ -2271,6 +2287,7 @@ export default function MyDepartment() {
                             toast.success('Task created!');
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
+                            setNewTaskAssignee2("");
                             setNewTaskDueDate("");
                             setNewTaskDetails("");
                             setAddingTask(false);
