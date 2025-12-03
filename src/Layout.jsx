@@ -48,6 +48,7 @@ import {
 import { SheetTrigger } from "@/components/ui/sheet";
 import AISearchBar from "@/components/shared/AISearchBar";
 import PushNotificationSetup from "@/components/shared/PushNotificationSetup";
+import ToolboxPopover from "@/components/shared/ToolboxPopover";
 
 const apps = [
   {
@@ -449,9 +450,10 @@ export default function Layout({ children, currentPageName }) {
               >
                 <Printer className="w-4 h-4 text-white/80" />
               </motion.div>
-            </div>
 
-            <div className="h-8 w-px bg-white/20 hidden lg:block" />
+              {/* Toolbox */}
+              <ToolboxPopover />
+            </div>
 
             {/* AI Helper */}
             <Link to={createPageUrl('AIHelper')}>
