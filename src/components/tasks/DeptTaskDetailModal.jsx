@@ -214,20 +214,7 @@ export default function DeptTaskDetailModal({
                   <Button 
                     size="sm" 
                     onClick={() => {
-                      // Log completion for reporting
-                      const completionLog = JSON.parse(localStorage.getItem('taskCompletionLog') || '[]');
-                      completionLog.push({
-                        type: 'dept_task',
-                        taskId: task.id,
-                        taskTitle: task.title,
-                        assignee: task.assignee,
-                        assigneeName: task.assigneeName,
-                        completedAt: new Date().toISOString(),
-                        dueDate: task.dueDate
-                      });
-                      localStorage.setItem('taskCompletionLog', JSON.stringify(completionLog));
-
-                      onUpdate({ ...task, completed: true, completedAt: new Date().toISOString() });
+                      onUpdate({ ...task, completed: true });
                       onClose();
                       toast.success('Task completed!');
                     }}

@@ -193,7 +193,6 @@ export default function MyDepartment() {
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
   const [showDeptTasks, setShowDeptTasks] = useState(false);
   const [showRoutineTasks, setShowRoutineTasks] = useState(false);
-  const [taskCompletionLog, setTaskCompletionLog] = useState([]);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -252,17 +251,6 @@ export default function MyDepartment() {
         setRoutineTasks(tasks);
       } catch (e) {
         console.error('Error loading routine tasks:', e);
-      }
-    }
-    
-    // Load task completion log
-    const storedCompletionLog = localStorage.getItem('taskCompletionLog');
-    if (storedCompletionLog) {
-      try {
-        const log = JSON.parse(storedCompletionLog);
-        setTaskCompletionLog(log);
-      } catch (e) {
-        console.error('Error loading completion log:', e);
       }
     }
   };
@@ -514,19 +502,11 @@ export default function MyDepartment() {
         return isAfter(resolvedDate, start) && isBefore(resolvedDate, end);
       });
       
-      // Count completed tasks from completion log
-      const monthCompletedTasks = taskCompletionLog.filter(log => {
-        const completedDate = new Date(log.completedAt);
-        return isAfter(completedDate, start) && isBefore(completedDate, end);
-      });
-      
       return {
         month,
         IT: monthTickets.filter(t => getDepartment(t.category) === 'it').length,
         Facilities: monthTickets.filter(t => getDepartment(t.category) === 'facilities').length,
-        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length,
-        'Dept Tasks': monthCompletedTasks.filter(t => t.type === 'dept_task').length,
-        'Routine Tasks': monthCompletedTasks.filter(t => t.type === 'routine_task').length
+        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length
       };
     });
   };
@@ -933,12 +913,12 @@ export default function MyDepartment() {
                   </CardContent>
                 </Card>
 
-                {/* Monthly Tracker - Tickets & Tasks Closed (Line Chart) */}
+                {/* Monthly Tracker - Tickets Closed by Dept (Line Chart) */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Calendar className="w-4 h-4 text-violet-600" />
-                      Monthly Completions
+                      Monthly Tickets Closed by Dept
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -950,19 +930,17 @@ export default function MyDepartment() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                           />
-                          <Legend wrapperStyle={{ fontSize: '11px' }} />
-                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
-                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} />
-                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} />
-                          <Line type="monotone" dataKey="Dept Tasks" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 3 }} strokeDasharray="5 5" />
-                          <Line type="monotone" dataKey="Routine Tasks" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 3 }} strokeDasharray="5 5" />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
+                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 4 }} />
+                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex flex-wrap justify-center gap-3 mt-2 text-xs">
+                    <div className="flex justify-center gap-4 mt-2 text-xs">
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-blue-500" />
-                        <span>IT Tickets</span>
+                        <span>IT</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-emerald-500" />
@@ -970,89 +948,9 @@ export default function MyDepartment() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-violet-500" />
-                        <span>Comms</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-teal-500" style={{ opacity: 0.7 }} />
-                        <span>Dept Tasks</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-indigo-500" style={{ opacity: 0.7 }} />
-                        <span>Routine</span>
+                        <span>Communications</span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Task Completion Log - Also in Overview for Admins */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Activity className="w-5 h-5 text-green-600" />
-                        Recent Task Completions
-                      </CardTitle>
-                      {taskCompletionLog.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            localStorage.removeItem('taskCompletionLog');
-                            setTaskCompletionLog([]);
-                            toast.success('Log cleared');
-                          }}
-                          className="text-slate-500"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {taskCompletionLog.length > 0 ? (
-                      <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {taskCompletionLog
-                          .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-                          .slice(0, 20)
-                          .map((entry, index) => (
-                          <div
-                            key={index}
-                            className={`p-2 rounded-lg border ${
-                              entry.type === 'routine_task' 
-                                ? 'bg-indigo-50 border-indigo-200' 
-                                : 'bg-teal-50 border-teal-200'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                {entry.type === 'routine_task' ? (
-                                  <RepeatIcon className="w-3 h-3 text-indigo-600 flex-shrink-0" />
-                                ) : (
-                                  <CheckCircle2 className="w-3 h-3 text-teal-600 flex-shrink-0" />
-                                )}
-                                <div>
-                                  <p className="font-medium text-slate-900 text-xs">{entry.taskTitle}</p>
-                                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-600">
-                                    <span>{entry.assigneeName || 'Unknown'}</span>
-                                    <span>•</span>
-                                    <span>{format(new Date(entry.completedAt), 'MMM d, h:mm a')}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <Badge className={`text-[10px] ${
-                                entry.type === 'routine_task' 
-                                  ? 'bg-indigo-100 text-indigo-700' 
-                                  : 'bg-teal-100 text-teal-700'
-                              }`}>
-                                {entry.type === 'routine_task' ? entry.frequency : 'Dept'}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-slate-500 py-4 text-sm">No completions logged yet</p>
-                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -2541,91 +2439,6 @@ export default function MyDepartment() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Task Completion Log */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-green-600" />
-                    Task Completion Log
-                  </CardTitle>
-                  {taskCompletionLog.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        localStorage.removeItem('taskCompletionLog');
-                        setTaskCompletionLog([]);
-                        toast.success('Log cleared');
-                      }}
-                      className="text-slate-500"
-                    >
-                      Clear Log
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {taskCompletionLog.length > 0 ? (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {taskCompletionLog
-                      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-                      .slice(0, 50)
-                      .map((entry, index) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded-lg border ${
-                          entry.type === 'routine_task' 
-                            ? 'bg-indigo-50 border-indigo-200' 
-                            : 'bg-teal-50 border-teal-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            {entry.type === 'routine_task' ? (
-                              <RepeatIcon className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                            ) : (
-                              <CheckCircle2 className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                            )}
-                            <div>
-                              <p className="font-medium text-slate-900 text-sm">{entry.taskTitle}</p>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
-                                <span>{entry.assigneeName || entry.assignee || 'Unknown'}</span>
-                                <span>•</span>
-                                <span>{format(new Date(entry.completedAt), 'MMM d, h:mm a')}</span>
-                                {entry.type === 'routine_task' && (
-                                  <>
-                                    <span>•</span>
-                                    <Badge variant="outline" className="text-xs bg-indigo-100 text-indigo-700 border-indigo-300">
-                                      {entry.frequency}
-                                    </Badge>
-                                  </>
-                                )}
-                              </div>
-                              {entry.type === 'routine_task' && entry.nextDueDate && (
-                                <p className="text-xs text-indigo-600 mt-1">
-                                  Next due: {format(new Date(entry.nextDueDate + 'T12:00:00'), 'MMM d, yyyy')}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Badge className={`text-xs ${
-                            entry.type === 'routine_task' 
-                              ? 'bg-indigo-100 text-indigo-700' 
-                              : 'bg-teal-100 text-teal-700'
-                          }`}>
-                            {entry.type === 'routine_task' ? 'Routine' : 'Dept Task'}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-slate-500 py-4">No task completions logged yet</p>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
           )}
         </Tabs>
@@ -2643,7 +2456,6 @@ export default function MyDepartment() {
             setRoutineTasks(updatedTasks);
             localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
             setSelectedRoutineTask(null);
-            loadDeptTasks(); // Reload to get updated completion log
           }}
           onDelete={(taskId) => {
             const updatedTasks = routineTasks.filter(t => t.id !== taskId);
@@ -2665,7 +2477,6 @@ export default function MyDepartment() {
             setDeptTasks(updatedTasks);
             localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
             setSelectedTask(null);
-            loadDeptTasks(); // Reload to get updated completion log
           }}
           onDelete={(taskId) => {
             const updatedTasks = deptTasks.filter(t => t.id !== taskId);
