@@ -1096,8 +1096,11 @@ export default function MyDepartment() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                     <span>{task.assigneeName}</span>
+                                    {task.assignee2Name && (
+                                      <span className="text-teal-500">+ {task.assignee2Name}</span>
+                                    )}
                                     <span>•</span>
                                     <span className="text-teal-600 font-medium">Due {format(new Date(task.dueDate + 'T12:00:00'), 'MMM d')}</span>
                                   </div>
@@ -1163,11 +1166,14 @@ export default function MyDepartment() {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
-                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                       <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
                                         {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
                                       </Badge>
                                       <span>{task.assigneeName || 'Unassigned'}</span>
+                                      {task.assignee2Name && (
+                                        <span className="text-indigo-500">+ {task.assignee2Name}</span>
+                                      )}
                                       {task.nextDueDate && (
                                         <span className="text-indigo-600 font-medium">Due {format(new Date(task.nextDueDate + 'T12:00:00'), 'MMM d')}</span>
                                       )}
@@ -2065,12 +2071,31 @@ export default function MyDepartment() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="mt-3">
+                        <div className="mt-3 grid sm:grid-cols-2 gap-3">
                           <Input
                             placeholder="Description (optional)..."
                             value={newRoutineTask.description}
                             onChange={(e) => setNewRoutineTask({...newRoutineTask, description: e.target.value})}
                           />
+                          <Select 
+                            value={newRoutineTask.assignee2 || ""} 
+                            onValueChange={(v) => setNewRoutineTask({...newRoutineTask, assignee2: v})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="2nd Assignee (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={null}>None</SelectItem>
+                              {departmentWorkers.filter(w => {
+                                const workerDepts = w.departments || [];
+                                return (userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode) && w.user_email !== newRoutineTask.assignee;
+                              }).map((worker) => (
+                                <SelectItem key={worker.user_email} value={worker.user_email}>
+                                  {worker.user_name || worker.user_email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="mt-3 flex items-center gap-2 flex-wrap">
                           {(newRoutineTask.attachments || []).map((attachment, idx) => (
@@ -2121,17 +2146,19 @@ export default function MyDepartment() {
                               toast.error('Please select a due date');
                               return;
                             }
+                            const worker2 = newRoutineTask.assignee2 ? departmentWorkers.find(w => w.user_email === newRoutineTask.assignee2) : null;
                             const newTask = { 
                               ...newRoutineTask, 
                               id: Date.now(),
                               assigneeName: newRoutineTask.assignee ? (departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee) : 'Unassigned',
+                              assignee2Name: worker2?.user_name || newRoutineTask.assignee2 || null,
                               nextDueDate: newRoutineTask.dueDate,
                               type: 'routine'
                             };
                             const updatedRoutineTasks = [...routineTasks, newTask];
                             setRoutineTasks(updatedRoutineTasks);
                             localStorage.setItem('routineTasks', JSON.stringify(updatedRoutineTasks));
-                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [], dueDate: "" });
+                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", assignee2: "", attachments: [], dueDate: "" });
                             toast.success('Routine task added!');
                           }}
                           size="sm"
@@ -2155,10 +2182,13 @@ export default function MyDepartment() {
                                 <RepeatIcon className="w-4 h-4 text-blue-500" />
                                 <div>
                                   <p className="font-medium text-slate-900 text-sm">{task.title}</p>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
                                     <span>{task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}</span>
                                     <span>•</span>
                                     <span>{task.assigneeName || 'Unassigned'}</span>
+                                    {task.assignee2Name && (
+                                      <span className="text-indigo-500">+ {task.assignee2Name}</span>
+                                    )}
                                     {(task.nextDueDate || task.dueDate) && (
                                       <>
                                         <span>•</span>
