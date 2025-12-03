@@ -323,43 +323,60 @@ export default function MyTasks() {
               
               setDeptTickets(deptFiltered);
               
-              // Load dept tasks from localStorage (these are created in MyDepartment)
-              const storedDeptTasks = localStorage.getItem('deptTasks');
-              if (storedDeptTasks) {
-                try {
-                  const tasks = JSON.parse(storedDeptTasks);
-                  // Filter to only show tasks assigned to current user that are not completed
-                  const myTasks = tasks.filter(t => t.assignee === user.email && !t.completed);
-                  console.log('Loaded dept tasks for user:', user.email, myTasks);
-                  setDeptTasks(myTasks);
-                } catch (e) {
-                  console.error('Error parsing dept tasks:', e);
-                }
-              } else {
-                console.log('No dept tasks in localStorage');
+              // Load dept tasks from database
+              try {
+                const dbDeptTasks = await base44.entities.DeptTask.filter({
+                  assignee: user.email,
+                  completed: false
+                });
+                const formattedDeptTasks = dbDeptTasks.map(t => ({
+                  id: t.id,
+                  title: t.title,
+                  details: t.details,
+                  assignee: t.assignee,
+                  assigneeName: t.assignee_name,
+                  assignee2: t.assignee2,
+                  assignee2Name: t.assignee2_name,
+                  dueDate: t.due_date,
+                  completed: t.completed,
+                  department: t.department,
+                  createdBy: t.created_by,
+                  createdAt: t.created_date,
+                  type: 'dept'
+                }));
+                console.log('Loaded dept tasks for user:', user.email, formattedDeptTasks);
+                setDeptTasks(formattedDeptTasks);
+              } catch (e) {
+                console.error('Error loading dept tasks:', e);
                 setDeptTasks([]);
               }
 
-              // Load routine tasks and add due ones to deptTasks
-              const storedRoutineTasks = localStorage.getItem('routineTasks');
-              if (storedRoutineTasks) {
-                try {
-                  const routineTasks = JSON.parse(storedRoutineTasks);
-                  // Filter to routine tasks assigned to current user that have a due date
-                  const myRoutineTasks = routineTasks
-                    .filter(t => t.assignee === user.email && (t.nextDueDate || t.dueDate))
-                    .map(t => ({
-                      ...t,
-                      dueDate: t.nextDueDate || t.dueDate,
-                      isRoutine: true,
-                      type: 'routine'
-                    }));
-                  console.log('Loaded routine tasks for user:', user.email, myRoutineTasks);
-                  // Merge with dept tasks
-                  setDeptTasks(prev => [...prev, ...myRoutineTasks]);
-                } catch (e) {
-                  console.error('Error parsing routine tasks:', e);
-                }
+              // Load routine tasks from database
+              try {
+                const dbRoutineTasks = await base44.entities.RoutineTask.filter({
+                  assignee: user.email
+                });
+                const formattedRoutineTasks = dbRoutineTasks.map(t => ({
+                  id: t.id,
+                  title: t.title,
+                  description: t.description,
+                  frequency: t.frequency,
+                  assignee: t.assignee,
+                  assigneeName: t.assignee_name,
+                  assignee2: t.assignee2,
+                  assignee2Name: t.assignee2_name,
+                  dueDate: t.next_due_date,
+                  nextDueDate: t.next_due_date,
+                  department: t.department,
+                  attachments: t.attachments || [],
+                  isRoutine: true,
+                  type: 'routine'
+                }));
+                console.log('Loaded routine tasks for user:', user.email, formattedRoutineTasks);
+                // Merge with dept tasks
+                setDeptTasks(prev => [...prev, ...formattedRoutineTasks]);
+              } catch (e) {
+                console.error('Error loading routine tasks:', e);
               }
             }
           }
