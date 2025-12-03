@@ -107,8 +107,32 @@ export default function ToolboxPopover() {
   const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
 
+  // Keyboard input for calculator
+  const handleKeyDown = (e) => {
+    const key = e.key;
+    if (/[0-9]/.test(key)) {
+      handleCalcInput(key);
+    } else if (['+', '-', '*', '/'].includes(key)) {
+      handleOperator(key);
+    } else if (key === '.') {
+      handleCalcInput('.');
+    } else if (key === 'Enter' || key === '=') {
+      e.preventDefault();
+      calculateResult();
+    } else if (key === 'Escape' || key === 'c' || key === 'C') {
+      clearCalc();
+    } else if (key === 'Backspace') {
+      if (calcDisplay.length > 1) {
+        setCalcDisplay(calcDisplay.slice(0, -1));
+        setCalcExpression(calcExpression.slice(0, -1));
+      } else {
+        clearCalc();
+      }
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10">
           <Wrench className="w-4 h-4" />
