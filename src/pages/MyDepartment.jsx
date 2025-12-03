@@ -176,7 +176,7 @@ export default function MyDepartment() {
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskDetails, setNewTaskDetails] = useState("");
   const [deptTasks, setDeptTasks] = useState([]);
-  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", frequency: "monthly", assignee: "" });
+  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [] });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
   const [ticketSort, setTicketSort] = useState("due_date");
@@ -1103,6 +1103,9 @@ export default function MyDepartment() {
                                       </Badge>
                                       <span>{task.assigneeName || 'Unassigned'}</span>
                                     </div>
+                                    {task.description && (
+                                      <p className="text-xs text-slate-500 mt-1">{task.description}</p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2067,9 +2070,10 @@ export default function MyDepartment() {
                             onValueChange={(v) => setNewRoutineTask({...newRoutineTask, assignee: v})}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Assign to..." />
+                              <SelectValue placeholder="Assign to (optional)" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value={null}>Unassigned</SelectItem>
                               {departmentWorkers.filter(w => {
                                 const workerDepts = w.departments || [];
                                 return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
@@ -2081,6 +2085,52 @@ export default function MyDepartment() {
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="mt-3">
+                          <Input
+                            placeholder="Description (optional)..."
+                            value={newRoutineTask.description}
+                            onChange={(e) => setNewRoutineTask({...newRoutineTask, description: e.target.value})}
+                          />
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 flex-wrap">
+                          {(newRoutineTask.attachments || []).map((attachment, idx) => (
+                            <div key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1">
+                              <Folder className="w-3 h-3" />
+                              {attachment.name}
+                              <button 
+                                onClick={() => setNewRoutineTask({
+                                  ...newRoutineTask, 
+                                  attachments: newRoutineTask.attachments.filter((_, i) => i !== idx)
+                                })}
+                                className="ml-1 hover:text-blue-900"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <label className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded flex items-center gap-1 hover:bg-slate-200 cursor-pointer">
+                            <Plus className="w-3 h-3" />
+                            Attach File
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                                  setNewRoutineTask({
+                                    ...newRoutineTask,
+                                    attachments: [...(newRoutineTask.attachments || []), { name: file.name, url: file_url }]
+                                  });
+                                  toast.success('File attached');
+                                } catch (error) {
+                                  toast.error('Failed to upload file');
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                         <Button
                           onClick={() => {
                             if (!newRoutineTask.title.trim()) {
@@ -2090,9 +2140,9 @@ export default function MyDepartment() {
                             setRoutineTasks([...routineTasks, { 
                               ...newRoutineTask, 
                               id: Date.now(),
-                              assigneeName: departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee
+                              assigneeName: newRoutineTask.assignee ? (departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee) : 'Unassigned'
                             }]);
-                            setNewRoutineTask({ title: "", frequency: "monthly", assignee: "" });
+                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [] });
                             toast.success('Routine task added!');
                           }}
                           size="sm"
