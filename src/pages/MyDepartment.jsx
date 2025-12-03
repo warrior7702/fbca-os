@@ -997,6 +997,8 @@ export default function MyDepartment() {
                 onClick={() => {
                   if (userRole === 'requester' || userRole === 'worker') {
                     setShowResolvedTickets(!showResolvedTickets);
+                    setShowOpenTickets(false);
+                    setShowInProgressTickets(false);
                   }
                 }}
               >
@@ -1019,10 +1021,168 @@ export default function MyDepartment() {
                   </p>
                 </CardContent>
               </Card>
-            </div>
+              </div>
 
-            {/* Resolved Tickets - Collapsible Section */}
-            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              {/* Open Tickets - Collapsible Section */}
+              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <AnimatePresence>
+                {showOpenTickets && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-blue-800">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                              <Clock className="w-5 h-5 text-blue-600" />
+                            </div>
+                            Open Tickets
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-300 ml-2">
+                              {filteredTickets.filter(t => t.status === 'open').length}
+                            </Badge>
+                          </CardTitle>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowOpenTickets(false)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {filteredTickets
+                            .filter(t => t.status === 'open')
+                            .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+                            .slice(0, 15)
+                            .map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="p-3 bg-white rounded-lg border border-blue-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                                  ticket.assigned_to_name ? 'bg-gradient-to-br from-blue-500 to-cyan-600' : 'bg-slate-300'
+                                }`}>
+                                  {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <span>{ticket.ticket_number}</span>
+                                    <span>•</span>
+                                    <span>Created {format(new Date(ticket.created_date), 'MMM d')}</span>
+                                    <Badge className={`text-xs ${
+                                      ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                      ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                      {ticket.priority}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {filteredTickets.filter(t => t.status === 'open').length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No open tickets</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              )}
+
+              {/* In Progress Tickets - Collapsible Section */}
+              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <AnimatePresence>
+                {showInProgressTickets && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-violet-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-purple-800">
+                            <div className="p-2 bg-purple-100 rounded-lg">
+                              <Flame className="w-5 h-5 text-purple-600" />
+                            </div>
+                            In Progress Tickets
+                            <Badge className="bg-purple-100 text-purple-700 border-purple-300 ml-2">
+                              {filteredTickets.filter(t => t.status === 'in_progress').length}
+                            </Badge>
+                          </CardTitle>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowInProgressTickets(false)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {filteredTickets
+                            .filter(t => t.status === 'in_progress')
+                            .sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))
+                            .slice(0, 15)
+                            .map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="p-3 bg-white rounded-lg border border-purple-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                  {getInitials(ticket.assigned_to_name)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <span>{ticket.ticket_number}</span>
+                                    {ticket.assigned_to_name && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{ticket.assigned_to_name}</span>
+                                      </>
+                                    )}
+                                    <Badge className={`text-xs ${
+                                      ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                      ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                      {ticket.priority}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {filteredTickets.filter(t => t.status === 'in_progress').length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No in-progress tickets</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              )}
+
+              {/* Resolved Tickets - Collapsible Section */}
+              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
               <AnimatePresence>
                 {showResolvedTickets && (
                   <motion.div
@@ -1092,7 +1252,7 @@ export default function MyDepartment() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            )}
+              )}
 
             {!isPreviewMode && (
             <>
