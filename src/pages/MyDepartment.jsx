@@ -839,7 +839,7 @@ export default function MyDepartment() {
           )}
         </div>
 
-        {!userRole && (
+        {!userRole && !isPreviewMode && !loading && (
           <Card className="mb-6 border-2 border-blue-300 bg-blue-50">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
