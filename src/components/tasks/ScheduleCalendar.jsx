@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
-import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket, CheckCircle2 } from 'lucide-react';
+import { Clock, Key, MapPin, Lock, Unlock, Video, Users, Ticket, CheckCircle2, RepeatIcon } from 'lucide-react';
 
 export default function ScheduleCalendar({ events, tickets = [], deptTasks = [], weekCount = 2, onEventClick, onTicketClick, onDeptTaskClick }) {
   const today = new Date();
@@ -226,33 +226,48 @@ export default function ScheduleCalendar({ events, tickets = [], deptTasks = [],
                         </Card>
                         ))}
 
-                        {/* Dept Tasks - Teal/Cyan Color */}
-                                                    {dayDeptTasks.map((task) => (
-                                                    <Card 
-                                                      key={`task-${task.id}`} 
-                                                      className="border-2 border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100 hover:shadow-md transition-all cursor-pointer"
-                                                      onClick={() => onDeptTaskClick && onDeptTaskClick(task)}
-                                                    >
-                          <CardContent className="p-2 space-y-1">
-                            <div className="flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-teal-600" />
-                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
-                                {task.title}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Badge variant="outline" className="text-[9px] bg-teal-100 border-teal-400 text-teal-700">
-                                Dept Task
-                              </Badge>
-                              {task.assigneeName && (
-                                <span className="text-[9px] text-teal-600 truncate">
-                                  {task.assigneeName}
-                                </span>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                        ))}
+                        {/* Dept Tasks - Teal/Cyan Color, Routine Tasks - Indigo */}
+                        {dayDeptTasks.map((task) => {
+                          const isRoutine = task.isRoutine || task.type === 'routine';
+                          return (
+                            <Card 
+                              key={`task-${task.id}`} 
+                              className={`border-2 hover:shadow-md transition-all cursor-pointer ${
+                                isRoutine 
+                                  ? 'border-indigo-400 bg-gradient-to-br from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100'
+                                  : 'border-teal-400 bg-gradient-to-br from-teal-50 to-cyan-50 hover:from-teal-100 hover:to-cyan-100'
+                              }`}
+                              onClick={() => onDeptTaskClick && onDeptTaskClick(task)}
+                            >
+                              <CardContent className="p-2 space-y-1">
+                                <div className="flex items-center gap-1">
+                                  {isRoutine ? (
+                                    <RepeatIcon className="w-3 h-3 text-indigo-600" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                                  )}
+                                  <p className="text-xs font-semibold text-slate-900 line-clamp-2">
+                                    {task.title}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Badge variant="outline" className={`text-[9px] ${
+                                    isRoutine 
+                                      ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
+                                      : 'bg-teal-100 border-teal-400 text-teal-700'
+                                  }`}>
+                                    {isRoutine ? task.frequency?.charAt(0).toUpperCase() + task.frequency?.slice(1) : 'Dept Task'}
+                                  </Badge>
+                                  {task.assigneeName && (
+                                    <span className={`text-[9px] truncate ${isRoutine ? 'text-indigo-600' : 'text-teal-600'}`}>
+                                      {task.assigneeName}
+                                    </span>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                         </div>
                   </div>
                 </div>
