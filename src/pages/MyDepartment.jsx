@@ -58,6 +58,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import RoutineTaskDetailModal from "@/components/tasks/RoutineTaskDetailModal";
+import ProjectsTab from "@/components/department/ProjectsTab";
 import { differenceInSeconds } from "date-fns";
 
 function RoomFlowCountdown({ pcoEvents }) {
@@ -874,14 +875,15 @@ export default function MyDepartment() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${
             userDepartments.some(d => d.toLowerCase() === 'facilities') 
-              ? (!isPreviewMode ? 'grid-cols-3' : 'grid-cols-4')
-              : (!isPreviewMode ? 'grid-cols-2' : 'grid-cols-3')
+              ? (!isPreviewMode ? 'grid-cols-4' : 'grid-cols-5')
+              : (!isPreviewMode ? 'grid-cols-3' : 'grid-cols-4')
           }`}>
             <TabsTrigger value="overview">
               {userRole === 'requester' || userRole === 'worker' ? (
                 <>
                   <Ticket className="w-4 h-4 mr-2" />
-                  My Tickets
+                  <span className="hidden sm:inline">My Tickets</span>
+                  <span className="sm:hidden">Tickets</span>
                 </>
               ) : (
                 <>
@@ -892,12 +894,19 @@ export default function MyDepartment() {
             </TabsTrigger>
             <TabsTrigger value="department">
               <Building2 className="w-4 h-4 mr-2" />
-              Department Info
+              <span className="hidden sm:inline">Department Info</span>
+              <span className="sm:hidden">Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="projects">
+              <Target className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Projects & Priorities</span>
+              <span className="sm:hidden">Projects</span>
             </TabsTrigger>
             {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
               <TabsTrigger value="roomflow">
                 <LayoutGrid className="w-4 h-4 mr-2" />
-                Room Flow
+                <span className="hidden sm:inline">Room Flow</span>
+                <span className="sm:hidden">Rooms</span>
               </TabsTrigger>
             )}
             {isPreviewMode && (
@@ -2467,6 +2476,15 @@ export default function MyDepartment() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="projects" className="space-y-6">
+            <ProjectsTab
+              userDepartments={userDepartments}
+              departmentWorkers={departmentWorkers}
+              user={user}
+              isPreviewMode={isPreviewMode}
+            />
           </TabsContent>
 
           {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
