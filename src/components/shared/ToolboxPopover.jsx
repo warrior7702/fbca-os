@@ -42,6 +42,7 @@ export default function ToolboxPopover() {
   const [calcDisplay, setCalcDisplay] = useState('0');
   const [calcExpression, setCalcExpression] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isOpen, setIsOpen] = useState(false);
 
   // Random Number Generator
   const generateRandomNumber = () => {
