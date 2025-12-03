@@ -366,9 +366,11 @@ export default function MyDepartment() {
             u.user_email === currentUser.email
           );
           
+          let userDepts = [];
           if (userData) {
             setUserRole(userData.ticket_role);
-            setUserDepartments(userData.departments || []);
+            userDepts = userData.departments || [];
+            setUserDepartments(userDepts);
           }
           
           // Get workers for user's departments
@@ -376,6 +378,9 @@ export default function MyDepartment() {
             u.ticket_role === 'worker' || u.ticket_role === 'admin'
           );
           setDepartmentWorkers(workers);
+          
+          // Now load dept tasks with the departments we just got
+          loadDeptTasks(userDepts);
         }
       }).catch(err => console.error('Error loading roles:', err));
 
