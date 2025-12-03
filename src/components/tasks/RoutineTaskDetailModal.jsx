@@ -224,10 +224,22 @@ export default function RoutineTaskDetailModal({
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">Attachments</label>
             <div className="flex items-center gap-2 flex-wrap">
-              {(isEditing ? editedTask.attachments : task.attachments || [])?.map((attachment, idx) => (
+              {(isEditing ? editedTask.attachments : task.attachments || [])?.map((attachment, idx) => {
+                // For SharePoint/OneDrive files, use web URL to open in browser viewer
+                const getViewUrl = (url) => {
+                  if (!url) return url;
+                  // If it's already a sharepoint.com or onedrive URL, it should open in browser
+                  if (url.includes('sharepoint.com') || url.includes('onedrive.com') || url.includes('1drv.ms')) {
+                    // Convert download URLs to view URLs if needed
+                    return url.replace('/download/', '/view/').replace('?download=1', '');
+                  }
+                  return url;
+                };
+                
+                return (
                 <div key={idx} className="flex items-center gap-1">
                   <a
-                    href={attachment.url}
+                    href={getViewUrl(attachment.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-indigo-100"
@@ -244,7 +256,8 @@ export default function RoutineTaskDetailModal({
                     </button>
                   )}
                 </div>
-              ))}
+              );
+              })}
               {isEditing && (
                 <label className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded flex items-center gap-1 hover:bg-slate-200 cursor-pointer">
                   <Plus className="w-3 h-3" />
