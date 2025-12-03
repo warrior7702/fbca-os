@@ -360,8 +360,9 @@ export default function MyDepartment() {
         setIsPreviewMode(true);
       }
 
-      // Load roles in background (non-blocking for initial render)
-      base44.functions.invoke('getUsersWithTicketRoles').then(rolesResponse => {
+      // Load roles - this is critical for proper page display
+      try {
+        const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
         if (rolesResponse.data?.success) {
           const userData = rolesResponse.data.allUsers.find(u => 
             u.user_email === currentUser.email
@@ -383,7 +384,11 @@ export default function MyDepartment() {
           // Now load dept tasks with the departments we just got
           loadDeptTasks(userDepts);
         }
-      }).catch(err => console.error('Error loading roles:', err));
+        setRolesLoaded(true);
+      } catch (err) {
+        console.error('Error loading roles:', err);
+        setRolesLoaded(true); // Mark as loaded even on error so page shows
+      }
 
     } catch (error) {
       console.error('Error loading data:', error);
