@@ -29,6 +29,7 @@ export default function BackfillEventCodes() {
   const [processing, setProcessing] = useState({});
   const [editingAccessTime, setEditingAccessTime] = useState({});
   const [editingDoorCode, setEditingDoorCode] = useState({});
+  const [localCodes, setLocalCodes] = useState({});
 
   useEffect(() => {
     loadData();
@@ -46,10 +47,27 @@ export default function BackfillEventCodes() {
         return;
       }
 
-      // Get schedule events
-      const response = await base44.functions.invoke('getMySchedule');
-      if (response.data?.events) {
-        setEvents(response.data.events);
+      // Get schedule events and local codes in parallel
+      const [scheduleResponse, storedCodes] = await Promise.all([
+        base44.functions.invoke('getMySchedule'),
+        base44.entities.LocalEventCode.list()
+      ]);
+      
+      // Build local codes map
+      const codesMap = {};
+      storedCodes.forEach(code => {
+        codesMap[code.event_id] = code;
+      });
+      setLocalCodes(codesMap);
+      
+      if (scheduleResponse.data?.events) {
+        // Merge local codes with events
+        const eventsWithLocalCodes = scheduleResponse.data.events.map(event => ({
+          ...event,
+          posted_door_code: codesMap[event.event_id]?.door_code || event.posted_door_code,
+          access_time: codesMap[event.event_id]?.access_time || event.access_time
+        }));
+        setEvents(eventsWithLocalCodes);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -134,42 +152,56 @@ export default function BackfillEventCodes() {
 
     setProcessing(prev => ({ ...prev, [event.event_id]: true }));
     try {
-      // Post the code to PCO
-      const response = await base44.functions.invoke('writePCONote', {
-        event_id: event.event_id,
-        badge_code: doorCode,
-        access_time: accessTime
-      });
-
-      if (response.data?.ok) {
-        toast.success('Code saved to PCO!');
-        
-        // Update local state
-        setEvents(prev => prev.map(e => {
-          if (e.event_id === event.event_id) {
-            return {
-              ...e,
-              posted_door_code: doorCode,
-              access_time: accessTime
-            };
-          }
-          return e;
-        }));
-
-        // Clear editing state
-        setEditingAccessTime(prev => {
-          const next = { ...prev };
-          delete next[event.event_id];
-          return next;
-        });
-        setEditingDoorCode(prev => {
-          const next = { ...prev };
-          delete next[event.event_id];
-          return next;
+      // Save locally instead of to PCO
+      const existingCode = localCodes[event.event_id];
+      
+      if (existingCode) {
+        // Update existing
+        await base44.entities.LocalEventCode.update(existingCode.id, {
+          access_time: accessTime,
+          door_code: doorCode
         });
       } else {
-        toast.error(response.data?.error || 'Failed to save code');
+        // Create new
+        await base44.entities.LocalEventCode.create({
+          event_id: event.event_id,
+          event_name: event.name,
+          event_date: event.starts_at,
+          access_time: accessTime,
+          door_code: doorCode
+        });
       }
+
+      toast.success('Code saved locally!');
+      
+      // Update local state
+      setLocalCodes(prev => ({
+        ...prev,
+        [event.event_id]: { event_id: event.event_id, door_code: doorCode, access_time: accessTime }
+      }));
+      
+      setEvents(prev => prev.map(e => {
+        if (e.event_id === event.event_id) {
+          return {
+            ...e,
+            posted_door_code: doorCode,
+            access_time: accessTime
+          };
+        }
+        return e;
+      }));
+
+      // Clear editing state
+      setEditingAccessTime(prev => {
+        const next = { ...prev };
+        delete next[event.event_id];
+        return next;
+      });
+      setEditingDoorCode(prev => {
+        const next = { ...prev };
+        delete next[event.event_id];
+        return next;
+      });
     } catch (error) {
       console.error('Error saving code:', error);
       toast.error('Failed to save code');
@@ -327,7 +359,7 @@ export default function BackfillEventCodes() {
                     ) : (
                       <Save className="w-4 h-4 mr-2" />
                     )}
-                    Save to PCO
+                    Save Locally
                   </Button>
                 </div>
               ))}
