@@ -902,6 +902,222 @@ export default function MyDepartment() {
               </div>
             )}
 
+            {/* Top Stats Row - Tasks & Routine */}
+            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    setShowDeptTasks(!showDeptTasks);
+                    setShowRoutineTasks(false);
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-xs sm:text-sm text-slate-600">Dept Tasks</p>
+                        <p className="text-xl sm:text-2xl font-bold text-teal-700">
+                          {deptTasks.filter(t => !t.completed).length}
+                        </p>
+                      </div>
+                      <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-teal-500" />
+                    </div>
+                    <p className="text-xs text-slate-500">Click to view</p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    setShowRoutineTasks(!showRoutineTasks);
+                    setShowDeptTasks(false);
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-xs sm:text-sm text-slate-600">Routine Tasks</p>
+                        <p className="text-xl sm:text-2xl font-bold text-indigo-700">
+                          {routineTasks.length}
+                        </p>
+                      </div>
+                      <RepeatIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-500" />
+                    </div>
+                    <p className="text-xs text-slate-500">Click to view</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Dept Tasks - Collapsible Section */}
+            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <AnimatePresence>
+                {showDeptTasks && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-teal-800">
+                            <div className="p-2 bg-teal-100 rounded-lg">
+                              <CheckCircle2 className="w-5 h-5 text-teal-600" />
+                            </div>
+                            Dept Tasks
+                            <Badge className="bg-teal-100 text-teal-700 border-teal-300 ml-2">
+                              {deptTasks.filter(t => !t.completed).length} active
+                            </Badge>
+                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Select value={taskSort} onValueChange={setTaskSort}>
+                              <SelectTrigger className="w-28 h-8 text-xs">
+                                <SelectValue placeholder="Sort..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="due_date">Due Date</SelectItem>
+                                <SelectItem value="assignee">Assignee</SelectItem>
+                                <SelectItem value="created">Created</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setShowDeptTasks(false)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {deptTasks
+                            .filter(t => !t.completed)
+                            .sort((a, b) => {
+                              if (taskSort === 'due_date') {
+                                return new Date(a.dueDate) - new Date(b.dueDate);
+                              } else if (taskSort === 'assignee') {
+                                return (a.assigneeName || '').localeCompare(b.assigneeName || '');
+                              } else {
+                                return new Date(b.createdAt) - new Date(a.createdAt);
+                              }
+                            })
+                            .map((task) => (
+                            <div
+                              key={task.id}
+                              className="p-3 bg-white rounded-lg border border-teal-200 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
+                              onClick={() => setSelectedTask(task)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updatedTasks = deptTasks.map(t => 
+                                      t.id === task.id ? {...t, completed: !t.completed} : t
+                                    );
+                                    setDeptTasks(updatedTasks);
+                                    localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                                    toast.success('Task completed!');
+                                  }}
+                                  className="w-5 h-5 rounded-full border-2 border-teal-400 flex items-center justify-center cursor-pointer hover:bg-teal-100 transition-colors flex-shrink-0"
+                                >
+                                  {task.completed && <CheckCircle2 className="w-3 h-3 text-teal-600" />}
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                  {getInitials(task.assigneeName)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <span>{task.assigneeName}</span>
+                                    <span>•</span>
+                                    <span className="text-teal-600 font-medium">Due {format(new Date(task.dueDate), 'MMM d')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {deptTasks.filter(t => !t.completed).length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No active tasks</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+
+            {/* Routine Tasks - Collapsible Section */}
+            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              <AnimatePresence>
+                {showRoutineTasks && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-indigo-800">
+                            <div className="p-2 bg-indigo-100 rounded-lg">
+                              <RepeatIcon className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            Routine Tasks
+                            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 ml-2">
+                              {routineTasks.length} configured
+                            </Badge>
+                          </CardTitle>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowRoutineTasks(false)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {routineTasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="p-3 bg-white rounded-lg border border-indigo-200 hover:shadow-md transition-all flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-3">
+                                <RepeatIcon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                  {getInitials(task.assigneeName)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                    <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
+                                      {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
+                                    </Badge>
+                                    <span>{task.assigneeName || 'Unassigned'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {routineTasks.length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No routine tasks configured</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+
+            {/* Ticket Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Card>
                 <CardContent className="p-4">
