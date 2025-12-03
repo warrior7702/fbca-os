@@ -180,7 +180,7 @@ export default function MyDepartment() {
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskDetails, setNewTaskDetails] = useState("");
   const [deptTasks, setDeptTasks] = useState([]);
-  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [], dueDate: "" });
+  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", description: "", frequency: "monthly", assignee: "", assignee2: "", attachments: [], dueDate: "" });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
   const [ticketSort, setTicketSort] = useState("due_date");
