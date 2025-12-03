@@ -187,6 +187,8 @@ export default function MyDepartment() {
   const [showResolvedTickets, setShowResolvedTickets] = useState(false);
   const [showOpenTickets, setShowOpenTickets] = useState(false);
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
+  const [showDeptTasks, setShowDeptTasks] = useState(false);
+  const [showRoutineTasks, setShowRoutineTasks] = useState(false);
 
   const getInitials = (name) => {
     if (!name) return '??';
