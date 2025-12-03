@@ -185,6 +185,8 @@ export default function MyDepartment() {
   const [pcoEvents, setPcoEvents] = useState([]);
   const [loadingPcoEvents, setLoadingPcoEvents] = useState(false);
   const [showResolvedTickets, setShowResolvedTickets] = useState(false);
+  const [showOpenTickets, setShowOpenTickets] = useState(false);
+  const [showInProgressTickets, setShowInProgressTickets] = useState(false);
 
   const getInitials = (name) => {
     if (!name) return '??';
