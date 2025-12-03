@@ -2235,20 +2235,43 @@ export default function MyDepartment() {
                       {routineTasks.length > 0 ? (
                         <div className="space-y-2">
                           {routineTasks.map((task) => (
-                            <div key={task.id} className="p-3 bg-white rounded-lg border flex items-center justify-between">
+                            <div 
+                              key={task.id} 
+                              className="p-3 bg-white rounded-lg border flex items-center justify-between cursor-pointer hover:shadow-md transition-all"
+                              onClick={() => setSelectedRoutineTask(task)}
+                            >
                               <div className="flex items-center gap-3">
                                 <RepeatIcon className="w-4 h-4 text-blue-500" />
                                 <div>
                                   <p className="font-medium text-slate-900 text-sm">{task.title}</p>
-                                  <p className="text-xs text-slate-500">
-                                    {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)} • {task.assigneeName || 'Unassigned'}
-                                  </p>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <span>{task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}</span>
+                                    <span>•</span>
+                                    <span>{task.assigneeName || 'Unassigned'}</span>
+                                    {(task.nextDueDate || task.dueDate) && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-indigo-600 font-medium">
+                                          Due {format(new Date((task.nextDueDate || task.dueDate) + 'T12:00:00'), 'MMM d')}
+                                        </span>
+                                      </>
+                                    )}
+                                    {task.lastCompletedAt && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-green-600">
+                                          Last: {format(new Date(task.lastCompletedAt), 'MMM d')}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const updatedTasks = routineTasks.filter(t => t.id !== task.id);
                                   setRoutineTasks(updatedTasks);
                                   localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
