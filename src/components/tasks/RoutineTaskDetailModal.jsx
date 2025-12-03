@@ -341,21 +341,6 @@ export default function RoutineTaskDetailModal({
                         nextDue.setMonth(nextDue.getMonth() + 1);
                     }
 
-                    // Log completion for reporting
-                    const completionLog = JSON.parse(localStorage.getItem('taskCompletionLog') || '[]');
-                    completionLog.push({
-                      type: 'routine_task',
-                      taskId: task.id,
-                      taskTitle: task.title,
-                      frequency: task.frequency,
-                      assignee: task.assignee,
-                      assigneeName: task.assigneeName,
-                      completedAt: new Date().toISOString(),
-                      previousDueDate: task.nextDueDate || task.dueDate,
-                      nextDueDate: nextDue.toISOString().split('T')[0]
-                    });
-                    localStorage.setItem('taskCompletionLog', JSON.stringify(completionLog));
-
                     const nextDueDateStr = nextDue.toISOString().split('T')[0];
                     onUpdate({ 
                       ...task, 
