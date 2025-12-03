@@ -2613,18 +2613,40 @@ export default function MyDepartment() {
           isOpen={!!selectedRoutineTask}
           onClose={() => setSelectedRoutineTask(null)}
           workers={departmentWorkers}
-          onUpdate={(updatedTask) => {
-            const updatedTasks = routineTasks.map(t => 
-              t.id === updatedTask.id ? updatedTask : t
-            );
-            setRoutineTasks(updatedTasks);
-            localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
-            setSelectedRoutineTask(null);
+          onUpdate={async (updatedTask) => {
+            try {
+              await base44.entities.RoutineTask.update(updatedTask.id, {
+                title: updatedTask.title,
+                description: updatedTask.description,
+                frequency: updatedTask.frequency,
+                assignee: updatedTask.assignee,
+                assignee_name: updatedTask.assigneeName,
+                assignee2: updatedTask.assignee2,
+                assignee2_name: updatedTask.assignee2Name,
+                next_due_date: updatedTask.nextDueDate || updatedTask.dueDate,
+                last_completed_at: updatedTask.lastCompletedAt,
+                last_completed_by: updatedTask.lastCompletedBy,
+                attachments: updatedTask.attachments
+              });
+              const updatedTasks = routineTasks.map(t => 
+                t.id === updatedTask.id ? updatedTask : t
+              );
+              setRoutineTasks(updatedTasks);
+              setSelectedRoutineTask(null);
+            } catch (error) {
+              console.error('Error updating routine task:', error);
+              toast.error('Failed to update task');
+            }
           }}
-          onDelete={(taskId) => {
-            const updatedTasks = routineTasks.filter(t => t.id !== taskId);
-            setRoutineTasks(updatedTasks);
-            localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
+          onDelete={async (taskId) => {
+            try {
+              await base44.entities.RoutineTask.delete(taskId);
+              const updatedTasks = routineTasks.filter(t => t.id !== taskId);
+              setRoutineTasks(updatedTasks);
+            } catch (error) {
+              console.error('Error deleting routine task:', error);
+              toast.error('Failed to delete task');
+            }
           }}
         />
 
@@ -2634,18 +2656,38 @@ export default function MyDepartment() {
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           workers={departmentWorkers}
-          onUpdate={(updatedTask) => {
-            const updatedTasks = deptTasks.map(t => 
-              t.id === updatedTask.id ? updatedTask : t
-            );
-            setDeptTasks(updatedTasks);
-            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
-            setSelectedTask(null);
+          onUpdate={async (updatedTask) => {
+            try {
+              await base44.entities.DeptTask.update(updatedTask.id, {
+                title: updatedTask.title,
+                details: updatedTask.details,
+                assignee: updatedTask.assignee,
+                assignee_name: updatedTask.assigneeName,
+                assignee2: updatedTask.assignee2,
+                assignee2_name: updatedTask.assignee2Name,
+                due_date: updatedTask.dueDate,
+                completed: updatedTask.completed,
+                completed_at: updatedTask.completedAt
+              });
+              const updatedTasks = deptTasks.map(t => 
+                t.id === updatedTask.id ? updatedTask : t
+              );
+              setDeptTasks(updatedTasks);
+              setSelectedTask(null);
+            } catch (error) {
+              console.error('Error updating dept task:', error);
+              toast.error('Failed to update task');
+            }
           }}
-          onDelete={(taskId) => {
-            const updatedTasks = deptTasks.filter(t => t.id !== taskId);
-            setDeptTasks(updatedTasks);
-            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+          onDelete={async (taskId) => {
+            try {
+              await base44.entities.DeptTask.delete(taskId);
+              const updatedTasks = deptTasks.filter(t => t.id !== taskId);
+              setDeptTasks(updatedTasks);
+            } catch (error) {
+              console.error('Error deleting dept task:', error);
+              toast.error('Failed to delete task');
+            }
           }}
         />
       </div>
