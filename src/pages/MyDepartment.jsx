@@ -1080,7 +1080,7 @@ export default function MyDepartment() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const updatedTasks = deptTasks.map(t => 
-                                      t.id === task.id ? {...t, completed: !t.completed} : t
+                                      t.id === task.id ? {...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : null} : t
                                     );
                                     setDeptTasks(updatedTasks);
                                     localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
