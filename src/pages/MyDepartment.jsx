@@ -60,6 +60,7 @@ import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import RoutineTaskDetailModal from "@/components/tasks/RoutineTaskDetailModal";
 import ProjectsTab from "@/components/department/ProjectsTab";
 import { differenceInSeconds } from "date-fns";
+import { FolderKanban } from "lucide-react";
 
 function RoomFlowCountdown({ pcoEvents }) {
   const [now, setNow] = useState(new Date());
@@ -195,6 +196,7 @@ export default function MyDepartment() {
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
   const [showDeptTasks, setShowDeptTasks] = useState(false);
   const [showRoutineTasks, setShowRoutineTasks] = useState(false);
+  const [projectsCount, setProjectsCount] = useState(0);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -240,6 +242,11 @@ export default function MyDepartment() {
 
   const loadDeptTasks = async () => {
     try {
+      // Load projects count
+      const primaryDept = userDepartments[0] || 'General';
+      const projectsData = await base44.entities.DeptProject.filter({ department: primaryDept }).catch(() => []);
+      setProjectsCount(projectsData.filter(p => p.status !== 'completed').length);
+      
       // Load dept tasks from database
       const dbDeptTasks = await base44.entities.DeptTask.list('-created_date');
       const mappedDeptTasks = dbDeptTasks.map(t => ({
@@ -1015,9 +1022,9 @@ export default function MyDepartment() {
               </div>
             )}
 
-            {/* Top Stats Row - Tasks & Routine */}
+            {/* Top Stats Row - Tasks, Routine & Projects */}
             {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 <Card 
                   className="cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => setShowDeptTasks(!showDeptTasks)}
@@ -1049,6 +1056,24 @@ export default function MyDepartment() {
                         </p>
                       </div>
                       <RepeatIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-500" />
+                    </div>
+                    <p className="text-xs text-slate-500">Click to view</p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setActiveTab('projects')}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-xs sm:text-sm text-slate-600">Projects</p>
+                        <p className="text-xl sm:text-2xl font-bold text-violet-700">
+                          {projectsCount}
+                        </p>
+                      </div>
+                      <FolderKanban className="w-6 h-6 sm:w-8 sm:h-8 text-violet-500" />
                     </div>
                     <p className="text-xs text-slate-500">Click to view</p>
                   </CardContent>
