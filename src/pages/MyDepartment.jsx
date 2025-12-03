@@ -56,6 +56,7 @@ import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, end
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
+import RoutineTaskDetailModal from "@/components/tasks/RoutineTaskDetailModal";
 import { differenceInSeconds } from "date-fns";
 
 function RoomFlowCountdown({ pcoEvents }) {
@@ -183,6 +184,7 @@ export default function MyDepartment() {
   const [ticketSort, setTicketSort] = useState("due_date");
   const [taskSort, setTaskSort] = useState("due_date");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedRoutineTask, setSelectedRoutineTask] = useState(null);
   const [pcoEvents, setPcoEvents] = useState([]);
   const [loadingPcoEvents, setLoadingPcoEvents] = useState(false);
   const [showResolvedTickets, setShowResolvedTickets] = useState(false);
@@ -1100,7 +1102,8 @@ export default function MyDepartment() {
                           {routineTasks.map((task) => (
                             <div
                               key={task.id}
-                              className="p-3 bg-white rounded-lg border border-indigo-200 hover:shadow-md transition-all"
+                              className="p-3 bg-white rounded-lg border border-indigo-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => setSelectedRoutineTask(task)}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -2412,6 +2415,27 @@ export default function MyDepartment() {
           </TabsContent>
           )}
         </Tabs>
+
+        {/* Routine Task Detail Modal */}
+        <RoutineTaskDetailModal
+          task={selectedRoutineTask}
+          isOpen={!!selectedRoutineTask}
+          onClose={() => setSelectedRoutineTask(null)}
+          workers={departmentWorkers}
+          onUpdate={(updatedTask) => {
+            const updatedTasks = routineTasks.map(t => 
+              t.id === updatedTask.id ? updatedTask : t
+            );
+            setRoutineTasks(updatedTasks);
+            localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
+            setSelectedRoutineTask(null);
+          }}
+          onDelete={(taskId) => {
+            const updatedTasks = routineTasks.filter(t => t.id !== taskId);
+            setRoutineTasks(updatedTasks);
+            localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
+          }}
+        />
 
         {/* Dept Task Detail Modal */}
         <DeptTaskDetailModal
