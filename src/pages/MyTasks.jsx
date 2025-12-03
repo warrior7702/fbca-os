@@ -345,13 +345,14 @@ export default function MyTasks() {
               if (storedRoutineTasks) {
                 try {
                   const routineTasks = JSON.parse(storedRoutineTasks);
-                  // Filter to routine tasks assigned to current user that are due
+                  // Filter to routine tasks assigned to current user that have a due date
                   const myRoutineTasks = routineTasks
-                    .filter(t => t.assignee === user.email && t.nextDueDate)
+                    .filter(t => t.assignee === user.email && (t.nextDueDate || t.dueDate))
                     .map(t => ({
                       ...t,
-                      dueDate: t.nextDueDate,
-                      isRoutine: true
+                      dueDate: t.nextDueDate || t.dueDate,
+                      isRoutine: true,
+                      type: 'routine'
                     }));
                   console.log('Loaded routine tasks for user:', user.email, myRoutineTasks);
                   // Merge with dept tasks
