@@ -903,7 +903,7 @@ export default function MyDepartment() {
             )}
 
             {/* Top Stats Row - Tasks & Routine */}
-            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+            {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <Card 
                   className="cursor-pointer hover:shadow-md transition-shadow"
@@ -950,7 +950,7 @@ export default function MyDepartment() {
             )}
 
             {/* Dept Tasks - Collapsible Section */}
-            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+            {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <AnimatePresence>
                 {showDeptTasks && (
                   <motion.div
@@ -1052,7 +1052,7 @@ export default function MyDepartment() {
             )}
 
             {/* Routine Tasks - Collapsible Section */}
-            {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+            {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <AnimatePresence>
                 {showRoutineTasks && (
                   <motion.div
@@ -1154,9 +1154,9 @@ export default function MyDepartment() {
               </Card>
 
               <Card 
-                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                className={`${(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                 onClick={() => {
-                  if (userRole === 'requester' || userRole === 'worker') {
+                  if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowOpenTickets(!showOpenTickets);
                     setShowInProgressTickets(false);
                     setShowResolvedTickets(false);
@@ -1174,16 +1174,16 @@ export default function MyDepartment() {
                     <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' :
+                    {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'Click to view' :
                      `${filteredTickets.filter(t => t.status === 'open' && !t.assigned_to).length} unassigned`}
                   </p>
                 </CardContent>
               </Card>
 
               <Card 
-                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                className={`${(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                 onClick={() => {
-                  if (userRole === 'requester' || userRole === 'worker') {
+                  if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowInProgressTickets(!showInProgressTickets);
                     setShowOpenTickets(false);
                     setShowResolvedTickets(false);
@@ -1194,10 +1194,10 @@ export default function MyDepartment() {
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs sm:text-sm text-slate-600">
-                        {userRole === 'worker' ? 'In Progress' : 'Escalations'}
+                        {(userRole === 'worker' || userRole === 'admin') ? 'In Progress' : 'Escalations'}
                       </p>
                       <p className="text-xl sm:text-2xl font-bold text-purple-700">
-                        {userRole === 'worker' ? 
+                        {(userRole === 'worker' || userRole === 'admin') ? 
                           filteredTickets.filter(t => t.status === 'in_progress').length :
                           escalations.length}
                       </p>
@@ -1205,15 +1205,15 @@ export default function MyDepartment() {
                     <Flame className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' : 'Needs immediate attention'}
+                    {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'Click to view' : 'Needs immediate attention'}
                   </p>
                 </CardContent>
               </Card>
 
               <Card 
-                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                className={`${(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                 onClick={() => {
-                  if (userRole === 'requester' || userRole === 'worker') {
+                  if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowResolvedTickets(!showResolvedTickets);
                     setShowOpenTickets(false);
                     setShowInProgressTickets(false);
@@ -1224,10 +1224,10 @@ export default function MyDepartment() {
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs sm:text-sm text-slate-600">
-                        {userRole === 'requester' || userRole === 'worker' ? 'Resolved' : 'Cross-Dept'}
+                        {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'Resolved' : 'Cross-Dept'}
                       </p>
                       <p className="text-xl sm:text-2xl font-bold text-green-700">
-                        {userRole === 'requester' || userRole === 'worker' ?
+                        {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ?
                           filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length :
                           crossDeptTickets.length}
                       </p>
@@ -1235,14 +1235,14 @@ export default function MyDepartment() {
                     <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' : 'Coordination needed'}
+                    {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode ? 'Click to view' : 'Coordination needed'}
                   </p>
                 </CardContent>
               </Card>
               </div>
 
               {/* Open Tickets - Collapsible Section */}
-              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <AnimatePresence>
                 {showOpenTickets && (
                   <motion.div
@@ -1320,7 +1320,7 @@ export default function MyDepartment() {
               )}
 
               {/* In Progress Tickets - Collapsible Section */}
-              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <AnimatePresence>
                 {showInProgressTickets && (
                   <motion.div
@@ -1400,7 +1400,7 @@ export default function MyDepartment() {
               )}
 
               {/* Resolved Tickets - Collapsible Section */}
-              {(userRole === 'requester' || userRole === 'worker') && !isPreviewMode && (
+              {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
               <AnimatePresence>
                 {showResolvedTickets && (
                   <motion.div
