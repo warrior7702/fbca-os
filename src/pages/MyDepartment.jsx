@@ -716,7 +716,7 @@ export default function MyDepartment() {
   const crossDeptTickets = getCrossDepartmentTickets();
   const activityFeed = getActivityFeed();
   const statusData = getTicketsByStatus();
-  const monthlyClosedData = getMonthlyClosedByDept();
+  const monthlyActivityData = getMonthlyActivityByDept();
 
   const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || sourceFilter !== "all";
 
