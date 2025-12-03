@@ -514,11 +514,19 @@ export default function MyDepartment() {
         return isAfter(resolvedDate, start) && isBefore(resolvedDate, end);
       });
       
+      // Count completed tasks from completion log
+      const monthCompletedTasks = taskCompletionLog.filter(log => {
+        const completedDate = new Date(log.completedAt);
+        return isAfter(completedDate, start) && isBefore(completedDate, end);
+      });
+      
       return {
         month,
         IT: monthTickets.filter(t => getDepartment(t.category) === 'it').length,
         Facilities: monthTickets.filter(t => getDepartment(t.category) === 'facilities').length,
-        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length
+        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length,
+        'Dept Tasks': monthCompletedTasks.filter(t => t.type === 'dept_task').length,
+        'Routine Tasks': monthCompletedTasks.filter(t => t.type === 'routine_task').length
       };
     });
   };
@@ -925,12 +933,12 @@ export default function MyDepartment() {
                   </CardContent>
                 </Card>
 
-                {/* Monthly Tracker - Tickets Closed by Dept (Line Chart) */}
+                {/* Monthly Tracker - Tickets & Tasks Closed (Line Chart) */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Calendar className="w-4 h-4 text-violet-600" />
-                      Monthly Tickets Closed by Dept
+                      Monthly Completions
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -942,17 +950,19 @@ export default function MyDepartment() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                           />
-                          <Legend wrapperStyle={{ fontSize: '12px' }} />
-                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
-                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 4 }} />
-                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 4 }} />
+                          <Legend wrapperStyle={{ fontSize: '11px' }} />
+                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
+                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} />
+                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} />
+                          <Line type="monotone" dataKey="Dept Tasks" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 3 }} strokeDasharray="5 5" />
+                          <Line type="monotone" dataKey="Routine Tasks" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 3 }} strokeDasharray="5 5" />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex justify-center gap-4 mt-2 text-xs">
+                    <div className="flex flex-wrap justify-center gap-3 mt-2 text-xs">
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-blue-500" />
-                        <span>IT</span>
+                        <span>IT Tickets</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-emerald-500" />
@@ -960,7 +970,15 @@ export default function MyDepartment() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-violet-500" />
-                        <span>Communications</span>
+                        <span>Comms</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-teal-500" style={{ opacity: 0.7 }} />
+                        <span>Dept Tasks</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-indigo-500" style={{ opacity: 0.7 }} />
+                        <span>Routine</span>
                       </div>
                     </div>
                   </CardContent>
@@ -2553,6 +2571,7 @@ export default function MyDepartment() {
             setRoutineTasks(updatedTasks);
             localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
             setSelectedRoutineTask(null);
+            loadDeptTasks(); // Reload to get updated completion log
           }}
           onDelete={(taskId) => {
             const updatedTasks = routineTasks.filter(t => t.id !== taskId);
@@ -2574,6 +2593,7 @@ export default function MyDepartment() {
             setDeptTasks(updatedTasks);
             localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
             setSelectedTask(null);
+            loadDeptTasks(); // Reload to get updated completion log
           }}
           onDelete={(taskId) => {
             const updatedTasks = deptTasks.filter(t => t.id !== taskId);
