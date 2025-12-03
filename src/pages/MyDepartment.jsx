@@ -176,6 +176,7 @@ export default function MyDepartment() {
   const [routineTasks, setRoutineTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
+  const [newTaskAssignee2, setNewTaskAssignee2] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskDetails, setNewTaskDetails] = useState("");
   const [deptTasks, setDeptTasks] = useState([]);
