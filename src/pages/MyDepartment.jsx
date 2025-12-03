@@ -40,6 +40,7 @@ import {
   Folder
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -748,6 +749,44 @@ export default function MyDepartment() {
               </p>
             </div>
           </div>
+          {/* Show/Hide All Button */}
+          {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const allOpen = showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets;
+                if (allOpen) {
+                  // Hide all
+                  setShowDeptTasks(false);
+                  setShowRoutineTasks(false);
+                  setShowOpenTickets(false);
+                  setShowInProgressTickets(false);
+                  setShowResolvedTickets(false);
+                } else {
+                  // Show all
+                  setShowDeptTasks(true);
+                  setShowRoutineTasks(true);
+                  setShowOpenTickets(true);
+                  setShowInProgressTickets(true);
+                  setShowResolvedTickets(true);
+                }
+              }}
+              className="flex items-center gap-1"
+            >
+              {(showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets) ? (
+                <>
+                  <EyeOff className="w-4 h-4" />
+                  <span className="hidden sm:inline">Hide All</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" />
+                  <span className="hidden sm:inline">Show All</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         {!userRole && (
