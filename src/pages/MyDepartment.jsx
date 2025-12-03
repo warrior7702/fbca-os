@@ -935,7 +935,16 @@ export default function MyDepartment() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card 
+                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                onClick={() => {
+                  if (userRole === 'requester' || userRole === 'worker') {
+                    setShowOpenTickets(!showOpenTickets);
+                    setShowInProgressTickets(false);
+                    setShowResolvedTickets(false);
+                  }
+                }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
@@ -947,30 +956,38 @@ export default function MyDepartment() {
                     <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
                   </div>
                   <p className="text-xs text-slate-500">
-                    {userRole === 'requester' ? 'Awaiting response' :
-                     userRole === 'worker' ? `${filteredTickets.filter(t => t.status === 'open' && t.assigned_to === user?.email).length} need my attention` :
+                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' :
                      `${filteredTickets.filter(t => t.status === 'open' && !t.assigned_to).length} unassigned`}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card 
+                className={`${(userRole === 'requester' || userRole === 'worker') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                onClick={() => {
+                  if (userRole === 'requester' || userRole === 'worker') {
+                    setShowInProgressTickets(!showInProgressTickets);
+                    setShowOpenTickets(false);
+                    setShowResolvedTickets(false);
+                  }
+                }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs sm:text-sm text-slate-600">
                         {userRole === 'worker' ? 'In Progress' : 'Escalations'}
                       </p>
-                      <p className="text-xl sm:text-2xl font-bold text-red-700">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-700">
                         {userRole === 'worker' ? 
-                          filteredTickets.filter(t => t.status === 'in_progress' && t.assigned_to === user?.email).length :
+                          filteredTickets.filter(t => t.status === 'in_progress').length :
                           escalations.length}
                       </p>
                     </div>
-                    <Flame className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
+                    <Flame className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
                   </div>
-                  <p className="text-xs text-red-600">
-                    {userRole === 'worker' ? 'Currently working' : 'Needs immediate attention'}
+                  <p className="text-xs text-slate-500">
+                    {userRole === 'requester' || userRole === 'worker' ? 'Click to view' : 'Needs immediate attention'}
                   </p>
                 </CardContent>
               </Card>
