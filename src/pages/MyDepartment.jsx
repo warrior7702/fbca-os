@@ -177,7 +177,7 @@ export default function MyDepartment() {
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskDetails, setNewTaskDetails] = useState("");
   const [deptTasks, setDeptTasks] = useState([]);
-  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [] });
+  const [newRoutineTask, setNewRoutineTask] = useState({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [], dueDate: "" });
   const [addingTask, setAddingTask] = useState(false);
   const [draggedTicket, setDraggedTicket] = useState(null);
   const [ticketSort, setTicketSort] = useState("due_date");
@@ -236,6 +236,18 @@ export default function MyDepartment() {
         setDeptTasks(tasks);
       } catch (e) {
         console.error('Error loading dept tasks:', e);
+      }
+    }
+    
+    // Also load routine tasks
+    const storedRoutineTasks = localStorage.getItem('routineTasks');
+    if (storedRoutineTasks) {
+      try {
+        const tasks = JSON.parse(storedRoutineTasks);
+        console.log('Loaded routine tasks:', tasks);
+        setRoutineTasks(tasks);
+      } catch (e) {
+        console.error('Error loading routine tasks:', e);
       }
     }
   };
@@ -1103,6 +1115,9 @@ export default function MyDepartment() {
                                         {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
                                       </Badge>
                                       <span>{task.assigneeName || 'Unassigned'}</span>
+                                      {task.nextDueDate && (
+                                        <span className="text-indigo-600 font-medium">Due {format(new Date(task.nextDueDate), 'MMM d')}</span>
+                                      )}
                                     </div>
                                     {task.description && (
                                       <p className="text-xs text-slate-500 mt-1">{task.description}</p>
@@ -2138,12 +2153,21 @@ export default function MyDepartment() {
                               toast.error('Please enter a task title');
                               return;
                             }
-                            setRoutineTasks([...routineTasks, { 
+                            if (!newRoutineTask.dueDate) {
+                              toast.error('Please select a due date');
+                              return;
+                            }
+                            const newTask = { 
                               ...newRoutineTask, 
                               id: Date.now(),
-                              assigneeName: newRoutineTask.assignee ? (departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee) : 'Unassigned'
-                            }]);
-                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [] });
+                              assigneeName: newRoutineTask.assignee ? (departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee) : 'Unassigned',
+                              nextDueDate: newRoutineTask.dueDate,
+                              type: 'routine'
+                            };
+                            const updatedRoutineTasks = [...routineTasks, newTask];
+                            setRoutineTasks(updatedRoutineTasks);
+                            localStorage.setItem('routineTasks', JSON.stringify(updatedRoutineTasks));
+                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", attachments: [], dueDate: "" });
                             toast.success('Routine task added!');
                           }}
                           size="sm"
@@ -2171,7 +2195,11 @@ export default function MyDepartment() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setRoutineTasks(routineTasks.filter(t => t.id !== task.id))}
+                                onClick={() => {
+                                  const updatedTasks = routineTasks.filter(t => t.id !== task.id);
+                                  setRoutineTasks(updatedTasks);
+                                  localStorage.setItem('routineTasks', JSON.stringify(updatedTasks));
+                                }}
                               >
                                 <X className="w-4 h-4 text-slate-400" />
                               </Button>
