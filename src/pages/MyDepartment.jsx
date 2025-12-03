@@ -1161,6 +1161,7 @@ export default function MyDepartment() {
                                             return t;
                                           });
                                           setRoutineTasks(updatedRoutineTasks);
+                                          localStorage.setItem('routineTasks', JSON.stringify(updatedRoutineTasks));
                                           toast.success('File attached');
                                         } catch (error) {
                                           toast.error('Failed to upload file');
