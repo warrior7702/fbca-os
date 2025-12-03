@@ -1043,7 +1043,7 @@ export default function MyDepartment() {
                                   <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                                     <span>{task.assigneeName}</span>
                                     <span>•</span>
-                                    <span className="text-teal-600 font-medium">Due {format(new Date(task.dueDate), 'MMM d')}</span>
+                                    <span className="text-teal-600 font-medium">Due {format(new Date(task.dueDate + 'T12:00:00'), 'MMM d')}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1113,7 +1113,7 @@ export default function MyDepartment() {
                                       </Badge>
                                       <span>{task.assigneeName || 'Unassigned'}</span>
                                       {task.nextDueDate && (
-                                        <span className="text-indigo-600 font-medium">Due {format(new Date(task.nextDueDate), 'MMM d')}</span>
+                                        <span className="text-indigo-600 font-medium">Due {format(new Date(task.nextDueDate + 'T12:00:00'), 'MMM d')}</span>
                                       )}
                                     </div>
                                     {task.description && (
