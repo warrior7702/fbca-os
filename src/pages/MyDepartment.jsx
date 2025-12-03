@@ -2170,7 +2170,7 @@ export default function MyDepartment() {
                           </label>
                         </div>
                         <Button
-                          onClick={() => {
+                          onClick={async () => {
                             if (!newRoutineTask.title.trim()) {
                               toast.error('Please enter a task title');
                               return;
@@ -2179,20 +2179,45 @@ export default function MyDepartment() {
                               toast.error('Please select a due date');
                               return;
                             }
-                            const worker2 = newRoutineTask.assignee2 ? departmentWorkers.find(w => w.user_email === newRoutineTask.assignee2) : null;
-                            const newTask = { 
-                              ...newRoutineTask, 
-                              id: Date.now(),
-                              assigneeName: newRoutineTask.assignee ? (departmentWorkers.find(w => w.user_email === newRoutineTask.assignee)?.user_name || newRoutineTask.assignee) : 'Unassigned',
-                              assignee2Name: worker2?.user_name || newRoutineTask.assignee2 || null,
-                              nextDueDate: newRoutineTask.dueDate,
-                              type: 'routine'
-                            };
-                            const updatedRoutineTasks = [...routineTasks, newTask];
-                            setRoutineTasks(updatedRoutineTasks);
-                            localStorage.setItem('routineTasks', JSON.stringify(updatedRoutineTasks));
-                            setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", assignee2: "", attachments: [], dueDate: "" });
-                            toast.success('Routine task added!');
+                            try {
+                              const worker = newRoutineTask.assignee ? departmentWorkers.find(w => w.user_email === newRoutineTask.assignee) : null;
+                              const worker2 = newRoutineTask.assignee2 ? departmentWorkers.find(w => w.user_email === newRoutineTask.assignee2) : null;
+                              
+                              const created = await base44.entities.RoutineTask.create({
+                                title: newRoutineTask.title,
+                                description: newRoutineTask.description,
+                                frequency: newRoutineTask.frequency,
+                                assignee: newRoutineTask.assignee || null,
+                                assignee_name: worker?.user_name || newRoutineTask.assignee || 'Unassigned',
+                                assignee2: newRoutineTask.assignee2 || null,
+                                assignee2_name: worker2?.user_name || null,
+                                next_due_date: newRoutineTask.dueDate,
+                                department: userDepartments[0] || null,
+                                attachments: newRoutineTask.attachments || []
+                              });
+                              
+                              const newTask = {
+                                id: created.id,
+                                title: created.title,
+                                description: created.description,
+                                frequency: created.frequency,
+                                assignee: created.assignee,
+                                assigneeName: created.assignee_name,
+                                assignee2: created.assignee2,
+                                assignee2Name: created.assignee2_name,
+                                nextDueDate: created.next_due_date,
+                                dueDate: created.next_due_date,
+                                department: created.department,
+                                attachments: created.attachments || [],
+                                type: 'routine'
+                              };
+                              setRoutineTasks([...routineTasks, newTask]);
+                              setNewRoutineTask({ title: "", description: "", frequency: "monthly", assignee: "", assignee2: "", attachments: [], dueDate: "" });
+                              toast.success('Routine task added!');
+                            } catch (error) {
+                              console.error('Error creating routine task:', error);
+                              toast.error('Failed to create routine task');
+                            }
                           }}
                           size="sm"
                           className="mt-3 bg-blue-600 hover:bg-blue-700"
