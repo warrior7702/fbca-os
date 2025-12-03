@@ -929,42 +929,42 @@ export default function MyDepartment() {
                   </CardContent>
                 </Card>
 
-                {/* Monthly Tracker - Tickets Closed by Dept (Line Chart) */}
+                {/* Monthly Tracker - Activity by Department (Line Chart) */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Calendar className="w-4 h-4 text-violet-600" />
-                      Monthly Tickets Closed by Dept
+                      Monthly Activity by Department
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyClosedData}>
+                        <LineChart data={monthlyActivityData}>
                           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                           />
                           <Legend wrapperStyle={{ fontSize: '12px' }} />
-                          <Line type="monotone" dataKey="IT" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
-                          <Line type="monotone" dataKey="Facilities" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 4 }} />
-                          <Line type="monotone" dataKey="Communications" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 4 }} />
+                          <Line type="monotone" dataKey="Tickets" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
+                          <Line type="monotone" dataKey="Dept Tasks" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 4 }} />
+                          <Line type="monotone" dataKey="Routine Tasks" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 4 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="flex justify-center gap-4 mt-2 text-xs">
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-blue-500" />
-                        <span>IT</span>
+                        <span>Tickets</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-emerald-500" />
-                        <span>Facilities</span>
+                        <div className="w-3 h-3 rounded bg-teal-500" />
+                        <span>Dept Tasks</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-violet-500" />
-                        <span>Communications</span>
+                        <div className="w-3 h-3 rounded bg-indigo-500" />
+                        <span>Routine Tasks</span>
                       </div>
                     </div>
                   </CardContent>
