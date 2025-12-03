@@ -2517,8 +2517,8 @@ export default function MyDepartment() {
                         </Select>
                         <Button
                         onClick={async () => {
-                          if (!newTaskTitle.trim() || !newTaskAssignee) {
-                            toast.error('Please enter a task and select an assignee');
+                          if (!newTaskTitle.trim()) {
+                            toast.error('Please enter a task title');
                             return;
                           }
                           setAddingTask(true);
@@ -2566,7 +2566,7 @@ export default function MyDepartment() {
                             setAddingTask(false);
                           }
                         }}
-                        disabled={addingTask || !newTaskTitle.trim() || !newTaskAssignee}
+                        disabled={addingTask || !newTaskTitle.trim()}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         {addingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
