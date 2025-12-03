@@ -157,7 +157,7 @@ export default function DeptTaskDetailModal({
             ) : (
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-teal-600" />
-                <span className="font-medium">{format(new Date(task.dueDate), 'EEEE, MMMM d, yyyy')}</span>
+                <span className="font-medium">{format(new Date(task.dueDate + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}</span>
               </div>
             )}
           </div>

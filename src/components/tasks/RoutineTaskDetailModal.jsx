@@ -213,7 +213,7 @@ export default function RoutineTaskDetailModal({
                 <Calendar className="w-4 h-4 text-indigo-600" />
                 <span className="font-medium">
                   {task.nextDueDate || task.dueDate 
-                    ? format(new Date(task.nextDueDate || task.dueDate), 'EEEE, MMMM d, yyyy')
+                    ? format(new Date((task.nextDueDate || task.dueDate) + 'T12:00:00'), 'EEEE, MMMM d, yyyy')
                     : 'No due date set'}
                 </span>
               </div>
