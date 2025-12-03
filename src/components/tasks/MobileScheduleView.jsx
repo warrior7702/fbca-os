@@ -31,8 +31,12 @@ export default function MobileScheduleView({ events, tickets = [], deptTasks = [
 
   const getDeptTasksForDay = (day) => {
     return deptTasks.filter(task => {
-      if (!task.dueDate && !task.due_date) return false;
-      const taskDate = new Date(task.dueDate || task.due_date);
+      // Check for various date fields
+      const dateStr = task.dueDate || task.due_date || task.nextDueDate;
+      if (!dateStr) return false;
+      // Parse date string properly - handle both date-only and datetime formats
+      const datePart = dateStr.split('T')[0];
+      const taskDate = new Date(datePart + 'T12:00:00');
       return isSameDay(taskDate, day);
     });
   };
