@@ -1194,11 +1194,11 @@ export default function MyDepartment() {
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs sm:text-sm text-slate-600">
-                        {(userRole === 'worker' || userRole === 'admin') ? 'In Progress' : 'Escalations'}
+                        {(userRole === 'worker' || userRole === 'admin' || userRole === 'requester') && !isPreviewMode ? 'Awaiting' : 'Escalations'}
                       </p>
                       <p className="text-xl sm:text-2xl font-bold text-purple-700">
-                        {(userRole === 'worker' || userRole === 'admin') ? 
-                          filteredTickets.filter(t => t.status === 'in_progress').length :
+                        {(userRole === 'worker' || userRole === 'admin' || userRole === 'requester') && !isPreviewMode ? 
+                          filteredTickets.filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length :
                           escalations.length}
                       </p>
                     </div>
@@ -1336,9 +1336,9 @@ export default function MyDepartment() {
                             <div className="p-2 bg-purple-100 rounded-lg">
                               <Flame className="w-5 h-5 text-purple-600" />
                             </div>
-                            In Progress Tickets
+                            Awaiting Tickets
                             <Badge className="bg-purple-100 text-purple-700 border-purple-300 ml-2">
-                              {filteredTickets.filter(t => t.status === 'in_progress').length}
+                              {filteredTickets.filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length}
                             </Badge>
                           </CardTitle>
                           <Button 
@@ -1353,7 +1353,7 @@ export default function MyDepartment() {
                       <CardContent className="pt-0">
                         <div className="space-y-2 max-h-96 overflow-y-auto">
                           {filteredTickets
-                            .filter(t => t.status === 'in_progress')
+                            .filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status))
                             .sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))
                             .slice(0, 15)
                             .map((ticket) => (
@@ -1377,19 +1377,20 @@ export default function MyDepartment() {
                                       </>
                                     )}
                                     <Badge className={`text-xs ${
-                                      ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                      ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-yellow-100 text-yellow-700'
+                                      ticket.status === 'awaiting_information' ? 'bg-yellow-100 text-yellow-700' :
+                                      ticket.status === 'awaiting_parts' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-purple-100 text-purple-700'
                                     }`}>
-                                      {ticket.priority}
+                                      {ticket.status === 'awaiting_information' ? 'Awaiting Info' :
+                                       ticket.status === 'awaiting_parts' ? 'Awaiting Parts' : 'In Progress'}
                                     </Badge>
                                   </div>
                                 </div>
                               </div>
                             </div>
                           ))}
-                          {filteredTickets.filter(t => t.status === 'in_progress').length === 0 && (
-                            <p className="text-center text-slate-500 py-4 text-sm">No in-progress tickets</p>
+                          {filteredTickets.filter(t => ['in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length === 0 && (
+                            <p className="text-center text-slate-500 py-4 text-sm">No awaiting tickets</p>
                           )}
                         </div>
                       </CardContent>
