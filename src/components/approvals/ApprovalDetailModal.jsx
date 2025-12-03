@@ -97,10 +97,24 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
     try {
       console.log('🔍 Approving from modal:', approval.request_id);
       
-      const response = await base44.functions.invoke('approveResourceRequest', {
+      // Build payload with door code info if selected
+      const payload = {
         request_id: approval.request_id,
-        action: 'approve'
-      });
+        action: 'approve',
+        event_id: approval.event_id,
+        event_name: approval.event_name,
+        event_date: approval.event_starts_at
+      };
+      
+      // Include door code if a cardholder was selected
+      if (selectedCardholder?.pin) {
+        payload.door_code = `${selectedCardholder.pin}#`;
+        payload.access_time = approval.event_starts_at && approval.event_ends_at
+          ? `${format(new Date(approval.event_starts_at), 'h:mm a')} - ${format(new Date(approval.event_ends_at), 'h:mm a')}`
+          : '';
+      }
+      
+      const response = await base44.functions.invoke('approveResourceRequest', payload);
 
       if (response.data?.ok) {
         toast.success('Request approved successfully!');
