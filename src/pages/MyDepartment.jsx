@@ -1252,17 +1252,17 @@ export default function MyDepartment() {
                                         if (!file) return;
                                         try {
                                           const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                                          const newAttachments = [...(task.attachments || []), { name: file.name, url: file_url }];
+                                          await base44.entities.RoutineTask.update(task.id, {
+                                            attachments: newAttachments
+                                          });
                                           const updatedRoutineTasks = routineTasks.map(t => {
                                             if (t.id === task.id) {
-                                              return {
-                                                ...t,
-                                                attachments: [...(t.attachments || []), { name: file.name, url: file_url }]
-                                              };
+                                              return { ...t, attachments: newAttachments };
                                             }
                                             return t;
                                           });
                                           setRoutineTasks(updatedRoutineTasks);
-                                          localStorage.setItem('routineTasks', JSON.stringify(updatedRoutineTasks));
                                           toast.success('File attached');
                                         } catch (error) {
                                           toast.error('Failed to upload file');
