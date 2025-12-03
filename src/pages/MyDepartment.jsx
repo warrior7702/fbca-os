@@ -196,7 +196,9 @@ export default function MyDepartment() {
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
   const [showDeptTasks, setShowDeptTasks] = useState(false);
   const [showRoutineTasks, setShowRoutineTasks] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
   const [projectsCount, setProjectsCount] = useState(0);
+  const [projects, setProjects] = useState([]);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -245,7 +247,9 @@ export default function MyDepartment() {
       // Load projects count
       const primaryDept = userDepartments[0] || 'General';
       const projectsData = await base44.entities.DeptProject.filter({ department: primaryDept }).catch(() => []);
-      setProjectsCount(projectsData.filter(p => p.status !== 'completed').length);
+      const activeProjects = projectsData.filter(p => p.status !== 'completed');
+      setProjectsCount(activeProjects.length);
+      setProjects(activeProjects);
       
       // Load dept tasks from database
       const dbDeptTasks = await base44.entities.DeptTask.list('-created_date');
@@ -1071,7 +1075,7 @@ export default function MyDepartment() {
 
                 <Card 
                   className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setActiveTab('projects')}
+                  onClick={() => setShowProjects(!showProjects)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -1318,6 +1322,115 @@ export default function MyDepartment() {
                           ))}
                           {routineTasks.length === 0 && (
                             <p className="text-center text-slate-500 py-4 text-sm">No routine tasks configured</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+
+            {/* Projects - Collapsible Section */}
+            {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
+              <AnimatePresence>
+                {showProjects && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card className="border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-violet-800">
+                            <div className="p-2 bg-violet-100 rounded-lg">
+                              <FolderKanban className="w-5 h-5 text-violet-600" />
+                            </div>
+                            Active Projects
+                            <Badge className="bg-violet-100 text-violet-700 border-violet-300 ml-2">
+                              {projects.length}
+                            </Badge>
+                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setActiveTab('projects')}
+                              className="text-xs"
+                            >
+                              Manage Projects
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setShowProjects(false)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {projects.map((project) => (
+                            <div
+                              key={project.id}
+                              className="p-3 bg-white rounded-lg border border-violet-200 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => setActiveTab('projects')}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <FolderKanban className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium text-slate-900 text-sm truncate">{project.title}</p>
+                                      <Badge className={`text-xs ${
+                                        project.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                        project.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-slate-100 text-slate-700'
+                                      }`}>
+                                        {project.priority}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
+                                      <Badge variant="outline" className={`text-xs ${
+                                        project.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-300' :
+                                        project.status === 'on_hold' ? 'bg-yellow-50 text-yellow-700 border-yellow-300' :
+                                        'bg-slate-50 text-slate-700 border-slate-300'
+                                      }`}>
+                                        {project.status?.replace('_', ' ')}
+                                      </Badge>
+                                      {project.target_date && (
+                                        <span className="text-violet-600 font-medium">
+                                          Target {format(new Date(project.target_date), 'MMM d')}
+                                        </span>
+                                      )}
+                                      {project.owner_name && (
+                                        <span>Owner: {project.owner_name}</span>
+                                      )}
+                                    </div>
+                                    {project.description && (
+                                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">{project.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {projects.length === 0 && (
+                            <div className="text-center py-4">
+                              <p className="text-slate-500 text-sm mb-2">No active projects</p>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => setActiveTab('projects')}
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Create Project
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </CardContent>
