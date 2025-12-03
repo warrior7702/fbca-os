@@ -483,7 +483,7 @@ export default function MyDepartment() {
     }));
   };
 
-  const getMonthlyClosedByDept = () => {
+  const getMonthlyActivityByDept = () => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
       const monthStart = startOfMonth(subMonths(new Date(), i));
@@ -496,17 +496,33 @@ export default function MyDepartment() {
     }
     
     return months.map(({ month, start, end }) => {
+      // Count resolved tickets
       const monthTickets = tickets.filter(t => {
         if (!t.resolved_at) return false;
         const resolvedDate = new Date(t.resolved_at);
         return isAfter(resolvedDate, start) && isBefore(resolvedDate, end);
       });
       
+      // Count completed dept tasks
+      const completedDeptTasks = deptTasks.filter(t => {
+        if (!t.completed) return false;
+        const completedDate = t.completedAt ? new Date(t.completedAt) : null;
+        if (!completedDate) return false;
+        return isAfter(completedDate, start) && isBefore(completedDate, end);
+      });
+      
+      // Count completed routine tasks (by lastCompletedAt)
+      const completedRoutineTasks = routineTasks.filter(t => {
+        if (!t.lastCompletedAt) return false;
+        const completedDate = new Date(t.lastCompletedAt);
+        return isAfter(completedDate, start) && isBefore(completedDate, end);
+      });
+      
       return {
         month,
-        IT: monthTickets.filter(t => getDepartment(t.category) === 'it').length,
-        Facilities: monthTickets.filter(t => getDepartment(t.category) === 'facilities').length,
-        Communications: monthTickets.filter(t => getDepartment(t.category) === 'comms').length
+        Tickets: monthTickets.length,
+        'Dept Tasks': completedDeptTasks.length,
+        'Routine Tasks': completedRoutineTasks.length
       };
     });
   };
