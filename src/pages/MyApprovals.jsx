@@ -50,7 +50,7 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
           <ApprovalCalendar
             approvals={approvals}
             onApprovalClick={(approval) => {
-              window.open(`https://calendar.planningcenteronline.com/events/${approval.event_id}`, '_blank');
+              window.open('https://calendar.planningcenteronline.com/approvals', '_blank');
             }}
           />
         </div>
@@ -720,7 +720,7 @@ export default function MyApprovals() {
                                   {postedCode ? 'Code Already Posted' : 'Send to PCO'}
                                 </Button>
                                 <Button
-                                  onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${approval.event_id}/approvals`, '_blank')}
+                                  onClick={() => window.open('https://calendar.planningcenteronline.com/approvals', '_blank')}
                                   variant="outline"
                                 >
                                   <ExternalLink className="w-4 h-4 mr-2" />
@@ -810,7 +810,7 @@ export default function MyApprovals() {
 
                               <div className="pt-2">
                                 <Button
-                                  onClick={() => window.open(`https://calendar.planningcenteronline.com/calendar/${eventGroup.event_id}/approvals`, '_blank')}
+                                  onClick={() => window.open('https://calendar.planningcenteronline.com/approvals', '_blank')}
                                   variant="outline"
                                   className="w-full"
                                 >
