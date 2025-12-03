@@ -341,16 +341,53 @@ export default function BackfillEventCodes() {
                       <label className="text-xs font-medium text-slate-700 mb-1 block">
                         Door Code
                       </label>
-                      <Input
-                        placeholder="e.g., 123456 or Unlock"
-                        value={editingDoorCode[event.event_id] ?? event.posted_door_code ?? ''}
-                        onChange={(e) => setEditingDoorCode(prev => ({
-                          ...prev,
-                          [event.event_id]: e.target.value
-                        }))}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g., 123456 or Unlock"
+                          value={editingDoorCode[event.event_id] ?? event.posted_door_code ?? ''}
+                          onChange={(e) => setEditingDoorCode(prev => ({
+                            ...prev,
+                            [event.event_id]: e.target.value
+                          }))}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowCardholderLookup(prev => ({
+                            ...prev,
+                            [event.event_id]: !prev[event.event_id]
+                          }))}
+                          title="Lookup cardholder"
+                        >
+                          <User className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
+
+                  {showCardholderLookup[event.event_id] && (
+                    <div className="border rounded-lg p-3 bg-white">
+                      <CardholderLookup
+                        eventName={event.name}
+                        resourceName={event.resources?.[0]?.name}
+                        onSelect={(cardholder) => {
+                          if (cardholder?.pin) {
+                            setEditingDoorCode(prev => ({
+                              ...prev,
+                              [event.event_id]: `${cardholder.pin}#`
+                            }));
+                            setShowCardholderLookup(prev => ({
+                              ...prev,
+                              [event.event_id]: false
+                            }));
+                            toast.success(`Selected: ${cardholder.name} (${cardholder.pin}#)`);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
 
                   <Button
                     onClick={() => saveEventCode(event)}
