@@ -205,10 +205,16 @@ export default function MyDepartment() {
   };
 
   useEffect(() => {
-    loadData();
-    loadDeptTasks();
-    loadPcoFacilitiesEvents();
+    loadDeptTasks(); // Sync - from localStorage, instant
+    loadData(); // Async - main data
   }, []);
+
+  // Lazy load PCO events only when Room Flow tab is selected
+  useEffect(() => {
+    if (activeTab === 'roomflow' && pcoEvents.length === 0 && !loadingPcoEvents) {
+      loadPcoFacilitiesEvents();
+    }
+  }, [activeTab]);
 
   // Refresh dept tasks when page becomes visible
   useEffect(() => {
@@ -287,27 +293,21 @@ export default function MyDepartment() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const currentUser = await base44.auth.me();
+      // Load user and tickets in parallel for faster initial load
+      const [currentUser, allTickets] = await Promise.all([
+        base44.auth.me(),
+        base44.entities.Ticket.list('-created_date', 100) // Limit to recent 100 tickets
+      ]);
+      
       setUser(currentUser);
-
-      // Fetch user's role and departments from security groups
-      const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
-      if (rolesResponse.data.success) {
-        const userData = rolesResponse.data.allUsers.find(u => 
-          u.user_email === currentUser.email
-        );
-        
-        if (userData) {
-          setUserRole(userData.ticket_role);
-          setUserDepartments(userData.departments || []);
-        }
-        
-        // Get workers for user's departments
-        const workers = rolesResponse.data.allUsers.filter(u => 
-          u.ticket_role === 'worker' || u.ticket_role === 'admin'
-        );
-        setDepartmentWorkers(workers);
-      }
+      setTickets(allTickets);
+      
+      // Get unassigned tickets
+      const unassigned = allTickets.filter(t => 
+        !t.assigned_to && 
+        ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)
+      );
+      setUnassignedTickets(unassigned);
 
       // Only show operations dashboard (preview mode) for Andy or super_user
       const isOperationsManager = currentUser.email?.toLowerCase().includes('andy') || 
@@ -317,15 +317,26 @@ export default function MyDepartment() {
         setIsPreviewMode(true);
       }
 
-      const allTickets = await base44.entities.Ticket.list('-created_date');
-      setTickets(allTickets);
-      
-      // Get unassigned tickets
-      const unassigned = allTickets.filter(t => 
-        !t.assigned_to && 
-        ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)
-      );
-      setUnassignedTickets(unassigned);
+      // Load roles in background (non-blocking for initial render)
+      base44.functions.invoke('getUsersWithTicketRoles').then(rolesResponse => {
+        if (rolesResponse.data?.success) {
+          const userData = rolesResponse.data.allUsers.find(u => 
+            u.user_email === currentUser.email
+          );
+          
+          if (userData) {
+            setUserRole(userData.ticket_role);
+            setUserDepartments(userData.departments || []);
+          }
+          
+          // Get workers for user's departments
+          const workers = rolesResponse.data.allUsers.filter(u => 
+            u.ticket_role === 'worker' || u.ticket_role === 'admin'
+          );
+          setDepartmentWorkers(workers);
+        }
+      }).catch(err => console.error('Error loading roles:', err));
+
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load department data');
