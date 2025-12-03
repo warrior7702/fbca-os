@@ -175,7 +175,7 @@ export default function ToolboxPopover() {
           </TabsContent>
 
           {/* Calculator */}
-          <TabsContent value="calc" className="space-y-2">
+          <TabsContent value="calc" className="space-y-2" onKeyDown={handleKeyDown} tabIndex={0}>
             <div className="bg-slate-900 text-white text-right p-3 rounded-lg font-mono text-xl overflow-x-auto">
               {calcDisplay}
             </div>
