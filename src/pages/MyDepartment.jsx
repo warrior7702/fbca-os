@@ -922,10 +922,7 @@ export default function MyDepartment() {
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <Card 
                   className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => {
-                    setShowDeptTasks(!showDeptTasks);
-                    setShowRoutineTasks(false);
-                  }}
+                  onClick={() => setShowDeptTasks(!showDeptTasks)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -943,10 +940,7 @@ export default function MyDepartment() {
 
                 <Card 
                   className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => {
-                    setShowRoutineTasks(!showRoutineTasks);
-                    setShowDeptTasks(false);
-                  }}
+                  onClick={() => setShowRoutineTasks(!showRoutineTasks)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -1228,8 +1222,6 @@ export default function MyDepartment() {
                 onClick={() => {
                   if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowOpenTickets(!showOpenTickets);
-                    setShowInProgressTickets(false);
-                    setShowResolvedTickets(false);
                   }
                 }}
               >
@@ -1255,8 +1247,6 @@ export default function MyDepartment() {
                 onClick={() => {
                   if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowInProgressTickets(!showInProgressTickets);
-                    setShowOpenTickets(false);
-                    setShowResolvedTickets(false);
                   }
                 }}
               >
@@ -1285,8 +1275,6 @@ export default function MyDepartment() {
                 onClick={() => {
                   if ((userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode) {
                     setShowResolvedTickets(!showResolvedTickets);
-                    setShowOpenTickets(false);
-                    setShowInProgressTickets(false);
                   }
                 }}
               >
