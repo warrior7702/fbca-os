@@ -2229,10 +2229,7 @@ export default function MyDepartment() {
                             <SelectValue placeholder="Assign to..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {departmentWorkers.filter(w => {
-                              const workerDepts = w.departments || [];
-                              return userDepartments.some(d => workerDepts.includes(d)) || isPreviewMode;
-                            }).map((worker) => (
+                            {departmentWorkers.map((worker) => (
                               <SelectItem key={worker.user_email} value={worker.user_email}>
                                 {worker.user_name || worker.user_email}
                               </SelectItem>
