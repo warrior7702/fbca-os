@@ -32,6 +32,7 @@ export default function BackfillEventCodes() {
   const [editingAccessTime, setEditingAccessTime] = useState({});
   const [editingDoorCode, setEditingDoorCode] = useState({});
   const [localCodes, setLocalCodes] = useState({});
+  const [showCardholderLookup, setShowCardholderLookup] = useState({});
 
   useEffect(() => {
     loadData();
