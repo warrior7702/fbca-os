@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Search,
-  Save
+  Save,
+  User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
+import CardholderLookup from "@/components/approvals/CardholderLookup";
 
 export default function BackfillEventCodes() {
   const navigate = useNavigate();
