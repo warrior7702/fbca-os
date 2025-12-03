@@ -2356,31 +2356,44 @@ export default function MyDepartment() {
                           try {
                             const worker = departmentWorkers.find(w => w.user_email === newTaskAssignee);
                             const worker2 = newTaskAssignee2 ? departmentWorkers.find(w => w.user_email === newTaskAssignee2) : null;
-                            const newTask = {
-                              id: Date.now().toString(),
+                            
+                            const created = await base44.entities.DeptTask.create({
                               title: newTaskTitle,
                               details: newTaskDetails,
                               assignee: newTaskAssignee,
-                              assigneeName: worker?.user_name || newTaskAssignee,
+                              assignee_name: worker?.user_name || newTaskAssignee,
                               assignee2: newTaskAssignee2 || null,
-                              assignee2Name: worker2?.user_name || newTaskAssignee2 || null,
-                              dueDate: newTaskDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+                              assignee2_name: worker2?.user_name || null,
+                              due_date: newTaskDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
                               completed: false,
+                              department: userDepartments[0] || null
+                            });
+                            
+                            const newTask = {
+                              id: created.id,
+                              title: created.title,
+                              details: created.details,
+                              assignee: created.assignee,
+                              assigneeName: created.assignee_name,
+                              assignee2: created.assignee2,
+                              assignee2Name: created.assignee2_name,
+                              dueDate: created.due_date,
+                              completed: false,
+                              department: created.department,
                               createdBy: user?.full_name || user?.email,
-                              createdAt: new Date().toISOString()
+                              createdAt: created.created_date
                             };
-                            const updatedTasks = [...deptTasks, newTask];
-                            setDeptTasks(updatedTasks);
-                            localStorage.setItem('deptTasks', JSON.stringify(updatedTasks));
+                            setDeptTasks([...deptTasks, newTask]);
                             toast.success('Task created!');
                             setNewTaskTitle("");
                             setNewTaskAssignee("");
                             setNewTaskAssignee2("");
                             setNewTaskDueDate("");
                             setNewTaskDetails("");
-                            setAddingTask(false);
                           } catch (error) {
+                            console.error('Error creating task:', error);
                             toast.error('Failed to create task');
+                          } finally {
                             setAddingTask(false);
                           }
                         }}
