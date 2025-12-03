@@ -267,8 +267,16 @@ export default function MyDepartment() {
       }));
       setDeptTasks(mappedDeptTasks);
       
-      // Load routine tasks from database
-      const dbRoutineTasks = await base44.entities.RoutineTask.list('-created_date');
+      // Load routine tasks from database - filter by department
+      const allRoutineTasks = await base44.entities.RoutineTask.list('-created_date');
+      const dbRoutineTasks = allRoutineTasks.filter(t => {
+        // Filter by department if set, or show all if user is in preview mode
+        if (!t.department) return true; // Tasks without department show everywhere
+        return userDepartments.some(d => 
+          d.toLowerCase() === t.department?.toLowerCase() ||
+          d.toLowerCase().replace(' ', '_') === t.department?.toLowerCase()
+        );
+      });
       const mappedRoutineTasks = dbRoutineTasks.map(t => ({
         id: t.id,
         title: t.title,
