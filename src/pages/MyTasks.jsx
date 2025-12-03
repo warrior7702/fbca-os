@@ -896,23 +896,28 @@ export default function MyTasks() {
         isOpen={showDeptTaskDetail}
         onClose={() => setShowDeptTaskDetail(false)}
         workers={[]}
-        onUpdate={(updatedTask) => {
-          const storedTasks = localStorage.getItem('deptTasks');
-          if (storedTasks) {
-            const allTasks = JSON.parse(storedTasks);
-            const updated = allTasks.map(t => t.id === updatedTask.id ? updatedTask : t);
-            localStorage.setItem('deptTasks', JSON.stringify(updated));
-            setDeptTasks(updated.filter(t => t.assignee === user?.email && !t.completed));
+        onUpdate={async (updatedTask) => {
+          try {
+            await base44.entities.DeptTask.update(updatedTask.id, {
+              title: updatedTask.title,
+              details: updatedTask.details,
+              assignee: updatedTask.assignee,
+              assignee_name: updatedTask.assigneeName,
+              due_date: updatedTask.dueDate,
+              completed: updatedTask.completed
+            });
+            setDeptTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t).filter(t => !t.completed));
+            setShowDeptTaskDetail(false);
+          } catch (error) {
+            toast.error('Failed to update task');
           }
-          setShowDeptTaskDetail(false);
         }}
-        onDelete={(taskId) => {
-          const storedTasks = localStorage.getItem('deptTasks');
-          if (storedTasks) {
-            const allTasks = JSON.parse(storedTasks);
-            const updated = allTasks.filter(t => t.id !== taskId);
-            localStorage.setItem('deptTasks', JSON.stringify(updated));
-            setDeptTasks(updated.filter(t => t.assignee === user?.email && !t.completed));
+        onDelete={async (taskId) => {
+          try {
+            await base44.entities.DeptTask.delete(taskId);
+            setDeptTasks(prev => prev.filter(t => t.id !== taskId));
+          } catch (error) {
+            toast.error('Failed to delete task');
           }
         }}
       />
