@@ -237,28 +237,50 @@ export default function MyDepartment() {
     };
   }, []);
 
-  const loadDeptTasks = () => {
-    const storedDeptTasks = localStorage.getItem('deptTasks');
-    if (storedDeptTasks) {
-      try {
-        const tasks = JSON.parse(storedDeptTasks);
-        console.log('Loaded dept tasks:', tasks);
-        setDeptTasks(tasks);
-      } catch (e) {
-        console.error('Error loading dept tasks:', e);
-      }
-    }
-    
-    // Also load routine tasks
-    const storedRoutineTasks = localStorage.getItem('routineTasks');
-    if (storedRoutineTasks) {
-      try {
-        const tasks = JSON.parse(storedRoutineTasks);
-        console.log('Loaded routine tasks:', tasks);
-        setRoutineTasks(tasks);
-      } catch (e) {
-        console.error('Error loading routine tasks:', e);
-      }
+  const loadDeptTasks = async () => {
+    try {
+      // Load dept tasks from database
+      const dbDeptTasks = await base44.entities.DeptTask.list('-created_date');
+      const mappedDeptTasks = dbDeptTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        details: t.details,
+        assignee: t.assignee,
+        assigneeName: t.assignee_name,
+        assignee2: t.assignee2,
+        assignee2Name: t.assignee2_name,
+        dueDate: t.due_date,
+        completed: t.completed,
+        completedAt: t.completed_at,
+        completedBy: t.completed_by,
+        department: t.department,
+        createdBy: t.created_by,
+        createdAt: t.created_date
+      }));
+      setDeptTasks(mappedDeptTasks);
+      
+      // Load routine tasks from database
+      const dbRoutineTasks = await base44.entities.RoutineTask.list('-created_date');
+      const mappedRoutineTasks = dbRoutineTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        frequency: t.frequency,
+        assignee: t.assignee,
+        assigneeName: t.assignee_name,
+        assignee2: t.assignee2,
+        assignee2Name: t.assignee2_name,
+        nextDueDate: t.next_due_date,
+        dueDate: t.next_due_date,
+        lastCompletedAt: t.last_completed_at,
+        lastCompletedBy: t.last_completed_by,
+        department: t.department,
+        attachments: t.attachments || [],
+        type: 'routine'
+      }));
+      setRoutineTasks(mappedRoutineTasks);
+    } catch (e) {
+      console.error('Error loading tasks from database:', e);
     }
   };
 
