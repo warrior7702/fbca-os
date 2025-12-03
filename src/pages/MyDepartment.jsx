@@ -191,6 +191,7 @@ export default function MyDepartment() {
   const [selectedRoutineTask, setSelectedRoutineTask] = useState(null);
   const [pcoEvents, setPcoEvents] = useState([]);
   const [loadingPcoEvents, setLoadingPcoEvents] = useState(false);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
   const [showResolvedTickets, setShowResolvedTickets] = useState(false);
   const [showOpenTickets, setShowOpenTickets] = useState(false);
   const [showInProgressTickets, setShowInProgressTickets] = useState(false);
