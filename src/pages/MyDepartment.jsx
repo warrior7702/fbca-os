@@ -241,10 +241,11 @@ export default function MyDepartment() {
     };
   }, []);
 
-  const loadDeptTasks = async () => {
+  const loadDeptTasks = async (depts) => {
+    const departments = depts || userDepartments;
     try {
       // Load projects count
-      const primaryDept = userDepartments[0] || 'General';
+      const primaryDept = departments[0] || 'General';
       const projectsData = await base44.entities.DeptProject.filter({ department: primaryDept }).catch(() => []);
       const activeProjects = projectsData.filter(p => p.status !== 'completed');
       setProjectsCount(activeProjects.length);
@@ -275,7 +276,7 @@ export default function MyDepartment() {
       const dbRoutineTasks = allRoutineTasks.filter(t => {
         // Filter by department if set, or show all if user is in preview mode
         if (!t.department) return true; // Tasks without department show everywhere
-        return userDepartments.some(d => 
+        return departments.some(d => 
           d.toLowerCase() === t.department?.toLowerCase() ||
           d.toLowerCase().replace(' ', '_') === t.department?.toLowerCase()
         );
