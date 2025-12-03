@@ -214,7 +214,7 @@ export default function DeptTaskDetailModal({
                   <Button 
                     size="sm" 
                     onClick={() => {
-                      onUpdate({ ...task, completed: true });
+                      onUpdate({ ...task, completed: true, completedAt: new Date().toISOString() });
                       onClose();
                       toast.success('Task completed!');
                     }}
