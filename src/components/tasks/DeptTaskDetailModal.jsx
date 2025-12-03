@@ -206,9 +206,25 @@ export default function DeptTaskDetailModal({
                 </Button>
               </>
             ) : (
-              <Button size="sm" onClick={() => setIsEditing(true)}>
-                Edit Task
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                  Edit Task
+                </Button>
+                {!task.completed && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      onUpdate({ ...task, completed: true });
+                      onClose();
+                      toast.success('Task completed!');
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                    Complete
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>

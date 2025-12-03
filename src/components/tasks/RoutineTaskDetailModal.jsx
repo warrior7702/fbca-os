@@ -313,9 +313,50 @@ export default function RoutineTaskDetailModal({
                 </Button>
               </>
             ) : (
-              <Button size="sm" onClick={() => setIsEditing(true)}>
-                Edit Task
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                  Edit Task
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    // Calculate next due date based on frequency
+                    const currentDue = new Date((task.nextDueDate || task.dueDate) + 'T12:00:00');
+                    let nextDue = new Date(currentDue);
+
+                    switch(task.frequency) {
+                      case 'daily':
+                        nextDue.setDate(nextDue.getDate() + 1);
+                        break;
+                      case 'weekly':
+                        nextDue.setDate(nextDue.getDate() + 7);
+                        break;
+                      case 'monthly':
+                        nextDue.setMonth(nextDue.getMonth() + 1);
+                        break;
+                      case 'quarterly':
+                        nextDue.setMonth(nextDue.getMonth() + 3);
+                        break;
+                      default:
+                        nextDue.setMonth(nextDue.getMonth() + 1);
+                    }
+
+                    const nextDueDateStr = nextDue.toISOString().split('T')[0];
+                    onUpdate({ 
+                      ...task, 
+                      nextDueDate: nextDueDateStr,
+                      dueDate: nextDueDateStr,
+                      lastCompletedAt: new Date().toISOString()
+                    });
+                    onClose();
+                    toast.success(`Task completed! Next due: ${nextDue.toLocaleDateString()}`);
+                  }}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <RepeatIcon className="w-4 h-4 mr-1" />
+                  Complete & Repeat
+                </Button>
+              </>
             )}
           </div>
         </div>
