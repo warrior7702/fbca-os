@@ -1087,21 +1087,68 @@ export default function MyDepartment() {
                           {routineTasks.map((task) => (
                             <div
                               key={task.id}
-                              className="p-3 bg-white rounded-lg border border-indigo-200 hover:shadow-md transition-all flex items-center justify-between"
+                              className="p-3 bg-white rounded-lg border border-indigo-200 hover:shadow-md transition-all"
                             >
-                              <div className="flex items-center gap-3">
-                                <RepeatIcon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                  {getInitials(task.assigneeName)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                                    <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
-                                      {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
-                                    </Badge>
-                                    <span>{task.assigneeName || 'Unassigned'}</span>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <RepeatIcon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                    {getInitials(task.assigneeName)}
                                   </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                      <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
+                                        {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
+                                      </Badge>
+                                      <span>{task.assigneeName || 'Unassigned'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Attachments Section */}
+                              <div className="mt-2 pt-2 border-t border-indigo-100">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {(task.attachments || []).map((attachment, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={attachment.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-indigo-100"
+                                    >
+                                      <Folder className="w-3 h-3" />
+                                      {attachment.name || `File ${idx + 1}`}
+                                    </a>
+                                  ))}
+                                  <label className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded flex items-center gap-1 hover:bg-slate-200 cursor-pointer">
+                                    <Plus className="w-3 h-3" />
+                                    Add File
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        try {
+                                          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                                          const updatedRoutineTasks = routineTasks.map(t => {
+                                            if (t.id === task.id) {
+                                              return {
+                                                ...t,
+                                                attachments: [...(t.attachments || []), { name: file.name, url: file_url }]
+                                              };
+                                            }
+                                            return t;
+                                          });
+                                          setRoutineTasks(updatedRoutineTasks);
+                                          toast.success('File attached');
+                                        } catch (error) {
+                                          toast.error('Failed to upload file');
+                                        }
+                                      }}
+                                    />
+                                  </label>
                                 </div>
                               </div>
                             </div>
