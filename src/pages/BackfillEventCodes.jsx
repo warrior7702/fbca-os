@@ -367,27 +367,26 @@ export default function BackfillEventCodes() {
                     </div>
                   </div>
 
-                  {showCardholderLookup[event.event_id] && (
-                    <div className="border rounded-lg p-3 bg-white">
-                      <CardholderLookup
-                        eventName={event.name}
-                        resourceName={event.resources?.[0]?.name}
-                        onSelect={(cardholder) => {
-                          if (cardholder?.pin) {
-                            setEditingDoorCode(prev => ({
-                              ...prev,
-                              [event.event_id]: `${cardholder.pin}#`
-                            }));
-                            setShowCardholderLookup(prev => ({
-                              ...prev,
-                              [event.event_id]: false
-                            }));
-                            toast.success(`Selected: ${cardholder.name} (${cardholder.pin}#)`);
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
+                  <CardholderLookup
+                    isOpen={showCardholderLookup[event.event_id] || false}
+                    onClose={() => setShowCardholderLookup(prev => ({
+                      ...prev,
+                      [event.event_id]: false
+                    }))}
+                    onSelect={(cardholder) => {
+                      if (cardholder?.pin) {
+                        setEditingDoorCode(prev => ({
+                          ...prev,
+                          [event.event_id]: `${cardholder.pin}#`
+                        }));
+                        setShowCardholderLookup(prev => ({
+                          ...prev,
+                          [event.event_id]: false
+                        }));
+                        toast.success(`Selected: ${cardholder.name} (${cardholder.pin}#)`);
+                      }
+                    }}
+                  />
 
                   <Button
                     onClick={() => saveEventCode(event)}
