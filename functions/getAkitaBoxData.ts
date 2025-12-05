@@ -40,23 +40,25 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
     
+    // Try AKITA_COOKIE first, fall back to AKITABOX_JWT
+    const cookie = Deno.env.get('AKITA_COOKIE');
     const jwt = Deno.env.get('AKITABOX_JWT');
 
-    if (!jwt) {
-      console.error('AKITABOX_JWT not found in environment');
+    if (!cookie && !jwt) {
+      console.error('No AkitaBox credentials found');
       return Response.json({ 
         success: false,
-        error: 'AkitaBox JWT not configured',
-        details: 'Please add AKITABOX_JWT secret in Settings'
+        error: 'AkitaBox credentials not configured',
+        details: 'Please add AKITA_COOKIE or AKITABOX_JWT secret in Settings'
       }, { status: 500 });
     }
 
-    console.log('🔑 JWT exists, length:', jwt.length);
-    console.log('🔑 JWT preview:', jwt.substring(0, 30) + '...');
+    // Use cookie directly if available, otherwise construct from JWT
+    const cookieValue = cookie || `abx_jwt=${jwt}`;
+    console.log('🔑 Using cookie auth, length:', cookieValue.length);
 
-    // Try Cookie authentication (original method)
     const headers = {
-      'Cookie': `abx_jwt=${jwt}`,
+      'Cookie': cookieValue,
       'Accept': 'application/json',
       'Origin': 'https://fbca.akitabox.com'
     };
