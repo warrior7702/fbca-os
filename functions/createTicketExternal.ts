@@ -20,6 +20,10 @@ Deno.serve(async (req) => {
         // Format: [{ name: "file.png", url: "https://..." }]
         // Also supports base64: [{ name: "file.png", base64: "data:image/png;base64,..." }]
         const rawAttachments = body.attachments || [];
+        
+        // Teams conversation data for 2-way messaging
+        const teamsConversationId = body.teams_conversation_id || body.teamsConversationId;
+        const teamsServiceUrl = body.teams_service_url || body.teamsServiceUrl;
 
         // Find requester if email provided
         let requester = null;
@@ -86,7 +90,9 @@ Deno.serve(async (req) => {
             status: 'open',
             priority: priority,
             source: source,
-            attachments: processedAttachments.length > 0 ? processedAttachments : []
+            attachments: processedAttachments.length > 0 ? processedAttachments : [],
+            teams_conversation_id: teamsConversationId || null,
+            teams_service_url: teamsServiceUrl || null
         });
 
         return Response.json({ 
