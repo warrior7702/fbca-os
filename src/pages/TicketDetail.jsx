@@ -201,6 +201,20 @@ export default function TicketDetail() {
       setNewComment("");
       toast.success('Comment added');
 
+      // Send Teams message if this ticket came from Teams and comment is not internal
+      if (!isInternalComment && ticket.teams_conversation_id && ticket.teams_service_url) {
+        try {
+          await base44.functions.invoke('sendTeamsMessage', {
+            ticket_id: ticketId,
+            message: newComment.trim()
+          });
+          toast.success('Message sent to Teams');
+        } catch (teamsError) {
+          console.warn('Teams notification failed:', teamsError);
+          // Don't show error - the comment was still added
+        }
+      }
+
       // Send notifications
       if (!isInternalComment) {
         // Notify requester about comment
