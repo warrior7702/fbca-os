@@ -86,15 +86,20 @@ export default function AkitaFetch() {
         type: 'buildings'
       });
       
+      console.log('Buildings response:', response.data);
+      
       if (response.data?.success && response.data?.data?.buildings) {
         setBuildings(response.data.data.buildings);
+      } else if (response.data?.error) {
+        throw new Error(response.data.error + (response.data.details ? `\n${response.data.details}` : ''));
       } else {
-        throw new Error('Failed to load buildings');
+        throw new Error('Failed to load buildings - invalid response');
       }
     } catch (err) {
       console.error('Error loading buildings:', err);
-      setError(err.message);
-      toast.error('Failed to load buildings');
+      const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
+      setError(errorMsg);
+      toast.error('AkitaBox connection failed - cookie may be expired');
     } finally {
       setLoading(false);
     }
