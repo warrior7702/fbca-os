@@ -126,7 +126,7 @@ export default function AkitaFetch() {
   const loadRoomsAndAssets = async (buildingId, levelId) => {
     setLoading(true);
     try {
-      const [roomsResponse, assetsResponse] = await Promise.all([
+      const [roomsResponse, assetsResponse, pinsResponse] = await Promise.all([
         base44.functions.invoke('getAkitaBoxData', {
           type: 'rooms',
           buildingId,
@@ -136,6 +136,9 @@ export default function AkitaFetch() {
           type: 'assets',
           buildingId,
           levelId
+        }),
+        base44.functions.invoke('getAssetPins', {
+          levelId
         })
       ]);
 
@@ -143,20 +146,33 @@ export default function AkitaFetch() {
         setRooms(roomsResponse.data.data.rooms);
       }
 
+      // Build pin map
+      const pinMap = new Map();
+      if (pinsResponse.data?.success && pinsResponse.data?.pins) {
+        pinsResponse.data.pins.forEach(pin => {
+          pinMap.set(pin.asset_id, pin);
+        });
+      }
+
       if (assetsResponse.data?.success && assetsResponse.data?.data?.assets) {
-        const assetsData = assetsResponse.data.data.assets.map(asset => ({
-          id: asset._id || asset.id,
-          name: asset.name || asset.displayName || 'Unnamed Asset',
-          group: asset.pinType?.name || asset.asset_group || null,
-          buildingId,
-          levelId,
-          roomId: asset.room?._id || null,
-          fields: asset.values || {},
-          floorplan: {
-            x: asset.percentX || null,
-            y: asset.percentY || null
-          }
-        }));
+        const assetsData = assetsResponse.data.data.assets.map(asset => {
+          const assetId = asset._id || asset.id;
+          const savedPin = pinMap.get(assetId);
+          
+          return {
+            id: assetId,
+            name: asset.name || asset.displayName || 'Unnamed Asset',
+            group: asset.pinType?.name || asset.asset_group || null,
+            buildingId,
+            levelId,
+            roomId: asset.room?._id || null,
+            fields: asset.values || {},
+            floorplan: {
+              x: savedPin?.x ?? asset.percentX ?? null,
+              y: savedPin?.y ?? asset.percentY ?? null
+            }
+          };
+        });
         setAssets(assetsData);
       }
     } catch (err) {
