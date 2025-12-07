@@ -171,26 +171,14 @@ export default function AkitaFetch() {
     if (!editMode || !selectedAsset) return;
 
     try {
-      // Save pin location to Base44
-      const existingPins = await base44.entities.AkitaPin.filter({
-        asset_id: selectedAsset.id,
-        level_id: selectedFloor.id
-      });
-
-      const pinData = {
-        asset_id: selectedAsset.id,
-        level_id: selectedFloor.id,
-        document_id: selectedFloor.document?.id || null,
+      // Save pin location using backend function
+      await base44.functions.invoke('updateAssetPin', {
+        assetId: selectedAsset.id,
+        levelId: selectedFloor._id,
+        documentId: selectedFloor.document?.id || null,
         x,
-        y,
-        updated_by: (await base44.auth.me()).id
-      };
-
-      if (existingPins.length > 0) {
-        await base44.entities.AkitaPin.update(existingPins[0].id, pinData);
-      } else {
-        await base44.entities.AkitaPin.create(pinData);
-      }
+        y
+      });
 
       // Update local state
       setAssets(prev => prev.map(a => 
