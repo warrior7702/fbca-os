@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
     
-    // Try AKITA_COOKIE first, fall back to AKITABOX_JWT
+    // Prioritize AKITA_COOKIE since it's already set
     const cookie = Deno.env.get('AKITA_COOKIE');
     const jwt = Deno.env.get('AKITABOX_JWT');
 
@@ -53,9 +53,9 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    // Use cookie directly if available, otherwise construct from JWT
+    // Use cookie directly if available (full cookie string), otherwise use JWT format
     const cookieValue = cookie || `abx_jwt=${jwt}`;
-    console.log('🔑 Using cookie auth, length:', cookieValue.length);
+    console.log('🔑 Using auth, type:', cookie ? 'AKITA_COOKIE' : 'JWT', 'length:', cookieValue.length);
 
     const headers = {
       'Cookie': cookieValue,
