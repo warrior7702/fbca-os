@@ -78,12 +78,20 @@ Deno.serve(async (req) => {
           const errorText = await buildingsResponse.text();
           console.error('❌ Buildings API Error:', buildingsResponse.status, errorText);
           
+          if (buildingsResponse.status === 401) {
+            return Response.json({ 
+              success: false,
+              error: 'AkitaBox cookie expired',
+              details: 'Your AkitaBox authentication cookie has expired. To fix:\n\n1. Log into https://fbca.akitabox.com in your browser\n2. Open Developer Tools (F12)\n3. Go to Application > Cookies\n4. Copy the "abx_jwt" cookie value\n5. Update the AKITA_COOKIE secret in Settings\n\nAlternatively, just paste the JWT token value into AKITABOX_JWT secret.',
+              statusCode: 401
+            }, { status: 500 });
+          }
+          
           return Response.json({ 
             success: false,
             error: `AkitaBox API returned ${buildingsResponse.status}`,
-            details: `Status: ${buildingsResponse.status}\n\nResponse: ${errorText}\n\nThis usually means the JWT token is expired or invalid. Please update AKITABOX_JWT in Settings.`,
-            statusCode: buildingsResponse.status,
-            response: errorText
+            details: errorText,
+            statusCode: buildingsResponse.status
           }, { status: 500 });
         }
         
