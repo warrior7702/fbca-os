@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
           floor_name: floorName,
           building_id: building.id,
           building_name: buildingName,
-          square_feet: row['Square Feet'] || '',
+          square_feet: row['Square Feet'] ? String(row['Square Feet']) : '',
           type: row['Type'] || '',
           floor_type: row['Floor Type'] || '',
           verified: row['Verified'] === 'Verified',
