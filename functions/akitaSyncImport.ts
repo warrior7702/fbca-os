@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
       }
       
       // Delay after every record to avoid rate limiting
-      await delay(1000);
+      await delay(2000);
     }
     }
 
@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
       }
       
       // Delay after every record to avoid rate limiting
-      await delay(1000);
+      await delay(2000);
     }
     }
 
@@ -449,7 +449,7 @@ Deno.serve(async (req) => {
       }
       
       // Delay after every record to avoid rate limiting
-      await delay(1000);
+      await delay(2000);
     }
     }
 
