@@ -101,9 +101,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized - admin only' }, { status: 401 });
     }
 
-    const { floorsFileUrl, roomsFileUrl, assetsFileUrls } = await req.json();
+    const { floorsFileUrl, roomsFileUrl, assetsFileUrls, importMode = 'all' } = await req.json();
 
-    if (!floorsFileUrl || !roomsFileUrl || !assetsFileUrls || assetsFileUrls.length === 0) {
+    // Validate based on import mode
+    if (importMode === 'floors' && !floorsFileUrl) {
+      return Response.json({ error: 'Missing floorsFileUrl' }, { status: 400 });
+    }
+    if (importMode === 'rooms' && !roomsFileUrl) {
+      return Response.json({ error: 'Missing roomsFileUrl' }, { status: 400 });
+    }
+    if (importMode === 'assets' && (!assetsFileUrls || assetsFileUrls.length === 0)) {
+      return Response.json({ error: 'Missing assetsFileUrls' }, { status: 400 });
+    }
+    if (importMode === 'all' && (!floorsFileUrl || !roomsFileUrl || !assetsFileUrls || assetsFileUrls.length === 0)) {
       return Response.json({ 
         error: 'Missing file URLs',
         details: 'Provide floorsFileUrl, roomsFileUrl, and assetsFileUrls (array)'
@@ -124,30 +134,32 @@ Deno.serve(async (req) => {
       errors: []
     };
 
-    // Fetch and parse files
-    console.log('Parsing files (CSV or XLSX)...');
-    const floorsRows = await parseFile(floorsFileUrl);
-    console.log(`✅ Floors parsed: ${floorsRows.length} rows`);
-    
-    const roomsRows = await parseFile(roomsFileUrl);
-    console.log(`✅ Rooms parsed: ${roomsRows.length} rows`);
-    
-    // Parse all asset files and combine
-    console.log(`Parsing ${assetsFileUrls.length} asset file(s)...`);
-    const allAssetsRows = [];
-    for (const assetFileUrl of assetsFileUrls) {
-      const assetRows = await parseFile(assetFileUrl);
-      console.log(`✅ Asset file parsed: ${assetRows.length} rows`);
-      allAssetsRows.push(...assetRows);
+    // Fetch and parse files based on import mode
+    console.log(`Import mode: ${importMode}`);
+    let floorsRows = [];
+    let roomsRows = [];
+    let allAssetsRows = [];
+
+    if (importMode === 'floors' || importMode === 'all') {
+      console.log('Parsing floors file...');
+      floorsRows = await parseFile(floorsFileUrl);
+      console.log(`✅ Floors parsed: ${floorsRows.length} rows`);
     }
-    console.log(`✅ Total assets: ${allAssetsRows.length} rows`);
     
-    if (floorsRows.length === 0 || roomsRows.length === 0 || allAssetsRows.length === 0) {
-      return Response.json({
-        success: false,
-        error: 'One or more files are empty or failed to parse',
-        details: `Floors: ${floorsRows.length}, Rooms: ${roomsRows.length}, Assets: ${allAssetsRows.length}`
-      }, { status: 400 });
+    if (importMode === 'rooms' || importMode === 'all') {
+      console.log('Parsing rooms file...');
+      roomsRows = await parseFile(roomsFileUrl);
+      console.log(`✅ Rooms parsed: ${roomsRows.length} rows`);
+    }
+    
+    if (importMode === 'assets' || importMode === 'all') {
+      console.log(`Parsing ${assetsFileUrls.length} asset file(s)...`);
+      for (const assetFileUrl of assetsFileUrls) {
+        const assetRows = await parseFile(assetFileUrl);
+        console.log(`✅ Asset file parsed: ${assetRows.length} rows`);
+        allAssetsRows.push(...assetRows);
+      }
+      console.log(`✅ Total assets: ${allAssetsRows.length} rows`);
     }
 
     // Cache for lookups
@@ -218,8 +230,10 @@ Deno.serve(async (req) => {
       // Delay after every record to avoid rate limiting
       await delay(1000);
     }
+    }
 
     // Process Rooms
+    if (importMode === 'rooms' || importMode === 'all') {
     console.log('Processing rooms...');
     for (let i = 0; i < roomsRows.length; i++) {
       const row = roomsRows[i];
@@ -302,8 +316,10 @@ Deno.serve(async (req) => {
       // Delay after every record to avoid rate limiting
       await delay(1000);
     }
+    }
 
     // Process Assets
+    if (importMode === 'assets' || importMode === 'all') {
     console.log('Processing assets...');
     for (let i = 0; i < allAssetsRows.length; i++) {
       const row = allAssetsRows[i];

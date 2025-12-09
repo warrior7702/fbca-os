@@ -23,10 +23,24 @@ export default function AkitaSyncAdmin() {
   const [assetsFiles, setAssetsFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
+  const [importMode, setImportMode] = useState('all');
 
   const handleImport = async () => {
-    if (!floorsFile || !roomsFile || assetsFiles.length === 0) {
-      toast.error('Please upload floors, rooms, and at least one assets file');
+    // Validate based on import mode
+    if (importMode === 'floors' && !floorsFile) {
+      toast.error('Please upload floors file');
+      return;
+    }
+    if (importMode === 'rooms' && !roomsFile) {
+      toast.error('Please upload rooms file');
+      return;
+    }
+    if (importMode === 'assets' && assetsFiles.length === 0) {
+      toast.error('Please upload at least one assets file');
+      return;
+    }
+    if (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) {
+      toast.error('Please upload all files');
       return;
     }
 
@@ -34,19 +48,27 @@ export default function AkitaSyncAdmin() {
     setResult(null);
 
     try {
-      // Upload all files
-      const floorsUpload = await base44.integrations.Core.UploadFile({ file: floorsFile });
-      const roomsUpload = await base44.integrations.Core.UploadFile({ file: roomsFile });
+      // Upload files based on mode
+      let floorsUpload, roomsUpload, assetsUploads;
       
-      const assetsUploads = await Promise.all(
-        assetsFiles.map(file => base44.integrations.Core.UploadFile({ file }))
-      );
+      if (importMode === 'floors' || importMode === 'all') {
+        floorsUpload = await base44.integrations.Core.UploadFile({ file: floorsFile });
+      }
+      if (importMode === 'rooms' || importMode === 'all') {
+        roomsUpload = await base44.integrations.Core.UploadFile({ file: roomsFile });
+      }
+      if (importMode === 'assets' || importMode === 'all') {
+        assetsUploads = await Promise.all(
+          assetsFiles.map(file => base44.integrations.Core.UploadFile({ file }))
+        );
+      }
 
-      // Call import function with array of asset file URLs
+      // Call import function
       const response = await base44.functions.invoke('akitaSyncImport', {
-        floorsFileUrl: floorsUpload.file_url,
-        roomsFileUrl: roomsUpload.file_url,
-        assetsFileUrls: assetsUploads.map(upload => upload.file_url)
+        floorsFileUrl: floorsUpload?.file_url,
+        roomsFileUrl: roomsUpload?.file_url,
+        assetsFileUrls: assetsUploads?.map(upload => upload.file_url),
+        importMode
       });
 
       if (response.data.success) {
@@ -95,16 +117,72 @@ export default function AkitaSyncAdmin() {
           </AlertDescription>
         </Alert>
 
+        {/* Import Mode Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Import Mode</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={importMode === 'all' ? 'default' : 'outline'}
+                onClick={() => setImportMode('all')}
+                className="h-auto py-4 flex flex-col items-center gap-2"
+              >
+                <Database className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">All Data</div>
+                  <div className="text-xs opacity-80">Floors, Rooms, Assets</div>
+                </div>
+              </Button>
+              <Button
+                variant={importMode === 'floors' ? 'default' : 'outline'}
+                onClick={() => setImportMode('floors')}
+                className="h-auto py-4 flex flex-col items-center gap-2"
+              >
+                <FileSpreadsheet className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Floors Only</div>
+                  <div className="text-xs opacity-80">Buildings & Floors</div>
+                </div>
+              </Button>
+              <Button
+                variant={importMode === 'rooms' ? 'default' : 'outline'}
+                onClick={() => setImportMode('rooms')}
+                className="h-auto py-4 flex flex-col items-center gap-2"
+              >
+                <FileSpreadsheet className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Rooms Only</div>
+                  <div className="text-xs opacity-80">Room data</div>
+                </div>
+              </Button>
+              <Button
+                variant={importMode === 'assets' ? 'default' : 'outline'}
+                onClick={() => setImportMode('assets')}
+                className="h-auto py-4 flex flex-col items-center gap-2"
+              >
+                <FileSpreadsheet className="w-5 h-5" />
+                <div>
+                  <div className="font-semibold">Assets Only</div>
+                  <div className="text-xs opacity-80">Asset data</div>
+                </div>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* File Uploads */}
         <Card>
           <CardHeader>
             <CardTitle>Upload Export Files</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Floors Export (CSV)
-              </label>
+            {(importMode === 'all' || importMode === 'floors') && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Floors Export (CSV)
+                </label>
               <input
                 type="file"
                 accept=".csv,.xlsx"
@@ -176,13 +254,19 @@ export default function AkitaSyncAdmin() {
                   ))}
                 </div>
               )}
-            </div>
+              </div>
+              )}
 
-            <Button
-              onClick={handleImport}
-              disabled={!floorsFile || !roomsFile || assetsFiles.length === 0 || importing}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
+              <Button
+                onClick={handleImport}
+                disabled={importing || 
+                  (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) ||
+                  (importMode === 'floors' && !floorsFile) ||
+                  (importMode === 'rooms' && !roomsFile) ||
+                  (importMode === 'assets' && assetsFiles.length === 0)
+                }
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
               {importing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
