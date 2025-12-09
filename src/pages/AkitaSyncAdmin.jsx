@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 export default function AkitaSyncAdmin() {
@@ -264,10 +265,10 @@ export default function AkitaSyncAdmin() {
                     ))}
                   </div>
                 )}
-                </div>
-                )}
+              </div>
+            )}
 
-                {importMode === 'rooms' && (
+            {importMode === 'rooms' && (
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                 <div>
                   <label className="text-xs font-medium text-slate-700 mb-1 block">
@@ -298,10 +299,10 @@ export default function AkitaSyncAdmin() {
                     Process rows {skipRows} to {skipRows + limitRows}. Run multiple times with different skip values to import all rooms.
                   </p>
                 </div>
-                </div>
-                )}
+            </div>
+            )}
 
-                <Button
+            <Button
                 onClick={handleImport}
                 disabled={importing || 
                   (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) ||
