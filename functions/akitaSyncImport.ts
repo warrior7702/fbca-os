@@ -227,9 +227,36 @@ Deno.serve(async (req) => {
           summary.warnings.push(`Failed to fetch rooms file: ${roomsResponse.statusText}`);
         } else {
           const text = await roomsResponse.text();
-          const roomsData = parseTSV(text);
           
-          console.log(`Parsed ${roomsData.length} rooms`);
+          // Parse TSV text with BOM handling
+          const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+          
+          // Extract headers and strip UTF-8 BOM
+          let header = lines[0];
+          header = header.replace(/^\uFEFF/, "");   // removes BOM
+          
+          const columns = header.split("\t");
+          
+          const roomsData = [];
+          for (let i = 1; i < lines.length; i++) {
+            const row = lines[i].split("\t");
+            const obj = {};
+            
+            for (let c = 0; c < columns.length; c++) {
+              obj[columns[c]] = row[c] ?? "";
+            }
+            
+            // Validate
+            if (!obj["_id"] || obj["_id"].trim() === "") {
+              summary.warnings.push(`Room missing _id at row ${i}`);
+              continue;
+            }
+            
+            roomsData.push(obj);
+          }
+          
+          console.log('Parsed room count:', roomsData.length);
+          console.log('Room headers:', columns);
           
           for (let i = 0; i < roomsData.length; i++) {
             const row = roomsData[i];
