@@ -169,6 +169,7 @@ Deno.serve(async (req) => {
     const assetGroupCache = new Map();
 
     // Process Floors first (which creates Buildings)
+    if (importMode === 'floors' || importMode === 'all') {
     console.log('Processing floors...');
     for (let i = 0; i < floorsRows.length; i++) {
       const row = floorsRows[i];
