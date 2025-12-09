@@ -226,53 +226,68 @@ Deno.serve(async (req) => {
         if (!roomsResponse.ok) {
           summary.warnings.push(`Failed to fetch rooms file: ${roomsResponse.statusText}`);
         } else {
-          const text = await roomsResponse.text();
-          console.log('Rooms file text length:', text.length);
-          console.log('First 200 chars:', text.substring(0, 200));
+          // Detect file format - check if it's XLSX or TSV
+          const arrayBuffer = await roomsResponse.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const isXLSX = bytes[0] === 0x50 && bytes[1] === 0x4B; // PK signature
           
-          // Parse TSV text with BOM handling
-          const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-          console.log('Total lines:', lines.length);
+          let roomsData = [];
           
-          // Extract headers and strip UTF-8 BOM
-          let header = lines[0];
-          console.log('Raw header (first 100 chars):', header.substring(0, 100));
-          console.log('Header char codes:', Array.from(header.substring(0, 10)).map(c => c.charCodeAt(0)));
-          
-          header = header.replace(/^\uFEFF/, "");   // removes BOM
-          console.log('Header after BOM removal:', header.substring(0, 100));
-          
-          const columns = header.split("\t").map(col => col.trim());
-          console.log('Column count:', columns.length);
-          console.log('First 5 columns:', columns.slice(0, 5));
-          console.log('First column exact:', JSON.stringify(columns[0]));
-          
-          const roomsData = [];
-          for (let i = 1; i < lines.length; i++) {
-            const row = lines[i].split("\t");
-            const obj = {};
+          if (isXLSX) {
+            console.log('Detected XLSX format for rooms file');
+            const workbook = XLSX.read(bytes, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            roomsData = XLSX.utils.sheet_to_json(firstSheet);
+            console.log(`Parsed ${roomsData.length} rooms from XLSX`);
+          } else {
+            console.log('Detected TSV/CSV format for rooms file');
+            const text = new TextDecoder('utf-8').decode(bytes);
+            console.log('Rooms file text length:', text.length);
+            console.log('First 200 chars:', text.substring(0, 200));
             
-            for (let c = 0; c < columns.length; c++) {
-              obj[columns[c]] = row[c] ?? "";
+            // Parse TSV text with BOM handling
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+            console.log('Total lines:', lines.length);
+            
+            // Extract headers and strip UTF-8 BOM
+            let header = lines[0];
+            console.log('Raw header (first 100 chars):', header.substring(0, 100));
+            console.log('Header char codes:', Array.from(header.substring(0, 10)).map(c => c.charCodeAt(0)));
+            
+            header = header.replace(/^\uFEFF/, "");   // removes BOM
+            console.log('Header after BOM removal:', header.substring(0, 100));
+            
+            const columns = header.split("\t").map(col => col.trim());
+            console.log('Column count:', columns.length);
+            console.log('First 5 columns:', columns.slice(0, 5));
+            console.log('First column exact:', JSON.stringify(columns[0]));
+            
+            for (let i = 1; i < lines.length; i++) {
+              const row = lines[i].split("\t");
+              const obj = {};
+              
+              for (let c = 0; c < columns.length; c++) {
+                obj[columns[c]] = row[c] ?? "";
+              }
+              
+              // Debug first row
+              if (i === 1) {
+                console.log('First row object keys:', Object.keys(obj).slice(0, 5));
+                console.log('First row _id value:', obj["_id"]);
+              }
+              
+              // Validate
+              if (!obj["_id"] || obj["_id"].trim() === "") {
+                summary.warnings.push(`Room missing _id at row ${i}`);
+                continue;
+              }
+              
+              roomsData.push(obj);
             }
             
-            // Debug first row
-            if (i === 1) {
-              console.log('First row object keys:', Object.keys(obj).slice(0, 5));
-              console.log('First row _id value:', obj["_id"]);
-            }
-            
-            // Validate
-            if (!obj["_id"] || obj["_id"].trim() === "") {
-              summary.warnings.push(`Room missing _id at row ${i}`);
-              continue;
-            }
-            
-            roomsData.push(obj);
+            console.log('Parsed room count:', roomsData.length);
+            console.log('Room headers:', columns);
           }
-          
-          console.log('Parsed room count:', roomsData.length);
-          console.log('Room headers:', columns);
           
           for (let i = 0; i < roomsData.length; i++) {
             const row = roomsData[i];
