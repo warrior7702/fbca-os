@@ -450,6 +450,7 @@ Deno.serve(async (req) => {
       // Delay after every record to avoid rate limiting
       await delay(1000);
     }
+    }
 
     console.log('✅ Import complete!');
     console.log('Summary:', JSON.stringify(summary, null, 2));
