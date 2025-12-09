@@ -324,15 +324,15 @@ Deno.serve(async (req) => {
           }
           
           // Small delay between records within batch
-          await delay(1000);
+          await delay(200);
         } catch (err) {
           summary.errors.push(`Room error: ${err.message}`);
         }
       }
       
       // Longer delay between batches to avoid rate limiting
-      console.log(`Batch complete. Waiting 5 seconds before next batch...`);
-      await delay(5000);
+      console.log(`Batch complete. Waiting 2 seconds before next batch...`);
+      await delay(2000);
     }
     }
 
