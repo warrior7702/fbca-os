@@ -20,13 +20,13 @@ export default function AkitaSyncAdmin() {
   const navigate = useNavigate();
   const [floorsFile, setFloorsFile] = useState(null);
   const [roomsFile, setRoomsFile] = useState(null);
-  const [assetsFile, setAssetsFile] = useState(null);
+  const [assetsFiles, setAssetsFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
 
   const handleImport = async () => {
-    if (!floorsFile || !roomsFile || !assetsFile) {
-      toast.error('Please upload all three files');
+    if (!floorsFile || !roomsFile || assetsFiles.length === 0) {
+      toast.error('Please upload floors, rooms, and at least one assets file');
       return;
     }
 
@@ -34,18 +34,19 @@ export default function AkitaSyncAdmin() {
     setResult(null);
 
     try {
-      // Upload files
-      const [floorsUpload, roomsUpload, assetsUpload] = await Promise.all([
-        base44.integrations.Core.UploadFile({ file: floorsFile }),
-        base44.integrations.Core.UploadFile({ file: roomsFile }),
-        base44.integrations.Core.UploadFile({ file: assetsFile })
-      ]);
+      // Upload all files
+      const floorsUpload = await base44.integrations.Core.UploadFile({ file: floorsFile });
+      const roomsUpload = await base44.integrations.Core.UploadFile({ file: roomsFile });
+      
+      const assetsUploads = await Promise.all(
+        assetsFiles.map(file => base44.integrations.Core.UploadFile({ file }))
+      );
 
-      // Call import function
+      // Call import function with array of asset file URLs
       const response = await base44.functions.invoke('akitaSyncImport', {
         floorsFileUrl: floorsUpload.file_url,
         roomsFileUrl: roomsUpload.file_url,
-        assetsFileUrl: assetsUpload.file_url
+        assetsFileUrls: assetsUploads.map(upload => upload.file_url)
       });
 
       if (response.data.success) {
@@ -148,12 +149,16 @@ export default function AkitaSyncAdmin() {
 
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Assets Export (CSV)
+                Assets Export(s) - Multiple Files Supported
               </label>
+              <p className="text-xs text-slate-500 mb-2">
+                If you split assets by building, upload all files here
+              </p>
               <input
                 type="file"
                 accept=".csv,.xlsx"
-                onChange={(e) => setAssetsFile(e.target.files[0])}
+                multiple
+                onChange={(e) => setAssetsFiles(Array.from(e.target.files))}
                 className="block w-full text-sm text-slate-500
                   file:mr-4 file:py-2 file:px-4
                   file:rounded-lg file:border-0
@@ -161,17 +166,21 @@ export default function AkitaSyncAdmin() {
                   file:bg-blue-50 file:text-blue-700
                   hover:file:bg-blue-100"
               />
-              {assetsFile && (
-                <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  {assetsFile.name}
-                </p>
+              {assetsFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {assetsFiles.map((file, idx) => (
+                    <p key={idx} className="text-sm text-green-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {file.name}
+                    </p>
+                  ))}
+                </div>
               )}
             </div>
 
             <Button
               onClick={handleImport}
-              disabled={!floorsFile || !roomsFile || !assetsFile || importing}
+              disabled={!floorsFile || !roomsFile || assetsFiles.length === 0 || importing}
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
               {importing ? (

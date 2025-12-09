@@ -101,12 +101,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized - admin only' }, { status: 401 });
     }
 
-    const { floorsFileUrl, roomsFileUrl, assetsFileUrl } = await req.json();
+    const { floorsFileUrl, roomsFileUrl, assetsFileUrls } = await req.json();
 
-    if (!floorsFileUrl || !roomsFileUrl || !assetsFileUrl) {
+    if (!floorsFileUrl || !roomsFileUrl || !assetsFileUrls || assetsFileUrls.length === 0) {
       return Response.json({ 
         error: 'Missing file URLs',
-        details: 'Provide floorsFileUrl, roomsFileUrl, and assetsFileUrl'
+        details: 'Provide floorsFileUrl, roomsFileUrl, and assetsFileUrls (array)'
       }, { status: 400 });
     }
 
@@ -132,14 +132,21 @@ Deno.serve(async (req) => {
     const roomsRows = await parseFile(roomsFileUrl);
     console.log(`✅ Rooms parsed: ${roomsRows.length} rows`);
     
-    const assetsRows = await parseFile(assetsFileUrl);
-    console.log(`✅ Assets parsed: ${assetsRows.length} rows`);
+    // Parse all asset files and combine
+    console.log(`Parsing ${assetsFileUrls.length} asset file(s)...`);
+    const allAssetsRows = [];
+    for (const assetFileUrl of assetsFileUrls) {
+      const assetRows = await parseFile(assetFileUrl);
+      console.log(`✅ Asset file parsed: ${assetRows.length} rows`);
+      allAssetsRows.push(...assetRows);
+    }
+    console.log(`✅ Total assets: ${allAssetsRows.length} rows`);
     
-    if (floorsRows.length === 0 || roomsRows.length === 0 || assetsRows.length === 0) {
+    if (floorsRows.length === 0 || roomsRows.length === 0 || allAssetsRows.length === 0) {
       return Response.json({
         success: false,
         error: 'One or more files are empty or failed to parse',
-        details: `Floors: ${floorsRows.length}, Rooms: ${roomsRows.length}, Assets: ${assetsRows.length}`
+        details: `Floors: ${floorsRows.length}, Rooms: ${roomsRows.length}, Assets: ${allAssetsRows.length}`
       }, { status: 400 });
     }
 
@@ -302,8 +309,8 @@ Deno.serve(async (req) => {
 
     // Process Assets
     console.log('Processing assets...');
-    for (let i = 0; i < assetsRows.length; i++) {
-      const row = assetsRows[i];
+    for (let i = 0; i < allAssetsRows.length; i++) {
+      const row = allAssetsRows[i];
       try {
         const assetId = row['_id'];
         const assetCategory = row['Asset Category'];
