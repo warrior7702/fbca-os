@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import * as XLSX from 'npm:xlsx@0.18.5';
 
 // Helper to parse level number from floor name
 function parseLevelNumber(floorName) {
