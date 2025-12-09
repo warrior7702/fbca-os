@@ -1,125 +1,104 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
-// Helper to add delay between operations
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper to parse level number from floor name
-function parseLevelNumber(floorName) {
-  if (!floorName) return null;
-  const lower = floorName.toLowerCase();
+// Helper to parse TSV text
+function parseTSV(text) {
+  const lines = text.split('\n').filter(line => line.trim());
+  if (lines.length === 0) return [];
   
-  if (lower.includes('first') || lower.includes('1st')) return 1;
-  if (lower.includes('second') || lower.includes('2nd')) return 2;
-  if (lower.includes('third') || lower.includes('3rd')) return 3;
-  if (lower.includes('fourth') || lower.includes('4th')) return 4;
-  if (lower.includes('fifth') || lower.includes('5th')) return 5;
-  if (lower.includes('sixth') || lower.includes('6th')) return 6;
-  if (lower.includes('seventh') || lower.includes('7th')) return 7;
+  const headers = lines[0].split('\t').map(h => h.trim());
+  const rows = [];
   
-  // Try to extract number
-  const match = floorName.match(/\d+/);
-  if (match) return parseInt(match[0], 10);
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split('\t');
+    const row = {};
+    headers.forEach((header, idx) => {
+      row[header] = values[idx] || '';
+    });
+    rows.push(row);
+  }
   
-  return null;
+  return rows;
 }
 
-// Helper to parse file (CSV or XLSX)
-async function parseFile(fileUrl) {
-  const response = await fetch(fileUrl);
-  if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
+// Helper to extract AkitaBox ID from URL
+function extractIdFromUrl(url, type = 'buildings') {
+  if (!url) return null;
+  const match = url.match(new RegExp(`/${type}/([a-f0-9]+)`));
+  return match ? match[1] : null;
+}
+
+// Helper to normalize name for slug
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// Helper to parse level number from floor name
+function parseLevelNumber(name) {
+  if (!name) return null;
+  const lower = name.toLowerCase();
   
-  // Check if it's XLSX by content type or file signature
-  const arrayBuffer = await response.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
+  const ordinals = {
+    'first': 1, '1st': 1,
+    'second': 2, '2nd': 2,
+    'third': 3, '3rd': 3,
+    'fourth': 4, '4th': 4,
+    'fifth': 5, '5th': 5,
+    'sixth': 6, '6th': 6,
+    'seventh': 7, '7th': 7,
+  };
   
-  // Check for XLSX signature (PK zip header)
-  const isXLSX = uint8Array[0] === 0x50 && uint8Array[1] === 0x4B;
-  
-  if (isXLSX) {
-    // Parse XLSX
-    const workbook = XLSX.read(uint8Array, { type: 'array' });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-    return jsonData;
-  } else {
-    // Parse CSV
-    const text = new TextDecoder().decode(uint8Array);
-    const lines = text.split('\n').filter(l => l.trim());
-    if (lines.length === 0) return [];
-    
-    const delimiter = lines[0].includes('\t') ? '\t' : ',';
-    
-    const parseRow = (line) => {
-      const result = [];
-      let current = '';
-      let inQuotes = false;
-      
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        
-        if (char === '"') {
-          if (inQuotes && line[i + 1] === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (char === delimiter && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      result.push(current.trim());
-      return result;
-    };
-    
-    const headers = parseRow(lines[0]);
-    const rows = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseRow(lines[i]);
-      const row = {};
-      headers.forEach((header, idx) => {
-        row[header] = values[idx] || '';
-      });
-      rows.push(row);
-    }
-    
-    return rows;
+  for (const [key, val] of Object.entries(ordinals)) {
+    if (lower.includes(key)) return val;
   }
+  
+  const match = name.match(/\d+/);
+  return match ? parseInt(match[0], 10) : null;
 }
 
 Deno.serve(async (req) => {
+  let base44;
+  let user;
+  
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
+    // Initialize Base44 client
+    base44 = createClientFromRequest(req);
+    user = await base44.auth.me();
+    
     if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Unauthorized - admin only' }, { status: 401 });
+      return Response.json({
+        success: false,
+        error: 'Unauthorized - admin only'
+      }, { status: 401 });
     }
-
-    const { floorsFileUrl, roomsFileUrl, assetsFileUrls, importMode = 'all' } = await req.json();
-
-    // Validate based on import mode
-    if (importMode === 'floors' && !floorsFileUrl) {
-      return Response.json({ error: 'Missing floorsFileUrl' }, { status: 400 });
-    }
-    if (importMode === 'rooms' && !roomsFileUrl) {
-      return Response.json({ error: 'Missing roomsFileUrl' }, { status: 400 });
-    }
-    if (importMode === 'assets' && (!assetsFileUrls || assetsFileUrls.length === 0)) {
-      return Response.json({ error: 'Missing assetsFileUrls' }, { status: 400 });
-    }
-    if (importMode === 'all' && (!floorsFileUrl || !roomsFileUrl || !assetsFileUrls || assetsFileUrls.length === 0)) {
-      return Response.json({ 
-        error: 'Missing file URLs',
-        details: 'Provide floorsFileUrl, roomsFileUrl, and assetsFileUrls (array)'
+    
+    // Parse request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return Response.json({
+        success: false,
+        error: 'Invalid JSON body',
+        details: e.message
       }, { status: 400 });
     }
-
+    
+    const { floorsFileId, roomsFileId, assetsFileId } = body;
+    
+    // Validate at least one file provided
+    if (!floorsFileId && !roomsFileId && !assetsFileId) {
+      return Response.json({
+        success: false,
+        error: 'At least one file ID must be provided (floorsFileId, roomsFileId, or assetsFileId)'
+      }, { status: 400 });
+    }
+    
+    console.log('Starting import...');
+    console.log(`Floors: ${floorsFileId || 'none'}`);
+    console.log(`Rooms: ${roomsFileId || 'none'}`);
+    console.log(`Assets: ${assetsFileId || 'none'}`);
+    
     const summary = {
       buildingsCreated: 0,
       buildingsUpdated: 0,
@@ -129,359 +108,425 @@ Deno.serve(async (req) => {
       roomsUpdated: 0,
       assetsCreated: 0,
       assetsUpdated: 0,
-      assetGroupsCreated: 0,
-      assetGroupsUpdated: 0,
-      errors: []
+      warnings: []
     };
-
-    // Fetch and parse files based on import mode
-    console.log(`Import mode: ${importMode}`);
-    let floorsRows = [];
-    let roomsRows = [];
-    let allAssetsRows = [];
-
-    if (importMode === 'floors' || importMode === 'all') {
-      console.log('Parsing floors file...');
-      floorsRows = await parseFile(floorsFileUrl);
-      console.log(`✅ Floors parsed: ${floorsRows.length} rows`);
-    }
     
-    if (importMode === 'rooms' || importMode === 'all') {
-      console.log('Parsing rooms file...');
-      roomsRows = await parseFile(roomsFileUrl);
-      console.log(`✅ Rooms parsed: ${roomsRows.length} rows`);
-    }
+    // Caches for lookups
+    const buildingCache = new Map(); // name -> Building
+    const floorCache = new Map(); // akita_level_id -> Floor
+    const roomCache = new Map(); // akita_room_id -> Room
+    const assetGroupCache = new Map(); // name -> AssetGroup
     
-    if (importMode === 'assets' || importMode === 'all') {
-      console.log(`Parsing ${assetsFileUrls.length} asset file(s)...`);
-      for (const assetFileUrl of assetsFileUrls) {
-        const assetRows = await parseFile(assetFileUrl);
-        console.log(`✅ Asset file parsed: ${assetRows.length} rows`);
-        allAssetsRows.push(...assetRows);
-      }
-      console.log(`✅ Total assets: ${allAssetsRows.length} rows`);
-    }
-
-    // Cache for lookups
-    const buildingCache = new Map();
-    const floorCache = new Map();
-    const roomCache = new Map();
-    const assetGroupCache = new Map();
-
-    // Process Floors first (which creates Buildings)
-    if (importMode === 'floors' || importMode === 'all') {
-    console.log('Processing floors...');
-    for (let i = 0; i < floorsRows.length; i++) {
-      const row = floorsRows[i];
+    // ============================================
+    // PROCESS FLOORS FILE
+    // ============================================
+    if (floorsFileId) {
       try {
-        const buildingName = row['Building'] || row['building'];
-        const floorId = row['_id'];
-        const floorName = row['Name'] || row['name'];
+        console.log('Fetching floors file...');
+        const floorsUrl = `https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/${floorsFileId}`;
+        const floorsResponse = await fetch(floorsUrl);
         
-        if (!floorId || !floorName) {
-          summary.errors.push(`Floor missing ID or name: ${JSON.stringify(row)}`);
-          continue;
-        }
-
-        // Upsert Building
-        let building = buildingCache.get(buildingName);
-        if (!building) {
-          const existingBuildings = await base44.entities.Building.filter({ name: buildingName });
-          if (existingBuildings.length > 0) {
-            building = existingBuildings[0];
-            buildingCache.set(buildingName, building);
-            summary.buildingsUpdated++;
-          } else {
-            building = await base44.entities.Building.create({
-              name: buildingName,
-              akita_building_id: row['Building _id'] || row['building_id'] || ''
-            });
-            buildingCache.set(buildingName, building);
-            summary.buildingsCreated++;
-          }
-        }
-
-        // Upsert Floor
-        const existingFloors = await base44.entities.Floor.filter({ akita_floor_id: floorId });
-        const floorData = {
-          akita_floor_id: floorId,
-          name: floorName,
-          level_number: parseLevelNumber(floorName),
-          building_id: building.id,
-          building_name: buildingName,
-          akita_url: row['Url'] || row['url'] || '',
-          portal_url: row['Portal URL'] || row['portal_url'] || '',
-          updated_at: new Date().toISOString()
-        };
-
-        if (existingFloors.length > 0) {
-          await base44.entities.Floor.update(existingFloors[0].id, floorData);
-          floorCache.set(floorId, existingFloors[0].id);
-          summary.floorsUpdated++;
+        if (!floorsResponse.ok) {
+          summary.warnings.push(`Failed to fetch floors file: ${floorsResponse.statusText}`);
         } else {
-          floorData.created_at = new Date().toISOString();
-          const newFloor = await base44.entities.Floor.create(floorData);
-          floorCache.set(floorId, newFloor.id);
-          summary.floorsCreated++;
+          const arrayBuffer = await floorsResponse.arrayBuffer();
+          const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const floorsData = XLSX.utils.sheet_to_json(firstSheet);
+          
+          console.log(`Parsed ${floorsData.length} floors`);
+          
+          for (const row of floorsData) {
+            try {
+              const buildingName = row['Building'] || '';
+              const levelId = row['_id'];
+              const levelName = row['Name'] || '';
+              const url = row['Url'] || '';
+              const portalUrl = row['Portal URL'] || '';
+              const floorPlanFile = row['Floor Plan'] || '';
+              
+              if (!levelId || !levelName) {
+                summary.warnings.push(`Floor missing _id or Name: ${JSON.stringify(row)}`);
+                continue;
+              }
+              
+              // Upsert Building first
+              let building = buildingCache.get(buildingName);
+              if (!building) {
+                const akitaBuildingId = extractIdFromUrl(url, 'buildings') || '';
+                const existing = await base44.asServiceRole.entities.Building.filter({ name: buildingName });
+                
+                if (existing.length > 0) {
+                  building = existing[0];
+                  await base44.asServiceRole.entities.Building.update(building.id, {
+                    akita_building_id: akitaBuildingId,
+                    name: buildingName
+                  });
+                  summary.buildingsUpdated++;
+                } else {
+                  building = await base44.asServiceRole.entities.Building.create({
+                    akita_building_id: akitaBuildingId,
+                    name: buildingName,
+                    address: null,
+                    notes: null
+                  });
+                  summary.buildingsCreated++;
+                }
+                buildingCache.set(buildingName, building);
+              }
+              
+              // Upsert Floor
+              const existing = await base44.asServiceRole.entities.Floor.filter({ akita_level_id: levelId });
+              const floorData = {
+                akita_level_id: levelId,
+                name: levelName,
+                level_name: levelName,
+                level_number: parseLevelNumber(levelName),
+                floor_plan_file: floorPlanFile || null,
+                building_id: building.id,
+                building_name: buildingName,
+                akita_url: url,
+                portal_url: portalUrl,
+                updated_at: new Date().toISOString()
+              };
+              
+              if (existing.length > 0) {
+                await base44.asServiceRole.entities.Floor.update(existing[0].id, floorData);
+                floorCache.set(levelId, existing[0]);
+                summary.floorsUpdated++;
+              } else {
+                floorData.created_at = new Date().toISOString();
+                const newFloor = await base44.asServiceRole.entities.Floor.create(floorData);
+                floorCache.set(levelId, newFloor);
+                summary.floorsCreated++;
+              }
+              
+            } catch (err) {
+              summary.warnings.push(`Floor error: ${err.message}`);
+            }
+          }
+          
+          console.log(`✅ Floors complete: ${summary.floorsCreated} created, ${summary.floorsUpdated} updated`);
         }
       } catch (err) {
-        summary.errors.push(`Floor error: ${err.message}`);
+        summary.warnings.push(`Floors file processing error: ${err.message}`);
+        console.error('Floors error:', err);
       }
-      
-      // Delay after every record to avoid rate limiting
-      await delay(2000);
     }
-    }
-
-    // Process Rooms
-    if (importMode === 'rooms' || importMode === 'all') {
-    console.log('Processing rooms...');
-    console.log(`Total rooms to process: ${roomsRows.length}`);
     
-    for (let i = 0; i < roomsRows.length; i++) {
-      const row = roomsRows[i];
-      
-      // Log progress every 50 rooms
-      if (i % 50 === 0) {
-        console.log(`Processing room ${i + 1} of ${roomsRows.length}`);
-      }
-      
+    // ============================================
+    // PROCESS ROOMS FILE
+    // ============================================
+    if (roomsFileId) {
       try {
-        const roomId = row['_id'];
-        const buildingName = row['Building'];
-        const floorName = row['Floor'];
+        console.log('Fetching rooms file...');
+        const roomsUrl = `https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/${roomsFileId}`;
+        const roomsResponse = await fetch(roomsUrl);
         
-        if (!roomId) {
-          summary.errors.push(`Room missing ID: ${JSON.stringify(row)}`);
-          continue;
-        }
-
-        // Find building (cached)
-        let building = buildingCache.get(buildingName);
-        if (!building) {
-          const existingBuildings = await base44.entities.Building.filter({ name: buildingName });
-          if (existingBuildings.length > 0) {
-            building = existingBuildings[0];
-            buildingCache.set(buildingName, building);
-          } else {
-            building = await base44.entities.Building.create({
-              name: buildingName
-            });
-            buildingCache.set(buildingName, building);
-            summary.buildingsCreated++;
-          }
-        }
-
-        // Find floor by name and building (cached)
-        const floorCacheKey = `${building.id}_${floorName}`;
-        let floorId = floorCache.get(floorCacheKey);
-        if (!floorId && floorName) {
-          const floors = await base44.entities.Floor.filter({ 
-            building_id: building.id,
-            name: floorName
-          });
-          if (floors.length > 0) {
-            floorId = floors[0].id;
-            floorCache.set(floorCacheKey, floorId);
-          }
-        }
-
-        // Upsert Room
-        const existingRooms = await base44.entities.Room.filter({ akita_room_id: roomId });
-        const roomData = {
-          akita_room_id: roomId,
-          room_number: row['Number'] || '',
-          room_name: row['Name'] || '',
-          room_category: row['Room Category'] || '',
-          floor_id: floorId,
-          floor_name: floorName,
-          building_id: building.id,
-          building_name: buildingName,
-          square_feet: row['Square Feet'] ? String(row['Square Feet']) : '',
-          type: row['Type'] || '',
-          floor_type: row['Floor Type'] || '',
-          verified: row['Verified'] === 'Verified',
-          description: row['Description'] || '',
-          occupant: row['Occupant'] || '',
-          status: row['Status'] || 'Active',
-          decommissioned_date: row['Decommissioned Date'] || null,
-          akita_url: row['Url'] || '',
-          portal_url: row['Portal URL'] || '',
-          updated_at: new Date().toISOString(),
-          updated_by: user.email
-        };
-
-        if (existingRooms.length > 0) {
-          await base44.entities.Room.update(existingRooms[0].id, roomData);
-          roomCache.set(roomId, existingRooms[0].id);
-          summary.roomsUpdated++;
+        if (!roomsResponse.ok) {
+          summary.warnings.push(`Failed to fetch rooms file: ${roomsResponse.statusText}`);
         } else {
-          roomData.created_at = new Date().toISOString();
-          roomData.created_by = user.email;
-          const newRoom = await base44.entities.Room.create(roomData);
-          roomCache.set(roomId, newRoom.id);
-          summary.roomsCreated++;
-        }
-        
-        // Minimal delay to avoid rate limits
-        await delay(100);
-      } catch (err) {
-        summary.errors.push(`Room error: ${err.message}`);
-      }
-    }
-    console.log(`✅ Completed processing ${roomsRows.length} rooms`);
-    }
-
-    // Process Assets
-    if (importMode === 'assets' || importMode === 'all') {
-    console.log('Processing assets...');
-    for (let i = 0; i < allAssetsRows.length; i++) {
-      const row = allAssetsRows[i];
-      try {
-        const assetId = row['_id'];
-        const assetCategory = row['Asset Category'];
-        
-        if (!assetId) {
-          summary.errors.push(`Asset missing ID: ${JSON.stringify(row)}`);
-          continue;
-        }
-
-        // Upsert AssetGroup
-        let assetGroup = assetGroupCache.get(assetCategory);
-        if (!assetGroup && assetCategory) {
-          const existingGroups = await base44.entities.AssetGroup.filter({ name: assetCategory });
-          if (existingGroups.length > 0) {
-            assetGroup = existingGroups[0];
-            assetGroupCache.set(assetCategory, assetGroup);
-            summary.assetGroupsUpdated++;
-          } else {
-            assetGroup = await base44.entities.AssetGroup.create({
-              name: assetCategory,
-              description: `Asset category: ${assetCategory}`
-            });
-            assetGroupCache.set(assetCategory, assetGroup);
-            summary.assetGroupsCreated++;
+          const text = await roomsResponse.text();
+          const roomsData = parseTSV(text);
+          
+          console.log(`Parsed ${roomsData.length} rooms`);
+          
+          for (let i = 0; i < roomsData.length; i++) {
+            const row = roomsData[i];
+            
+            if (i % 100 === 0 && i > 0) {
+              console.log(`Processing room ${i} of ${roomsData.length}`);
+            }
+            
+            try {
+              const roomId = row['_id'];
+              const number = row['Number'] || '';
+              const name = row['Name'] || '';
+              const category = row['Room Category'] || '';
+              const floorName = row['Floor'] || '';
+              const buildingName = row['Building'] || '';
+              const squareFeet = row['Square Feet'];
+              const type = row['Type'] || '';
+              const floorType = row['Floor Type'] || '';
+              const verified = row['Verified'] === 'Verified';
+              const description = row['Description'] || '';
+              const occupant = row['Occupant'] || '';
+              const status = row['Status'] || 'Active';
+              const decommissionedDate = row['Decommissioned Date'] || null;
+              const url = row['Url'] || '';
+              const portalUrl = row['Portal URL'] || '';
+              
+              if (!roomId) {
+                summary.warnings.push(`Room missing _id at row ${i + 1}`);
+                continue;
+              }
+              
+              // Find or create Building
+              let building = buildingCache.get(buildingName);
+              if (!building && buildingName) {
+                const existing = await base44.asServiceRole.entities.Building.filter({ name: buildingName });
+                if (existing.length > 0) {
+                  building = existing[0];
+                } else {
+                  building = await base44.asServiceRole.entities.Building.create({
+                    name: buildingName,
+                    akita_building_id: '',
+                    address: null,
+                    notes: null
+                  });
+                  summary.buildingsCreated++;
+                }
+                buildingCache.set(buildingName, building);
+              }
+              
+              // Find Floor
+              let floor = null;
+              if (building && floorName) {
+                const floors = await base44.asServiceRole.entities.Floor.filter({
+                  building_id: building.id,
+                  name: floorName
+                });
+                if (floors.length > 0) {
+                  floor = floors[0];
+                } else {
+                  summary.warnings.push(`Room ${roomId}: Floor "${floorName}" not found in building "${buildingName}"`);
+                }
+              }
+              
+              // Upsert Room
+              const existing = await base44.asServiceRole.entities.Room.filter({ akita_room_id: roomId });
+              const roomData = {
+                akita_room_id: roomId,
+                room_number: number,
+                room_name: name,
+                room_category: category,
+                floor_id: floor?.id || null,
+                floor_name: floorName,
+                building_id: building?.id || null,
+                building_name: buildingName,
+                square_feet: squareFeet ? String(squareFeet) : '',
+                type: type,
+                floor_type: floorType,
+                verified: verified,
+                description: description,
+                occupant: occupant,
+                status: status,
+                decommissioned_date: decommissionedDate,
+                akita_url: url,
+                portal_url: portalUrl,
+                updated_at: new Date().toISOString(),
+                updated_by: user.email
+              };
+              
+              if (existing.length > 0) {
+                await base44.asServiceRole.entities.Room.update(existing[0].id, roomData);
+                roomCache.set(roomId, existing[0]);
+                summary.roomsUpdated++;
+              } else {
+                roomData.created_at = new Date().toISOString();
+                roomData.created_by = user.email;
+                const newRoom = await base44.asServiceRole.entities.Room.create(roomData);
+                roomCache.set(roomId, newRoom);
+                summary.roomsCreated++;
+              }
+              
+            } catch (err) {
+              summary.warnings.push(`Room error at row ${i + 1}: ${err.message}`);
+            }
           }
-        }
-
-        // Find building
-        const buildingName = row['Building'];
-        let building = buildingCache.get(buildingName);
-        if (!building) {
-          const existingBuildings = await base44.entities.Building.filter({ name: buildingName });
-          if (existingBuildings.length > 0) {
-            building = existingBuildings[0];
-            buildingCache.set(buildingName, building);
-          }
-        }
-
-        // Find floor
-        const floorAkitaId = row['Floor _id'];
-        let floorId = floorCache.get(floorAkitaId);
-        if (!floorId && floorAkitaId) {
-          const floors = await base44.entities.Floor.filter({ akita_floor_id: floorAkitaId });
-          if (floors.length > 0) {
-            floorId = floors[0].id;
-            floorCache.set(floorAkitaId, floorId);
-          }
-        }
-
-        // Find room
-        const roomAkitaId = row['Room Number _id'];
-        let roomId = roomCache.get(roomAkitaId);
-        if (!roomId && roomAkitaId) {
-          const rooms = await base44.entities.Room.filter({ akita_room_id: roomAkitaId });
-          if (rooms.length > 0) {
-            roomId = rooms[0].id;
-            roomCache.set(roomAkitaId, roomId);
-          }
-        }
-
-        // Parse coordinates
-        const xCoord = row['X Coordinate'] ? parseFloat(row['X Coordinate']) : null;
-        const yCoord = row['Y Coordinate'] ? parseFloat(row['Y Coordinate']) : null;
-
-        // Upsert Asset
-        const existingAssets = await base44.entities.Asset.filter({ akita_asset_id: assetId });
-        const assetData = {
-          akita_asset_id: assetId,
-          name: row['Name'] || 'Unnamed Asset',
-          asset_category: assetCategory || '',
-          asset_group_id: assetGroup?.id || null,
-          organization_name: row['Organization'] || '',
-          building_id: building?.id || null,
-          building_name: buildingName || '',
-          building_akita_id: row['Building _id'] || '',
-          building_group: row['Building Group'] || '',
-          building_group_id: row['Building Group _id'] || '',
-          floor_id: floorId || null,
-          floor_name: row['Floor'] || '',
-          floor_akita_id: floorAkitaId || '',
-          room_id: roomId || null,
-          room_number: row['Room Number'] || '',
-          room_akita_id: roomAkitaId || '',
-          room_name: row['Room Name'] || '',
-          type: row['Type'] || '',
-          asset_id_number: row['ID'] || '',
-          manufacturer: row['Manufacturer'] || '',
-          model: row['Model'] || '',
-          serial_number: row['Serial Number'] || '',
-          description: row['Description'] || '',
-          condition: row['Condition'] || '',
-          condition_date: row['Condition Date'] || null,
-          installation_date: row['Installation Date'] || null,
-          warranty_expiration_date: row['Warranty Expiration Date'] || null,
-          verified: row['Verified'] === 'Verified',
-          status: row['Status'] || 'Active',
-          decommissioned_date: row['Decommissioned Date'] || null,
-          website_url: row['Website'] || '',
-          om_manuals: row['OM Manuals'] || '',
-          warranty_notes: row['Warranty'] || '',
-          cost: row['Cost'] ? parseFloat(row['Cost']) : null,
-          total_cost: row['Total Cost'] ? parseFloat(row['Total Cost']) : null,
-          number: row['Number'] || '',
-          akita_url: row['Url'] || '',
-          x_coord: xCoord,
-          y_coord: yCoord,
-          qr_code: row['QR Code'] || '',
-          updated_at: new Date().toISOString(),
-          updated_by: user.email
-        };
-
-        if (existingAssets.length > 0) {
-          await base44.entities.Asset.update(existingAssets[0].id, assetData);
-          summary.assetsUpdated++;
-        } else {
-          assetData.created_at = new Date().toISOString();
-          assetData.created_by = user.email;
-          await base44.entities.Asset.create(assetData);
-          summary.assetsCreated++;
+          
+          console.log(`✅ Rooms complete: ${summary.roomsCreated} created, ${summary.roomsUpdated} updated`);
         }
       } catch (err) {
-        summary.errors.push(`Asset error: ${err.message}`);
+        summary.warnings.push(`Rooms file processing error: ${err.message}`);
+        console.error('Rooms error:', err);
       }
-      
-      // Delay after every record to avoid rate limiting
-      await delay(2000);
     }
+    
+    // ============================================
+    // PROCESS ASSETS FILE
+    // ============================================
+    if (assetsFileId) {
+      try {
+        console.log('Fetching assets file...');
+        const assetsUrl = `https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/${assetsFileId}`;
+        const assetsResponse = await fetch(assetsUrl);
+        
+        if (!assetsResponse.ok) {
+          summary.warnings.push(`Failed to fetch assets file: ${assetsResponse.statusText}`);
+        } else {
+          const text = await assetsResponse.text();
+          const assetsData = parseTSV(text);
+          
+          console.log(`Parsed ${assetsData.length} assets`);
+          
+          for (let i = 0; i < assetsData.length; i++) {
+            const row = assetsData[i];
+            
+            if (i % 100 === 0 && i > 0) {
+              console.log(`Processing asset ${i} of ${assetsData.length}`);
+            }
+            
+            try {
+              const assetId = row['_id'];
+              const assetName = row['Name'] || 'Unnamed Asset';
+              const assetCategory = row['Asset Category'] || '';
+              const buildingName = row['Building'] || '';
+              const floorName = row['Floor'] || '';
+              const roomNumber = row['Room Number'] || '';
+              const manufacturer = row['Manufacturer'] || '';
+              const model = row['Model'] || '';
+              const serialNumber = row['Serial Number'] || '';
+              const condition = row['Condition'] || '';
+              const conditionDate = row['Condition Date'] || null;
+              const assetType = row['Type'] || '';
+              const xCoord = row['X Coordinate'];
+              const yCoord = row['Y Coordinate'];
+              const status = row['Status'] || 'Active';
+              const url = row['Url'] || '';
+              
+              if (!assetId) {
+                summary.warnings.push(`Asset missing _id at row ${i + 1}`);
+                continue;
+              }
+              
+              // Find or create AssetGroup
+              let assetGroup = null;
+              if (assetCategory) {
+                assetGroup = assetGroupCache.get(assetCategory);
+                if (!assetGroup) {
+                  const existing = await base44.asServiceRole.entities.AssetGroup.filter({ name: assetCategory });
+                  if (existing.length > 0) {
+                    assetGroup = existing[0];
+                  } else {
+                    assetGroup = await base44.asServiceRole.entities.AssetGroup.create({
+                      name: assetCategory,
+                      description: `Asset category: ${assetCategory}`
+                    });
+                    summary.assetGroupsCreated = (summary.assetGroupsCreated || 0) + 1;
+                  }
+                  assetGroupCache.set(assetCategory, assetGroup);
+                }
+              }
+              
+              // Find Building
+              let building = buildingCache.get(buildingName);
+              if (!building && buildingName) {
+                const existing = await base44.asServiceRole.entities.Building.filter({ name: buildingName });
+                if (existing.length > 0) {
+                  building = existing[0];
+                  buildingCache.set(buildingName, building);
+                } else {
+                  summary.warnings.push(`Asset ${assetId}: Building "${buildingName}" not found`);
+                }
+              }
+              
+              // Find Floor
+              let floor = null;
+              if (building && floorName) {
+                const floors = await base44.asServiceRole.entities.Floor.filter({
+                  building_id: building.id,
+                  name: floorName
+                });
+                if (floors.length > 0) {
+                  floor = floors[0];
+                }
+              }
+              
+              // Find Room
+              let room = null;
+              if (building && roomNumber) {
+                const rooms = await base44.asServiceRole.entities.Room.filter({
+                  building_id: building.id,
+                  room_number: roomNumber
+                });
+                if (rooms.length > 0) {
+                  room = rooms[0];
+                }
+              }
+              
+              // Parse coordinates
+              let xCoordNum = null;
+              let yCoordNum = null;
+              if (xCoord) {
+                xCoordNum = parseFloat(xCoord);
+                if (isNaN(xCoordNum) || xCoordNum < 0 || xCoordNum > 1) {
+                  summary.warnings.push(`Asset ${assetId}: Invalid X coordinate ${xCoord}`);
+                  xCoordNum = null;
+                }
+              }
+              if (yCoord) {
+                yCoordNum = parseFloat(yCoord);
+                if (isNaN(yCoordNum) || yCoordNum < 0 || yCoordNum > 1) {
+                  summary.warnings.push(`Asset ${assetId}: Invalid Y coordinate ${yCoord}`);
+                  yCoordNum = null;
+                }
+              }
+              
+              // Upsert Asset
+              const existing = await base44.asServiceRole.entities.Asset.filter({ akita_asset_id: assetId });
+              const assetData = {
+                akita_asset_id: assetId,
+                name: assetName,
+                asset_category: assetCategory,
+                asset_group_id: assetGroup?.id || null,
+                building_id: building?.id || null,
+                building_name: buildingName,
+                floor_id: floor?.id || null,
+                floor_name: floorName,
+                room_id: room?.id || null,
+                room_number: roomNumber,
+                manufacturer: manufacturer,
+                model: model,
+                serial_number: serialNumber,
+                condition: condition,
+                condition_date: conditionDate,
+                type: assetType,
+                x_coord: xCoordNum,
+                y_coord: yCoordNum,
+                status: status,
+                akita_url: url,
+                updated_at: new Date().toISOString(),
+                updated_by: user.email
+              };
+              
+              if (existing.length > 0) {
+                await base44.asServiceRole.entities.Asset.update(existing[0].id, assetData);
+                summary.assetsUpdated++;
+              } else {
+                assetData.created_at = new Date().toISOString();
+                assetData.created_by = user.email;
+                await base44.asServiceRole.entities.Asset.create(assetData);
+                summary.assetsCreated++;
+              }
+              
+            } catch (err) {
+              summary.warnings.push(`Asset error at row ${i + 1}: ${err.message}`);
+            }
+          }
+          
+          console.log(`✅ Assets complete: ${summary.assetsCreated} created, ${summary.assetsUpdated} updated`);
+        }
+      } catch (err) {
+        summary.warnings.push(`Assets file processing error: ${err.message}`);
+        console.error('Assets error:', err);
+      }
     }
-
+    
     console.log('✅ Import complete!');
-    console.log('Summary:', JSON.stringify(summary, null, 2));
-
+    console.log(`Summary: ${JSON.stringify(summary, null, 2)}`);
+    
     return Response.json({
       success: true,
       summary
     });
-
+    
   } catch (error) {
-    console.error('❌ Import error:', error);
-    console.error('Stack:', error.stack);
+    console.error('❌ Fatal error:', error);
     return Response.json({
       success: false,
-      error: error.message,
-      details: error.stack,
-      summary
+      error: error.message || 'Unknown error',
+      details: error.stack || error.toString()
     }, { status: 500 });
   }
 });
