@@ -238,102 +238,98 @@ Deno.serve(async (req) => {
     console.log('Processing rooms...');
     console.log(`Total rooms to process: ${roomsRows.length}`);
     
-    // Process in batches of 10 to avoid overwhelming the API
-    const BATCH_SIZE = 10;
-    for (let batchStart = 0; batchStart < roomsRows.length; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, roomsRows.length);
-      console.log(`Processing rooms batch ${batchStart + 1}-${batchEnd} of ${roomsRows.length}`);
+    for (let i = 0; i < roomsRows.length; i++) {
+      const row = roomsRows[i];
       
-      for (let i = batchStart; i < batchEnd; i++) {
-        const row = roomsRows[i];
-        try {
-          const roomId = row['_id'];
-          const buildingName = row['Building'];
-          const floorName = row['Floor'];
-          
-          if (!roomId) {
-            summary.errors.push(`Room missing ID: ${JSON.stringify(row)}`);
-            continue;
-          }
-
-          // Find building (cached)
-          let building = buildingCache.get(buildingName);
-          if (!building) {
-            const existingBuildings = await base44.entities.Building.filter({ name: buildingName });
-            if (existingBuildings.length > 0) {
-              building = existingBuildings[0];
-              buildingCache.set(buildingName, building);
-            } else {
-              building = await base44.entities.Building.create({
-                name: buildingName
-              });
-              buildingCache.set(buildingName, building);
-              summary.buildingsCreated++;
-            }
-          }
-
-          // Find floor by name and building (cached)
-          const floorCacheKey = `${building.id}_${floorName}`;
-          let floorId = floorCache.get(floorCacheKey);
-          if (!floorId && floorName) {
-            const floors = await base44.entities.Floor.filter({ 
-              building_id: building.id,
-              name: floorName
-            });
-            if (floors.length > 0) {
-              floorId = floors[0].id;
-              floorCache.set(floorCacheKey, floorId);
-            }
-          }
-
-          // Upsert Room
-          const existingRooms = await base44.entities.Room.filter({ akita_room_id: roomId });
-          const roomData = {
-            akita_room_id: roomId,
-            room_number: row['Number'] || '',
-            room_name: row['Name'] || '',
-            room_category: row['Room Category'] || '',
-            floor_id: floorId,
-            floor_name: floorName,
-            building_id: building.id,
-            building_name: buildingName,
-            square_feet: row['Square Feet'] ? String(row['Square Feet']) : '',
-            type: row['Type'] || '',
-            floor_type: row['Floor Type'] || '',
-            verified: row['Verified'] === 'Verified',
-            description: row['Description'] || '',
-            occupant: row['Occupant'] || '',
-            status: row['Status'] || 'Active',
-            decommissioned_date: row['Decommissioned Date'] || null,
-            akita_url: row['Url'] || '',
-            portal_url: row['Portal URL'] || '',
-            updated_at: new Date().toISOString(),
-            updated_by: user.email
-          };
-
-          if (existingRooms.length > 0) {
-            await base44.entities.Room.update(existingRooms[0].id, roomData);
-            roomCache.set(roomId, existingRooms[0].id);
-            summary.roomsUpdated++;
-          } else {
-            roomData.created_at = new Date().toISOString();
-            roomData.created_by = user.email;
-            const newRoom = await base44.entities.Room.create(roomData);
-            roomCache.set(roomId, newRoom.id);
-            summary.roomsCreated++;
-          }
-          
-          // Small delay between records within batch
-          await delay(200);
-        } catch (err) {
-          summary.errors.push(`Room error: ${err.message}`);
-        }
+      // Log progress every 50 rooms
+      if (i % 50 === 0) {
+        console.log(`Processing room ${i + 1} of ${roomsRows.length}`);
       }
       
-      // Longer delay between batches to avoid rate limiting
-      console.log(`Batch complete. Waiting 2 seconds before next batch...`);
-      await delay(2000);
+      try {
+        const roomId = row['_id'];
+        const buildingName = row['Building'];
+        const floorName = row['Floor'];
+        
+        if (!roomId) {
+          summary.errors.push(`Room missing ID: ${JSON.stringify(row)}`);
+          continue;
+        }
+
+        // Find building (cached)
+        let building = buildingCache.get(buildingName);
+        if (!building) {
+          const existingBuildings = await base44.entities.Building.filter({ name: buildingName });
+          if (existingBuildings.length > 0) {
+            building = existingBuildings[0];
+            buildingCache.set(buildingName, building);
+          } else {
+            building = await base44.entities.Building.create({
+              name: buildingName
+            });
+            buildingCache.set(buildingName, building);
+            summary.buildingsCreated++;
+          }
+        }
+
+        // Find floor by name and building (cached)
+        const floorCacheKey = `${building.id}_${floorName}`;
+        let floorId = floorCache.get(floorCacheKey);
+        if (!floorId && floorName) {
+          const floors = await base44.entities.Floor.filter({ 
+            building_id: building.id,
+            name: floorName
+          });
+          if (floors.length > 0) {
+            floorId = floors[0].id;
+            floorCache.set(floorCacheKey, floorId);
+          }
+        }
+
+        // Upsert Room
+        const existingRooms = await base44.entities.Room.filter({ akita_room_id: roomId });
+        const roomData = {
+          akita_room_id: roomId,
+          room_number: row['Number'] || '',
+          room_name: row['Name'] || '',
+          room_category: row['Room Category'] || '',
+          floor_id: floorId,
+          floor_name: floorName,
+          building_id: building.id,
+          building_name: buildingName,
+          square_feet: row['Square Feet'] ? String(row['Square Feet']) : '',
+          type: row['Type'] || '',
+          floor_type: row['Floor Type'] || '',
+          verified: row['Verified'] === 'Verified',
+          description: row['Description'] || '',
+          occupant: row['Occupant'] || '',
+          status: row['Status'] || 'Active',
+          decommissioned_date: row['Decommissioned Date'] || null,
+          akita_url: row['Url'] || '',
+          portal_url: row['Portal URL'] || '',
+          updated_at: new Date().toISOString(),
+          updated_by: user.email
+        };
+
+        if (existingRooms.length > 0) {
+          await base44.entities.Room.update(existingRooms[0].id, roomData);
+          roomCache.set(roomId, existingRooms[0].id);
+          summary.roomsUpdated++;
+        } else {
+          roomData.created_at = new Date().toISOString();
+          roomData.created_by = user.email;
+          const newRoom = await base44.entities.Room.create(roomData);
+          roomCache.set(roomId, newRoom.id);
+          summary.roomsCreated++;
+        }
+        
+        // Minimal delay to avoid rate limits
+        await delay(100);
+      } catch (err) {
+        summary.errors.push(`Room error: ${err.message}`);
+      }
     }
+    console.log(`✅ Completed processing ${roomsRows.length} rooms`);
     }
 
     // Process Assets
