@@ -297,9 +297,9 @@ Deno.serve(async (req) => {
             for (let i = startIdx; i < endIdx; i++) {
             const row = roomsData[i];
             
-            // Add delay to avoid rate limits (500ms per room)
+            // Add delay to avoid rate limits (1000ms per room)
             if (i > startIdx) {
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
             if (i % 100 === 0 && i > 0) {
