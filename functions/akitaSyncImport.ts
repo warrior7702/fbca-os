@@ -215,9 +215,9 @@ Deno.serve(async (req) => {
         summary.errors.push(`Floor error: ${err.message}`);
       }
       
-      // Small delay to avoid rate limiting
-      if ((i + 1) % 10 === 0) {
-        await delay(100);
+      // Delay to avoid rate limiting
+      if ((i + 1) % 5 === 0) {
+        await delay(500);
       }
     }
 
@@ -301,9 +301,9 @@ Deno.serve(async (req) => {
         summary.errors.push(`Room error: ${err.message}`);
       }
       
-      // Small delay to avoid rate limiting
-      if ((i + 1) % 10 === 0) {
-        await delay(100);
+      // Delay to avoid rate limiting
+      if ((i + 1) % 5 === 0) {
+        await delay(500);
       }
     }
 
@@ -435,9 +435,9 @@ Deno.serve(async (req) => {
         summary.errors.push(`Asset error: ${err.message}`);
       }
       
-      // Small delay to avoid rate limiting
-      if ((i + 1) % 10 === 0) {
-        await delay(100);
+      // Delay to avoid rate limiting
+      if ((i + 1) % 5 === 0) {
+        await delay(500);
       }
     }
 
