@@ -1,6 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
+// Helper to add delay between operations
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Helper to parse level number from floor name
 function parseLevelNumber(floorName) {
   if (!floorName) return null;
@@ -148,7 +151,8 @@ Deno.serve(async (req) => {
 
     // Process Floors first (which creates Buildings)
     console.log('Processing floors...');
-    for (const row of floorsRows) {
+    for (let i = 0; i < floorsRows.length; i++) {
+      const row = floorsRows[i];
       try {
         const buildingName = row['Building'] || row['building'];
         const floorId = row['_id'];
@@ -203,11 +207,17 @@ Deno.serve(async (req) => {
       } catch (err) {
         summary.errors.push(`Floor error: ${err.message}`);
       }
+      
+      // Small delay to avoid rate limiting
+      if ((i + 1) % 10 === 0) {
+        await delay(100);
+      }
     }
 
     // Process Rooms
     console.log('Processing rooms...');
-    for (const row of roomsRows) {
+    for (let i = 0; i < roomsRows.length; i++) {
+      const row = roomsRows[i];
       try {
         const roomId = row['_id'];
         const buildingName = row['Building'];
@@ -283,11 +293,17 @@ Deno.serve(async (req) => {
       } catch (err) {
         summary.errors.push(`Room error: ${err.message}`);
       }
+      
+      // Small delay to avoid rate limiting
+      if ((i + 1) % 10 === 0) {
+        await delay(100);
+      }
     }
 
     // Process Assets
     console.log('Processing assets...');
-    for (const row of assetsRows) {
+    for (let i = 0; i < assetsRows.length; i++) {
+      const row = assetsRows[i];
       try {
         const assetId = row['_id'];
         const assetCategory = row['Asset Category'];
@@ -410,6 +426,11 @@ Deno.serve(async (req) => {
         }
       } catch (err) {
         summary.errors.push(`Asset error: ${err.message}`);
+      }
+      
+      // Small delay to avoid rate limiting
+      if ((i + 1) % 10 === 0) {
+        await delay(100);
       }
     }
 
