@@ -20,16 +20,46 @@ function parseLevelNumber(floorName) {
   return null;
 }
 
-// Helper to parse CSV/TSV
-function parseCSV(text, delimiter = ',') {
+// Helper to parse CSV with proper quote handling
+function parseCSV(text) {
   const lines = text.split('\n').filter(l => l.trim());
   if (lines.length === 0) return [];
   
-  const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+  // Detect delimiter (comma or tab)
+  const firstLine = lines[0];
+  const delimiter = firstLine.includes('\t') ? '\t' : ',';
+  
+  const parseRow = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+  
+  const headers = parseRow(lines[0]);
   const rows = [];
   
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+    const values = parseRow(lines[i]);
     const row = {};
     headers.forEach((header, idx) => {
       row[header] = values[idx] || '';
@@ -72,23 +102,39 @@ Deno.serve(async (req) => {
       errors: []
     };
 
-    // Fetch files
+    // Fetch and parse files
     console.log('Fetching floors file...');
     const floorsResponse = await fetch(floorsFileUrl);
+    if (!floorsResponse.ok) throw new Error('Failed to fetch floors file');
     const floorsText = await floorsResponse.text();
-    const floorsRows = parseCSV(floorsText);
+    console.log('Floors file size:', floorsText.length);
     
     console.log('Fetching rooms file...');
     const roomsResponse = await fetch(roomsFileUrl);
+    if (!roomsResponse.ok) throw new Error('Failed to fetch rooms file');
     const roomsText = await roomsResponse.text();
-    const roomsRows = parseCSV(roomsText);
+    console.log('Rooms file size:', roomsText.length);
     
     console.log('Fetching assets file...');
     const assetsResponse = await fetch(assetsFileUrl);
+    if (!assetsResponse.ok) throw new Error('Failed to fetch assets file');
     const assetsText = await assetsResponse.text();
+    console.log('Assets file size:', assetsText.length);
+
+    console.log('Parsing CSV files...');
+    const floorsRows = parseCSV(floorsText);
+    const roomsRows = parseCSV(roomsText);
     const assetsRows = parseCSV(assetsText);
 
-    console.log(`Parsed: ${floorsRows.length} floors, ${roomsRows.length} rooms, ${assetsRows.length} assets`);
+    console.log(`✅ Parsed: ${floorsRows.length} floors, ${roomsRows.length} rooms, ${assetsRows.length} assets`);
+    
+    if (floorsRows.length === 0 || roomsRows.length === 0 || assetsRows.length === 0) {
+      return Response.json({
+        success: false,
+        error: 'One or more files are empty or failed to parse',
+        details: `Floors: ${floorsRows.length}, Rooms: ${roomsRows.length}, Assets: ${assetsRows.length}`
+      }, { status: 400 });
+    }
 
     // Cache for lookups
     const buildingCache = new Map();
@@ -97,6 +143,7 @@ Deno.serve(async (req) => {
     const assetGroupCache = new Map();
 
     // Process Floors first (which creates Buildings)
+    console.log('Processing floors...');
     for (const row of floorsRows) {
       try {
         const buildingName = row['Building'] || row['building'];
@@ -155,6 +202,7 @@ Deno.serve(async (req) => {
     }
 
     // Process Rooms
+    console.log('Processing rooms...');
     for (const row of roomsRows) {
       try {
         const roomId = row['_id'];
@@ -234,6 +282,7 @@ Deno.serve(async (req) => {
     }
 
     // Process Assets
+    console.log('Processing assets...');
     for (const row of assetsRows) {
       try {
         const assetId = row['_id'];
@@ -360,16 +409,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log('✅ Import complete!');
+    console.log('Summary:', JSON.stringify(summary, null, 2));
+
     return Response.json({
       success: true,
       summary
     });
 
   } catch (error) {
-    console.error('Import error:', error);
+    console.error('❌ Import error:', error);
+    console.error('Stack:', error.stack);
     return Response.json({
+      success: false,
       error: error.message,
-      details: error.stack
+      details: error.stack,
+      summary
     }, { status: 500 });
   }
 });
