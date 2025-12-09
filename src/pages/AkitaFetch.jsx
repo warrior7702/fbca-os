@@ -6,15 +6,12 @@ import {
   ArrowLeft,
   Building2,
   Layers,
-  DoorOpen,
   Package,
   Search,
   MapPin,
-  Edit3,
-  Check,
-  X,
   Loader2,
-  Filter
+  Filter,
+  ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 export default function AkitaFetch() {
@@ -37,220 +34,113 @@ export default function AkitaFetch() {
   // Data state
   const [buildings, setBuildings] = useState([]);
   const [floors, setFloors] = useState([]);
-  const [rooms, setRooms] = useState([]);
   const [assets, setAssets] = useState([]);
+  const [assetGroups, setAssetGroups] = useState([]);
   
   // Selection state
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [selectedFloor, setSelectedFloor] = useState(null);
-  const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   
   // UI state
   const [loading, setLoading] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
-  const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("Active");
 
-  // Load buildings on mount
+  // Load data on mount
   useEffect(() => {
-    loadBuildings();
+    loadAllData();
   }, []);
 
-  // Load floors when building changes
-  useEffect(() => {
-    if (selectedBuilding) {
-      loadFloors(selectedBuilding.id);
-    } else {
-      setFloors([]);
-      setSelectedFloor(null);
-    }
-  }, [selectedBuilding]);
-
-  // Load rooms and assets when floor changes
-  useEffect(() => {
-    if (selectedFloor && selectedBuilding) {
-      loadRoomsAndAssets(selectedBuilding.id, selectedFloor.id);
-    } else {
-      setRooms([]);
-      setAssets([]);
-    }
-  }, [selectedFloor, selectedBuilding]);
-
-  const loadBuildings = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await base44.functions.invoke('getAkitaBoxData', {
-        type: 'buildings'
-      });
-      
-      console.log('Buildings response:', response.data);
-      
-      if (response.data?.success && response.data?.data?.buildings) {
-        setBuildings(response.data.data.buildings);
-      } else if (response.data?.error) {
-        throw new Error(response.data.error + (response.data.details ? `\n${response.data.details}` : ''));
-      } else {
-        throw new Error('Failed to load buildings - invalid response');
-      }
-    } catch (err) {
-      console.error('Error loading buildings:', err);
-      const errorMsg = err.response?.data?.error || err.response?.data?.details || err.message;
-      setError(errorMsg);
-      toast.error('AkitaBox connection failed - cookie may be expired');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadFloors = async (buildingId) => {
+  const loadAllData = async () => {
     setLoading(true);
     try {
-      const response = await base44.functions.invoke('getAkitaBoxData', {
-        type: 'levels',
-        buildingId
-      });
-      
-      if (response.data?.success && response.data?.data?.levels) {
-        const sortedLevels = response.data.data.levels.sort((a, b) => (a.order || 0) - (b.order || 0));
-        setFloors(sortedLevels);
-        if (sortedLevels.length > 0) {
-          setSelectedFloor(sortedLevels[0]);
+      const [buildingsData, floorsData, assetsData, groupsData] = await Promise.all([
+        base44.entities.Building.list(),
+        base44.entities.Floor.list(),
+        base44.entities.Asset.list(),
+        base44.entities.AssetGroup.list()
+      ]);
+
+      setBuildings(buildingsData);
+      setFloors(floorsData);
+      setAssets(assetsData);
+      setAssetGroups(groupsData);
+
+      // Auto-select first building and floor
+      if (buildingsData.length > 0) {
+        setSelectedBuilding(buildingsData[0]);
+        const buildingFloors = floorsData.filter(f => f.building_id === buildingsData[0].id);
+        if (buildingFloors.length > 0) {
+          setSelectedFloor(buildingFloors[0]);
         }
       }
     } catch (err) {
-      console.error('Error loading floors:', err);
-      toast.error('Failed to load floors');
+      console.error('Error loading data:', err);
+      toast.error('Failed to load facility data');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRoomsAndAssets = async (buildingId, levelId) => {
-    setLoading(true);
-    try {
-      const [roomsResponse, assetsResponse, pinsResponse] = await Promise.all([
-        base44.functions.invoke('getAkitaBoxData', {
-          type: 'rooms',
-          buildingId,
-          levelId
-        }),
-        base44.functions.invoke('getAkitaBoxData', {
-          type: 'assets',
-          buildingId,
-          levelId
-        }),
-        base44.functions.invoke('getAssetPins', {
-          levelId
-        })
-      ]);
-
-      if (roomsResponse.data?.success && roomsResponse.data?.data?.rooms) {
-        setRooms(roomsResponse.data.data.rooms);
-      }
-
-      // Build pin map
-      const pinMap = new Map();
-      if (pinsResponse.data?.success && pinsResponse.data?.pins) {
-        pinsResponse.data.pins.forEach(pin => {
-          pinMap.set(pin.asset_id, pin);
-        });
-      }
-
-      if (assetsResponse.data?.success && assetsResponse.data?.data?.assets) {
-        const assetsData = assetsResponse.data.data.assets.map(asset => {
-          const assetId = asset._id || asset.id;
-          const savedPin = pinMap.get(assetId);
-          
-          return {
-            id: assetId,
-            name: asset.name || asset.displayName || 'Unnamed Asset',
-            group: asset.pinType?.name || asset.asset_group || null,
-            buildingId,
-            levelId,
-            roomId: asset.room?._id || null,
-            fields: asset.values || {},
-            floorplan: {
-              x: savedPin?.x ?? asset.percentX ?? null,
-              y: savedPin?.y ?? asset.percentY ?? null
-            }
-          };
-        });
-        setAssets(assetsData);
-      }
-    } catch (err) {
-      console.error('Error loading rooms/assets:', err);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
+  const handleAssetClick = (asset) => {
+    setSelectedAsset(asset);
   };
 
-  const handlePinClick = async (x, y) => {
-    if (!editMode || !selectedAsset) return;
-
-    try {
-      // Save pin location using backend function
-      await base44.functions.invoke('updateAssetPin', {
-        assetId: selectedAsset.id,
-        levelId: selectedFloor._id,
-        documentId: selectedFloor.document?.id || null,
-        x,
-        y
-      });
-
-      // Update local state
-      setAssets(prev => prev.map(a => 
-        a.id === selectedAsset.id 
-          ? { ...a, floorplan: { x, y } }
-          : a
-      ));
-
-      toast.success('Pin location updated');
-    } catch (err) {
-      console.error('Error updating pin:', err);
-      toast.error('Failed to update pin location');
-    }
-  };
+  // Get floors for selected building
+  const buildingFloors = useMemo(() => {
+    if (!selectedBuilding) return [];
+    return floors.filter(f => f.building_id === selectedBuilding.id)
+      .sort((a, b) => (a.level_number || 0) - (b.level_number || 0));
+  }, [selectedBuilding, floors]);
 
   // Asset filtering
-  const assetGroups = useMemo(() => {
-    const groups = new Set(assets.map(a => a.group).filter(Boolean));
-    return Array.from(groups);
-  }, [assets]);
-
   const filteredAssets = useMemo(() => {
+    if (!selectedBuilding || !selectedFloor) return [];
+    
     return assets.filter(asset => {
-      // Group filter
-      if (groupFilter !== "all" && asset.group !== groupFilter) return false;
+      // Floor filter
+      if (asset.floor_id !== selectedFloor.id) return false;
       
-      // Room filter
-      if (selectedRoom && asset.roomId !== selectedRoom.id) return false;
+      // Status filter
+      if (statusFilter !== "all" && asset.status !== statusFilter) return false;
+      
+      // Group filter
+      if (groupFilter !== "all") {
+        const assetGroup = assetGroups.find(g => g.id === asset.asset_group_id);
+        if (assetGroup?.name !== groupFilter) return false;
+      }
       
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const searchableText = `${asset.name} ${asset.group || ''} ${JSON.stringify(asset.fields)}`.toLowerCase();
+        const searchableText = `${asset.name} ${asset.model || ''} ${asset.serial_number || ''} ${asset.room_number || ''}`.toLowerCase();
         if (!searchableText.includes(query)) return false;
       }
       
       return true;
     });
-  }, [assets, groupFilter, selectedRoom, searchQuery]);
+  }, [assets, selectedBuilding, selectedFloor, groupFilter, statusFilter, searchQuery, assetGroups]);
 
-  const floorplanImage = selectedFloor?.document?.public_thumbnail_url_display ||
-                        selectedFloor?.document?.public_thumbnail_url_large ||
-                        selectedFloor?.document?.public_thumbnail_url_medium ||
-                        selectedFloor?.document?.public_url ||
-                        null;
+  const floorplanImage = selectedFloor?.floor_plan_file || null;
+
+  // Get asset stats
+  const assetStats = useMemo(() => {
+    if (!selectedBuilding) return { total: 0, byFloor: 0 };
+    const buildingAssets = assets.filter(a => a.building_id === selectedBuilding.id);
+    const floorAssets = selectedFloor ? buildingAssets.filter(a => a.floor_id === selectedFloor.id) : [];
+    return {
+      total: buildingAssets.length,
+      byFloor: floorAssets.length
+    };
+  }, [selectedBuilding, selectedFloor, assets]);
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
       {/* Header */}
       <div className="border-b bg-white shadow-sm p-4">
-        <div className="flex items-center justify-between max-w-full">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -267,33 +157,12 @@ export default function AkitaFetch() {
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={editMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setEditMode(!editMode)}
-              className={editMode ? "bg-blue-600" : ""}
-            >
-              {editMode ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Edit Mode ON
-                </>
-              ) : (
-                <>
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Edit Pins
-                </>
-              )}
-            </Button>
-          </div>
         </div>
       </div>
 
       {/* 3-Panel Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* PANEL 1: Navigation (Buildings → Floors → Rooms) */}
+        {/* PANEL 1: Buildings & Floors */}
         <div className="w-80 border-r bg-white shadow-sm flex flex-col">
           <ScrollArea className="flex-1 p-4">
             {/* Buildings */}
@@ -307,155 +176,167 @@ export default function AkitaFetch() {
                   <div className="flex justify-center p-4">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                   </div>
+                ) : buildings.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">
+                    No buildings found. Run AkitaSync import first.
+                  </p>
                 ) : (
-                  buildings.map(building => (
-                    <motion.div
-                      key={building.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Card
-                        className={`cursor-pointer transition-all ${
-                          selectedBuilding?.id === building.id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'hover:border-blue-300'
-                        }`}
-                        onClick={() => {
-                          setSelectedBuilding(building);
-                          setSelectedRoom(null);
-                          setSelectedAsset(null);
-                        }}
+                  buildings.map(building => {
+                    const buildingAssetCount = assets.filter(a => a.building_id === building.id).length;
+                    return (
+                      <motion.div
+                        key={building.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <CardContent className="p-3">
-                          <div className="font-medium text-sm">{building.name}</div>
-                          <div className="text-xs text-slate-500 mt-1">{building.address}</div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))
+                        <Card
+                          className={`cursor-pointer transition-all ${
+                            selectedBuilding?.id === building.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'hover:border-blue-300'
+                          }`}
+                          onClick={() => {
+                            setSelectedBuilding(building);
+                            const newFloors = floors.filter(f => f.building_id === building.id);
+                            if (newFloors.length > 0) {
+                              setSelectedFloor(newFloors[0]);
+                            } else {
+                              setSelectedFloor(null);
+                            }
+                            setSelectedAsset(null);
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <div className="font-medium text-sm">{building.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {building.address && (
+                                <div className="text-xs text-slate-500">{building.address}</div>
+                              )}
+                              <Badge variant="outline" className="text-xs ml-auto">
+                                {buildingAssetCount} assets
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })
                 )}
               </div>
             </div>
 
             {/* Floors */}
             {selectedBuilding && (
-              <div className="mb-6">
+              <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Layers className="w-4 h-4 text-slate-600" />
                   <h3 className="font-semibold text-sm text-slate-700">Floors</h3>
                 </div>
                 <div className="space-y-2">
-                  {floors.map(floor => (
-                    <motion.div
-                      key={floor._id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Card
-                        className={`cursor-pointer transition-all ${
-                          selectedFloor?._id === floor._id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'hover:border-blue-300'
-                        }`}
-                        onClick={() => {
-                          setSelectedFloor(floor);
-                          setSelectedRoom(null);
-                          setSelectedAsset(null);
-                        }}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-sm">{floor.name}</div>
-                            <Badge variant="outline" className="text-xs">
-                              {floor.order || 0}
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Rooms */}
-            {selectedFloor && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <DoorOpen className="w-4 h-4 text-slate-600" />
-                  <h3 className="font-semibold text-sm text-slate-700">Rooms</h3>
-                  {selectedRoom && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedRoom(null)}
-                      className="h-6 text-xs"
-                    >
-                      Clear
-                    </Button>
+                  {buildingFloors.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-2">No floors found</p>
+                  ) : (
+                    buildingFloors.map(floor => {
+                      const floorAssetCount = assets.filter(a => a.floor_id === floor.id).length;
+                      return (
+                        <motion.div
+                          key={floor.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Card
+                            className={`cursor-pointer transition-all ${
+                              selectedFloor?.id === floor.id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'hover:border-blue-300'
+                            }`}
+                            onClick={() => {
+                              setSelectedFloor(floor);
+                              setSelectedAsset(null);
+                            }}
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium text-sm">{floor.name}</div>
+                                <div className="flex items-center gap-2">
+                                  {floor.level_number && (
+                                    <Badge variant="outline" className="text-xs">
+                                      L{floor.level_number}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {floorAssetCount}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })
                   )}
-                </div>
-                <div className="space-y-1">
-                  {rooms.map(room => (
-                    <div
-                      key={room._id}
-                      className={`p-2 rounded cursor-pointer text-sm transition-colors ${
-                        selectedRoom?._id === room._id
-                          ? 'bg-blue-100 text-blue-900'
-                          : 'hover:bg-slate-100'
-                      }`}
-                      onClick={() => setSelectedRoom(room)}
-                    >
-                      <div className="font-medium">{room.number || room.name}</div>
-                      {room.number && room.name && (
-                        <div className="text-xs text-slate-500">{room.name}</div>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
           </ScrollArea>
         </div>
 
-        {/* PANEL 2: Floorplan Canvas */}
+        {/* PANEL 2: Floorplan Viewer */}
         <div className="flex-1 flex flex-col bg-slate-100">
-          <div className="border-b bg-white p-3 flex items-center justify-between">
+          <div className="border-b bg-white p-3">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-slate-600" />
               <h3 className="font-semibold text-sm">
-                {selectedFloor ? `${selectedFloor.name} Floorplan` : 'Select a floor'}
+                {selectedFloor ? `${selectedFloor.name} - Floor Plan` : 'Select a floor'}
               </h3>
+              {selectedFloor && (
+                <Badge variant="outline" className="ml-auto">
+                  {assetStats.byFloor} assets on this floor
+                </Badge>
+              )}
             </div>
-            {editMode && selectedAsset && (
-              <Badge className="bg-amber-500">
-                Click floorplan to place pin for: {selectedAsset.name}
-              </Badge>
-            )}
           </div>
 
           <div className="flex-1 p-4 overflow-auto">
-            {floorplanImage ? (
-              <FloorplanCanvas
-                imageUrl={floorplanImage}
-                assets={filteredAssets}
-                selectedAsset={selectedAsset}
-                editMode={editMode}
-                onPinClick={handlePinClick}
-                onAssetClick={(asset) => setSelectedAsset(asset)}
-              />
+            {selectedFloor ? (
+              floorplanImage ? (
+                <FloorplanCanvas
+                  imageUrl={floorplanImage}
+                  assets={filteredAssets}
+                  selectedAsset={selectedAsset}
+                  onAssetClick={handleAssetClick}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <Card className="max-w-md">
+                    <CardContent className="py-12 text-center">
+                      <MapPin className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                      <p className="text-slate-600 font-medium mb-2">No floor plan available</p>
+                      <p className="text-sm text-slate-500 mb-4">
+                        Upload a floor plan PDF for {selectedFloor.name}
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(createPageUrl('FloorPlanManager'))}
+                      >
+                        Upload Floor Plans
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )
             ) : (
               <div className="h-full flex items-center justify-center text-slate-400">
                 <div className="text-center">
-                  <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No floorplan available</p>
+                  <Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Select a building and floor to view floor plan</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* PANEL 3: Assets */}
+        {/* PANEL 3: Assets List & Details */}
         <div className="w-96 border-l bg-white shadow-sm flex flex-col">
           {/* Search & Filters */}
           <div className="p-4 border-b space-y-3">
@@ -470,201 +351,231 @@ export default function AkitaFetch() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search assets..."
+                placeholder="Search by name, model, serial..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
             </div>
 
-            <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Groups</SelectItem>
-                {assetGroups.map(group => (
-                  <SelectItem key={group} value={group}>
-                    {group}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={groupFilter} onValueChange={setGroupFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
+                  {assetGroups.map(group => (
+                    <SelectItem key={group.id} value={group.name}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Decommissioned">Decommissioned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Asset List */}
           <ScrollArea className="flex-1 p-4">
-            <div className="space-y-2">
-              {filteredAssets.map(asset => (
-                <motion.div
-                  key={asset.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Card
-                    className={`cursor-pointer transition-all ${
-                      selectedAsset?.id === asset.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'hover:border-blue-300'
-                    }`}
-                    onClick={() => setSelectedAsset(asset)}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {asset.name}
-                          </div>
-                          {asset.group && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {asset.group}
-                            </Badge>
-                          )}
-                          <div className="text-xs text-slate-500 mt-1">
-                            {asset.floorplan.x && asset.floorplan.y ? (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                Pin: {asset.floorplan.x.toFixed(1)}%, {asset.floorplan.y.toFixed(1)}%
+            {filteredAssets.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                <p className="text-sm text-slate-500">
+                  {!selectedFloor ? 'Select a floor to view assets' : 'No assets found'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredAssets.map(asset => {
+                  const assetGroup = assetGroups.find(g => g.id === asset.asset_group_id);
+                  return (
+                    <motion.div
+                      key={asset.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Card
+                        className={`cursor-pointer transition-all ${
+                          selectedAsset?.id === asset.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'hover:border-blue-300'
+                        }`}
+                        onClick={() => setSelectedAsset(asset)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="font-medium text-sm">{asset.name}</div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {assetGroup && (
+                              <Badge variant="outline" className="text-xs">
+                                {assetGroup.name}
+                              </Badge>
+                            )}
+                            {asset.room_number && (
+                              <span className="text-xs text-slate-500">
+                                Room {asset.room_number}
                               </span>
-                            ) : (
-                              <span className="text-amber-600">No pin placed</span>
                             )}
                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                          {asset.x_coord !== null && asset.y_coord !== null ? (
+                            <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              On floor plan
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-400 mt-1">No location</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </ScrollArea>
 
           {/* Asset Details */}
           {selectedAsset && (
-            <div className="border-t p-4 bg-slate-50">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm">Asset Details</h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedAsset(null)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              
-              <div className="space-y-2 text-xs">
+            <div className="border-t p-4 bg-slate-50 max-h-96 overflow-y-auto">
+              <div className="space-y-3 text-sm">
                 <div>
-                  <span className="font-medium text-slate-600">Name:</span>
-                  <div className="mt-1">{selectedAsset.name}</div>
-                </div>
-                
-                {selectedAsset.group && (
-                  <div>
-                    <span className="font-medium text-slate-600">Group:</span>
-                    <div className="mt-1">{selectedAsset.group}</div>
-                  </div>
-                )}
-
-                {rooms.find(r => r._id === selectedAsset.roomId) && (
-                  <div>
-                    <span className="font-medium text-slate-600">Room:</span>
-                    <div className="mt-1">
-                      {rooms.find(r => r._id === selectedAsset.roomId)?.number || 
-                       rooms.find(r => r._id === selectedAsset.roomId)?.name}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <span className="font-medium text-slate-600">Coordinates:</span>
-                  <div className="mt-1">
-                    {selectedAsset.floorplan.x && selectedAsset.floorplan.y
-                      ? `X: ${selectedAsset.floorplan.x.toFixed(2)}%, Y: ${selectedAsset.floorplan.y.toFixed(2)}%`
-                      : 'Not placed'}
-                  </div>
+                  <h4 className="font-semibold text-slate-900 mb-2">{selectedAsset.name}</h4>
+                  {selectedAsset.asset_category && (
+                    <Badge variant="outline">{selectedAsset.asset_category}</Badge>
+                  )}
                 </div>
 
-                {Object.keys(selectedAsset.fields).length > 0 && (
-                  <div>
-                    <span className="font-medium text-slate-600">Fields:</span>
-                    <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
-                      {Object.entries(selectedAsset.fields).map(([key, value]) => (
-                        <div key={key} className="text-xs">
-                          <span className="font-medium">{key}:</span>{' '}
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </div>
-                      ))}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {selectedAsset.building_name && (
+                    <div>
+                      <span className="font-medium text-slate-600">Building</span>
+                      <div className="mt-1">{selectedAsset.building_name}</div>
                     </div>
+                  )}
+                  {selectedAsset.floor_name && (
+                    <div>
+                      <span className="font-medium text-slate-600">Floor</span>
+                      <div className="mt-1">{selectedAsset.floor_name}</div>
+                    </div>
+                  )}
+                  {selectedAsset.room_number && (
+                    <div>
+                      <span className="font-medium text-slate-600">Room</span>
+                      <div className="mt-1">
+                        {selectedAsset.room_number}
+                        {selectedAsset.room_name && ` - ${selectedAsset.room_name}`}
+                      </div>
+                    </div>
+                  )}
+                  {selectedAsset.manufacturer && (
+                    <div>
+                      <span className="font-medium text-slate-600">Manufacturer</span>
+                      <div className="mt-1">{selectedAsset.manufacturer}</div>
+                    </div>
+                  )}
+                  {selectedAsset.model && (
+                    <div>
+                      <span className="font-medium text-slate-600">Model</span>
+                      <div className="mt-1">{selectedAsset.model}</div>
+                    </div>
+                  )}
+                  {selectedAsset.serial_number && (
+                    <div>
+                      <span className="font-medium text-slate-600">Serial</span>
+                      <div className="mt-1">{selectedAsset.serial_number}</div>
+                    </div>
+                  )}
+                  {selectedAsset.condition && (
+                    <div>
+                      <span className="font-medium text-slate-600">Condition</span>
+                      <div className="mt-1">{selectedAsset.condition}</div>
+                    </div>
+                  )}
+                  {selectedAsset.installation_date && (
+                    <div>
+                      <span className="font-medium text-slate-600">Installed</span>
+                      <div className="mt-1">{selectedAsset.installation_date}</div>
+                    </div>
+                  )}
+                </div>
+
+                {selectedAsset.description && (
+                  <div>
+                    <span className="font-medium text-slate-600 text-xs">Description</span>
+                    <p className="text-xs text-slate-700 mt-1">{selectedAsset.description}</p>
                   </div>
                 )}
 
-                <Button
-                  className="w-full mt-3"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditMode(true)}
-                >
-                  <Edit3 className="w-3 h-3 mr-2" />
-                  Edit Pin Location
-                </Button>
+                <div className="pt-2 border-t">
+                  <span className="font-medium text-slate-600 text-xs">Floor Plan Location</span>
+                  <div className="text-xs text-slate-700 mt-1">
+                    {selectedAsset.x_coord !== null && selectedAsset.y_coord !== null
+                      ? `X: ${(selectedAsset.x_coord * 100).toFixed(1)}%, Y: ${(selectedAsset.y_coord * 100).toFixed(1)}%`
+                      : 'No coordinates set'}
+                  </div>
+                </div>
+
+                {selectedAsset.akita_url && (
+                  <a
+                    href={selectedAsset.akita_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <Button variant="outline" size="sm" className="w-full">
+                      <ExternalLink className="w-3 h-3 mr-2" />
+                      View in AkitaBox
+                    </Button>
+                  </a>
+                )}
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="absolute bottom-4 right-4 bg-red-100 border border-red-300 text-red-800 px-4 py-2 rounded-lg shadow-lg">
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
+          </div>
+          </div>
+          </div>
+          );
+          }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, selectedAsset, editMode, onPinClick, onAssetClick }) {
-  const canvasRef = React.useRef(null);
-
-  const handleCanvasClick = (e) => {
-    if (!editMode || !selectedAsset) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    onPinClick(x, y);
-  };
-
+function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick }) {
   return (
-    <div 
-      ref={canvasRef}
-      className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner"
-      style={{ cursor: editMode && selectedAsset ? 'crosshair' : 'default' }}
-      onClick={handleCanvasClick}
-    >
+    <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
       <img
         src={imageUrl}
-        alt="Floorplan"
+        alt="Floor plan"
         className="max-w-full max-h-full object-contain select-none"
         draggable={false}
       />
 
-      {/* Pin Overlay */}
+      {/* Asset Pins Overlay */}
       <div className="absolute inset-0 pointer-events-none">
         {assets.map(asset => {
-          if (!asset.floorplan.x || !asset.floorplan.y) return null;
+          if (asset.x_coord === null || asset.y_coord === null) return null;
 
           const isSelected = selectedAsset?.id === asset.id;
+          
+          // Convert 0-1 normalized coords to percentage
+          const xPercent = asset.x_coord * 100;
+          const yPercent = asset.y_coord * 100;
 
           return (
             <motion.div
               key={asset.id}
               className="absolute pointer-events-auto"
               style={{
-                left: `${asset.floorplan.x}%`,
-                top: `${asset.floorplan.y}%`,
+                left: `${xPercent}%`,
+                top: `${yPercent}%`,
                 transform: 'translate(-50%, -50%)'
               }}
               initial={{ scale: 0 }}
