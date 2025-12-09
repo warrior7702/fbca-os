@@ -59,6 +59,8 @@ import ImportClickUpTickets from './pages/ImportClickUpTickets';
 import ImportTickets from './pages/ImportTickets';
 import NormalizeUserNames from './pages/NormalizeUserNames';
 import BackfillEventCodes from './pages/BackfillEventCodes';
+import FloorPlanManager from './pages/FloorPlanManager';
+import AkitaSyncAdmin from './pages/AkitaSyncAdmin';
 import __Layout from './Layout.jsx';
 
 
@@ -124,6 +126,8 @@ export const PAGES = {
     "ImportTickets": ImportTickets,
     "NormalizeUserNames": NormalizeUserNames,
     "BackfillEventCodes": BackfillEventCodes,
+    "FloorPlanManager": FloorPlanManager,
+    "AkitaSyncAdmin": AkitaSyncAdmin,
 }
 
 export const pagesConfig = {
