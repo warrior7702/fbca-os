@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import * as XLSX from 'npm:xlsx@0.18.5';
 
 // Helper to parse level number from floor name
 function parseLevelNumber(floorName) {
@@ -102,29 +103,34 @@ Deno.serve(async (req) => {
       errors: []
     };
 
-    // Fetch and parse files
-    console.log('Fetching floors file...');
-    const floorsResponse = await fetch(floorsFileUrl);
-    if (!floorsResponse.ok) throw new Error('Failed to fetch floors file');
-    const floorsText = await floorsResponse.text();
-    console.log('Floors file size:', floorsText.length);
-    
-    console.log('Fetching rooms file...');
-    const roomsResponse = await fetch(roomsFileUrl);
-    if (!roomsResponse.ok) throw new Error('Failed to fetch rooms file');
-    const roomsText = await roomsResponse.text();
-    console.log('Rooms file size:', roomsText.length);
-    
-    console.log('Fetching assets file...');
-    const assetsResponse = await fetch(assetsFileUrl);
-    if (!assetsResponse.ok) throw new Error('Failed to fetch assets file');
-    const assetsText = await assetsResponse.text();
-    console.log('Assets file size:', assetsText.length);
+    // Helper to parse file (CSV or XLSX)
+    const parseFile = async (url, name) => {
+      console.log(`Fetching ${name} file...`);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch ${name} file`);
+      
+      const buffer = await response.arrayBuffer();
+      console.log(`${name} file size:`, buffer.byteLength);
+      
+      // Check if it's XLSX (starts with PK signature)
+      const view = new Uint8Array(buffer);
+      const isXLSX = view[0] === 0x50 && view[1] === 0x4B; // "PK"
+      
+      if (isXLSX) {
+        console.log(`${name} is XLSX format, parsing...`);
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        return XLSX.utils.sheet_to_json(firstSheet);
+      } else {
+        console.log(`${name} is CSV format, parsing...`);
+        const text = new TextDecoder().decode(buffer);
+        return parseCSV(text);
+      }
+    };
 
-    console.log('Parsing CSV files...');
-    const floorsRows = parseCSV(floorsText);
-    const roomsRows = parseCSV(roomsText);
-    const assetsRows = parseCSV(assetsText);
+    const floorsRows = await parseFile(floorsFileUrl, 'Floors');
+    const roomsRows = await parseFile(roomsFileUrl, 'Rooms');
+    const assetsRows = await parseFile(assetsFileUrl, 'Assets');
 
     console.log(`✅ Parsed: ${floorsRows.length} floors, ${roomsRows.length} rooms, ${assetsRows.length} assets`);
     
