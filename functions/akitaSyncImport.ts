@@ -227,15 +227,24 @@ Deno.serve(async (req) => {
           summary.warnings.push(`Failed to fetch rooms file: ${roomsResponse.statusText}`);
         } else {
           const text = await roomsResponse.text();
+          console.log('Rooms file text length:', text.length);
+          console.log('First 200 chars:', text.substring(0, 200));
           
           // Parse TSV text with BOM handling
           const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+          console.log('Total lines:', lines.length);
           
           // Extract headers and strip UTF-8 BOM
           let header = lines[0];
+          console.log('Raw header (first 100 chars):', header.substring(0, 100));
+          console.log('Header char codes:', Array.from(header.substring(0, 10)).map(c => c.charCodeAt(0)));
+          
           header = header.replace(/^\uFEFF/, "");   // removes BOM
+          console.log('Header after BOM removal:', header.substring(0, 100));
           
           const columns = header.split("\t");
+          console.log('Column count:', columns.length);
+          console.log('First 5 columns:', columns.slice(0, 5));
           
           const roomsData = [];
           for (let i = 1; i < lines.length; i++) {
@@ -244,6 +253,12 @@ Deno.serve(async (req) => {
             
             for (let c = 0; c < columns.length; c++) {
               obj[columns[c]] = row[c] ?? "";
+            }
+            
+            // Debug first row
+            if (i === 1) {
+              console.log('First row object keys:', Object.keys(obj).slice(0, 5));
+              console.log('First row _id value:', obj["_id"]);
             }
             
             // Validate
