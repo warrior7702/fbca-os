@@ -242,9 +242,10 @@ Deno.serve(async (req) => {
           header = header.replace(/^\uFEFF/, "");   // removes BOM
           console.log('Header after BOM removal:', header.substring(0, 100));
           
-          const columns = header.split("\t");
+          const columns = header.split("\t").map(col => col.trim());
           console.log('Column count:', columns.length);
           console.log('First 5 columns:', columns.slice(0, 5));
+          console.log('First column exact:', JSON.stringify(columns[0]));
           
           const roomsData = [];
           for (let i = 1; i < lines.length; i++) {
