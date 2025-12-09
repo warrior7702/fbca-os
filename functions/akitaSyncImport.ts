@@ -20,54 +20,72 @@ function parseLevelNumber(floorName) {
   return null;
 }
 
-// Helper to parse CSV with proper quote handling
-function parseCSV(text) {
-  const lines = text.split('\n').filter(l => l.trim());
-  if (lines.length === 0) return [];
+// Helper to parse file (CSV or XLSX)
+async function parseFile(fileUrl) {
+  const response = await fetch(fileUrl);
+  if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
   
-  // Detect delimiter (comma or tab)
-  const firstLine = lines[0];
-  const delimiter = firstLine.includes('\t') ? '\t' : ',';
+  // Check if it's XLSX by content type or file signature
+  const arrayBuffer = await response.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
   
-  const parseRow = (line) => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
+  // Check for XLSX signature (PK zip header)
+  const isXLSX = uint8Array[0] === 0x50 && uint8Array[1] === 0x4B;
+  
+  if (isXLSX) {
+    // Parse XLSX
+    const workbook = XLSX.read(uint8Array, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+    return jsonData;
+  } else {
+    // Parse CSV
+    const text = new TextDecoder().decode(uint8Array);
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return [];
     
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
+    const delimiter = lines[0].includes('\t') ? '\t' : ',';
+    
+    const parseRow = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
       
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim());
+          current = '';
         } else {
-          inQuotes = !inQuotes;
+          current += char;
         }
-      } else if (char === delimiter && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
       }
+      result.push(current.trim());
+      return result;
+    };
+    
+    const headers = parseRow(lines[0]);
+    const rows = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseRow(lines[i]);
+      const row = {};
+      headers.forEach((header, idx) => {
+        row[header] = values[idx] || '';
+      });
+      rows.push(row);
     }
-    result.push(current.trim());
-    return result;
-  };
-  
-  const headers = parseRow(lines[0]);
-  const rows = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseRow(lines[i]);
-    const row = {};
-    headers.forEach((header, idx) => {
-      row[header] = values[idx] || '';
-    });
-    rows.push(row);
+    
+    return rows;
   }
-  
-  return rows;
 }
 
 Deno.serve(async (req) => {
@@ -103,30 +121,15 @@ Deno.serve(async (req) => {
     };
 
     // Fetch and parse files
-    console.log('Fetching floors file...');
-    const floorsResponse = await fetch(floorsFileUrl);
-    if (!floorsResponse.ok) throw new Error('Failed to fetch floors file');
-    const floorsText = await floorsResponse.text();
-    console.log('Floors file size:', floorsText.length);
+    console.log('Parsing files (CSV or XLSX)...');
+    const floorsRows = await parseFile(floorsFileUrl);
+    console.log(`✅ Floors parsed: ${floorsRows.length} rows`);
     
-    console.log('Fetching rooms file...');
-    const roomsResponse = await fetch(roomsFileUrl);
-    if (!roomsResponse.ok) throw new Error('Failed to fetch rooms file');
-    const roomsText = await roomsResponse.text();
-    console.log('Rooms file size:', roomsText.length);
+    const roomsRows = await parseFile(roomsFileUrl);
+    console.log(`✅ Rooms parsed: ${roomsRows.length} rows`);
     
-    console.log('Fetching assets file...');
-    const assetsResponse = await fetch(assetsFileUrl);
-    if (!assetsResponse.ok) throw new Error('Failed to fetch assets file');
-    const assetsText = await assetsResponse.text();
-    console.log('Assets file size:', assetsText.length);
-
-    console.log('Parsing CSV files...');
-    const floorsRows = parseCSV(floorsText);
-    const roomsRows = parseCSV(roomsText);
-    const assetsRows = parseCSV(assetsText);
-
-    console.log(`✅ Parsed: ${floorsRows.length} floors, ${roomsRows.length} rooms, ${assetsRows.length} assets`);
+    const assetsRows = await parseFile(assetsFileUrl);
+    console.log(`✅ Assets parsed: ${assetsRows.length} rows`);
     
     if (floorsRows.length === 0 || roomsRows.length === 0 || assetsRows.length === 0) {
       return Response.json({
