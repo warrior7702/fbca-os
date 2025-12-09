@@ -215,10 +215,8 @@ Deno.serve(async (req) => {
         summary.errors.push(`Floor error: ${err.message}`);
       }
       
-      // Delay to avoid rate limiting
-      if ((i + 1) % 5 === 0) {
-        await delay(500);
-      }
+      // Delay after every record to avoid rate limiting
+      await delay(1000);
     }
 
     // Process Rooms
@@ -301,10 +299,8 @@ Deno.serve(async (req) => {
         summary.errors.push(`Room error: ${err.message}`);
       }
       
-      // Delay to avoid rate limiting
-      if ((i + 1) % 5 === 0) {
-        await delay(500);
-      }
+      // Delay after every record to avoid rate limiting
+      await delay(1000);
     }
 
     // Process Assets
@@ -435,10 +431,8 @@ Deno.serve(async (req) => {
         summary.errors.push(`Asset error: ${err.message}`);
       }
       
-      // Delay to avoid rate limiting
-      if ((i + 1) % 5 === 0) {
-        await delay(500);
-      }
+      // Delay after every record to avoid rate limiting
+      await delay(1000);
     }
 
     console.log('✅ Import complete!');
