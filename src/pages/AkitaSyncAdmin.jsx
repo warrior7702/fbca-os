@@ -49,26 +49,28 @@ export default function AkitaSyncAdmin() {
 
     try {
       // Upload files based on mode
-      let floorsUpload, roomsUpload, assetsUploads;
+      let floorsFileId = null;
+      let roomsFileId = null;
+      let assetsFileId = null;
       
       if (importMode === 'floors' || importMode === 'all') {
-        floorsUpload = await base44.integrations.Core.UploadFile({ file: floorsFile });
+        const upload = await base44.integrations.Core.UploadFile({ file: floorsFile });
+        floorsFileId = upload.file_url.split('/').pop();
       }
       if (importMode === 'rooms' || importMode === 'all') {
-        roomsUpload = await base44.integrations.Core.UploadFile({ file: roomsFile });
+        const upload = await base44.integrations.Core.UploadFile({ file: roomsFile });
+        roomsFileId = upload.file_url.split('/').pop();
       }
       if (importMode === 'assets' || importMode === 'all') {
-        assetsUploads = await Promise.all(
-          assetsFiles.map(file => base44.integrations.Core.UploadFile({ file }))
-        );
+        const upload = await base44.integrations.Core.UploadFile({ file: assetsFiles[0] });
+        assetsFileId = upload.file_url.split('/').pop();
       }
 
       // Call import function
       const response = await base44.functions.invoke('akitaSyncImport', {
-        floorsFileUrl: floorsUpload?.file_url,
-        roomsFileUrl: roomsUpload?.file_url,
-        assetsFileUrls: assetsUploads?.map(upload => upload.file_url),
-        importMode
+        floorsFileId,
+        roomsFileId,
+        assetsFileId
       });
 
       if (response.data.success) {
@@ -80,7 +82,7 @@ export default function AkitaSyncAdmin() {
     } catch (error) {
       console.error('Import error:', error);
       toast.error(error.message || 'Import failed');
-      setResult({ errors: [error.message] });
+      setResult({ warnings: [error.message] });
     } finally {
       setImporting(false);
     }
@@ -291,7 +293,7 @@ export default function AkitaSyncAdmin() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {result.errors?.length > 0 ? (
+                {result.warnings?.length > 0 ? (
                   <>
                     <AlertCircle className="w-5 h-5 text-amber-600" />
                     Import Completed with Warnings
@@ -340,14 +342,14 @@ export default function AkitaSyncAdmin() {
                 </div>
               </div>
 
-              {result.errors && result.errors.length > 0 && (
+              {result.warnings && result.warnings.length > 0 && (
                 <div>
                   <p className="text-sm font-semibold text-amber-700 mb-2">
-                    Errors ({result.errors.length})
+                    Warnings ({result.warnings.length})
                   </p>
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 max-h-48 overflow-y-auto">
-                    {result.errors.map((error, idx) => (
-                      <p key={idx} className="text-xs text-amber-800 mb-1">{error}</p>
+                    {result.warnings.map((warning, idx) => (
+                      <p key={idx} className="text-xs text-amber-800 mb-1">{warning}</p>
                     ))}
                   </div>
                 </div>
