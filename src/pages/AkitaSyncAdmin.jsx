@@ -24,6 +24,8 @@ export default function AkitaSyncAdmin() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
   const [importMode, setImportMode] = useState('all');
+  const [skipRows, setSkipRows] = useState(0);
+  const [limitRows, setLimitRows] = useState(150);
 
   const handleImport = async () => {
     // Validate based on import mode
@@ -70,7 +72,9 @@ export default function AkitaSyncAdmin() {
       const response = await base44.functions.invoke('akitaSyncImport', {
         floorsFileId,
         roomsFileId,
-        assetsFileId
+        assetsFileId,
+        skipRows: importMode === 'rooms' ? skipRows : undefined,
+        limitRows: importMode === 'rooms' ? limitRows : undefined
       });
 
       if (response.data.success) {
@@ -260,10 +264,44 @@ export default function AkitaSyncAdmin() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+                </div>
+                )}
 
-              <Button
+                {importMode === 'rooms' && (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">
+                    Skip Rows (Start at row #)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={skipRows}
+                    onChange={(e) => setSkipRows(parseInt(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">
+                    Limit (Process # rows)
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={limitRows}
+                    onChange={(e) => setLimitRows(parseInt(e.target.value) || 150)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-500">
+                    Process rows {skipRows} to {skipRows + limitRows}. Run multiple times with different skip values to import all rooms.
+                  </p>
+                </div>
+                </div>
+                )}
+
+                <Button
                 onClick={handleImport}
                 disabled={importing || 
                   (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) ||

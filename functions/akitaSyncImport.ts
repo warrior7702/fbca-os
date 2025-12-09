@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
     
-    const { floorsFileId, roomsFileId, assetsFileId } = body;
+    const { floorsFileId, roomsFileId, assetsFileId, skipRows = 0, limitRows = null } = body;
     
     // Validate at least one file provided
     if (!floorsFileId && !roomsFileId && !assetsFileId) {
@@ -287,13 +287,18 @@ Deno.serve(async (req) => {
             
             console.log('Parsed room count:', roomsData.length);
             console.log('Room headers:', columns);
-          }
-          
-          for (let i = 0; i < roomsData.length; i++) {
+            }
+
+            // Apply skip/limit
+            const startIdx = skipRows;
+            const endIdx = limitRows ? Math.min(startIdx + limitRows, roomsData.length) : roomsData.length;
+            console.log(`Processing rooms ${startIdx} to ${endIdx} of ${roomsData.length}`);
+
+            for (let i = startIdx; i < endIdx; i++) {
             const row = roomsData[i];
             
             // Add delay to avoid rate limits (500ms per room)
-            if (i > 0) {
+            if (i > startIdx) {
               await new Promise(resolve => setTimeout(resolve, 500));
             }
             
