@@ -22,6 +22,7 @@ export default function AkitaSyncAdmin() {
   const [floorsFile, setFloorsFile] = useState(null);
   const [roomsFile, setRoomsFile] = useState(null);
   const [assetsFiles, setAssetsFiles] = useState([]);
+  const [photoFiles, setPhotoFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
   const [importMode, setImportMode] = useState('all');
@@ -236,36 +237,69 @@ export default function AkitaSyncAdmin() {
             )}
 
             {(importMode === 'all' || importMode === 'assets') && (
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Assets Export(s) - Multiple Files Supported
-                </label>
-                <p className="text-xs text-slate-500 mb-2">
-                  If you split assets by building, upload all files here
-                </p>
-                <input
-                  type="file"
-                  accept=".csv,.xlsx"
-                  multiple
-                  onChange={(e) => setAssetsFiles(Array.from(e.target.files))}
-                  className="block w-full text-sm text-slate-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-lg file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100"
-                />
-                {assetsFiles.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {assetsFiles.map((file, idx) => (
-                      <p key={idx} className="text-sm text-green-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        {file.name}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-2 block">
+                    Assets Export(s) - Multiple Files Supported
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    If you split assets by building, upload all files here
+                  </p>
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx"
+                    multiple
+                    onChange={(e) => setAssetsFiles(Array.from(e.target.files))}
+                    className="block w-full text-sm text-slate-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-lg file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100"
+                  />
+                  {assetsFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {assetsFiles.map((file, idx) => (
+                        <p key={idx} className="text-sm text-green-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {file.name}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium text-slate-700 mb-2 block">
+                    Asset Photos (ZIP) - Optional
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Upload after importing asset data. Process photos separately to avoid CPU limits.
+                  </p>
+                  <input
+                    type="file"
+                    accept=".zip"
+                    multiple
+                    onChange={(e) => setPhotoFiles(Array.from(e.target.files))}
+                    className="block w-full text-sm text-slate-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-lg file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-purple-50 file:text-purple-700
+                      hover:file:bg-purple-100"
+                  />
+                  {photoFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {photoFiles.map((file, idx) => (
+                        <p key={idx} className="text-sm text-purple-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {file.name}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {importMode === 'rooms' && (
