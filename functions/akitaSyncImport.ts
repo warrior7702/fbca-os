@@ -605,6 +605,16 @@ Deno.serve(async (req) => {
               const assetName = row['Name'] || 'Unnamed Asset';
               const assetCategory = row['Asset Category'] || '';
               const buildingName = row['Building'] || '';
+
+              // Debug problematic rows
+              if (!buildingName || buildingName.includes('http') || buildingName.includes('://')) {
+                console.log(`⚠️ Row ${i + 1} has suspicious building name:`, buildingName);
+                console.log('Asset ID:', assetId);
+                console.log('Asset Name:', assetName);
+                console.log('Sample keys:', Object.keys(row).slice(0, 15));
+                console.log('Sample values:', Object.values(row).slice(0, 15));
+              }
+
               const buildingAkitaId = row['Building _id'] || '';
               const buildingGroup = row['Building Group'] || '';
               const buildingGroupId = row['Building Group _id'] || '';
@@ -669,14 +679,17 @@ Deno.serve(async (req) => {
               
               // Find Building
               let building = buildingCache.get(buildingName);
-              if (!building && buildingName) {
+              if (!building && buildingName && !buildingName.includes('http')) {
                 const existing = await base44.asServiceRole.entities.Building.filter({ name: buildingName });
                 if (existing.length > 0) {
                   building = existing[0];
                   buildingCache.set(buildingName, building);
                 } else {
-                  summary.warnings.push(`Asset ${assetId}: Building "${buildingName}" not found`);
+                  summary.warnings.push(`Asset "${assetName}" (${assetId}): Building "${buildingName}" not found`);
                 }
+              } else if (buildingName.includes('http')) {
+                summary.warnings.push(`Asset "${assetName}" (${assetId}): Skipping - column misalignment detected (building="${buildingName}")`);
+                continue;
               }
               
               // Find Floor
