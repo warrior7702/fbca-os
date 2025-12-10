@@ -29,7 +29,7 @@ export default function AkitaSyncAdmin() {
   const [skipRows, setSkipRows] = useState(0);
   const [limitRows, setLimitRows] = useState(10);
   const [skipAssets, setSkipAssets] = useState(0);
-  const [limitAssets, setLimitAssets] = useState(10);
+  const [limitAssets, setLimitAssets] = useState(5);
 
   const handleImport = async () => {
     // Validate based on import mode
@@ -328,7 +328,7 @@ export default function AkitaSyncAdmin() {
                     type="number"
                     min="1"
                     value={limitAssets}
-                    onChange={(e) => setLimitAssets(parseInt(e.target.value) || 10)}
+                    onChange={(e) => setLimitAssets(parseInt(e.target.value) || 5)}
                     className="h-9"
                   />
                 </div>
