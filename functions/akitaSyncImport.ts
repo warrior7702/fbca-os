@@ -433,7 +433,18 @@ Deno.serve(async (req) => {
             console.log('Detected XLSX format for assets file');
             const workbook = XLSX.read(bytes, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            assetsData = XLSX.utils.sheet_to_json(firstSheet);
+            const rawData = XLSX.utils.sheet_to_json(firstSheet);
+
+            // Filter out rows without _id during parsing
+            assetsData = rawData.filter((row, idx) => {
+              if (!row['_id'] || String(row['_id']).trim() === '') {
+                console.log(`Skipping row ${idx + 2} - no _id`);
+                return false;
+              }
+              return true;
+            });
+
+            console.log(`XLSX: ${rawData.length} rows -> ${assetsData.length} valid assets`);
           } else {
             console.log('Detected TSV/CSV format for assets file');
             const text = new TextDecoder('utf-8').decode(bytes);
@@ -443,21 +454,23 @@ Deno.serve(async (req) => {
             header = header.replace(/^\uFEFF/, "");
             const columns = header.split("\t").map(col => col.trim());
 
+            console.log('First column name:', JSON.stringify(columns[0]));
+
             for (let i = 1; i < lines.length; i++) {
               const row = lines[i].split("\t");
               const obj = {};
               for (let c = 0; c < columns.length; c++) {
                 obj[columns[c]] = row[c] ?? "";
               }
-              if (!obj["_id"] || obj["_id"].trim() === "") {
-                summary.warnings.push(`Asset missing _id at row ${i}`);
+              if (!obj["_id"] || String(obj["_id"]).trim() === "") {
+                console.log(`Skipping TSV row ${i} - no _id`);
                 continue;
               }
               assetsData.push(obj);
             }
           }
 
-          console.log(`Parsed ${assetsData.length} assets`);
+          console.log(`Parsed ${assetsData.length} valid assets`);
 
           // Apply skip/limit
           const startIdx = skipAssets;
@@ -467,17 +480,23 @@ Deno.serve(async (req) => {
           for (let i = startIdx; i < endIdx; i++) {
             const row = assetsData[i];
 
-            // Add delay to avoid CPU limits (1000ms per asset)
+            // Add delay to avoid CPU limits (1500ms per asset for extra safety)
             if (i > startIdx) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              await new Promise(resolve => setTimeout(resolve, 1500));
             }
 
-            if (i % 10 === 0 && i > 0) {
-              console.log(`Processing asset ${i} of ${assetsData.length}`);
+            if (i % 5 === 0 && i > startIdx) {
+              console.log(`Processing asset ${i + 1} of ${assetsData.length}`);
             }
-            
+
             try {
-              const assetId = row['_id'];
+              const assetId = String(row['_id'] || '').trim();
+
+              if (!assetId) {
+                summary.warnings.push(`Asset at index ${i} missing _id`);
+                continue;
+              }
+
               const assetName = row['Name'] || 'Unnamed Asset';
               const assetCategory = row['Asset Category'] || '';
               const buildingName = row['Building'] || '';
