@@ -625,13 +625,16 @@ Deno.serve(async (req) => {
               const assetCategory = row['Asset Category'] || '';
               const buildingName = row['Building'] || '';
 
-              // Debug problematic rows
-              if (!buildingName || buildingName.includes('http') || buildingName.includes('://')) {
-                console.log(`⚠️ Row ${i + 1} has suspicious building name:`, buildingName);
+              // Debug ALL problematic assets
+              if (!buildingName || buildingName.includes('http') || buildingName.includes('://') || assetName.includes('Memory')) {
+                console.log(`\n⚠️ PROBLEMATIC ASSET - Row ${i + 1}:`);
                 console.log('Asset ID:', assetId);
                 console.log('Asset Name:', assetName);
-                console.log('Sample keys:', Object.keys(row).slice(0, 15));
-                console.log('Sample values:', Object.values(row).slice(0, 15));
+                console.log('Building:', buildingName);
+                console.log('ALL row keys:', Object.keys(row));
+                console.log('ALL row values:', Object.values(row));
+                summary.warnings.push(`Row ${i + 1}: assetId="${assetId}", name="${assetName}", building="${buildingName}"`);
+                continue; // Skip this row entirely
               }
 
               const buildingAkitaId = row['Building _id'] || '';
