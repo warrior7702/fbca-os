@@ -26,11 +26,33 @@ Deno.serve(async (req) => {
         const teamsConversationId = body.teams_conversation_id || body.teamsConversationId;
         const teamsServiceUrl = body.teams_service_url || body.teamsServiceUrl;
 
-        // Find requester if email provided
+        // Find requester if email provided and get proper name
         let requester = null;
+        let formattedName = requesterName;
+        
         if (requesterEmail) {
             const users = await base44.asServiceRole.entities.User.filter({ email: requesterEmail });
             requester = users[0];
+            
+            // Use full_name from User entity if available
+            if (requester?.full_name) {
+                formattedName = requester.full_name;
+            } else if (requesterName) {
+                // Format the name: capitalize each word, replace dots/underscores with spaces
+                formattedName = requesterName
+                    .replace(/[._]/g, ' ')
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+            } else {
+                // Extract name from email if no name provided
+                const emailName = requesterEmail.split('@')[0];
+                formattedName = emailName
+                    .replace(/[._]/g, ' ')
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+            }
         }
 
         // Generate ticket number
@@ -82,7 +104,7 @@ Deno.serve(async (req) => {
         const ticket = await base44.asServiceRole.entities.Ticket.create({
             ticket_number: ticketNumber,
             requester_email: requesterEmail || 'unknown@fbca.dev',
-            requester_name: requester?.full_name || requesterName || requesterEmail || 'Bot User',
+            requester_name: formattedName || requesterEmail || 'Bot User',
             category: category?.toLowerCase(),
             subject: subject || (description?.substring?.(0, 100)) || 'New Ticket',
             description: description || `Ticket created via Spark bot at ${new Date().toLocaleString()}`,
