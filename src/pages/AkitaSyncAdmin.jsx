@@ -30,6 +30,34 @@ export default function AkitaSyncAdmin() {
   const [limitRows, setLimitRows] = useState(10);
   const [skipAssets, setSkipAssets] = useState(0);
   const [limitAssets, setLimitAssets] = useState(5);
+  const [stats, setStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    setLoadingStats(true);
+    try {
+      const [buildings, floors, rooms, assets] = await Promise.all([
+        base44.entities.Building.list(),
+        base44.entities.Floor.list(),
+        base44.entities.Room.list(),
+        base44.entities.Asset.list()
+      ]);
+      setStats({
+        buildings: buildings.length,
+        floors: floors.length,
+        rooms: rooms.length,
+        assets: assets.length
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const handleImport = async () => {
     // Validate based on import mode
@@ -86,6 +114,7 @@ export default function AkitaSyncAdmin() {
       if (response.data.success) {
         setResult(response.data.summary);
         toast.success('Import completed successfully');
+        loadStats(); // Refresh stats after import
       } else {
         throw new Error(response.data.error || 'Import failed');
       }
@@ -115,6 +144,44 @@ export default function AkitaSyncAdmin() {
             <p className="text-sm text-slate-600">Import floors, rooms, and assets from AkitaBox exports</p>
           </div>
         </div>
+
+        {/* Current Database Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5" />
+              Current Database Stats
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingStats ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : stats ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-3xl font-bold text-blue-600">{stats.buildings}</div>
+                  <div className="text-sm text-slate-600 mt-1">Buildings</div>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-3xl font-bold text-purple-600">{stats.floors}</div>
+                  <div className="text-sm text-slate-600 mt-1">Floors</div>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-3xl font-bold text-green-600">{stats.rooms}</div>
+                  <div className="text-sm text-slate-600 mt-1">Rooms</div>
+                </div>
+                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                  <div className="text-3xl font-bold text-amber-600">{stats.assets}</div>
+                  <div className="text-sm text-slate-600 mt-1">Assets</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 text-center py-4">Unable to load stats</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Instructions */}
         <Alert>
