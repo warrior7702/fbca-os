@@ -556,11 +556,21 @@ Deno.serve(async (req) => {
                 obj[columns[c]] = values[c] || '';
               }
 
-              // Debug first row
-              if (lineIdx === 1) {
-                console.log('First row _id:', obj["_id"]);
-                console.log('First row Name:', obj["Name"]);
-                console.log('First row Building:', obj["Building"]);
+              // Debug first 3 rows
+              if (lineIdx <= 3) {
+                console.log(`\n=== Row ${lineIdx} Debug ===`);
+                console.log('_id:', obj["_id"]);
+                console.log('Name:', obj["Name"]);
+                console.log('Organization:', obj["Organization"]);
+                console.log('Building:', obj["Building"]);
+                console.log('Floor:', obj["Floor"]);
+                console.log('Description length:', (obj["Description"] || '').length);
+                console.log('Description sample:', (obj["Description"] || '').substring(0, 50));
+                console.log('Values count:', values.length);
+                console.log('Columns count:', columns.length);
+                if (values.length !== columns.length) {
+                  console.log('⚠️ MISMATCH: values vs columns');
+                }
               }
 
               // Check for _id
