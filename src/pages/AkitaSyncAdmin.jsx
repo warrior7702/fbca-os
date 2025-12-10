@@ -25,6 +25,7 @@ export default function AkitaSyncAdmin() {
   const [photoFiles, setPhotoFiles] = useState([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
+  const [importProgress, setImportProgress] = useState(null);
   const [importMode, setImportMode] = useState('all');
   const [skipRows, setSkipRows] = useState(0);
   const [limitRows, setLimitRows] = useState(10);
@@ -80,6 +81,7 @@ export default function AkitaSyncAdmin() {
 
     setImporting(true);
     setResult(null);
+    setImportProgress(null);
 
     try {
       // Upload files based on mode
@@ -98,6 +100,15 @@ export default function AkitaSyncAdmin() {
       if (importMode === 'assets' || importMode === 'all') {
         const upload = await base44.integrations.Core.UploadFile({ file: assetsFiles[0] });
         assetsFileId = upload.file_url.split('/').pop();
+      }
+
+      // Show progress estimate
+      if (importMode === 'assets' || importMode === 'all') {
+        setImportProgress(`Processing assets ${skipAssets} to ${skipAssets + limitAssets}...`);
+      } else if (importMode === 'rooms') {
+        setImportProgress(`Processing rooms ${skipRows} to ${skipRows + limitRows}...`);
+      } else {
+        setImportProgress('Processing data...');
       }
 
       // Call import function
@@ -446,27 +457,34 @@ export default function AkitaSyncAdmin() {
             )}
 
             <Button
-                onClick={handleImport}
-                disabled={importing || 
-                  (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) ||
-                  (importMode === 'floors' && !floorsFile) ||
-                  (importMode === 'rooms' && !roomsFile) ||
-                  (importMode === 'assets' && assetsFiles.length === 0)
-                }
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-              {importing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Database className="w-4 h-4 mr-2" />
-                  Run Import
-                </>
-              )}
+              onClick={handleImport}
+              disabled={importing || 
+                (importMode === 'all' && (!floorsFile || !roomsFile || assetsFiles.length === 0)) ||
+                (importMode === 'floors' && !floorsFile) ||
+                (importMode === 'rooms' && !roomsFile) ||
+                (importMode === 'assets' && assetsFiles.length === 0)
+              }
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Database className="w-4 h-4 mr-2" />
+                Run Import
+              </>
+            )}
             </Button>
+
+            {importing && importProgress && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-900">{importProgress}</p>
+              <p className="text-xs text-blue-600 mt-1">This may take several minutes...</p>
+            </div>
+            )}
           </CardContent>
         </Card>
 
