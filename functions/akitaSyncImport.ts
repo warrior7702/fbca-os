@@ -452,22 +452,36 @@ Deno.serve(async (req) => {
 
             let header = lines[0];
             header = header.replace(/^\uFEFF/, "");
-            const columns = header.split("\t").map(col => col.trim());
 
-            console.log('First column name:', JSON.stringify(columns[0]));
+            // Detect delimiter - check if comma or tab
+            const delimiter = header.includes('\t') ? '\t' : ',';
+            console.log('Detected delimiter:', delimiter === '\t' ? 'TAB' : 'COMMA');
+
+            const columns = header.split(delimiter).map(col => col.trim());
+
+            console.log('Column count:', columns.length);
+            console.log('First 5 columns:', columns.slice(0, 5));
+            console.log('First column exact:', JSON.stringify(columns[0]));
 
             for (let i = 1; i < lines.length; i++) {
-              const row = lines[i].split("\t");
+              const row = lines[i].split(delimiter);
               const obj = {};
               for (let c = 0; c < columns.length; c++) {
-                obj[columns[c]] = row[c] ?? "";
+                obj[columns[c]] = (row[c] || '').trim();
               }
-              if (!obj["_id"] || String(obj["_id"]).trim() === "") {
-                console.log(`Skipping TSV row ${i} - no _id`);
+
+              // Log first row for debugging
+              if (i === 1) {
+                console.log('First row data:', JSON.stringify(obj).substring(0, 200));
+              }
+
+              if (!obj["_id"] || obj["_id"] === "") {
                 continue;
               }
               assetsData.push(obj);
             }
+
+            console.log(`Parsed ${assetsData.length} valid assets from ${lines.length - 1} rows`);
           }
 
           console.log(`Parsed ${assetsData.length} valid assets`);
