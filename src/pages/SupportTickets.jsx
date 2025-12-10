@@ -112,10 +112,10 @@ export default function SupportTickets() {
       let departments = [];
       try {
         const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
-        if (rolesResponse.data.success) {
+        if (rolesResponse.data?.success) {
           const userData = rolesResponse.data.allUsers.find(u => u.user_email === currentUser.email);
           if (userData) {
-            workerStatus = userData.ticket_role === 'worker';
+            workerStatus = userData.ticket_role === 'worker' || userData.ticket_role === 'admin';
             departments = userData.departments || [];
           }
         }
