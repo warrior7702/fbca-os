@@ -6,12 +6,13 @@ Deno.serve(async (req) => {
         
         const body = await req.json();
         
-        // Support both formats: camelCase (bot) and snake_case (legacy)
-        const requesterEmail = body.requester_email || body.requesterEmail;
-        const requesterName = body.requester_name || body.requesterName;
+        // Support multiple field name formats
+        const requesterEmail = body.requester_email || body.requesterEmail || body.from_email;
+        const requesterName = body.requester_name || body.requesterName || body.from_name;
         const category = body.category;
         const description = body.description;
-        const location = body.location || body.building || body.room_number;
+        const building = body.building;
+        const roomNumber = body.room_number || body.room;
         const subject = body.subject;
         const priority = body.priority || 'medium';
         const source = body.source || 'bot';
@@ -78,22 +79,22 @@ Deno.serve(async (req) => {
         }
 
         // Create ticket
-const ticket = await base44.asServiceRole.entities.Ticket.create({
-    ticket_number: ticketNumber,
-    requester_email: requesterEmail || 'unknown@fbca.dev',
-    requester_name: requester?.full_name || requesterName || requesterEmail || 'Bot User',
-    category: category?.toLowerCase(),
-    subject: subject || (description?.substring?.(0, 100)) || 'New Ticket',
-    description: description || `Ticket created via Spark bot at ${new Date().toLocaleString()}`,
-    building: location || null,
-    room_number: body.room_number || null,
-    status: 'open',
-    priority: priority,
-    source: source,
-    attachments: processedAttachments.length > 0 ? processedAttachments : [],
-    teams_conversation_id: teamsConversationId || null,
-    teams_service_url: teamsServiceUrl || null
-});
+        const ticket = await base44.asServiceRole.entities.Ticket.create({
+            ticket_number: ticketNumber,
+            requester_email: requesterEmail || 'unknown@fbca.dev',
+            requester_name: requester?.full_name || requesterName || requesterEmail || 'Bot User',
+            category: category?.toLowerCase(),
+            subject: subject || (description?.substring?.(0, 100)) || 'New Ticket',
+            description: description || `Ticket created via Spark bot at ${new Date().toLocaleString()}`,
+            building: building || null,
+            room_number: roomNumber || null,
+            status: 'open',
+            priority: priority,
+            source: source,
+            attachments: processedAttachments.length > 0 ? processedAttachments : [],
+            teams_conversation_id: teamsConversationId || null,
+            teams_service_url: teamsServiceUrl || null
+        });
 
         return Response.json({ 
             success: true, 
