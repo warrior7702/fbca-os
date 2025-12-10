@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
     
-    const { floorsFileId, roomsFileId, assetsFileId, skipRows = 0, limitRows = null } = body;
+    const { floorsFileId, roomsFileId, assetsFileId, skipRows = 0, limitRows = null, skipAssets = 0, limitAssets = 10 } = body;
     
     // Validate at least one file provided
     if (!floorsFileId && !roomsFileId && !assetsFileId) {
@@ -419,19 +419,60 @@ Deno.serve(async (req) => {
         console.log('Fetching assets file...');
         const assetsUrl = `https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/${assetsFileId}`;
         const assetsResponse = await fetch(assetsUrl);
-        
+
         if (!assetsResponse.ok) {
           summary.warnings.push(`Failed to fetch assets file: ${assetsResponse.statusText}`);
         } else {
-          const text = await assetsResponse.text();
-          const assetsData = parseTSV(text);
-          
+          const arrayBuffer = await assetsResponse.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const isXLSX = bytes[0] === 0x50 && bytes[1] === 0x4B;
+
+          let assetsData = [];
+
+          if (isXLSX) {
+            console.log('Detected XLSX format for assets file');
+            const workbook = XLSX.read(bytes, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            assetsData = XLSX.utils.sheet_to_json(firstSheet);
+          } else {
+            console.log('Detected TSV/CSV format for assets file');
+            const text = new TextDecoder('utf-8').decode(bytes);
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+
+            let header = lines[0];
+            header = header.replace(/^\uFEFF/, "");
+            const columns = header.split("\t").map(col => col.trim());
+
+            for (let i = 1; i < lines.length; i++) {
+              const row = lines[i].split("\t");
+              const obj = {};
+              for (let c = 0; c < columns.length; c++) {
+                obj[columns[c]] = row[c] ?? "";
+              }
+              if (!obj["_id"] || obj["_id"].trim() === "") {
+                summary.warnings.push(`Asset missing _id at row ${i}`);
+                continue;
+              }
+              assetsData.push(obj);
+            }
+          }
+
           console.log(`Parsed ${assetsData.length} assets`);
-          
-          for (let i = 0; i < assetsData.length; i++) {
+
+          // Apply skip/limit
+          const startIdx = skipAssets;
+          const endIdx = limitAssets ? Math.min(startIdx + limitAssets, assetsData.length) : assetsData.length;
+          console.log(`Processing assets ${startIdx} to ${endIdx} of ${assetsData.length}`);
+
+          for (let i = startIdx; i < endIdx; i++) {
             const row = assetsData[i];
-            
-            if (i % 100 === 0 && i > 0) {
+
+            // Add delay to avoid CPU limits (1000ms per asset)
+            if (i > startIdx) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            if (i % 10 === 0 && i > 0) {
               console.log(`Processing asset ${i} of ${assetsData.length}`);
             }
             
@@ -440,18 +481,43 @@ Deno.serve(async (req) => {
               const assetName = row['Name'] || 'Unnamed Asset';
               const assetCategory = row['Asset Category'] || '';
               const buildingName = row['Building'] || '';
+              const buildingAkitaId = row['Building _id'] || '';
+              const buildingGroup = row['Building Group'] || '';
+              const buildingGroupId = row['Building Group _id'] || '';
               const floorName = row['Floor'] || '';
+              const floorAkitaId = row['Floor _id'] || '';
               const roomNumber = row['Room Number'] || '';
+              const roomAkitaId = row['Room Number _id'] || '';
+              const roomName = row['Room Name'] || '';
               const manufacturer = row['Manufacturer'] || '';
               const model = row['Model'] || '';
+              const modelNumber = row['Model Number'] || '';
               const serialNumber = row['Serial Number'] || '';
               const condition = row['Condition'] || '';
               const conditionDate = row['Condition Date'] || null;
               const assetType = row['Type'] || '';
+              const assetIdNumber = row['ID'] || '';
+              const installationDate = row['Installation Date'] || null;
+              const warrantyExpiration = row['Warranty Expiration Date'] || null;
+              const verified = row['Verified'] === 'Verified';
+              const description = row['Description'] || '';
+              const websiteUrl = row['Website'] || '';
+              const omManuals = row['OM Manuals'] || '';
+              const warrantyNotes = row['Warranty'] || '';
+              const cost = row['Cost'] ? parseFloat(row['Cost']) : null;
+              const totalCost = row['Total Cost'] ? parseFloat(row['Total Cost']) : null;
+              const number = row['Number'] || '';
               const xCoord = row['X Coordinate'];
               const yCoord = row['Y Coordinate'];
+              const qrCode = row['QR Code'] || '';
+              const qrCodeImage = row['QR Code Image'] || '';
               const status = row['Status'] || 'Active';
+              const decommissionedDate = row['Decommissioned Date'] || null;
               const url = row['Url'] || '';
+              const createdAt = row['Date Created'] || null;
+              const createdBy = row['Created By'] || '';
+              const updatedAt = row['Date Modified'] || null;
+              const updatedBy = row['Modified By'] || '';
               
               if (!assetId) {
                 summary.warnings.push(`Asset missing _id at row ${i + 1}`);
@@ -538,24 +604,47 @@ Deno.serve(async (req) => {
                 name: assetName,
                 asset_category: assetCategory,
                 asset_group_id: assetGroup?.id || null,
+                organization_name: row['Organization'] || '',
                 building_id: building?.id || null,
                 building_name: buildingName,
+                building_akita_id: buildingAkitaId,
+                building_group: buildingGroup,
+                building_group_id: buildingGroupId,
                 floor_id: floor?.id || null,
                 floor_name: floorName,
+                floor_akita_id: floorAkitaId,
                 room_id: room?.id || null,
                 room_number: roomNumber,
+                room_akita_id: roomAkitaId,
+                room_name: roomName,
+                type: assetType,
+                asset_id_number: assetIdNumber,
                 manufacturer: manufacturer,
                 model: model,
                 serial_number: serialNumber,
+                description: description,
                 condition: condition,
                 condition_date: conditionDate,
-                type: assetType,
+                installation_date: installationDate,
+                warranty_expiration_date: warrantyExpiration,
+                verified: verified,
+                status: status,
+                decommissioned_date: decommissionedDate,
+                website_url: websiteUrl,
+                om_manuals: omManuals,
+                warranty_notes: warrantyNotes,
+                cost: cost,
+                total_cost: totalCost,
+                number: number,
+                akita_url: url,
                 x_coord: xCoordNum,
                 y_coord: yCoordNum,
-                status: status,
-                akita_url: url,
-                updated_at: new Date().toISOString(),
-                updated_by: user.email
+                qr_code: qrCode,
+                qr_code_image: qrCodeImage,
+                created_at: createdAt || new Date().toISOString(),
+                created_by: createdBy || user.email,
+                updated_at: updatedAt || new Date().toISOString(),
+                updated_by: updatedBy || user.email
               };
               
               if (existing.length > 0) {
