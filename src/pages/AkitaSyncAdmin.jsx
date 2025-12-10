@@ -28,6 +28,8 @@ export default function AkitaSyncAdmin() {
   const [importMode, setImportMode] = useState('all');
   const [skipRows, setSkipRows] = useState(0);
   const [limitRows, setLimitRows] = useState(10);
+  const [skipAssets, setSkipAssets] = useState(0);
+  const [limitAssets, setLimitAssets] = useState(10);
 
   const handleImport = async () => {
     // Validate based on import mode
@@ -76,7 +78,9 @@ export default function AkitaSyncAdmin() {
         roomsFileId,
         assetsFileId,
         skipRows: importMode === 'rooms' ? skipRows : undefined,
-        limitRows: importMode === 'rooms' ? limitRows : undefined
+        limitRows: importMode === 'rooms' ? limitRows : undefined,
+        skipAssets: importMode === 'assets' ? skipAssets : undefined,
+        limitAssets: importMode === 'assets' ? limitAssets : undefined
       });
 
       if (response.data.success) {
@@ -300,6 +304,40 @@ export default function AkitaSyncAdmin() {
                   )}
                 </div>
               </>
+            )}
+
+            {importMode === 'assets' && (
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">
+                    Skip Assets (Start at row #)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={skipAssets}
+                    onChange={(e) => setSkipAssets(parseInt(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">
+                    Limit (Process # assets)
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={limitAssets}
+                    onChange={(e) => setLimitAssets(parseInt(e.target.value) || 10)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-500">
+                    Process assets {skipAssets} to {skipAssets + limitAssets}. Run multiple times with different skip values to import all assets.
+                  </p>
+                </div>
+              </div>
             )}
 
             {importMode === 'rooms' && (
