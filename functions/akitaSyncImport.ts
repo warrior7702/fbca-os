@@ -449,71 +449,130 @@ Deno.serve(async (req) => {
             console.log('Detected TSV/CSV format for assets file');
             const text = new TextDecoder('utf-8').decode(bytes);
 
-            // Split lines and remove empty ones
-            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-            console.log('Total lines in file:', lines.length);
-
-            // Extract and clean header
-            let header = lines[0];
             // Remove BOM if present
-            header = header.replace(/^\uFEFF/, "").replace(/^\ufeff/, "");
+            const cleanText = text.replace(/^\uFEFF/, "").replace(/^\ufeff/, "");
 
-            console.log('Raw header first 100 chars:', header.substring(0, 100));
-            console.log('Header char codes (first 20):', Array.from(header.substring(0, 20)).map(c => c.charCodeAt(0)));
+            // Parse TSV/CSV with quote handling
+            const lines = [];
+            let currentLine = '';
+            let insideQuotes = false;
 
-            // Detect delimiter - check if tab or comma
+            for (let i = 0; i < cleanText.length; i++) {
+              const char = cleanText[i];
+              const nextChar = cleanText[i + 1];
+
+              if (char === '"') {
+                if (insideQuotes && nextChar === '"') {
+                  // Escaped quote
+                  currentLine += '"';
+                  i++; // Skip next quote
+                } else {
+                  // Toggle quote state
+                  insideQuotes = !insideQuotes;
+                }
+              } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+                // End of line (only if not inside quotes)
+                if (currentLine.trim()) {
+                  lines.push(currentLine);
+                }
+                currentLine = '';
+                // Skip \r\n combination
+                if (char === '\r' && nextChar === '\n') i++;
+              } else {
+                currentLine += char;
+              }
+            }
+
+            // Add last line
+            if (currentLine.trim()) {
+              lines.push(currentLine);
+            }
+
+            console.log('Total lines parsed:', lines.length);
+
+            if (lines.length === 0) {
+              console.error('❌ No lines found in file');
+              continue;
+            }
+
+            // Extract header
+            const header = lines[0];
+            console.log('Header first 100 chars:', header.substring(0, 100));
+
+            // Detect delimiter
             const tabCount = (header.match(/\t/g) || []).length;
             const commaCount = (header.match(/,/g) || []).length;
             const delimiter = tabCount > commaCount ? '\t' : ',';
             console.log(`Detected delimiter: ${delimiter === '\t' ? 'TAB' : 'COMMA'} (tabs: ${tabCount}, commas: ${commaCount})`);
 
-            // Split columns and clean them
-            const columns = header.split(delimiter).map(col => col.trim());
+            // Parse header columns
+            const columns = [];
+            let currentCol = '';
+            insideQuotes = false;
+
+            for (let i = 0; i < header.length; i++) {
+              const char = header[i];
+
+              if (char === '"') {
+                insideQuotes = !insideQuotes;
+              } else if (char === delimiter && !insideQuotes) {
+                columns.push(currentCol.trim());
+                currentCol = '';
+              } else {
+                currentCol += char;
+              }
+            }
+            columns.push(currentCol.trim());
+
             console.log('Column count:', columns.length);
             console.log('First 10 columns:', columns.slice(0, 10));
-            console.log('First column details:', {
-              value: columns[0],
-              length: columns[0].length,
-              charCodes: Array.from(columns[0]).map(c => c.charCodeAt(0))
-            });
 
             // Parse data rows
-            for (let i = 1; i < lines.length; i++) {
-              const line = lines[i];
-              if (!line.trim()) continue;
+            for (let lineIdx = 1; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
 
-              const values = line.split(delimiter);
+              // Parse values with quote handling
+              const values = [];
+              let currentVal = '';
+              insideQuotes = false;
+
+              for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                  insideQuotes = !insideQuotes;
+                } else if (char === delimiter && !insideQuotes) {
+                  values.push(currentVal.trim());
+                  currentVal = '';
+                } else {
+                  currentVal += char;
+                }
+              }
+              values.push(currentVal.trim());
+
+              // Create object
               const obj = {};
-
               for (let c = 0; c < columns.length; c++) {
-                obj[columns[c]] = (values[c] || '').trim();
+                obj[columns[c]] = values[c] || '';
               }
 
               // Debug first row
-              if (i === 1) {
-                console.log('First row keys:', Object.keys(obj).slice(0, 10));
-                console.log('First row _id value:', JSON.stringify(obj["_id"]));
-                console.log('First row sample:', JSON.stringify(obj).substring(0, 300));
+              if (lineIdx === 1) {
+                console.log('First row _id:', obj["_id"]);
+                console.log('First row Name:', obj["Name"]);
+                console.log('First row Building:', obj["Building"]);
               }
 
-              // Check if _id exists and is not empty
-              const assetId = obj["_id"] || obj["_Id"] || obj["_ID"] || obj["id"] || obj["Id"] || obj["ID"];
+              // Check for _id
+              const assetId = obj["_id"];
               if (!assetId || assetId.trim() === "") {
-                if (i <= 3) {
-                  console.log(`Row ${i} missing ID - available keys:`, Object.keys(obj).slice(0, 5));
-                }
                 continue;
               }
 
-              // Normalize _id field name
-              obj["_id"] = assetId;
               assetsData.push(obj);
             }
 
             console.log(`✅ Parsed ${assetsData.length} valid assets from ${lines.length - 1} total rows`);
-            if (assetsData.length === 0 && lines.length > 1) {
-              console.error('❌ NO ASSETS PARSED - Check column name matching!');
-            }
           }
 
           console.log(`Parsed ${assetsData.length} valid assets`);
