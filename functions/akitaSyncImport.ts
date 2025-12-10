@@ -448,40 +448,72 @@ Deno.serve(async (req) => {
           } else {
             console.log('Detected TSV/CSV format for assets file');
             const text = new TextDecoder('utf-8').decode(bytes);
+
+            // Split lines and remove empty ones
             const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+            console.log('Total lines in file:', lines.length);
 
+            // Extract and clean header
             let header = lines[0];
-            header = header.replace(/^\uFEFF/, "");
+            // Remove BOM if present
+            header = header.replace(/^\uFEFF/, "").replace(/^\ufeff/, "");
 
-            // Detect delimiter - check if comma or tab
-            const delimiter = header.includes('\t') ? '\t' : ',';
-            console.log('Detected delimiter:', delimiter === '\t' ? 'TAB' : 'COMMA');
+            console.log('Raw header first 100 chars:', header.substring(0, 100));
+            console.log('Header char codes (first 20):', Array.from(header.substring(0, 20)).map(c => c.charCodeAt(0)));
 
+            // Detect delimiter - check if tab or comma
+            const tabCount = (header.match(/\t/g) || []).length;
+            const commaCount = (header.match(/,/g) || []).length;
+            const delimiter = tabCount > commaCount ? '\t' : ',';
+            console.log(`Detected delimiter: ${delimiter === '\t' ? 'TAB' : 'COMMA'} (tabs: ${tabCount}, commas: ${commaCount})`);
+
+            // Split columns and clean them
             const columns = header.split(delimiter).map(col => col.trim());
-
             console.log('Column count:', columns.length);
-            console.log('First 5 columns:', columns.slice(0, 5));
-            console.log('First column exact:', JSON.stringify(columns[0]));
+            console.log('First 10 columns:', columns.slice(0, 10));
+            console.log('First column details:', {
+              value: columns[0],
+              length: columns[0].length,
+              charCodes: Array.from(columns[0]).map(c => c.charCodeAt(0))
+            });
 
+            // Parse data rows
             for (let i = 1; i < lines.length; i++) {
-              const row = lines[i].split(delimiter);
+              const line = lines[i];
+              if (!line.trim()) continue;
+
+              const values = line.split(delimiter);
               const obj = {};
+
               for (let c = 0; c < columns.length; c++) {
-                obj[columns[c]] = (row[c] || '').trim();
+                obj[columns[c]] = (values[c] || '').trim();
               }
 
-              // Log first row for debugging
+              // Debug first row
               if (i === 1) {
-                console.log('First row data:', JSON.stringify(obj).substring(0, 200));
+                console.log('First row keys:', Object.keys(obj).slice(0, 10));
+                console.log('First row _id value:', JSON.stringify(obj["_id"]));
+                console.log('First row sample:', JSON.stringify(obj).substring(0, 300));
               }
 
-              if (!obj["_id"] || obj["_id"] === "") {
+              // Check if _id exists and is not empty
+              const assetId = obj["_id"] || obj["_Id"] || obj["_ID"] || obj["id"] || obj["Id"] || obj["ID"];
+              if (!assetId || assetId.trim() === "") {
+                if (i <= 3) {
+                  console.log(`Row ${i} missing ID - available keys:`, Object.keys(obj).slice(0, 5));
+                }
                 continue;
               }
+
+              // Normalize _id field name
+              obj["_id"] = assetId;
               assetsData.push(obj);
             }
 
-            console.log(`Parsed ${assetsData.length} valid assets from ${lines.length - 1} rows`);
+            console.log(`✅ Parsed ${assetsData.length} valid assets from ${lines.length - 1} total rows`);
+            if (assetsData.length === 0 && lines.length > 1) {
+              console.error('❌ NO ASSETS PARSED - Check column name matching!');
+            }
           }
 
           console.log(`Parsed ${assetsData.length} valid assets`);
