@@ -527,6 +527,14 @@ Deno.serve(async (req) => {
             console.log('Column count:', columns.length);
             console.log('First 10 columns:', columns.slice(0, 10));
 
+            // Check for _id column
+            const idColIndex = columns.findIndex(col => col === '_id');
+            console.log('_id column index:', idColIndex);
+            if (idColIndex === -1) {
+              console.error('❌ NO _id COLUMN FOUND!');
+              console.log('All columns:', columns);
+            }
+
             // Parse data rows
             for (let lineIdx = 1; lineIdx < lines.length; lineIdx++) {
               const line = lines[lineIdx];
@@ -559,17 +567,18 @@ Deno.serve(async (req) => {
               // Debug first 3 rows
               if (lineIdx <= 3) {
                 console.log(`\n=== Row ${lineIdx} Debug ===`);
+                console.log('Raw line preview:', line.substring(0, 200));
+                console.log('Values count:', values.length);
+                console.log('Columns count:', columns.length);
+                console.log('First 10 values:', values.slice(0, 10));
                 console.log('_id:', obj["_id"]);
                 console.log('Name:', obj["Name"]);
                 console.log('Organization:', obj["Organization"]);
                 console.log('Building:', obj["Building"]);
                 console.log('Floor:', obj["Floor"]);
-                console.log('Description length:', (obj["Description"] || '').length);
-                console.log('Description sample:', (obj["Description"] || '').substring(0, 50));
-                console.log('Values count:', values.length);
-                console.log('Columns count:', columns.length);
                 if (values.length !== columns.length) {
                   console.log('⚠️ MISMATCH: values vs columns');
+                  console.log('Difference:', values.length - columns.length);
                 }
               }
 
