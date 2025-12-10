@@ -78,22 +78,22 @@ Deno.serve(async (req) => {
         }
 
         // Create ticket
-        const ticket = await base44.asServiceRole.entities.Ticket.create({
-            ticket_number: ticketNumber,
-            requester_email: requesterEmail || 'unknown@fbca.dev',
-            requester_name: requester?.full_name || requesterName || requesterEmail || 'Bot User',
-            category: category?.toLowerCase(),
-            subject: subject || description?.substring(0, 100) || 'New Ticket',
-            description,
-            building: location,
-            room_number: body.room_number,
-            status: 'open',
-            priority: priority,
-            source: source,
-            attachments: processedAttachments.length > 0 ? processedAttachments : [],
-            teams_conversation_id: teamsConversationId || null,
-            teams_service_url: teamsServiceUrl || null
-        });
+const ticket = await base44.asServiceRole.entities.Ticket.create({
+    ticket_number: ticketNumber,
+    requester_email: requesterEmail || 'unknown@fbca.dev',
+    requester_name: requester?.full_name || requesterName || requesterEmail || 'Bot User',
+    category: category?.toLowerCase(),
+    subject: subject || (description?.substring?.(0, 100)) || 'New Ticket',
+    description: description || `Ticket created via Spark bot at ${new Date().toLocaleString()}`,
+    building: location || null,
+    room_number: body.room_number || null,
+    status: 'open',
+    priority: priority,
+    source: source,
+    attachments: processedAttachments.length > 0 ? processedAttachments : [],
+    teams_conversation_id: teamsConversationId || null,
+    teams_service_url: teamsServiceUrl || null
+});
 
         return Response.json({ 
             success: true, 
