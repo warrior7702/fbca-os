@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
     
-    const { floorsFileId, roomsFileId, assetsFileId, skipRows = 0, limitRows = null, skipAssets = 0, limitAssets = 10 } = body;
+    const { floorsFileId, roomsFileId, assetsFileId, skipRows = 0, limitRows = null, skipAssets = 0, limitAssets = 5 } = body;
     
     // Validate at least one file provided
     if (!floorsFileId && !roomsFileId && !assetsFileId) {
