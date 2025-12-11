@@ -34,25 +34,20 @@ Deno.serve(async (req) => {
             const users = await base44.asServiceRole.entities.User.filter({ email: requesterEmail });
             requester = users[0];
             
-            // Use full_name from User entity if available
-            if (requester?.full_name) {
-                formattedName = requester.full_name;
-            } else if (requesterName) {
-                // Format the name: capitalize each word, replace dots/underscores with spaces
-                formattedName = requesterName
-                    .replace(/[._]/g, ' ')
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                    .join(' ');
-            } else {
-                // Extract name from email if no name provided
-                const emailName = requesterEmail.split('@')[0];
-                formattedName = emailName
-                    .replace(/[._]/g, ' ')
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                    .join(' ');
+            // Get name from User entity or provided name
+            let rawName = requester?.full_name || requesterName;
+            
+            // If no name at all, extract from email
+            if (!rawName) {
+                rawName = requesterEmail.split('@')[0];
             }
+            
+            // Format the name: capitalize each word, replace dots/underscores with spaces
+            formattedName = rawName
+                .replace(/[._]/g, ' ')
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
         }
 
         // Generate ticket number
