@@ -89,19 +89,19 @@ export default function Calendar() {
         }
       }
       
-      // Add technology ticket flags to events
-      const eventsWithTickets = eventsData.map(event => {
-        const hasTechRequest = tickets.some(ticket => {
-          // Match by event name or other criteria
-          const ticketDesc = (ticket.description || '').toLowerCase();
-          const ticketSubj = (ticket.subject || '').toLowerCase();
-          const eventName = (event.name || '').toLowerCase();
-          return ticketDesc.includes(eventName) || ticketSubj.includes(eventName);
-        });
+      // Add technology resource flags to events
+      const eventsWithTechFlags = eventsData.map(event => {
+        const hasTechRequest = event.resources?.some(resource => 
+          resource.kind !== 'Room' && (
+            resource.category?.toLowerCase().includes('technology') ||
+            resource.approval_group_name?.toLowerCase().includes('technology') ||
+            resource.name?.toLowerCase().includes('technology')
+          )
+        ) || false;
         return { ...event, has_tech_request: hasTechRequest };
       });
       
-      setEvents(eventsWithTickets);
+      setEvents(eventsWithTechFlags);
       setLastSync(new Date());
 
       // Extract unique rooms and resource categories
