@@ -533,10 +533,17 @@ export default function Calendar() {
                               <div
                                 key={event.id}
                                 onClick={() => setSelectedEvent(event)}
-                                className="p-2 bg-blue-50 border border-blue-200 rounded cursor-pointer hover:bg-blue-100 transition-colors"
+                                className={`p-2 rounded cursor-pointer hover:bg-blue-100 transition-colors ${
+                                  event.has_tech_request ? 'bg-orange-50 border-2 border-orange-300' : 'bg-blue-50 border border-blue-200'
+                                }`}
                               >
-                                <p className="text-sm font-medium text-blue-900 mb-1">{event.name}</p>
-                                <p className="text-xs text-blue-700">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {event.has_tech_request && <Laptop className="w-4 h-4 text-orange-600 flex-shrink-0" />}
+                                  <p className={`text-sm font-medium ${event.has_tech_request ? 'text-orange-900' : 'text-blue-900'}`}>
+                                    {event.name}
+                                  </p>
+                                </div>
+                                <p className={`text-xs ${event.has_tech_request ? 'text-orange-700' : 'text-blue-700'}`}>
                                   {format(parseISO(event.starts_at), 'h:mm a')} - {format(parseISO(event.ends_at), 'h:mm a')}
                                 </p>
                                 {event.resources && event.resources.length > 0 && (
