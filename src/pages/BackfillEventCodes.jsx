@@ -177,24 +177,8 @@ export default function BackfillEventCodes() {
 
       toast.success('Code saved locally!');
       
-      // Update local state
-      setLocalCodes(prev => ({
-        ...prev,
-        [event.event_id]: { event_id: event.event_id, door_code: doorCode, access_time: accessTime }
-      }));
-      
-      setEvents(prev => prev.map(e => {
-        if (e.event_id === event.event_id) {
-          return {
-            ...e,
-            posted_door_code: doorCode,
-            access_time: accessTime
-          };
-        }
-        return e;
-      }));
-
-      // Clear editing state
+      // Reload data to refresh counts and event lists
+      await loadData();
       setEditingAccessTime(prev => {
         const next = { ...prev };
         delete next[event.event_id];
