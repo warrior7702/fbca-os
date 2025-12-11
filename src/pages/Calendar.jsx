@@ -597,11 +597,18 @@ export default function Calendar() {
                   setSelectedDayEvents(null);
                   setSelectedEvent(event);
                 }}
-                className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all cursor-pointer bg-white hover:bg-blue-50"
+                className={`p-4 rounded-lg hover:shadow-md transition-all cursor-pointer ${
+                  event.has_tech_request ? 'border-2 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'border border-slate-200 bg-white hover:bg-blue-50'
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-1">{event.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      {event.has_tech_request && <Laptop className="w-5 h-5 text-orange-600 flex-shrink-0" />}
+                      <h3 className={`font-semibold ${event.has_tech_request ? 'text-orange-900' : 'text-slate-900'}`}>
+                        {event.name}
+                      </h3>
+                    </div>
                     <p className="text-sm text-slate-600 mb-2">
                       {format(parseISO(event.starts_at), 'h:mm a')} - {format(parseISO(event.ends_at), 'h:mm a')}
                     </p>
