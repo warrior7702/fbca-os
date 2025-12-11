@@ -68,10 +68,7 @@ export default function Calendar() {
         return;
       }
 
-      const [eventsResponse, tickets] = await Promise.all([
-        base44.functions.invoke('getPCOCalendarEvents'),
-        base44.entities.Ticket.filter({ category: 'technology', status: { $in: ['open', 'awaiting_information', 'awaiting_parts'] } })
-      ]);
+      const eventsResponse = await base44.functions.invoke('getPCOCalendarEvents');
       
       if (!eventsResponse.data || !eventsResponse.data.events) {
         console.error('No events in response');
