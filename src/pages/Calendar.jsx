@@ -436,8 +436,11 @@ export default function Calendar() {
                             e.stopPropagation();
                             setSelectedEvent(event);
                           }}
-                          className="text-[10px] sm:text-xs p-1 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
+                          className={`text-[10px] sm:text-xs p-1 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate flex items-center gap-1 ${
+                            event.has_tech_request ? 'bg-orange-100 text-orange-800 border border-orange-300' : 'bg-blue-100 text-blue-800'
+                          }`}
                         >
+                          {event.has_tech_request && <Laptop className="w-3 h-3 flex-shrink-0" />}
                           <span className="hidden sm:inline">{format(parseISO(event.starts_at), 'h:mm a')} </span>
                           {event.name}
                         </motion.div>
