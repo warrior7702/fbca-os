@@ -720,19 +720,22 @@ function FloorplanViewer({ imageUrl }) {
       {isPdf ? (
         <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8">
           <FileText className="w-16 h-16 mb-4 text-slate-400" />
-          <p className="mb-2 font-medium">Floor Plan PDF</p>
-          <p className="text-sm text-slate-500 mb-4 text-center">
-            Click below to view the floor plan in a new tab
+          <p className="mb-2 font-medium text-lg">PDF Floor Plan Available</p>
+          <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
+            PDF preview is not available. Click the button below when you're ready to download and view the floor plan.
           </p>
-          <a 
-            href={imageUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          <Button
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = imageUrl;
+              link.download = 'floorplan.pdf';
+              link.click();
+            }}
+            className="bg-blue-600 hover:bg-blue-700"
           >
-            <Maximize2 className="w-4 h-4" />
-            Open PDF in New Tab
-          </a>
+            <FileText className="w-4 h-4 mr-2" />
+            Download PDF Floor Plan
+          </Button>
         </div>
       ) : (
         <img
