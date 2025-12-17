@@ -549,14 +549,28 @@ export default function AkitaFetch() {
 
 // Floorplan Canvas Component
 function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick }) {
+  const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
+
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
-      <img
-        src={imageUrl}
-        alt="Floor plan"
-        className="max-w-full max-h-full object-contain select-none"
-        draggable={false}
-      />
+      {isPdf ? (
+        <iframe
+          src={imageUrl}
+          className="w-full h-full border-0"
+          title="Floor plan PDF"
+        />
+      ) : (
+        <img
+          src={imageUrl}
+          alt="Floor plan"
+          className="max-w-full max-h-full object-contain select-none"
+          draggable={false}
+          onError={(e) => {
+            console.error('Image failed to load:', imageUrl);
+            e.target.alt = 'Failed to load floor plan';
+          }}
+        />
+      )}
 
       {/* Asset Pins Overlay */}
       <div className="absolute inset-0 pointer-events-none">
