@@ -11,7 +11,8 @@ import {
   MapPin,
   Loader2,
   Filter,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -554,11 +555,13 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick }) {
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
       {isPdf ? (
-        <iframe
-          src={imageUrl}
-          className="w-full h-full border-0"
-          title="Floor plan PDF"
-        />
+        <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8">
+          <FileText className="w-16 h-16 mb-4 text-slate-400" />
+          <p className="mb-2 font-medium text-lg">PDF Floor Plan</p>
+          <p className="text-sm text-slate-500 text-center max-w-md">
+            This floor has a PDF floor plan. Asset pins cannot be displayed on PDF floor plans. Upload an image version for visual asset mapping.
+          </p>
+        </div>
       ) : (
         <img
           src={imageUrl}
