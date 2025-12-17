@@ -409,7 +409,7 @@ export default function FloorPlanManager() {
                   <input
                     type="file"
                     id="replace-primary"
-                    accept=".pdf,image/*"
+                    accept=".png,image/png"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -435,7 +435,7 @@ export default function FloorPlanManager() {
                       <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                       <p className="text-slate-600 font-medium mb-2">No primary floor plan</p>
                       <p className="text-sm text-slate-500 mb-4">
-                        Upload a primary floor plan for {selectedFloor.name}
+                        Upload a PNG floor plan image for {selectedFloor.name}
                       </p>
                       <Button 
                         type="button"
@@ -460,7 +460,7 @@ export default function FloorPlanManager() {
                       <input
                         type="file"
                         id="upload-primary"
-                        accept=".pdf,image/*"
+                        accept=".png,image/png"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
@@ -626,7 +626,7 @@ export default function FloorPlanManager() {
           <DialogHeader>
             <DialogTitle>Add Alternate Floor Plan</DialogTitle>
             <DialogDescription>
-              Upload an alternate floor plan (HVAC, Electrical, Legacy, etc.)
+              Upload an alternate floor plan PNG (HVAC, Electrical, Legacy, etc.)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -651,7 +651,7 @@ export default function FloorPlanManager() {
               <input
                 type="file"
                 id="alternate-file"
-                accept=".pdf,image/*"
+                accept=".png,image/png"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -712,31 +712,19 @@ export default function FloorPlanManager() {
 
 function FloorplanViewer({ imageUrl }) {
   if (!imageUrl) return null;
-  
-  const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
-      {isPdf ? (
-        <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8">
-          <FileText className="w-16 h-16 mb-4 text-slate-400" />
-          <p className="mb-2 font-medium text-lg">PDF Floor Plan Stored</p>
-          <p className="text-sm text-slate-500 text-center max-w-md">
-            This floor has a PDF floor plan stored. Image preview not available for PDFs.
-          </p>
-        </div>
-      ) : (
-        <img
-          src={imageUrl}
-          alt="Floor plan"
-          className="max-w-full max-h-full object-contain select-none"
-          draggable={false}
-          onError={(e) => {
-            console.error('Image failed to load:', imageUrl);
-            e.target.alt = 'Failed to load floor plan';
-          }}
-        />
-      )}
+      <img
+        src={imageUrl}
+        alt="Floor plan"
+        className="max-w-full max-h-full object-contain select-none"
+        draggable={false}
+        onError={(e) => {
+          console.error('Image failed to load:', imageUrl);
+          e.target.alt = 'Failed to load floor plan';
+        }}
+      />
     </div>
   );
 }
