@@ -438,10 +438,11 @@ export default function FloorPlanManager() {
                         Upload a primary floor plan for {selectedFloor.name}
                       </p>
                       <Button 
+                        type="button"
                         disabled={uploadingPrimary}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          document.getElementById('upload-primary').click();
+                        onClick={() => {
+                          const input = document.getElementById('upload-primary');
+                          if (input) input.click();
                         }}
                       >
                         {uploadingPrimary ? (
@@ -462,7 +463,6 @@ export default function FloorPlanManager() {
                         accept=".pdf,image/*"
                         className="hidden"
                         onChange={(e) => {
-                          e.preventDefault();
                           const file = e.target.files?.[0];
                           if (file) {
                             uploadPrimaryFloorplan(file);
