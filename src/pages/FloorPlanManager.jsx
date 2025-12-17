@@ -668,16 +668,34 @@ export default function FloorPlanManager() {
 }
 
 function FloorplanViewer({ imageUrl }) {
+  if (!imageUrl) return null;
+  
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
+  
+  // Add #toolbar=0 to PDF URL to prevent download prompts
+  const pdfUrl = isPdf && !imageUrl.includes('#toolbar=0') ? `${imageUrl}#toolbar=0` : imageUrl;
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
       {isPdf ? (
-        <iframe
-          src={imageUrl}
-          className="w-full h-full border-0"
-          title="Floor plan PDF"
-        />
+        <object
+          data={pdfUrl}
+          type="application/pdf"
+          className="w-full h-full"
+        >
+          <div className="flex flex-col items-center justify-center h-full text-slate-600">
+            <FileText className="w-12 h-12 mb-4 text-slate-400" />
+            <p className="mb-2">PDF Preview</p>
+            <a 
+              href={imageUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Open in new tab
+            </a>
+          </div>
+        </object>
       ) : (
         <img
           src={imageUrl}
