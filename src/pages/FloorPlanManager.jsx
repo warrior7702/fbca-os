@@ -334,7 +334,10 @@ export default function FloorPlanManager() {
                     variant="outline"
                     size="sm"
                     disabled={uploadingPrimary}
-                    onClick={() => document.getElementById('replace-primary').click()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById('replace-primary').click();
+                    }}
                   >
                     {uploadingPrimary ? (
                       <>
@@ -354,13 +357,13 @@ export default function FloorPlanManager() {
                     accept=".pdf,image/*"
                     className="hidden"
                     onChange={(e) => {
-                      const file = e.target.files[0];
+                      e.preventDefault();
+                      const file = e.target.files?.[0];
                       if (file) {
                         handleReplacePrimary(file);
-                        e.target.value = '';
                       }
+                      e.target.value = '';
                     }}
-                    disabled={uploadingPrimary}
                   />
                 </div>
               )}
@@ -382,7 +385,10 @@ export default function FloorPlanManager() {
                       </p>
                       <Button 
                         disabled={uploadingPrimary}
-                        onClick={() => document.getElementById('upload-primary').click()}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          document.getElementById('upload-primary').click();
+                        }}
                       >
                         {uploadingPrimary ? (
                           <>
@@ -402,13 +408,13 @@ export default function FloorPlanManager() {
                         accept=".pdf,image/*"
                         className="hidden"
                         onChange={(e) => {
-                          const file = e.target.files[0];
+                          e.preventDefault();
+                          const file = e.target.files?.[0];
                           if (file) {
                             uploadPrimaryFloorplan(file);
-                            e.target.value = '';
                           }
+                          e.target.value = '';
                         }}
-                        disabled={uploadingPrimary}
                       />
                     </CardContent>
                   </Card>
@@ -579,7 +585,10 @@ export default function FloorPlanManager() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => document.getElementById('alternate-file').click()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('alternate-file').click();
+                }}
               >
                 <Upload className="w-4 h-4 mr-2" />
                 {newAlternate.file ? newAlternate.file.name : 'Choose File'}
@@ -590,11 +599,12 @@ export default function FloorPlanManager() {
                 accept=".pdf,image/*"
                 className="hidden"
                 onChange={(e) => {
-                  const file = e.target.files[0];
+                  e.preventDefault();
+                  const file = e.target.files?.[0];
                   if (file) {
                     setNewAlternate({ ...newAlternate, file });
-                    e.target.value = '';
                   }
+                  e.target.value = '';
                 }}
               />
             </div>
