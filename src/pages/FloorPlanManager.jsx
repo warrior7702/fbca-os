@@ -70,7 +70,6 @@ export default function FloorPlanManager() {
   }, []);
 
   const loadData = async () => {
-    setLoading(true);
     try {
       const [buildingsData, floorsData] = await Promise.all([
         base44.entities.Building.list(),
@@ -80,7 +79,14 @@ export default function FloorPlanManager() {
       setBuildings(buildingsData);
       setFloors(floorsData);
 
-      if (buildingsData.length > 0 && !selectedBuilding) {
+      // If we have a selected floor, update it with fresh data
+      if (selectedFloor) {
+        const updatedFloor = floorsData.find(f => f.id === selectedFloor.id);
+        if (updatedFloor) {
+          setSelectedFloor(updatedFloor);
+        }
+      } else if (buildingsData.length > 0 && !selectedBuilding) {
+        // Initial load
         setSelectedBuilding(buildingsData[0]);
         const buildingFloors = floorsData.filter(f => f.building_id === buildingsData[0].id);
         if (buildingFloors.length > 0) {
@@ -90,8 +96,6 @@ export default function FloorPlanManager() {
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -113,13 +117,13 @@ export default function FloorPlanManager() {
         primary_floorplan_file: file_url
       });
 
-      toast.success('Primary floor plan uploaded');
-      await loadData();
+      // Update local state immediately
+      setSelectedFloor({ ...selectedFloor, primary_floorplan_file: file_url });
       
-      const updatedFloor = floors.find(f => f.id === selectedFloor.id);
-      if (updatedFloor) {
-        setSelectedFloor({ ...selectedFloor, primary_floorplan_file: file_url });
-      }
+      // Refresh all data from database
+      await loadData();
+
+      toast.success('Primary floor plan uploaded');
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Failed to upload floor plan');
@@ -154,15 +158,15 @@ export default function FloorPlanManager() {
         alternate_floorplans: updatedAlternates
       });
 
+      // Update local state immediately
+      setSelectedFloor({ ...selectedFloor, alternate_floorplans: updatedAlternates });
+
+      // Refresh all data
+      await loadData();
+
       toast.success('Alternate floor plan added');
       setShowAddAlternate(false);
       setNewAlternate({ name: '', file: null, notes: '' });
-      await loadData();
-      
-      const updatedFloor = floors.find(f => f.id === selectedFloor.id);
-      if (updatedFloor) {
-        setSelectedFloor(updatedFloor);
-      }
     } catch (error) {
       console.error('Error adding alternate:', error);
       toast.error('Failed to add alternate floor plan');
@@ -181,15 +185,19 @@ export default function FloorPlanManager() {
         alternate_floorplans: remainingAlternates
       });
 
+      // Update local state immediately
+      setSelectedFloor({
+        ...selectedFloor,
+        primary_floorplan_file: promotingAlternate.file,
+        alternate_floorplans: remainingAlternates
+      });
+
+      // Refresh all data
+      await loadData();
+
       toast.success('Alternate promoted to primary');
       setShowPromoteWarning(false);
       setPromotingAlternate(null);
-      await loadData();
-      
-      const updatedFloor = floors.find(f => f.id === selectedFloor.id);
-      if (updatedFloor) {
-        setSelectedFloor(updatedFloor);
-      }
     } catch (error) {
       console.error('Error promoting alternate:', error);
       toast.error('Failed to promote alternate');
@@ -205,13 +213,13 @@ export default function FloorPlanManager() {
         alternate_floorplans: updatedAlternates
       });
 
-      toast.success('Alternate floor plan deleted');
+      // Update local state immediately
+      setSelectedFloor({ ...selectedFloor, alternate_floorplans: updatedAlternates });
+
+      // Refresh all data
       await loadData();
-      
-      const updatedFloor = floors.find(f => f.id === selectedFloor.id);
-      if (updatedFloor) {
-        setSelectedFloor(updatedFloor);
-      }
+
+      toast.success('Alternate floor plan deleted');
     } catch (error) {
       console.error('Error deleting alternate:', error);
       toast.error('Failed to delete alternate');
