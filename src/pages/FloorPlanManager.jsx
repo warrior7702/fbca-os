@@ -720,22 +720,10 @@ function FloorplanViewer({ imageUrl }) {
       {isPdf ? (
         <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8">
           <FileText className="w-16 h-16 mb-4 text-slate-400" />
-          <p className="mb-2 font-medium text-lg">PDF Floor Plan Available</p>
-          <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
-            PDF preview is not available. Click the button below when you're ready to download and view the floor plan.
+          <p className="mb-2 font-medium text-lg">PDF Floor Plan Stored</p>
+          <p className="text-sm text-slate-500 text-center max-w-md">
+            This floor has a PDF floor plan stored. Image preview not available for PDFs.
           </p>
-          <Button
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = imageUrl;
-              link.download = 'floorplan.pdf';
-              link.click();
-            }}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Download PDF Floor Plan
-          </Button>
         </div>
       ) : (
         <img
