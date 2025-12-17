@@ -385,12 +385,13 @@ export default function FloorPlanManager() {
                     Fullscreen
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     disabled={uploadingPrimary}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById('replace-primary').click();
+                    onClick={() => {
+                      const input = document.getElementById('replace-primary');
+                      if (input) input.click();
                     }}
                   >
                     {uploadingPrimary ? (
@@ -411,7 +412,6 @@ export default function FloorPlanManager() {
                     accept=".pdf,image/*"
                     className="hidden"
                     onChange={(e) => {
-                      e.preventDefault();
                       const file = e.target.files?.[0];
                       if (file) {
                         handleReplacePrimary(file);
@@ -637,11 +637,12 @@ export default function FloorPlanManager() {
             />
             <div>
               <Button 
+                type="button"
                 variant="outline" 
                 className="w-full"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('alternate-file').click();
+                onClick={() => {
+                  const input = document.getElementById('alternate-file');
+                  if (input) input.click();
                 }}
               >
                 <Upload className="w-4 h-4 mr-2" />
@@ -653,7 +654,6 @@ export default function FloorPlanManager() {
                 accept=".pdf,image/*"
                 className="hidden"
                 onChange={(e) => {
-                  e.preventDefault();
                   const file = e.target.files?.[0];
                   if (file) {
                     setNewAlternate({ ...newAlternate, file });
