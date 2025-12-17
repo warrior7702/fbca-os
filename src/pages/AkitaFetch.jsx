@@ -123,7 +123,7 @@ export default function AkitaFetch() {
     });
   }, [assets, selectedBuilding, selectedFloor, groupFilter, statusFilter, searchQuery, assetGroups]);
 
-  const floorplanImage = selectedFloor?.floor_plan_file || null;
+  const floorplanImage = selectedFloor?.primary_floorplan_file || selectedFloor?.floor_plan_file || null;
 
   // Get asset stats
   const assetStats = useMemo(() => {
