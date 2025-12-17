@@ -330,6 +330,24 @@ export default function FloorPlanManager() {
                     <Maximize2 className="w-4 h-4 mr-1" />
                     Fullscreen
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingPrimary}
+                    onClick={() => document.getElementById('replace-primary').click()}
+                  >
+                    {uploadingPrimary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-1" />
+                        Replace Primary
+                      </>
+                    )}
+                  </Button>
                   <input
                     type="file"
                     id="replace-primary"
@@ -337,32 +355,13 @@ export default function FloorPlanManager() {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files[0];
-                      if (file) handleReplacePrimary(file);
+                      if (file) {
+                        handleReplacePrimary(file);
+                        e.target.value = '';
+                      }
                     }}
                     disabled={uploadingPrimary}
                   />
-                  <label htmlFor="replace-primary">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={uploadingPrimary}
-                      asChild
-                    >
-                      <span className="cursor-pointer">
-                        {uploadingPrimary ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4 mr-1" />
-                            Replace Primary
-                          </>
-                        )}
-                      </span>
-                    </Button>
-                  </label>
                 </div>
               )}
             </div>
@@ -381,6 +380,22 @@ export default function FloorPlanManager() {
                       <p className="text-sm text-slate-500 mb-4">
                         Upload a primary floor plan for {selectedFloor.name}
                       </p>
+                      <Button 
+                        disabled={uploadingPrimary}
+                        onClick={() => document.getElementById('upload-primary').click()}
+                      >
+                        {uploadingPrimary ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Primary
+                          </>
+                        )}
+                      </Button>
                       <input
                         type="file"
                         id="upload-primary"
@@ -388,27 +403,13 @@ export default function FloorPlanManager() {
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files[0];
-                          if (file) uploadPrimaryFloorplan(file);
+                          if (file) {
+                            uploadPrimaryFloorplan(file);
+                            e.target.value = '';
+                          }
                         }}
                         disabled={uploadingPrimary}
                       />
-                      <label htmlFor="upload-primary">
-                        <Button asChild disabled={uploadingPrimary}>
-                          <span className="cursor-pointer">
-                            {uploadingPrimary ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Uploading...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-4 h-4 mr-2" />
-                                Upload Primary
-                              </>
-                            )}
-                          </span>
-                        </Button>
-                      </label>
                     </CardContent>
                   </Card>
                 </div>
@@ -575,6 +576,14 @@ export default function FloorPlanManager() {
               onChange={(e) => setNewAlternate({ ...newAlternate, name: e.target.value })}
             />
             <div>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => document.getElementById('alternate-file').click()}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {newAlternate.file ? newAlternate.file.name : 'Choose File'}
+              </Button>
               <input
                 type="file"
                 id="alternate-file"
@@ -582,17 +591,12 @@ export default function FloorPlanManager() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files[0];
-                  if (file) setNewAlternate({ ...newAlternate, file });
+                  if (file) {
+                    setNewAlternate({ ...newAlternate, file });
+                    e.target.value = '';
+                  }
                 }}
               />
-              <label htmlFor="alternate-file">
-                <Button variant="outline" asChild className="w-full">
-                  <span className="cursor-pointer">
-                    <Upload className="w-4 h-4 mr-2" />
-                    {newAlternate.file ? newAlternate.file.name : 'Choose File'}
-                  </span>
-                </Button>
-              </label>
             </div>
             <Textarea
               placeholder="Notes (optional)"
