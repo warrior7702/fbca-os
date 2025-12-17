@@ -70,6 +70,7 @@ export default function FloorPlanManager() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [buildingsData, floorsData] = await Promise.all([
         base44.entities.Building.list(),
@@ -96,6 +97,8 @@ export default function FloorPlanManager() {
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
     }
   };
 
