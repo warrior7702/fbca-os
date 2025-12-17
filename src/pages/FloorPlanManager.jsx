@@ -112,24 +112,48 @@ export default function FloorPlanManager() {
   };
 
   const uploadPrimaryFloorplan = async (file) => {
+    if (!file || !selectedFloor) {
+      toast.error('No file or floor selected');
+      return;
+    }
+
     setUploadingPrimary(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      console.log('Uploading file:', file.name, file.type);
+      
+      const uploadResult = await base44.integrations.Core.UploadFile({ file });
+      console.log('Upload result:', uploadResult);
+      
+      if (!uploadResult?.file_url) {
+        throw new Error('No file URL returned from upload');
+      }
+
+      const { file_url } = uploadResult;
       
       await base44.entities.Floor.update(selectedFloor.id, {
         primary_floorplan_file: file_url
       });
 
-      // Update local state immediately
-      setSelectedFloor({ ...selectedFloor, primary_floorplan_file: file_url });
-      
-      // Refresh all data from database
-      await loadData();
+      console.log('Floor updated with primary_floorplan_file:', file_url);
 
-      toast.success('Primary floor plan uploaded');
+      // Refresh all data from database
+      const [buildingsData, floorsData] = await Promise.all([
+        base44.entities.Building.list(),
+        base44.entities.Floor.list()
+      ]);
+
+      setBuildings(buildingsData);
+      setFloors(floorsData);
+
+      const updatedFloor = floorsData.find(f => f.id === selectedFloor.id);
+      if (updatedFloor) {
+        setSelectedFloor(updatedFloor);
+      }
+
+      toast.success('Primary floor plan uploaded successfully');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload floor plan');
+      toast.error('Failed to upload floor plan: ' + error.message);
     } finally {
       setUploadingPrimary(false);
       setShowReplaceWarning(false);
@@ -144,7 +168,16 @@ export default function FloorPlanManager() {
     }
 
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: newAlternate.file });
+      console.log('Uploading alternate file:', newAlternate.file.name);
+      
+      const uploadResult = await base44.integrations.Core.UploadFile({ file: newAlternate.file });
+      
+      if (!uploadResult?.file_url) {
+        throw new Error('No file URL returned from upload');
+      }
+
+      const { file_url } = uploadResult;
+      console.log('Alternate uploaded:', file_url);
       
       const existingAlternates = selectedFloor.alternate_floorplans || [];
       const updatedAlternates = [
@@ -161,18 +194,28 @@ export default function FloorPlanManager() {
         alternate_floorplans: updatedAlternates
       });
 
-      // Update local state immediately
-      setSelectedFloor({ ...selectedFloor, alternate_floorplans: updatedAlternates });
+      console.log('Floor updated with alternate plans');
 
       // Refresh all data
-      await loadData();
+      const [buildingsData, floorsData] = await Promise.all([
+        base44.entities.Building.list(),
+        base44.entities.Floor.list()
+      ]);
 
-      toast.success('Alternate floor plan added');
+      setBuildings(buildingsData);
+      setFloors(floorsData);
+
+      const updatedFloor = floorsData.find(f => f.id === selectedFloor.id);
+      if (updatedFloor) {
+        setSelectedFloor(updatedFloor);
+      }
+
+      toast.success('Alternate floor plan added successfully');
       setShowAddAlternate(false);
       setNewAlternate({ name: '', file: null, notes: '' });
     } catch (error) {
       console.error('Error adding alternate:', error);
-      toast.error('Failed to add alternate floor plan');
+      toast.error('Failed to add alternate: ' + error.message);
     }
   };
 
@@ -671,31 +714,15 @@ function FloorplanViewer({ imageUrl }) {
   if (!imageUrl) return null;
   
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
-  
-  // Add #toolbar=0 to PDF URL to prevent download prompts
-  const pdfUrl = isPdf && !imageUrl.includes('#toolbar=0') ? `${imageUrl}#toolbar=0` : imageUrl;
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
       {isPdf ? (
-        <object
-          data={pdfUrl}
-          type="application/pdf"
-          className="w-full h-full"
-        >
-          <div className="flex flex-col items-center justify-center h-full text-slate-600">
-            <FileText className="w-12 h-12 mb-4 text-slate-400" />
-            <p className="mb-2">PDF Preview</p>
-            <a 
-              href={imageUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              Open in new tab
-            </a>
-          </div>
-        </object>
+        <iframe
+          src={`${imageUrl}#view=FitH&toolbar=0&navpanes=0`}
+          className="w-full h-full border-0"
+          title="Floor plan PDF"
+        />
       ) : (
         <img
           src={imageUrl}
