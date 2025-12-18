@@ -46,6 +46,7 @@ export default function AkitaFetch() {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [showPins, setShowPins] = useState(true);
   const [showRoomLabels, setShowRoomLabels] = useState(false);
   const [showOnlyWithTickets, setShowOnlyWithTickets] = useState(false);
@@ -103,6 +104,12 @@ export default function AkitaFetch() {
 
   const handleAssetClick = (asset) => {
     setSelectedAsset(asset);
+    setSelectedRoom(null);
+  };
+
+  const handleRoomClick = (room) => {
+    setSelectedRoom(room);
+    setSelectedAsset(null);
   };
 
   // Get floors for selected building
@@ -475,6 +482,7 @@ export default function AkitaFetch() {
                   roomFilter={roomFilter}
                   openTicketsByRoom={openTicketsByRoom}
                   showOnlyWithTickets={showOnlyWithTickets}
+                  onRoomClick={handleRoomClick}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -731,8 +739,115 @@ export default function AkitaFetch() {
             )}
           </ScrollArea>
 
+          {/* Room Details */}
+          {selectedRoom && (
+            <div className="border-t p-4 bg-slate-50 max-h-96 overflow-y-auto">
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-semibold text-slate-900 text-base mb-1">
+                    {selectedRoom.description || selectedRoom.room_number || 'Unnamed Room'}
+                  </h4>
+                  <div className="text-xs text-slate-500 space-y-0.5">
+                    <div>Building: {selectedRoom.building_name || 'N/A'}</div>
+                    <div>Floor: {selectedRoom.floor_name || 'N/A'}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                  <div className="text-center p-3 bg-white rounded-lg border">
+                    <div className="text-2xl font-bold text-slate-900">
+                      {assets.filter(a => a.room_id === selectedRoom.id).length}
+                    </div>
+                    <div className="text-xs text-slate-600">Assets</div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg border">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {openTicketsByRoom.roomTickets[selectedRoom.id]?.length || 0}
+                    </div>
+                    <div className="text-xs text-slate-600">Open Tickets</div>
+                  </div>
+                </div>
+
+                {/* Open Tickets */}
+                {openTicketsByRoom.roomTickets[selectedRoom.id]?.length > 0 && (
+                  <div className="pt-3 border-t">
+                    <h5 className="font-semibold text-xs text-slate-700 mb-2">Open Tickets</h5>
+                    <div className="space-y-2">
+                      {openTicketsByRoom.roomTickets[selectedRoom.id].map(ticket => {
+                        const createdDate = new Date(ticket.created_date);
+                        const daysOld = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+                        return (
+                          <div key={ticket.id} className="bg-white rounded-lg border p-2">
+                            <div className="font-medium text-xs text-slate-900 mb-1">{ticket.subject}</div>
+                            <div className="flex items-center gap-2 flex-wrap text-xs">
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {ticket.category}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {ticket.status.replace(/_/g, ' ')}
+                              </Badge>
+                              <span className="text-slate-500">{daysOld}d old</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assets in Room */}
+                <div className="pt-3 border-t">
+                  <h5 className="font-semibold text-xs text-slate-700 mb-2">Assets in Room</h5>
+                  {assets.filter(a => a.room_id === selectedRoom.id).length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4">No assets in this room</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {assets.filter(a => a.room_id === selectedRoom.id).map(asset => {
+                        const hasTickets = openTicketsByRoom.assetTickets[asset.name]?.length > 0;
+                        return (
+                          <div
+                            key={asset.id}
+                            className="bg-white rounded-lg border p-2 cursor-pointer hover:border-blue-300 transition-colors"
+                            onClick={() => handleAssetClick(asset)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-xs text-slate-900">{asset.name}</div>
+                                {asset.model && (
+                                  <div className="text-xs text-slate-500">{asset.model}</div>
+                                )}
+                              </div>
+                              {hasTickets && (
+                                <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full bg-blue-600 hover:bg-blue-700 mt-3"
+                  onClick={() => {
+                    const params = new URLSearchParams();
+                    if (selectedRoom.building_id) params.set('building_id', selectedRoom.building_id);
+                    if (selectedRoom.id) params.set('room_id', selectedRoom.id);
+                    navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+                  }}
+                >
+                  <Ticket className="w-3 h-3 mr-2" />
+                  Create Ticket for Room
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Asset Details */}
-          {selectedAsset && (
+          {selectedAsset && !selectedRoom && (
             <div className="border-t p-4 bg-slate-50 max-h-96 overflow-y-auto">
               <div className="space-y-3 text-sm">
                 <div>
@@ -860,7 +975,7 @@ export default function AkitaFetch() {
                     <Ticket className="w-3 h-3 mr-2" />
                     Create Ticket for Asset
                   </Button>
-                  
+
                   {selectedAsset.akita_url && (
                     <a
                       href={selectedAsset.akita_url}
@@ -885,7 +1000,7 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets }) {
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets, onRoomClick }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   // Check if asset has open tickets (asset-scoped only)
@@ -949,26 +1064,33 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
 
       {/* Room Labels Overlay */}
       {showRoomLabels && (
-        <div className="absolute inset-0 pointer-events-none">
-          {Object.entries(roomLabelPositions).map(([roomId, pos]) => (
-            <div
-              key={roomId}
-              className="absolute"
-              style={{
-                left: `${pos.x}%`,
-                top: `${pos.y}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-            >
-              <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap ${
-                pos.hasTicket 
-                  ? 'border-2 border-orange-500 text-orange-900' 
-                  : 'border border-slate-300 text-slate-900'
-              }`}>
-                {pos.label}
+        <div className="absolute inset-0">
+          {Object.entries(roomLabelPositions).map(([roomId, pos]) => {
+            const room = rooms.find(r => r.id === roomId);
+            return (
+              <div
+                key={roomId}
+                className="absolute cursor-pointer pointer-events-auto"
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (room && onRoomClick) onRoomClick(room);
+                }}
+              >
+                <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow ${
+                  pos.hasTicket 
+                    ? 'border-2 border-orange-500 text-orange-900' 
+                    : 'border border-slate-300 text-slate-900'
+                }`}>
+                  {pos.label}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
