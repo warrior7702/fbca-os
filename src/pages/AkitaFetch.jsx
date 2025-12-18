@@ -45,6 +45,7 @@ export default function AkitaFetch() {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showPins, setShowPins] = useState(true);
+  const [showRoomLabels, setShowRoomLabels] = useState(false);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -328,6 +329,13 @@ export default function AkitaFetch() {
                       <MapPin className="w-4 h-4 mr-1" />
                       {showPins ? 'Hide' : 'Show'} Pins
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRoomLabels(!showRoomLabels)}
+                    >
+                      {showRoomLabels ? 'Hide' : 'Show'} Room Labels
+                    </Button>
                     <Badge variant="outline">
                       {assetStats.byFloor} assets
                     </Badge>
@@ -347,6 +355,8 @@ export default function AkitaFetch() {
                   selectedAsset={selectedAsset}
                   onAssetClick={handleAssetClick}
                   showPins={showPins}
+                  showRoomLabels={showRoomLabels}
+                  rooms={rooms.filter(r => r.floor_id === selectedFloor.id)}
                   roomFilter={roomFilter}
                 />
               ) : (
@@ -658,8 +668,30 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, roomFilter }) {
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
+
+  // Calculate room label positions based on average asset coordinates
+  const roomLabelPositions = React.useMemo(() => {
+    const positions = {};
+    
+    rooms.forEach(room => {
+      const roomAssets = assets.filter(a => a.room_id === room.id && a.x_coord !== null && a.y_coord !== null);
+      
+      if (roomAssets.length > 0) {
+        const avgX = roomAssets.reduce((sum, a) => sum + a.x_coord, 0) / roomAssets.length;
+        const avgY = roomAssets.reduce((sum, a) => sum + a.y_coord, 0) / roomAssets.length;
+        
+        positions[room.id] = {
+          x: avgX * 100,
+          y: avgY * 100,
+          label: room.room_number ? `${room.room_number}${room.room_name ? ' - ' + room.room_name : ''}` : room.room_name
+        };
+      }
+    });
+    
+    return positions;
+  }, [rooms, assets]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
@@ -682,6 +714,27 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             e.target.alt = 'Failed to load floor plan';
           }}
         />
+      )}
+
+      {/* Room Labels Overlay */}
+      {showRoomLabels && (
+        <div className="absolute inset-0 pointer-events-none">
+          {Object.entries(roomLabelPositions).map(([roomId, pos]) => (
+            <div
+              key={roomId}
+              className="absolute"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg border border-slate-300 text-xs font-medium text-slate-900 whitespace-nowrap">
+                {pos.label}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Asset Pins Overlay */}
