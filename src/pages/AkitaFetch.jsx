@@ -146,23 +146,17 @@ export default function AkitaFetch() {
     );
 
     openTickets.forEach(ticket => {
-      // Track by room
-      if (ticket.room_id) {
+      // Track by scope
+      if (ticket.scope === "ROOM" && ticket.room_id) {
         if (!roomTickets[ticket.room_id]) {
           roomTickets[ticket.room_id] = [];
         }
         roomTickets[ticket.room_id].push(ticket);
-      }
-
-      // Track by asset name (if mentioned in subject/description)
-      if (ticket.subject) {
-        const assetName = ticket.subject.match(/Asset Issue: (.+)/)?.[1];
-        if (assetName) {
-          if (!assetTickets[assetName]) {
-            assetTickets[assetName] = [];
-          }
-          assetTickets[assetName].push(ticket);
+      } else if (ticket.scope === "ASSET" && ticket.asset_name) {
+        if (!assetTickets[ticket.asset_name]) {
+          assetTickets[ticket.asset_name] = [];
         }
+        assetTickets[ticket.asset_name].push(ticket);
       }
     });
 
@@ -916,16 +910,19 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
         const avgX = roomAssets.reduce((sum, a) => sum + a.x_coord, 0) / roomAssets.length;
         const avgY = roomAssets.reduce((sum, a) => sum + a.y_coord, 0) / roomAssets.length;
         
+        const hasRoomTicket = openTicketsByRoom.roomTickets[room.id]?.length > 0;
+        
         positions[room.id] = {
           x: avgX * 100,
           y: avgY * 100,
-          label: room.room_name || room.name || room.room_number || 'Unnamed'
+          label: room.room_name || room.name || room.room_number || 'Unnamed',
+          hasTicket: hasRoomTicket
         };
       }
     });
     
     return positions;
-  }, [rooms, assets]);
+  }, [rooms, assets, openTicketsByRoom]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
@@ -963,7 +960,11 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
                 transform: 'translate(-50%, -50%)'
               }}
             >
-              <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg border border-slate-300 text-xs font-medium text-slate-900 whitespace-nowrap">
+              <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap ${
+                pos.hasTicket 
+                  ? 'border-2 border-orange-500 text-orange-900' 
+                  : 'border border-slate-300 text-slate-900'
+              }`}>
                 {pos.label}
               </div>
             </div>
