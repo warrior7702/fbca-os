@@ -477,6 +477,7 @@ export default function AkitaFetch() {
                   showRoomLabels={showRoomLabels}
                   rooms={rooms.filter(r => r.floor_id === selectedFloor.id)}
                   roomFilter={roomFilter}
+                  openTicketsByRoom={openTicketsByRoom}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
