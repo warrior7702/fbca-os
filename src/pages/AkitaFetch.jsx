@@ -595,42 +595,42 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPi
       {showPins && (
         <div className="absolute inset-0 pointer-events-none">
           {assets.map(asset => {
-          if (asset.x_coord === null || asset.y_coord === null) return null;
+            if (asset.x_coord === null || asset.y_coord === null) return null;
 
-          const isSelected = selectedAsset?.id === asset.id;
-          
-          // Convert 0-1 normalized coords to percentage
-          const xPercent = asset.x_coord * 100;
-          const yPercent = asset.y_coord * 100;
+            const isSelected = selectedAsset?.id === asset.id;
+            
+            // Convert 0-1 normalized coords to percentage
+            const xPercent = asset.x_coord * 100;
+            const yPercent = asset.y_coord * 100;
 
-          return (
-            <motion.div
-              key={asset.id}
-              className="absolute pointer-events-auto"
-              style={{
-                left: `${xPercent}%`,
-                top: `${yPercent}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              whileHover={{ scale: 1.3 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAssetClick(asset);
-              }}
-            >
-              <div
-                className={`w-4 h-4 rounded-full cursor-pointer shadow-lg transition-all ${
-                  isSelected
-                    ? 'bg-blue-500 ring-4 ring-blue-300'
-                    : 'bg-emerald-500 hover:bg-emerald-600'
-                }`}
-                title={asset.name}
-              />
-            </motion.div>
-          );
-        })}
+            return (
+              <motion.div
+                key={asset.id}
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${xPercent}%`,
+                  top: `${yPercent}%`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                whileHover={{ scale: 1.3 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAssetClick(asset);
+                }}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full cursor-pointer shadow-lg transition-all ${
+                    isSelected
+                      ? 'bg-blue-500 ring-4 ring-blue-300'
+                      : 'bg-emerald-500 hover:bg-emerald-600'
+                  }`}
+                  title={asset.name}
+                />
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
