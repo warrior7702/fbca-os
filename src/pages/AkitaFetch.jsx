@@ -169,19 +169,10 @@ export default function AkitaFetch() {
     return { roomTickets, assetTickets };
   }, [tickets]);
 
-  // Check if asset or its room has open tickets
+  // Check if asset has open tickets (asset-scoped only)
   const hasOpenTickets = (asset) => {
-    // Check direct asset match
-    if (openTicketsByRoom.assetTickets[asset.name]?.length > 0) {
-      return true;
-    }
-
-    // Check room match
-    if (asset.room_id && openTicketsByRoom.roomTickets[asset.room_id]?.length > 0) {
-      return true;
-    }
-
-    return false;
+    // Only check direct asset match - room tickets do NOT affect asset pins
+    return openTicketsByRoom.assetTickets[asset.name]?.length > 0;
   };
 
   // Filtered rooms and groups for autocomplete
