@@ -887,8 +887,23 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter }) {
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
+
+  // Check if asset or its room has open tickets
+  const hasOpenTickets = (asset) => {
+    // Check direct asset match
+    if (openTicketsByRoom.assetTickets[asset.name]?.length > 0) {
+      return true;
+    }
+
+    // Check room match
+    if (asset.room_id && openTicketsByRoom.roomTickets[asset.room_id]?.length > 0) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Calculate room label positions based on average asset coordinates
   const roomLabelPositions = React.useMemo(() => {
