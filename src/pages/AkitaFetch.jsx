@@ -1020,13 +1020,6 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
     const positions = {};
     
     rooms.forEach(room => {
-      // Skip exterior rooms on floor plan
-      const isExterior = (room.room_name || '').toLowerCase().includes('exterior') || 
-                         (room.room_category || '').toLowerCase().includes('exterior') ||
-                         (room.room_number || '').toLowerCase().includes('exterior');
-      
-      if (isExterior) return;
-      
       const roomAssets = assets.filter(a => a.room_id === room.id && a.x_coord !== null && a.y_coord !== null);
       
       if (roomAssets.length > 0) {
