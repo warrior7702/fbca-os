@@ -685,7 +685,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
         positions[room.id] = {
           x: avgX * 100,
           y: avgY * 100,
-          label: room.room_number ? `${room.room_number}${room.room_name ? ' - ' + room.room_name : ''}` : room.room_name
+          label: room.room_name || room.name || room.room_number || 'Unnamed'
         };
       }
     });
