@@ -48,6 +48,7 @@ export default function AkitaFetch() {
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showPins, setShowPins] = useState(true);
   const [showRoomLabels, setShowRoomLabels] = useState(false);
+  const [showOnlyWithTickets, setShowOnlyWithTickets] = useState(false);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -449,6 +450,15 @@ export default function AkitaFetch() {
                       {showPins ? 'Hide' : 'Show'} Pins
                     </Button>
                     <Button
+                      variant={showOnlyWithTickets ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowOnlyWithTickets(!showOnlyWithTickets)}
+                      className={showOnlyWithTickets ? "bg-orange-500 hover:bg-orange-600" : ""}
+                    >
+                      <Ticket className="w-4 h-4 mr-1" />
+                      Tickets Only
+                    </Button>
+                    <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowRoomLabels(!showRoomLabels)}
@@ -478,6 +488,7 @@ export default function AkitaFetch() {
                   rooms={rooms.filter(r => r.floor_id === selectedFloor.id)}
                   roomFilter={roomFilter}
                   openTicketsByRoom={openTicketsByRoom}
+                  showOnlyWithTickets={showOnlyWithTickets}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -888,7 +899,7 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom }) {
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   // Check if asset or its room has open tickets
@@ -905,6 +916,11 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
 
     return false;
   };
+
+  // Filter assets based on ticket filter
+  const visibleAssets = showOnlyWithTickets 
+    ? assets.filter(hasOpenTickets)
+    : assets;
 
   // Calculate room label positions based on average asset coordinates
   const roomLabelPositions = React.useMemo(() => {
@@ -975,7 +991,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
       {/* Asset Pins Overlay */}
       {showPins && (
         <div className="absolute inset-0 pointer-events-none">
-          {assets.map(asset => {
+          {visibleAssets.map(asset => {
             if (asset.x_coord === null || asset.y_coord === null) return null;
 
             const isSelected = selectedAsset?.id === asset.id;
