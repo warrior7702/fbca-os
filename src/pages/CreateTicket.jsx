@@ -44,6 +44,8 @@ export default function CreateTicket() {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [roomSearch, setRoomSearch] = useState("");
   const [showRoomDropdown, setShowRoomDropdown] = useState(false);
+  const [buildingSearch, setBuildingSearch] = useState("");
+  const [showBuildingDropdown, setShowBuildingDropdown] = useState(false);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
@@ -233,6 +235,14 @@ export default function CreateTicket() {
     const roomNum = (room.room_number || '').toLowerCase();
     const roomName = (room.room_name || '').toLowerCase();
     return roomNum.includes(search) || roomName.includes(search);
+  });
+
+  const filteredBuildings = buildings.filter(building => {
+    if (!buildingSearch) return true;
+    const search = buildingSearch.toLowerCase();
+    const name = (building.name || '').toLowerCase();
+    const address = (building.address || '').toLowerCase();
+    return name.includes(search) || address.includes(search);
   });
 
   const availableCategories = [
@@ -560,28 +570,60 @@ export default function CreateTicket() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <label className="text-sm font-medium">Building</label>
                     {loadingBuildings ? (
                       <div className="flex items-center justify-center h-10 border rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                       </div>
                     ) : (
-                      <Select 
-                        value={ticket.building_id} 
-                        onValueChange={handleBuildingChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select building..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {buildings.map(building => (
-                            <SelectItem key={building.id} value={building.id}>
-                              {building.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Input
+                          value={buildingSearch}
+                          onChange={(e) => {
+                            setBuildingSearch(e.target.value);
+                            setShowBuildingDropdown(true);
+                          }}
+                          onFocus={() => setShowBuildingDropdown(true)}
+                          placeholder="Search buildings..."
+                          className="pr-8"
+                        />
+                        {ticket.building_id && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                            onClick={() => {
+                              setTicket({...ticket, building: '', building_id: '', room_id: '', room_number: '', floor_id: null});
+                              setBuildingSearch('');
+                              setRooms([]);
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {showBuildingDropdown && filteredBuildings.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredBuildings.map(building => (
+                              <div
+                                key={building.id}
+                                className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                                onClick={() => {
+                                  handleBuildingChange(building.id);
+                                  setBuildingSearch(building.name);
+                                  setShowBuildingDropdown(false);
+                                }}
+                              >
+                                <div className="font-medium">{building.name}</div>
+                                {building.address && (
+                                  <div className="text-xs text-slate-500">{building.address}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
