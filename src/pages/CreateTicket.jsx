@@ -59,6 +59,8 @@ export default function CreateTicket() {
     details: "",
     priority: "medium",
     category: "",
+    scope: "ROOM",
+    asset_name: "",
     attachments: []
   });
 
@@ -139,7 +141,9 @@ export default function CreateTicket() {
     if (assetName) {
       setTicket(prev => ({
         ...prev,
-        subject: `Asset Issue: ${assetName}`
+        subject: `Asset Issue: ${assetName}`,
+        scope: "ASSET",
+        asset_name: assetName
       }));
       setIssueDescription(`Issue with asset: ${assetName}`);
     }
@@ -308,8 +312,13 @@ export default function CreateTicket() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!ticket.requester_name || !ticket.requester_email || !issueDescription || !ticket.category) {
+    if (!ticket.requester_name || !ticket.requester_email || !issueDescription || !ticket.category || !ticket.scope) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (ticket.scope === "ASSET" && !ticket.asset_name) {
+      toast.error("Please specify the asset name for asset-scoped tickets");
       return;
     }
     
@@ -340,6 +349,8 @@ export default function CreateTicket() {
         requester_name: ticket.requester_name,
         subject: ticket.subject || issueDescription.substring(0, 50) + '...',
         description: issueDescription,
+        scope: ticket.scope,
+        asset_name: ticket.scope === "ASSET" ? ticket.asset_name : null,
         building: ticket.building,
         building_id: ticket.building_id || null,
         floor_id: ticket.floor_id || null,
@@ -715,6 +726,48 @@ export default function CreateTicket() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Issue Scope<span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="ROOM"
+                        checked={ticket.scope === "ROOM"}
+                        onChange={(e) => setTicket({...ticket, scope: e.target.value, asset_name: ""})}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Room Issue</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="ASSET"
+                        checked={ticket.scope === "ASSET"}
+                        onChange={(e) => setTicket({...ticket, scope: e.target.value})}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Asset Issue</span>
+                    </label>
+                  </div>
+                </div>
+
+                {ticket.scope === "ASSET" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Asset Name<span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={ticket.asset_name}
+                      onChange={(e) => setTicket({...ticket, asset_name: e.target.value})}
+                      placeholder="Enter asset name"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
