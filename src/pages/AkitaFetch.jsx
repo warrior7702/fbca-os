@@ -14,6 +14,7 @@ import {
   ExternalLink,
   FileText
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -527,15 +528,46 @@ export default function AkitaFetch() {
                       <div className="mt-1">{selectedAsset.floor_name}</div>
                     </div>
                   )}
-                  {selectedAsset.room_number && (
-                    <div>
-                      <span className="font-medium text-slate-600">Room</span>
-                      <div className="mt-1">
-                        {selectedAsset.room_number}
-                        {selectedAsset.room_name && ` - ${selectedAsset.room_name}`}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <span className="font-medium text-slate-600">Room</span>
+                    <Select
+                      value={selectedAsset.room_id || "unassigned"}
+                      onValueChange={async (value) => {
+                        try {
+                          const roomId = value === "unassigned" ? null : value;
+                          const room = floorRooms.find(r => r.id === roomId);
+
+                          await base44.entities.Asset.update(selectedAsset.id, {
+                            room_id: roomId,
+                            room_number: room?.room_number || null,
+                            room_name: room?.name || null
+                          });
+
+                          // Refresh data
+                          const updatedAssets = await base44.entities.Asset.list();
+                          setAssets(updatedAssets);
+                          setSelectedAsset(updatedAssets.find(a => a.id === selectedAsset.id));
+
+                          toast.success('Room assignment updated');
+                        } catch (error) {
+                          console.error('Error updating room:', error);
+                          toast.error('Failed to update room assignment');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {floorRooms.map(room => (
+                          <SelectItem key={room.id} value={room.id}>
+                            {room.room_number ? `${room.room_number} - ${room.name || 'Unnamed'}` : room.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {selectedAsset.manufacturer && (
                     <div>
                       <span className="font-medium text-slate-600">Manufacturer</span>
