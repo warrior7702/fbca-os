@@ -113,6 +113,18 @@ export default function AkitaFetch() {
     });
   }, [selectedFloor, rooms]);
 
+  // Calculate asset counts per room
+  const roomAssetCounts = useMemo(() => {
+    const counts = {};
+    assets.forEach(asset => {
+      if (asset.floor_id === selectedFloor?.id) {
+        const roomId = asset.room_id || 'unassigned';
+        counts[roomId] = (counts[roomId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [assets, selectedFloor]);
+
   // Asset filtering
   const filteredAssets = useMemo(() => {
     if (!selectedBuilding || !selectedFloor) return [];
@@ -317,6 +329,18 @@ export default function AkitaFetch() {
                 <h3 className="font-semibold text-sm">
                   {selectedFloor ? `${selectedFloor.name} - Floor Plan` : 'Select a floor'}
                 </h3>
+                {roomFilter !== "all" && (
+                  <>
+                    <span className="text-slate-400">/</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {roomFilter === "unassigned" 
+                        ? "Unassigned Assets"
+                        : floorRooms.find(r => r.id === roomFilter)?.room_name || 
+                          floorRooms.find(r => r.id === roomFilter)?.room_number || 
+                          "Room"}
+                    </Badge>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedFloor && (
@@ -337,7 +361,7 @@ export default function AkitaFetch() {
                       {showRoomLabels ? 'Hide' : 'Show'} Room Labels
                     </Button>
                     <Badge variant="outline">
-                      {assetStats.byFloor} assets
+                      {filteredAssets.length} / {assetStats.byFloor} assets
                     </Badge>
                   </>
                 )}
@@ -417,13 +441,21 @@ export default function AkitaFetch() {
                   <SelectValue placeholder="All Rooms" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Rooms</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {floorRooms.map(room => (
-                    <SelectItem key={room.id} value={room.id}>
-                      {room.room_number ? `${room.room_number} - ${room.name || 'Unnamed'}` : room.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">
+                    All Rooms ({roomAssetCounts.unassigned ? Object.values(roomAssetCounts).reduce((a, b) => a + b, 0) : assetStats.byFloor})
+                  </SelectItem>
+                  <SelectItem value="unassigned">
+                    Unassigned ({roomAssetCounts.unassigned || 0})
+                  </SelectItem>
+                  {floorRooms.map(room => {
+                    const count = roomAssetCounts[room.id] || 0;
+                    const label = room.room_name || room.name || room.room_number || 'Unnamed';
+                    return (
+                      <SelectItem key={room.id} value={room.id}>
+                        {room.room_number ? `${room.room_number} – ` : ''}{label} ({count})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
 
@@ -746,7 +778,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             const isSelected = selectedAsset?.id === asset.id;
             const isFiltered = filteredAssets.some(a => a.id === asset.id);
             const isRoomFiltered = roomFilter !== "all";
-            
+
             // Convert 0-1 normalized coords to percentage
             const xPercent = asset.x_coord * 100;
             const yPercent = asset.y_coord * 100;
@@ -759,7 +791,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
                   left: `${xPercent}%`,
                   top: `${yPercent}%`,
                   transform: 'translate(-50%, -50%)',
-                  opacity: isRoomFiltered && !isFiltered ? 0.2 : 1
+                  opacity: isRoomFiltered && !isFiltered ? 0.5 : 1
                 }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
