@@ -13,7 +13,8 @@ import {
   Filter,
   ExternalLink,
   FileText,
-  Ticket
+  Ticket,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +54,10 @@ export default function AkitaFetch() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("Active");
   const [roomFilter, setRoomFilter] = useState("all");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [showRoomDropdown, setShowRoomDropdown] = useState(false);
+  const [groupSearch, setGroupSearch] = useState("");
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -125,17 +130,36 @@ export default function AkitaFetch() {
     return counts;
   }, [assets, selectedFloor]);
 
+  // Filtered rooms and groups for autocomplete
+  const filteredRooms = useMemo(() => {
+    if (!roomSearch) return floorRooms;
+    const search = roomSearch.toLowerCase();
+    return floorRooms.filter(room => {
+      const roomNum = (room.room_number || '').toLowerCase();
+      const roomName = (room.room_name || room.name || '').toLowerCase();
+      return roomNum.includes(search) || roomName.includes(search);
+    });
+  }, [floorRooms, roomSearch]);
+
+  const filteredGroups = useMemo(() => {
+    if (!groupSearch) return assetGroups;
+    const search = groupSearch.toLowerCase();
+    return assetGroups.filter(group => 
+      group.name.toLowerCase().includes(search)
+    );
+  }, [assetGroups, groupSearch]);
+
   // Asset filtering
   const filteredAssets = useMemo(() => {
     if (!selectedBuilding || !selectedFloor) return [];
-    
+
     return assets.filter(asset => {
       // Floor filter
       if (asset.floor_id !== selectedFloor.id) return false;
-      
+
       // Status filter
       if (statusFilter !== "all" && asset.status !== statusFilter) return false;
-      
+
       // Group filter
       if (groupFilter !== "all") {
         const assetGroup = assetGroups.find(g => g.id === asset.asset_group_id);
@@ -150,14 +174,14 @@ export default function AkitaFetch() {
           if (asset.room_id !== roomFilter) return false;
         }
       }
-      
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const searchableText = `${asset.name} ${asset.model || ''} ${asset.serial_number || ''} ${asset.room_number || ''}`.toLowerCase();
         if (!searchableText.includes(query)) return false;
       }
-      
+
       return true;
     });
   }, [assets, selectedBuilding, selectedFloor, groupFilter, statusFilter, roomFilter, searchQuery, assetGroups]);
@@ -455,43 +479,135 @@ export default function AkitaFetch() {
             </div>
 
             <div className="space-y-2">
-              <Select value={roomFilter} onValueChange={setRoomFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Rooms" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    All Rooms ({roomAssetCounts.unassigned ? Object.values(roomAssetCounts).reduce((a, b) => a + b, 0) : assetStats.byFloor})
-                  </SelectItem>
-                  <SelectItem value="unassigned">
-                    Unassigned ({roomAssetCounts.unassigned || 0})
-                  </SelectItem>
-                  {floorRooms.map(room => {
-                    const count = roomAssetCounts[room.id] || 0;
-                    const label = room.room_name || room.name || room.room_number || 'Unnamed';
-                    return (
-                      <SelectItem key={room.id} value={room.id}>
-                        {room.room_number ? `${room.room_number} – ` : ''}{label} ({count})
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              {/* Room Filter - Autocomplete */}
+              <div className="relative">
+                <Input
+                  placeholder={roomFilter === "all" ? `All Rooms (${roomAssetCounts.unassigned ? Object.values(roomAssetCounts).reduce((a, b) => a + b, 0) : assetStats.byFloor})` : roomFilter === "unassigned" ? "Unassigned" : floorRooms.find(r => r.id === roomFilter)?.room_number || floorRooms.find(r => r.id === roomFilter)?.room_name || "Room"}
+                  value={roomSearch}
+                  onChange={(e) => {
+                    setRoomSearch(e.target.value);
+                    setShowRoomDropdown(true);
+                  }}
+                  onFocus={() => setShowRoomDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowRoomDropdown(false), 200)}
+                  className="pr-8"
+                />
+                {roomFilter !== "all" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => {
+                      setRoomFilter("all");
+                      setRoomSearch("");
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+                {showRoomDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div
+                      className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm border-b"
+                      onClick={() => {
+                        setRoomFilter("all");
+                        setRoomSearch("");
+                        setShowRoomDropdown(false);
+                      }}
+                    >
+                      All Rooms ({roomAssetCounts.unassigned ? Object.values(roomAssetCounts).reduce((a, b) => a + b, 0) : assetStats.byFloor})
+                    </div>
+                    <div
+                      className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm border-b"
+                      onClick={() => {
+                        setRoomFilter("unassigned");
+                        setRoomSearch("Unassigned");
+                        setShowRoomDropdown(false);
+                      }}
+                    >
+                      Unassigned ({roomAssetCounts.unassigned || 0})
+                    </div>
+                    {filteredRooms.slice(0, 50).map(room => {
+                      const count = roomAssetCounts[room.id] || 0;
+                      const label = room.room_name || room.name || room.room_number || 'Unnamed';
+                      return (
+                        <div
+                          key={room.id}
+                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                          onClick={() => {
+                            setRoomFilter(room.id);
+                            setRoomSearch(room.room_number ? `${room.room_number} – ${label}` : label);
+                            setShowRoomDropdown(false);
+                          }}
+                        >
+                          {room.room_number ? `${room.room_number} – ` : ''}{label} ({count})
+                        </div>
+                      );
+                    })}
+                    {filteredRooms.length > 50 && (
+                      <div className="px-3 py-2 text-xs text-slate-500 text-center border-t">
+                        Showing 50 of {filteredRooms.length} rooms - keep typing to narrow results
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <Select value={groupFilter} onValueChange={setGroupFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Groups</SelectItem>
-                    {assetGroups.map(group => (
-                      <SelectItem key={group.id} value={group.name}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Group Filter - Autocomplete */}
+                <div className="relative">
+                  <Input
+                    placeholder={groupFilter === "all" ? "All Groups" : groupFilter}
+                    value={groupSearch}
+                    onChange={(e) => {
+                      setGroupSearch(e.target.value);
+                      setShowGroupDropdown(true);
+                    }}
+                    onFocus={() => setShowGroupDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowGroupDropdown(false), 200)}
+                    className={groupFilter !== "all" ? "pr-8" : ""}
+                  />
+                  {groupFilter !== "all" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => {
+                        setGroupFilter("all");
+                        setGroupSearch("");
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {showGroupDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                      <div
+                        className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm border-b"
+                        onClick={() => {
+                          setGroupFilter("all");
+                          setGroupSearch("");
+                          setShowGroupDropdown(false);
+                        }}
+                      >
+                        All Groups
+                      </div>
+                      {filteredGroups.map(group => (
+                        <div
+                          key={group.id}
+                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                          onClick={() => {
+                            setGroupFilter(group.name);
+                            setGroupSearch(group.name);
+                            setShowGroupDropdown(false);
+                          }}
+                        >
+                          {group.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
