@@ -139,9 +139,10 @@ export default function AkitaFetch() {
     const roomTickets = {};
     const assetTickets = {};
 
-    // Filter for open tickets only
+    // Filter for open tickets only - specific statuses
+    const openStatuses = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'];
     const openTickets = tickets.filter(t => 
-      t.status !== 'resolved' && t.status !== 'archived'
+      openStatuses.includes(t.status)
     );
 
     openTickets.forEach(ticket => {
@@ -1006,15 +1007,22 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             // Build tooltip text
             let tooltipText = asset.name;
             if (hasTickets) {
-              const assetTicketCount = openTicketsByRoom.assetTickets[asset.name]?.length || 0;
-              const roomTicketCount = asset.room_id ? (openTicketsByRoom.roomTickets[asset.room_id]?.length || 0) : 0;
+              const assetTickets = openTicketsByRoom.assetTickets[asset.name] || [];
+              const roomTickets = asset.room_id ? (openTicketsByRoom.roomTickets[asset.room_id] || []) : [];
 
-              if (assetTicketCount > 0 && roomTicketCount > 0) {
-                tooltipText += `\n⚠️ ${assetTicketCount} open ticket(s) for this asset + ${roomTicketCount} in room`;
-              } else if (assetTicketCount > 0) {
-                tooltipText += `\n⚠️ ${assetTicketCount} open ticket(s) for this asset`;
-              } else {
-                tooltipText += `\n⚠️ ${roomTicketCount} open ticket(s) in this room`;
+              // Show asset-level tickets first
+              if (assetTickets.length > 0) {
+                assetTickets.forEach(ticket => {
+                  const statusLabel = ticket.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  tooltipText += `\n⚠️ ${ticket.subject || 'Untitled'} (${statusLabel})`;
+                });
+              }
+              
+              // Show room-level tickets
+              if (roomTickets.length > 0 && assetTickets.length === 0) {
+                const room = rooms.find(r => r.id === asset.room_id);
+                const roomName = room?.room_name || room?.room_number || 'Room';
+                tooltipText += `\n⚠️ ${roomTickets.length} open ticket(s) in ${roomName}`;
               }
             }
 
