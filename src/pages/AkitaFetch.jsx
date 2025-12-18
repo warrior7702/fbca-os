@@ -222,12 +222,29 @@ export default function AkitaFetch() {
         lastTicketDate = sortedByDate[0].created_date;
       }
 
+      // Determine heat state
+      const hasCriticalTicket = openTickets.some(t => 
+        ['safety', 'fire', 'life_safety'].includes(t.category?.toLowerCase())
+      );
+      
+      let heatState = 'none';
+      if (hasCriticalTicket) {
+        heatState = 'critical';
+      } else if (openTickets.length >= 6) {
+        heatState = 'high';
+      } else if (openTickets.length >= 3) {
+        heatState = 'medium';
+      } else if (openTickets.length >= 1) {
+        heatState = 'low';
+      }
+
       heatMap[room.id] = {
         open_ticket_count: openTickets.length,
         tickets_30d: tickets30d.length,
         tickets_90d: tickets90d.length,
         asset_count: assetCount,
-        last_ticket_date: lastTicketDate
+        last_ticket_date: lastTicketDate,
+        heat_state: heatState
       };
     });
 
