@@ -105,6 +105,7 @@ export default function CreateTicket() {
       const building = loadedBuildings.find(b => b.id === buildingId);
       if (building) {
         setSelectedBuilding(building);
+        setBuildingSearch(building.name);
         setTicket(prev => ({
           ...prev,
           building: building.name,
