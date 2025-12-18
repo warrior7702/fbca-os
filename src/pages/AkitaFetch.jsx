@@ -40,6 +40,7 @@ export default function AkitaFetch() {
   const [assets, setAssets] = useState([]);
   const [assetGroups, setAssetGroups] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [tickets, setTickets] = useState([]);
   
   // Selection state
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -67,12 +68,13 @@ export default function AkitaFetch() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [buildingsData, floorsData, assetsData, groupsData, roomsData] = await Promise.all([
+      const [buildingsData, floorsData, assetsData, groupsData, roomsData, ticketsData] = await Promise.all([
         base44.entities.Building.list(),
         base44.entities.Floor.list(),
         base44.entities.Asset.list(),
         base44.entities.AssetGroup.list(),
-        base44.entities.Room.list()
+        base44.entities.Room.list(),
+        base44.entities.Ticket.list()
       ]);
 
       setBuildings(buildingsData);
@@ -80,6 +82,7 @@ export default function AkitaFetch() {
       setAssets(assetsData);
       setAssetGroups(groupsData);
       setRooms(roomsData);
+      setTickets(ticketsData);
 
       // Auto-select first building and floor
       if (buildingsData.length > 0) {
@@ -129,6 +132,55 @@ export default function AkitaFetch() {
     });
     return counts;
   }, [assets, selectedFloor]);
+
+  // Calculate open tickets per room and asset
+  const openTicketsByRoom = useMemo(() => {
+    const roomTickets = {};
+    const assetTickets = {};
+
+    // Filter for open tickets only
+    const openTickets = tickets.filter(t => 
+      t.status !== 'resolved' && t.status !== 'archived'
+    );
+
+    openTickets.forEach(ticket => {
+      // Track by room
+      if (ticket.room_id) {
+        if (!roomTickets[ticket.room_id]) {
+          roomTickets[ticket.room_id] = [];
+        }
+        roomTickets[ticket.room_id].push(ticket);
+      }
+
+      // Track by asset name (if mentioned in subject/description)
+      if (ticket.subject) {
+        const assetName = ticket.subject.match(/Asset Issue: (.+)/)?.[1];
+        if (assetName) {
+          if (!assetTickets[assetName]) {
+            assetTickets[assetName] = [];
+          }
+          assetTickets[assetName].push(ticket);
+        }
+      }
+    });
+
+    return { roomTickets, assetTickets };
+  }, [tickets]);
+
+  // Check if asset or its room has open tickets
+  const hasOpenTickets = (asset) => {
+    // Check direct asset match
+    if (openTicketsByRoom.assetTickets[asset.name]?.length > 0) {
+      return true;
+    }
+
+    // Check room match
+    if (asset.room_id && openTicketsByRoom.roomTickets[asset.room_id]?.length > 0) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Filtered rooms and groups for autocomplete
   const filteredRooms = useMemo(() => {
@@ -913,10 +965,26 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             const isSelected = selectedAsset?.id === asset.id;
             const isFiltered = filteredAssets.some(a => a.id === asset.id);
             const isRoomFiltered = roomFilter !== "all";
+            const hasTickets = hasOpenTickets(asset);
 
             // Convert 0-1 normalized coords to percentage
             const xPercent = asset.x_coord * 100;
             const yPercent = asset.y_coord * 100;
+
+            // Build tooltip text
+            let tooltipText = asset.name;
+            if (hasTickets) {
+              const assetTicketCount = openTicketsByRoom.assetTickets[asset.name]?.length || 0;
+              const roomTicketCount = asset.room_id ? (openTicketsByRoom.roomTickets[asset.room_id]?.length || 0) : 0;
+
+              if (assetTicketCount > 0 && roomTicketCount > 0) {
+                tooltipText += `\n⚠️ ${assetTicketCount} open ticket(s) for this asset + ${roomTicketCount} in room`;
+              } else if (assetTicketCount > 0) {
+                tooltipText += `\n⚠️ ${assetTicketCount} open ticket(s) for this asset`;
+              } else {
+                tooltipText += `\n⚠️ ${roomTicketCount} open ticket(s) in this room`;
+              }
+            }
 
             return (
               <motion.div
@@ -940,11 +1008,13 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
                   className={`w-4 h-4 rounded-full cursor-pointer shadow-lg transition-all ${
                     isSelected
                       ? 'bg-blue-500 ring-4 ring-blue-300'
+                      : hasTickets
+                      ? 'bg-orange-500 hover:bg-orange-600 ring-2 ring-orange-300'
                       : isFiltered && isRoomFiltered
                       ? 'bg-yellow-500 hover:bg-yellow-600 ring-2 ring-yellow-300'
                       : 'bg-emerald-500 hover:bg-emerald-600'
                   }`}
-                  title={asset.name}
+                  title={tooltipText}
                 />
               </motion.div>
             );
