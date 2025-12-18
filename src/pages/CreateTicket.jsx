@@ -65,11 +65,35 @@ export default function CreateTicket() {
     loadURLParams();
   }, []);
 
+  // Map asset categories to ticket categories
+  const mapAssetCategoryToTicketCategory = (assetCategory) => {
+    if (!assetCategory) return null;
+    
+    const category = assetCategory.toLowerCase();
+    
+    // Technology-related keywords
+    if (category.includes('av') || category.includes('audio') || category.includes('video') ||
+        category.includes('computer') || category.includes('network') || category.includes('projector') ||
+        category.includes('screen') || category.includes('technology') || category.includes('it') ||
+        category.includes('camera') || category.includes('sound') || category.includes('lighting')) {
+      return 'technology';
+    }
+    
+    // Cleaning-related keywords
+    if (category.includes('cleaning') || category.includes('janitorial')) {
+      return 'cleaning';
+    }
+    
+    // Default to maintenance for everything else (HVAC, plumbing, electrical, etc.)
+    return 'maintenance';
+  };
+
   const loadURLParams = async () => {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
     const roomId = params.get('room_id');
     const assetName = params.get('asset_name');
+    const assetCategory = params.get('asset_category');
     
     if (buildingId) {
       // Wait for buildings to load first
@@ -115,6 +139,16 @@ export default function CreateTicket() {
         subject: `Asset Issue: ${assetName}`
       }));
       setIssueDescription(`Issue with asset: ${assetName}`);
+    }
+    
+    if (assetCategory) {
+      const mappedCategory = mapAssetCategoryToTicketCategory(assetCategory);
+      if (mappedCategory) {
+        setTicket(prev => ({
+          ...prev,
+          category: mappedCategory
+        }));
+      }
     }
   };
 

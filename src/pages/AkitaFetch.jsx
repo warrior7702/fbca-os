@@ -625,6 +625,7 @@ export default function AkitaFetch() {
                       const params = new URLSearchParams();
                       if (selectedAsset.building_id) params.set('building_id', selectedAsset.building_id);
                       if (selectedAsset.room_id) params.set('room_id', selectedAsset.room_id);
+                      if (selectedAsset.asset_category) params.set('asset_category', selectedAsset.asset_category);
                       params.set('asset_name', selectedAsset.name);
                       navigate(createPageUrl('CreateTicket') + '?' + params.toString());
                     }}
