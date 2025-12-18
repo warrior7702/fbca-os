@@ -171,6 +171,69 @@ export default function AkitaFetch() {
     return { roomTickets, assetTickets };
   }, [tickets]);
 
+  // Room-level heat aggregation
+  const roomHeatData = useMemo(() => {
+    const heatMap = {};
+    const now = Date.now();
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = now - (90 * 24 * 60 * 60 * 1000);
+
+    rooms.forEach(room => {
+      // Count assets in this room
+      const roomAssets = assets.filter(a => a.room_id === room.id);
+      const assetCount = roomAssets.length;
+
+      // Get all tickets affecting this room:
+      // 1. Room-scoped tickets directly on this room
+      const directRoomTickets = tickets.filter(t => 
+        t.scope === "ROOM" && t.room_id === room.id
+      );
+
+      // 2. Asset-scoped tickets for assets in this room
+      const assetTicketsInRoom = tickets.filter(t => {
+        if (t.scope !== "ASSET" || !t.asset_name) return false;
+        // Check if any asset in this room matches the ticket's asset_name
+        return roomAssets.some(asset => asset.name === t.asset_name);
+      });
+
+      // Combine all tickets affecting this room
+      const allRoomTickets = [...directRoomTickets, ...assetTicketsInRoom];
+
+      // Calculate metrics
+      const openStatuses = ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'];
+      const openTickets = allRoomTickets.filter(t => openStatuses.includes(t.status));
+      
+      const tickets30d = allRoomTickets.filter(t => {
+        const createdDate = new Date(t.created_date).getTime();
+        return createdDate >= thirtyDaysAgo;
+      });
+
+      const tickets90d = allRoomTickets.filter(t => {
+        const createdDate = new Date(t.created_date).getTime();
+        return createdDate >= ninetyDaysAgo;
+      });
+
+      // Find most recent ticket date
+      let lastTicketDate = null;
+      if (allRoomTickets.length > 0) {
+        const sortedByDate = [...allRoomTickets].sort((a, b) => 
+          new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
+        );
+        lastTicketDate = sortedByDate[0].created_date;
+      }
+
+      heatMap[room.id] = {
+        open_ticket_count: openTickets.length,
+        tickets_30d: tickets30d.length,
+        tickets_90d: tickets90d.length,
+        asset_count: assetCount,
+        last_ticket_date: lastTicketDate
+      };
+    });
+
+    return heatMap;
+  }, [rooms, assets, tickets]);
+
   // Check if asset has open tickets (asset-scoped only)
   const hasOpenTickets = (asset) => {
     // Only check direct asset match - room tickets do NOT affect asset pins
