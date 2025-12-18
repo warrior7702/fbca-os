@@ -14,7 +14,8 @@ import {
   ExternalLink,
   FileText,
   Ticket,
-  X
+  X,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -482,6 +483,7 @@ export default function AkitaFetch() {
                   roomFilter={roomFilter}
                   openTicketsByRoom={openTicketsByRoom}
                   showOnlyWithTickets={showOnlyWithTickets}
+                  onRoomClick={handleRoomClick}
                   onRoomClick={handleRoomClick}
                 />
               ) : (
