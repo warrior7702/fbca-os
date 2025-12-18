@@ -37,6 +37,7 @@ export default function AkitaFetch() {
   const [floors, setFloors] = useState([]);
   const [assets, setAssets] = useState([]);
   const [assetGroups, setAssetGroups] = useState([]);
+  const [rooms, setRooms] = useState([]);
   
   // Selection state
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -49,6 +50,7 @@ export default function AkitaFetch() {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("Active");
+  const [roomFilter, setRoomFilter] = useState("all");
 
   // Load data on mount
   useEffect(() => {
@@ -58,17 +60,19 @@ export default function AkitaFetch() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [buildingsData, floorsData, assetsData, groupsData] = await Promise.all([
+      const [buildingsData, floorsData, assetsData, groupsData, roomsData] = await Promise.all([
         base44.entities.Building.list(),
         base44.entities.Floor.list(),
         base44.entities.Asset.list(),
-        base44.entities.AssetGroup.list()
+        base44.entities.AssetGroup.list(),
+        base44.entities.Room.list()
       ]);
 
       setBuildings(buildingsData);
       setFloors(floorsData);
       setAssets(assetsData);
       setAssetGroups(groupsData);
+      setRooms(roomsData);
 
       // Auto-select first building and floor
       if (buildingsData.length > 0) {
@@ -97,6 +101,16 @@ export default function AkitaFetch() {
       .sort((a, b) => (a.level_number || 0) - (b.level_number || 0));
   }, [selectedBuilding, floors]);
 
+  // Get rooms for selected floor
+  const floorRooms = useMemo(() => {
+    if (!selectedFloor) return [];
+    return rooms.filter(r => r.floor_id === selectedFloor.id).sort((a, b) => {
+      const aNum = a.room_number || '';
+      const bNum = b.room_number || '';
+      return aNum.localeCompare(bNum, undefined, { numeric: true });
+    });
+  }, [selectedFloor, rooms]);
+
   // Asset filtering
   const filteredAssets = useMemo(() => {
     if (!selectedBuilding || !selectedFloor) return [];
@@ -113,6 +127,15 @@ export default function AkitaFetch() {
         const assetGroup = assetGroups.find(g => g.id === asset.asset_group_id);
         if (assetGroup?.name !== groupFilter) return false;
       }
+
+      // Room filter
+      if (roomFilter !== "all") {
+        if (roomFilter === "unassigned") {
+          if (asset.room_id) return false;
+        } else {
+          if (asset.room_id !== roomFilter) return false;
+        }
+      }
       
       // Search filter
       if (searchQuery) {
@@ -123,7 +146,7 @@ export default function AkitaFetch() {
       
       return true;
     });
-  }, [assets, selectedBuilding, selectedFloor, groupFilter, statusFilter, searchQuery, assetGroups]);
+  }, [assets, selectedBuilding, selectedFloor, groupFilter, statusFilter, roomFilter, searchQuery, assetGroups]);
 
   const floorplanImage = selectedFloor?.primary_floorplan_file || selectedFloor?.floor_plan_file || null;
 
@@ -318,10 +341,12 @@ export default function AkitaFetch() {
               floorplanImage ? (
                 <FloorplanCanvas
                   imageUrl={floorplanImage}
-                  assets={filteredAssets}
+                  assets={assets.filter(a => a.floor_id === selectedFloor.id)}
+                  filteredAssets={filteredAssets}
                   selectedAsset={selectedAsset}
                   onAssetClick={handleAssetClick}
                   showPins={showPins}
+                  roomFilter={roomFilter}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -375,31 +400,48 @@ export default function AkitaFetch() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={groupFilter} onValueChange={setGroupFilter}>
+            <div className="space-y-2">
+              <Select value={roomFilter} onValueChange={setRoomFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Group" />
+                  <SelectValue placeholder="All Rooms" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {assetGroups.map(group => (
-                    <SelectItem key={group.id} value={group.name}>
-                      {group.name}
+                  <SelectItem value="all">All Rooms</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {floorRooms.map(room => (
+                    <SelectItem key={room.id} value={room.id}>
+                      {room.room_number ? `${room.room_number} - ${room.name || 'Unnamed'}` : room.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Decommissioned">Decommissioned</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={groupFilter} onValueChange={setGroupFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {assetGroups.map(group => (
+                      <SelectItem key={group.id} value={group.name}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Decommissioned">Decommissioned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -565,7 +607,7 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPins }) {
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, roomFilter }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   return (
@@ -598,6 +640,8 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPi
             if (asset.x_coord === null || asset.y_coord === null) return null;
 
             const isSelected = selectedAsset?.id === asset.id;
+            const isFiltered = filteredAssets.some(a => a.id === asset.id);
+            const isRoomFiltered = roomFilter !== "all";
             
             // Convert 0-1 normalized coords to percentage
             const xPercent = asset.x_coord * 100;
@@ -610,7 +654,8 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPi
                 style={{
                   left: `${xPercent}%`,
                   top: `${yPercent}%`,
-                  transform: 'translate(-50%, -50%)'
+                  transform: 'translate(-50%, -50%)',
+                  opacity: isRoomFiltered && !isFiltered ? 0.2 : 1
                 }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -624,6 +669,8 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPi
                   className={`w-4 h-4 rounded-full cursor-pointer shadow-lg transition-all ${
                     isSelected
                       ? 'bg-blue-500 ring-4 ring-blue-300'
+                      : isFiltered && isRoomFiltered
+                      ? 'bg-yellow-500 hover:bg-yellow-600 ring-2 ring-yellow-300'
                       : 'bg-emerald-500 hover:bg-emerald-600'
                   }`}
                   title={asset.name}
