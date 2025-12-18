@@ -12,7 +12,8 @@ import {
   Loader2,
   Filter,
   ExternalLink,
-  FileText
+  FileText,
+  Ticket
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -615,19 +616,37 @@ export default function AkitaFetch() {
                   </div>
                 </div>
 
-                {selectedAsset.akita_url && (
-                  <a
-                    href={selectedAsset.akita_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
+                <div className="space-y-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (selectedAsset.building_id) params.set('building_id', selectedAsset.building_id);
+                      if (selectedAsset.room_id) params.set('room_id', selectedAsset.room_id);
+                      params.set('asset_name', selectedAsset.name);
+                      navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+                    }}
                   >
-                    <Button variant="outline" size="sm" className="w-full">
-                      <ExternalLink className="w-3 h-3 mr-2" />
-                      View in AkitaBox
-                    </Button>
-                  </a>
-                )}
+                    <Ticket className="w-3 h-3 mr-2" />
+                    Create Ticket for Asset
+                  </Button>
+                  
+                  {selectedAsset.akita_url && (
+                    <a
+                      href={selectedAsset.akita_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <Button variant="outline" size="sm" className="w-full">
+                        <ExternalLink className="w-3 h-3 mr-2" />
+                        View in AkitaBox
+                      </Button>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           )}

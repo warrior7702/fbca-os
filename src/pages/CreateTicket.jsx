@@ -61,33 +61,60 @@ export default function CreateTicket() {
   });
 
   useEffect(() => {
-    loadBuildingsFromDB();
     loadCurrentUser();
     loadURLParams();
   }, []);
 
-  const loadURLParams = () => {
+  const loadURLParams = async () => {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
-    const buildingName = params.get('building_name');
-    const level = params.get('level');
-    const room = params.get('room');
-    const asset = params.get('asset');
+    const roomId = params.get('room_id');
+    const assetName = params.get('asset_name');
     
-    if (buildingName) {
-      setTicket(prev => ({
-        ...prev,
-        building: buildingName,
-        room_number: room || level || ''
-      }));
+    if (buildingId) {
+      // Wait for buildings to load first
+      const loadedBuildings = await base44.entities.Building.list();
+      setBuildings(loadedBuildings);
+      
+      const building = loadedBuildings.find(b => b.id === buildingId);
+      if (building) {
+        setSelectedBuilding(building);
+        setTicket(prev => ({
+          ...prev,
+          building: building.name,
+          building_id: buildingId
+        }));
+        
+        // Load rooms for this building
+        const roomsData = await base44.entities.Room.filter({ building_id: buildingId });
+        const sortedRooms = roomsData.sort((a, b) => {
+          const aNum = a.room_number || a.room_name || '';
+          const bNum = b.room_number || b.room_name || '';
+          return aNum.localeCompare(bNum, undefined, { numeric: true });
+        });
+        setRooms(sortedRooms);
+        
+        if (roomId) {
+          const room = roomsData.find(r => r.id === roomId);
+          if (room) {
+            setTicket(prev => ({
+              ...prev,
+              room_id: roomId,
+              room_number: room.room_number || room.room_name || '',
+              floor_id: room.floor_id || null
+            }));
+            setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
+          }
+        }
+      }
     }
     
-    if (asset) {
+    if (assetName) {
       setTicket(prev => ({
         ...prev,
-        subject: `Asset Issue: ${asset}`,
-        description: `Issue with asset: ${asset}${room ? ` in ${room}` : ''}${level ? ` (${level})` : ''}`
+        subject: `Asset Issue: ${assetName}`
       }));
+      setIssueDescription(`Issue with asset: ${assetName}`);
     }
   };
 
