@@ -1008,22 +1008,12 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             let tooltipText = asset.name;
             if (hasTickets) {
               const assetTickets = openTicketsByRoom.assetTickets[asset.name] || [];
-              const roomTickets = asset.room_id ? (openTicketsByRoom.roomTickets[asset.room_id] || []) : [];
 
-              // Show asset-level tickets first
-              if (assetTickets.length > 0) {
-                assetTickets.forEach(ticket => {
-                  const statusLabel = ticket.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                  tooltipText += `\n⚠️ ${ticket.subject || 'Untitled'} (${statusLabel})`;
-                });
-              }
-              
-              // Show room-level tickets
-              if (roomTickets.length > 0 && assetTickets.length === 0) {
-                const room = rooms.find(r => r.id === asset.room_id);
-                const roomName = room?.room_name || room?.room_number || 'Room';
-                tooltipText += `\n⚠️ ${roomTickets.length} open ticket(s) in ${roomName}`;
-              }
+              // Show asset-level tickets only
+              assetTickets.forEach(ticket => {
+                const statusLabel = ticket.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                tooltipText += `\n🔧 ASSET: ${ticket.subject || 'Untitled'} (${statusLabel})`;
+              });
             }
 
             return (
