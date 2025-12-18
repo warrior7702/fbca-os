@@ -47,7 +47,9 @@ export default function CreateTicket() {
     requester_name: "",
     requester_email: "",
     building: "",
-    building_name: "",
+    building_id: "",
+    floor_id: "",
+    room_id: "",
     room_number: "",
     subject: "",
     details: "",
@@ -57,7 +59,7 @@ export default function CreateTicket() {
   });
 
   useEffect(() => {
-    loadBuildings();
+    loadBuildingsFromDB();
     loadCurrentUser();
     loadURLParams();
   }, []);
@@ -112,22 +114,13 @@ export default function CreateTicket() {
     }
   };
 
-  useEffect(() => {
-    if (selectedBuilding && selectedLevel) {
-      loadRooms();
-    }
-  }, [selectedBuilding, selectedLevel]);
 
-  const loadBuildings = async () => {
+
+  const loadBuildingsFromDB = async () => {
     setLoadingBuildings(true);
     try {
-      const response = await base44.functions.invoke('getAkitaBoxData', {
-        type: 'buildings'
-      });
-      
-      if (response.data.success) {
-        setBuildings(response.data.data.buildings);
-      }
+      const buildingsData = await base44.entities.Building.list();
+      setBuildings(buildingsData);
     } catch (error) {
       console.error('Error loading buildings:', error);
       toast.error('Failed to load buildings');
@@ -139,32 +132,30 @@ export default function CreateTicket() {
   const handleBuildingChange = async (buildingId) => {
     const building = buildings.find(b => b.id === buildingId);
     setSelectedBuilding(building);
-    setLevels(building?.levels || []);
-    setSelectedLevel(null);
-    setRooms([]);
     setTicket({
       ...ticket,
-      building: buildingId,
-      building_name: building?.name || '',
+      building: building?.name || '',
+      building_id: buildingId,
+      room_id: '',
       room_number: ''
     });
+    
+    // Load rooms for this building
+    loadRoomsForBuilding(buildingId);
   };
 
-  const loadRooms = async () => {
-    if (!selectedBuilding || !selectedLevel) return;
+  const loadRoomsForBuilding = async (buildingId) => {
+    if (!buildingId) return;
     
     setLoadingRooms(true);
     try {
-      const response = await base44.functions.invoke('getAkitaBoxData', {
-        type: 'rooms',
-        buildingId: selectedBuilding.id,
-        levelId: selectedLevel
+      const roomsData = await base44.entities.Room.filter({ building_id: buildingId });
+      const sortedRooms = roomsData.sort((a, b) => {
+        const aNum = a.room_number || a.room_name || '';
+        const bNum = b.room_number || b.room_name || '';
+        return aNum.localeCompare(bNum, undefined, { numeric: true });
       });
-      
-      if (response.data.success) {
-        const roomsData = response.data.data.rooms || response.data.data || [];
-        setRooms(Array.isArray(roomsData) ? roomsData : []);
-      }
+      setRooms(sortedRooms);
     } catch (error) {
       console.error('Error loading rooms:', error);
       setRooms([]);
@@ -235,7 +226,7 @@ export default function CreateTicket() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!ticket.requester_name || !ticket.requester_email || !issueDescription || !ticket.category || !ticket.building) {
+    if (!ticket.requester_name || !ticket.requester_email || !issueDescription || !ticket.category) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -267,8 +258,11 @@ export default function CreateTicket() {
         requester_name: ticket.requester_name,
         subject: ticket.subject || issueDescription.substring(0, 50) + '...',
         description: issueDescription,
-        building: ticket.building_name || ticket.building,
-        room_number: ticket.room_number,
+        building: ticket.building,
+        building_id: ticket.building_id || null,
+        floor_id: ticket.floor_id || null,
+        room_id: ticket.room_id || null,
+        room_number: ticket.room_number || null,
         status: "open",
         priority: ticket.priority,
         category: ticket.category,
@@ -357,14 +351,14 @@ export default function CreateTicket() {
     setSubmitted(false);
     setTicketNumber("");
     setSelectedBuilding(null);
-    setSelectedLevel(null);
-    setLevels([]);
     setRooms([]);
     setTicket({
       requester_name: "",
       requester_email: "",
       building: "",
-      building_name: "",
+      building_id: "",
+      floor_id: "",
+      room_id: "",
       room_number: "",
       subject: "",
       details: "",
@@ -496,33 +490,68 @@ export default function CreateTicket() {
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Building<span className="text-red-500">*</span>
-                    </label>
-                    <Select 
-                      value={ticket.building} 
-                      onValueChange={(value) => setTicket({...ticket, building: value})}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select building..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="wade">WADE</SelectItem>
-                        <SelectItem value="fbc">FBC</SelectItem>
-                        <SelectItem value="pcb">PCB</SelectItem>
-                        <SelectItem value="sc">SC</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="text-sm font-medium">Building</label>
+                    {loadingBuildings ? (
+                      <div className="flex items-center justify-center h-10 border rounded-md">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      </div>
+                    ) : (
+                      <Select 
+                        value={ticket.building_id} 
+                        onValueChange={handleBuildingChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select building..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {buildings.map(building => (
+                            <SelectItem key={building.id} value={building.id}>
+                              {building.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Room</label>
-                    <Input
-                      value={ticket.room_number}
-                      onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
-                      placeholder="Room number or name"
-                    />
+                    {loadingRooms ? (
+                      <div className="flex items-center justify-center h-10 border rounded-md">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      </div>
+                    ) : selectedBuilding && rooms.length > 0 ? (
+                      <Select 
+                        value={ticket.room_id || ""} 
+                        onValueChange={(value) => {
+                          const room = rooms.find(r => r.id === value);
+                          setTicket({
+                            ...ticket, 
+                            room_id: value,
+                            room_number: room?.room_number || room?.room_name || '',
+                            floor_id: room?.floor_id || null
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select room..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rooms.map(room => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={ticket.room_number}
+                        onChange={(e) => setTicket({...ticket, room_number: e.target.value})}
+                        placeholder={selectedBuilding ? "Type room number..." : "Select building first"}
+                        disabled={!selectedBuilding}
+                      />
+                    )}
                   </div>
                 </div>
 
