@@ -28,7 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 
 export default function AkitaFetch() {
   const navigate = useNavigate();
