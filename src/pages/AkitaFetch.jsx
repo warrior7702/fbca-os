@@ -286,16 +286,30 @@ export default function AkitaFetch() {
         {/* PANEL 2: Floorplan Viewer */}
         <div className="flex-1 flex flex-col bg-slate-100">
           <div className="border-b bg-white p-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-slate-600" />
-              <h3 className="font-semibold text-sm">
-                {selectedFloor ? `${selectedFloor.name} - Floor Plan` : 'Select a floor'}
-              </h3>
-              {selectedFloor && (
-                <Badge variant="outline" className="ml-auto">
-                  {assetStats.byFloor} assets on this floor
-                </Badge>
-              )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-600" />
+                <h3 className="font-semibold text-sm">
+                  {selectedFloor ? `${selectedFloor.name} - Floor Plan` : 'Select a floor'}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedFloor && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPins(!showPins)}
+                    >
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {showPins ? 'Hide' : 'Show'} Pins
+                    </Button>
+                    <Badge variant="outline">
+                      {assetStats.byFloor} assets
+                    </Badge>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -617,7 +631,8 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPi
             </motion.div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
