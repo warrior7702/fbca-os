@@ -323,24 +323,43 @@ export default function AkitaFetch() {
         {/* PANEL 2: Floorplan Viewer */}
         <div className="flex-1 flex flex-col bg-slate-100">
           <div className="border-b bg-white p-3">
+            {roomFilter !== "all" && selectedBuilding && selectedFloor && (
+              <div className="mb-3 flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => {
+                    setSelectedBuilding(null);
+                    setSelectedFloor(null);
+                    setRoomFilter("all");
+                  }}
+                  className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                >
+                  {selectedBuilding.name}
+                </button>
+                <span className="text-slate-400">→</span>
+                <button
+                  onClick={() => {
+                    setRoomFilter("all");
+                  }}
+                  className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                >
+                  {selectedFloor.name}
+                </button>
+                <span className="text-slate-400">→</span>
+                <span className="font-semibold text-slate-900">
+                  {roomFilter === "unassigned" 
+                    ? "Unassigned Assets"
+                    : floorRooms.find(r => r.id === roomFilter)?.room_name || 
+                      floorRooms.find(r => r.id === roomFilter)?.room_number || 
+                      "Room"}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-slate-600" />
                 <h3 className="font-semibold text-sm">
                   {selectedFloor ? `${selectedFloor.name} - Floor Plan` : 'Select a floor'}
                 </h3>
-                {roomFilter !== "all" && (
-                  <>
-                    <span className="text-slate-400">/</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {roomFilter === "unassigned" 
-                        ? "Unassigned Assets"
-                        : floorRooms.find(r => r.id === roomFilter)?.room_name || 
-                          floorRooms.find(r => r.id === roomFilter)?.room_number || 
-                          "Room"}
-                    </Badge>
-                  </>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedFloor && (
