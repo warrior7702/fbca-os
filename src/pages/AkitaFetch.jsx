@@ -484,7 +484,6 @@ export default function AkitaFetch() {
                   openTicketsByRoom={openTicketsByRoom}
                   showOnlyWithTickets={showOnlyWithTickets}
                   onRoomClick={handleRoomClick}
-                  onRoomClick={handleRoomClick}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
