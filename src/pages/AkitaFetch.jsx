@@ -1016,10 +1016,14 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
     : assets;
 
   // Calculate room label positions based on average asset coordinates
+  // Exclude Exterior rooms from floor plan rendering
   const roomLabelPositions = React.useMemo(() => {
     const positions = {};
     
     rooms.forEach(room => {
+      // Skip Exterior rooms - they are not rendered on floor plans
+      if (room.category === "Exterior") return;
+      
       const roomAssets = assets.filter(a => a.room_id === room.id && a.x_coord !== null && a.y_coord !== null);
       
       if (roomAssets.length > 0) {
