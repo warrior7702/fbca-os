@@ -42,6 +42,7 @@ export default function AkitaFetch() {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [showPins, setShowPins] = useState(true);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -306,6 +307,7 @@ export default function AkitaFetch() {
                   assets={filteredAssets}
                   selectedAsset={selectedAsset}
                   onAssetClick={handleAssetClick}
+                  showPins={showPins}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -549,7 +551,7 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick }) {
+function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick, showPins }) {
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   return (
@@ -576,8 +578,9 @@ function FloorplanCanvas({ imageUrl, assets, selectedAsset, onAssetClick }) {
       )}
 
       {/* Asset Pins Overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        {assets.map(asset => {
+      {showPins && (
+        <div className="absolute inset-0 pointer-events-none">
+          {assets.map(asset => {
           if (asset.x_coord === null || asset.y_coord === null) return null;
 
           const isSelected = selectedAsset?.id === asset.id;
