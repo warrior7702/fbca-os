@@ -66,6 +66,7 @@ export default function CreateTicket() {
 
   useEffect(() => {
     loadCurrentUser();
+    loadBuildingsFromDB();
     loadURLParams();
   }, []);
 
