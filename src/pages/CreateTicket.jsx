@@ -46,6 +46,9 @@ export default function CreateTicket() {
   const [showRoomDropdown, setShowRoomDropdown] = useState(false);
   const [buildingSearch, setBuildingSearch] = useState("");
   const [showBuildingDropdown, setShowBuildingDropdown] = useState(false);
+  const [roomAssets, setRoomAssets] = useState([]);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [showAssetDropdown, setShowAssetDropdown] = useState(false);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
@@ -208,11 +211,38 @@ export default function CreateTicket() {
       building: building?.name || '',
       building_id: buildingId,
       room_id: '',
-      room_number: ''
+      room_number: '',
+      asset_name: ''
     });
-    
+
     // Load rooms for this building
     loadRoomsForBuilding(buildingId);
+    setRoomAssets([]);
+    setAssetSearch('');
+  };
+
+  const handleRoomChange = async (roomId) => {
+    const room = rooms.find(r => r.id === roomId);
+    setTicket({
+      ...ticket,
+      room_id: roomId,
+      room_number: room?.room_number || null,
+      floor_id: room?.floor_id || null
+    });
+    setRoomSearch(room?.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room?.room_name);
+
+    // Load assets for this room
+    if (roomId) {
+      try {
+        const assetsData = await base44.entities.Asset.filter({ room_id: roomId });
+        setRoomAssets(assetsData);
+      } catch (error) {
+        console.error('Error loading assets:', error);
+        setRoomAssets([]);
+      }
+    } else {
+      setRoomAssets([]);
+    }
   };
 
   const loadRoomsForBuilding = async (buildingId) => {
@@ -249,6 +279,14 @@ export default function CreateTicket() {
     const name = (building.name || '').toLowerCase();
     const address = (building.address || '').toLowerCase();
     return name.includes(search) || address.includes(search);
+  });
+
+  const filteredAssets = roomAssets.filter(asset => {
+    if (!assetSearch) return true;
+    const search = assetSearch.toLowerCase();
+    const name = (asset.name || '').toLowerCase();
+    const model = (asset.model || '').toLowerCase();
+    return name.includes(search) || model.includes(search);
   });
 
   const availableCategories = [
@@ -677,13 +715,7 @@ export default function CreateTicket() {
                                 key={room.id}
                                 className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
                                 onClick={() => {
-                                  setTicket({
-                                    ...ticket, 
-                                    room_id: room.id,
-                                    room_number: room.room_number || room.room_name || '',
-                                    floor_id: room.floor_id || null
-                                  });
-                                  setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
+                                  handleRoomChange(room.id);
                                   setShowRoomDropdown(false);
                                 }}
                               >
@@ -726,15 +758,46 @@ export default function CreateTicket() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <label className="text-sm font-medium">
                     Asset Name (Optional - for specific equipment issues)
                   </label>
                   <Input
-                    value={ticket.asset_name}
-                    onChange={(e) => setTicket({...ticket, asset_name: e.target.value})}
+                    value={assetSearch}
+                    onChange={(e) => {
+                      setAssetSearch(e.target.value);
+                      setTicket({...ticket, asset_name: e.target.value});
+                      setShowAssetDropdown(true);
+                    }}
+                    onFocus={() => setShowAssetDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowAssetDropdown(false), 200)}
                     placeholder="e.g., Projector A1, HVAC Unit 3"
                   />
+                  {showAssetDropdown && roomAssets.length > 0 && filteredAssets.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                      {filteredAssets.slice(0, 50).map(asset => (
+                        <div
+                          key={asset.id}
+                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                          onClick={() => {
+                            setTicket({...ticket, asset_name: asset.name});
+                            setAssetSearch(asset.name);
+                            setShowAssetDropdown(false);
+                          }}
+                        >
+                          <div className="font-medium">{asset.name}</div>
+                          {asset.model && (
+                            <div className="text-xs text-slate-500">{asset.model}</div>
+                          )}
+                        </div>
+                      ))}
+                      {filteredAssets.length > 50 && (
+                        <div className="px-3 py-2 text-xs text-slate-500 text-center border-t">
+                          Showing 50 of {filteredAssets.length} assets
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <p className="text-xs text-slate-500">Leave blank for general room issues</p>
                 </div>
 
