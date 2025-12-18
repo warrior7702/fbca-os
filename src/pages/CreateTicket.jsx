@@ -42,6 +42,8 @@ export default function CreateTicket() {
   const [rooms, setRooms] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [showRoomDropdown, setShowRoomDropdown] = useState(false);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
@@ -163,6 +165,14 @@ export default function CreateTicket() {
       setLoadingRooms(false);
     }
   };
+
+  const filteredRooms = rooms.filter(room => {
+    if (!roomSearch) return true;
+    const search = roomSearch.toLowerCase();
+    const roomNum = (room.room_number || '').toLowerCase();
+    const roomName = (room.room_name || '').toLowerCase();
+    return roomNum.includes(search) || roomName.includes(search);
+  });
 
   const availableCategories = [
     { value: 'technology', label: 'Technology' },
@@ -514,36 +524,61 @@ export default function CreateTicket() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <label className="text-sm font-medium">Room</label>
                     {loadingRooms ? (
                       <div className="flex items-center justify-center h-10 border rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                       </div>
                     ) : selectedBuilding && rooms.length > 0 ? (
-                      <Select 
-                        value={ticket.room_id || ""} 
-                        onValueChange={(value) => {
-                          const room = rooms.find(r => r.id === value);
-                          setTicket({
-                            ...ticket, 
-                            room_id: value,
-                            room_number: room?.room_number || room?.room_name || '',
-                            floor_id: room?.floor_id || null
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select room..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {rooms.map(room => (
-                            <SelectItem key={room.id} value={room.id}>
-                              {room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Input
+                          value={roomSearch}
+                          onChange={(e) => {
+                            setRoomSearch(e.target.value);
+                            setShowRoomDropdown(true);
+                          }}
+                          onFocus={() => setShowRoomDropdown(true)}
+                          placeholder="Search rooms..."
+                          className="pr-8"
+                        />
+                        {ticket.room_id && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                            onClick={() => {
+                              setTicket({...ticket, room_id: '', room_number: '', floor_id: null});
+                              setRoomSearch('');
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {showRoomDropdown && filteredRooms.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredRooms.slice(0, 50).map(room => (
+                              <div
+                                key={room.id}
+                                className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                                onClick={() => {
+                                  setTicket({
+                                    ...ticket, 
+                                    room_id: room.id,
+                                    room_number: room.room_number || room.room_name || '',
+                                    floor_id: room.floor_id || null
+                                  });
+                                  setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
+                                  setShowRoomDropdown(false);
+                                }}
+                              >
+                                {room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <Input
                         value={ticket.room_number}
