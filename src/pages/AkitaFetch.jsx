@@ -143,6 +143,12 @@ export default function AkitaFetch() {
   }, [assets, selectedFloor]);
 
   // Calculate open tickets per room and asset
+  // CRITICAL: Ticket scope rules for visuals
+  // - Asset pins ONLY change based on asset-scoped tickets for THAT asset
+  // - Room indicators ONLY change based on room-scoped tickets for THAT room
+  // - NO cascading: asset tickets do NOT affect sibling assets or room visuals
+  // - NO cascading: room tickets do NOT affect asset visuals
+  // - Building-level or unscoped tickets do NOT affect visuals
   const openTicketsByRoom = useMemo(() => {
     const roomTickets = {};
     const assetTickets = {};
@@ -154,7 +160,7 @@ export default function AkitaFetch() {
     );
 
     openTickets.forEach(ticket => {
-      // Track by scope
+      // Track by scope - NEVER mix scopes for visual indicators
       if (ticket.scope === "ROOM" && ticket.room_id) {
         if (!roomTickets[ticket.room_id]) {
           roomTickets[ticket.room_id] = [];
@@ -171,7 +177,9 @@ export default function AkitaFetch() {
     return { roomTickets, assetTickets };
   }, [tickets]);
 
-  // Room-level heat aggregation
+  // Room-level heat aggregation (for analytics/data - NOT for visuals)
+  // NOTE: This aggregates ALL tickets affecting a room (both room-scoped and asset-scoped)
+  // for comprehensive heat metrics, but visual indicators must ONLY use scope-specific data
   const roomHeatData = useMemo(() => {
     const heatMap = {};
     const now = Date.now();
@@ -1099,19 +1107,22 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
   // Exclude Exterior rooms from floor plan rendering
   const roomLabelPositions = React.useMemo(() => {
     const positions = {};
-    
+
     rooms.forEach(room => {
       // Skip Exterior rooms - they are not rendered on floor plans
       if (room.category === "Exterior") return;
-      
+
       const roomAssets = assets.filter(a => a.room_id === room.id && a.x_coord !== null && a.y_coord !== null);
-      
+
       if (roomAssets.length > 0) {
         const avgX = roomAssets.reduce((sum, a) => sum + a.x_coord, 0) / roomAssets.length;
         const avgY = roomAssets.reduce((sum, a) => sum + a.y_coord, 0) / roomAssets.length;
-        
+
+        // CRITICAL: Room label visual indicator
+        // Room labels ONLY turn orange when THAT room has room-scoped tickets
+        // Asset tickets do NOT affect room labels - no cascading
         const hasRoomTicket = openTicketsByRoom.roomTickets[room.id]?.length > 0;
-        
+
         positions[room.id] = {
           x: avgX * 100,
           y: avgY * 100,
@@ -1120,7 +1131,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
         };
       }
     });
-    
+
     return positions;
   }, [rooms, assets, openTicketsByRoom]);
 
