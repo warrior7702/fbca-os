@@ -48,6 +48,7 @@ export default function AkitaFetch() {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [showPins, setShowPins] = useState(true);
   const [showRoomLabels, setShowRoomLabels] = useState(false);
   const [showOnlyWithTickets, setShowOnlyWithTickets] = useState(false);
@@ -1127,7 +1128,8 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
           x: avgX * 100,
           y: avgY * 100,
           label: room.room_name || room.name || room.room_number || 'Unnamed',
-          hasTicket: hasRoomTicket
+          hasTicket: hasRoomTicket,
+          room: room
         };
       }
     });
@@ -1161,32 +1163,29 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
       {/* Room Labels Overlay */}
       {showRoomLabels && (
         <div className="absolute inset-0">
-          {Object.entries(roomLabelPositions).map(([roomId, pos]) => {
-            const room = rooms.find(r => r.id === roomId);
-            return (
-              <div
-                key={roomId}
-                className="absolute cursor-pointer pointer-events-auto"
-                style={{
-                  left: `${pos.x}%`,
-                  top: `${pos.y}%`,
-                  transform: 'translate(-50%, -50%)'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (room && onRoomClick) onRoomClick(room);
-                }}
-              >
-                <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow ${
-                  pos.hasTicket 
-                    ? 'border-2 border-orange-500 text-orange-900' 
-                    : 'border border-slate-300 text-slate-900'
-                }`}>
-                  {pos.label}
-                </div>
+          {Object.entries(roomLabelPositions).map(([roomId, pos]) => (
+            <div
+              key={roomId}
+              className="absolute cursor-pointer pointer-events-auto"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                transform: 'translate(-50%, -50%)'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (pos.room && onRoomClick) onRoomClick(pos.room);
+              }}
+            >
+              <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow ${
+                pos.hasTicket 
+                  ? 'border-2 border-orange-500 text-orange-900' 
+                  : 'border border-slate-300 text-slate-900'
+              }`}>
+                {pos.label}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
