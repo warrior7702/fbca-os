@@ -48,7 +48,6 @@ export default function AkitaFetch() {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [selectedRoom, setSelectedRoom] = useState(null);
   const [showPins, setShowPins] = useState(true);
   const [showRoomLabels, setShowRoomLabels] = useState(false);
   const [showOnlyWithTickets, setShowOnlyWithTickets] = useState(false);
