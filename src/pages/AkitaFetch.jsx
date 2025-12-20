@@ -1096,6 +1096,10 @@ export default function AkitaFetch() {
 
 // Floorplan Canvas Component
 function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets, onRoomClick }) {
+  const [scale, setScale] = React.useState(1);
+  const [offsetX, setOffsetX] = React.useState(0);
+  const [offsetY, setOffsetY] = React.useState(0);
+  const [showAdjustControls, setShowAdjustControls] = React.useState(false);
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
 
   // Check if asset has open tickets (asset-scoped only)
@@ -1144,6 +1148,130 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-white rounded-lg shadow-inner">
+      {/* Alignment Controls */}
+      {!isPdf && (
+        <div className="absolute top-4 right-4 z-50">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdjustControls(!showAdjustControls)}
+            className="bg-white shadow-lg"
+          >
+            {showAdjustControls ? 'Hide' : 'Align Floor Plan'}
+          </Button>
+          
+          {showAdjustControls && (
+            <div className="mt-2 bg-white rounded-lg shadow-xl border p-4 space-y-3 w-64">
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">
+                  Scale: {scale.toFixed(2)}x
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScale(Math.max(0.1, scale - 0.1))}
+                  >
+                    -
+                  </Button>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={scale}
+                    onChange={(e) => setScale(parseFloat(e.target.value))}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScale(Math.min(3, scale + 0.1))}
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">
+                  Horizontal Offset: {offsetX}px
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOffsetX(offsetX - 10)}
+                  >
+                    ←
+                  </Button>
+                  <input
+                    type="range"
+                    min="-500"
+                    max="500"
+                    step="10"
+                    value={offsetX}
+                    onChange={(e) => setOffsetX(parseInt(e.target.value))}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOffsetX(offsetX + 10)}
+                  >
+                    →
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">
+                  Vertical Offset: {offsetY}px
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOffsetY(offsetY - 10)}
+                  >
+                    ↑
+                  </Button>
+                  <input
+                    type="range"
+                    min="-500"
+                    max="500"
+                    step="10"
+                    value={offsetY}
+                    onChange={(e) => setOffsetY(parseInt(e.target.value))}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOffsetY(offsetY + 10)}
+                  >
+                    ↓
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setScale(1);
+                  setOffsetX(0);
+                  setOffsetY(0);
+                }}
+                className="w-full"
+              >
+                Reset
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {isPdf ? (
         <div className="flex flex-col items-center justify-center h-full text-slate-600 p-8">
           <FileText className="w-16 h-16 mb-4 text-slate-400" />
@@ -1158,6 +1286,10 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
           alt="Floor plan"
           className="max-w-full max-h-full object-contain select-none"
           draggable={false}
+          style={{
+            transform: `scale(${scale}) translate(${offsetX / scale}px, ${offsetY / scale}px)`,
+            transition: 'transform 0.1s ease-out'
+          }}
           onError={(e) => {
             console.error('Image failed to load:', imageUrl);
             e.target.alt = 'Failed to load floor plan';
