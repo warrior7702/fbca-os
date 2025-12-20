@@ -266,15 +266,21 @@ export default function AkitaFetch() {
   };
 
   // Filtered rooms and groups for autocomplete
+  // Include Exterior rooms from same building in addition to floor rooms
   const filteredRooms = useMemo(() => {
-    if (!roomSearch) return floorRooms;
+    const buildingExteriorRooms = selectedBuilding 
+      ? rooms.filter(r => r.building_id === selectedBuilding.id && r.category === "Exterior")
+      : [];
+    const allSelectableRooms = [...floorRooms, ...buildingExteriorRooms];
+    
+    if (!roomSearch) return allSelectableRooms;
     const search = roomSearch.toLowerCase();
-    return floorRooms.filter(room => {
+    return allSelectableRooms.filter(room => {
       const roomNum = (room.room_number || '').toLowerCase();
       const roomName = (room.room_name || room.name || '').toLowerCase();
       return roomNum.includes(search) || roomName.includes(search);
     });
-  }, [floorRooms, roomSearch]);
+  }, [floorRooms, roomSearch, selectedBuilding, rooms]);
 
   const filteredGroups = useMemo(() => {
     if (!groupSearch) return assetGroups;
