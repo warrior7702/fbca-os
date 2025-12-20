@@ -578,6 +578,7 @@ export default function AkitaFetch() {
                   openTicketsByRoom={openTicketsByRoom}
                   showOnlyWithTickets={showOnlyWithTickets}
                   onRoomClick={handleRoomClick}
+                  selectedBuilding={selectedBuilding}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -1095,12 +1096,40 @@ export default function AkitaFetch() {
           }
 
 // Floorplan Canvas Component
-function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets, onRoomClick }) {
-  const [scale, setScale] = React.useState(1);
-  const [offsetX, setOffsetX] = React.useState(0);
-  const [offsetY, setOffsetY] = React.useState(0);
+function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAssetClick, showPins, showRoomLabels, rooms, roomFilter, openTicketsByRoom, showOnlyWithTickets, onRoomClick, selectedBuilding }) {
+  const [scale, setScale] = React.useState(selectedBuilding?.floorplan_scale || 1);
+  const [offsetX, setOffsetX] = React.useState(selectedBuilding?.floorplan_offset_x || 0);
+  const [offsetY, setOffsetY] = React.useState(selectedBuilding?.floorplan_offset_y || 0);
   const [showAdjustControls, setShowAdjustControls] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const isPdf = imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.includes('pdf');
+
+  // Load building settings when building changes
+  React.useEffect(() => {
+    if (selectedBuilding) {
+      setScale(selectedBuilding.floorplan_scale || 1);
+      setOffsetX(selectedBuilding.floorplan_offset_x || 0);
+      setOffsetY(selectedBuilding.floorplan_offset_y || 0);
+    }
+  }, [selectedBuilding?.id]);
+
+  const saveAlignment = async () => {
+    if (!selectedBuilding) return;
+    setSaving(true);
+    try {
+      await base44.entities.Building.update(selectedBuilding.id, {
+        floorplan_scale: scale,
+        floorplan_offset_x: offsetX,
+        floorplan_offset_y: offsetY
+      });
+      toast.success('Floor plan alignment saved');
+    } catch (error) {
+      console.error('Error saving alignment:', error);
+      toast.error('Failed to save alignment');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Check if asset has open tickets (asset-scoped only)
   const hasOpenTickets = (asset) => {
@@ -1255,18 +1284,29 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setScale(1);
-                  setOffsetX(0);
-                  setOffsetY(0);
-                }}
-                className="w-full"
-              >
-                Reset
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setScale(1);
+                    setOffsetX(0);
+                    setOffsetY(0);
+                  }}
+                  className="flex-1"
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={saveAlignment}
+                  disabled={saving}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
           )}
         </div>
