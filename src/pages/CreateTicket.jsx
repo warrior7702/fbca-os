@@ -75,6 +75,8 @@ export default function CreateTicket() {
   });
   const [suggestedCategory, setSuggestedCategory] = useState("");
   const [suggestedPriority, setSuggestedPriority] = useState("medium");
+  const [priorityReason, setPriorityReason] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
   const [duplicateTickets, setDuplicateTickets] = useState([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
 
@@ -213,32 +215,103 @@ export default function CreateTicket() {
   const generateSmartSuggestions = async () => {
     try {
       let suggestedCat = "";
-      let suggestedPrio = "medium";
+      let basePrio = "medium";
+      const reasons = [];
+
+      // Check for recurring issues (3+ tickets in 6 months)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const allTickets = await base44.entities.Ticket.list();
+      let historicalTickets = [];
+
+      if (assetSearch) {
+        historicalTickets = allTickets.filter(t => 
+          t.asset_name && t.asset_name.toLowerCase() === assetSearch.toLowerCase() &&
+          new Date(t.created_date) >= sixMonthsAgo
+        );
+      } else if (ticket.room_id) {
+        historicalTickets = allTickets.filter(t => 
+          t.room_id === ticket.room_id &&
+          new Date(t.created_date) >= sixMonthsAgo
+        );
+      }
+
+      if (historicalTickets.length >= 3) {
+        setIsRecurring(true);
+        reasons.push("recurring issue");
+      }
 
       // Asset-based suggestions
       if (assetSearch) {
         const assetLower = assetSearch.toLowerCase();
-        if (assetLower.includes('projector') || assetLower.includes('computer') || 
-            assetLower.includes('screen') || assetLower.includes('audio') || 
-            assetLower.includes('camera') || assetLower.includes('network')) {
+        
+        // Safety & Life Safety
+        if (assetLower.includes('fire') || assetLower.includes('emergency') || 
+            assetLower.includes('security') || assetLower.includes('life safety') ||
+            assetLower.includes('sprinkler') || assetLower.includes('alarm')) {
+          basePrio = "critical";
+          reasons.push("life safety system");
+        }
+        // Core infrastructure
+        else if (assetLower.includes('hvac') || assetLower.includes('network') || 
+                 assetLower.includes('electrical') || assetLower.includes('plumbing') ||
+                 assetLower.includes('water') || assetLower.includes('gas')) {
+          basePrio = "high";
+          reasons.push("core infrastructure");
+        }
+        // Technology
+        else if (assetLower.includes('projector') || assetLower.includes('computer') || 
+                 assetLower.includes('screen') || assetLower.includes('audio') || 
+                 assetLower.includes('camera')) {
           suggestedCat = "technology";
-        } else if (assetLower.includes('hvac') || assetLower.includes('electrical') || 
-                   assetLower.includes('plumbing')) {
-          suggestedCat = "maintenance";
-          suggestedPrio = "high";
+          basePrio = "medium";
         }
       }
 
-      // Room-based suggestions
-      if (roomSearch && !suggestedCat) {
-        const roomLower = roomSearch.toLowerCase();
-        if (roomLower.includes('sanctuary') || roomLower.includes('worship')) {
-          suggestedPrio = "high";
+      // Check description for safety keywords
+      if (issueDescription) {
+        const descLower = issueDescription.toLowerCase();
+        if (descLower.includes('fire') || descLower.includes('water leak') || 
+            descLower.includes('flood') || descLower.includes('emergency') ||
+            descLower.includes('safety') || descLower.includes('danger')) {
+          basePrio = "critical";
+          reasons.push("safety concern");
         }
+      }
+
+      // Room-based escalation
+      if (ticket.room_id && basePrio !== "critical") {
+        const roomLower = roomSearch.toLowerCase();
+        if (roomLower.includes('sanctuary') || roomLower.includes('worship') || 
+            roomLower.includes('chapel')) {
+          basePrio = basePrio === "low" ? "medium" : basePrio === "medium" ? "high" : "high";
+          reasons.push("affects worship space");
+        } else {
+          // +1 level for room-scoped
+          basePrio = basePrio === "low" ? "medium" : basePrio === "medium" ? "high" : basePrio;
+          reasons.push("affects room");
+        }
+      }
+
+      // Building-scoped escalation (+2 levels)
+      if (!assetSearch && !ticket.room_id && ticket.building_id && basePrio !== "critical") {
+        basePrio = basePrio === "low" ? "high" : "critical";
+        reasons.push("building-wide issue");
+      }
+
+      // Repeated ticket (+1 level)
+      if (historicalTickets.length > 0 && historicalTickets.length < 3 && basePrio !== "critical") {
+        basePrio = basePrio === "low" ? "medium" : basePrio === "medium" ? "high" : "critical";
+        reasons.push("repeated issue");
       }
 
       if (suggestedCat) setSuggestedCategory(suggestedCat);
-      if (suggestedPrio) setSuggestedPriority(suggestedPrio);
+      setSuggestedPriority(basePrio);
+      
+      if (reasons.length > 0) {
+        setPriorityReason(reasons.join(" + "));
+      }
     } catch (error) {
       console.error('Error generating suggestions:', error);
     }
@@ -529,7 +602,9 @@ export default function CreateTicket() {
         room_number: ticket.room_number || null,
         status: "open",
         priority: finalPriority,
+        priority_reason: priorityReason || null,
         category: finalCategory,
+        recurring_issue: isRecurring,
         source: "web_form",
         due_date: tomorrowStr,
         attachments: ticket.attachments,
@@ -954,7 +1029,11 @@ export default function CreateTicket() {
                   <label className="text-sm font-medium flex items-center gap-2">
                     Priority
                     {suggestedPriority !== "medium" && !ticket.priority && (
-                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
+                      <Badge variant="outline" className={`text-xs ${
+                        suggestedPriority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
+                        suggestedPriority === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}>
                         Suggested: {suggestedPriority}
                       </Badge>
                     )}
@@ -970,10 +1049,23 @@ export default function CreateTicket() {
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium {suggestedPriority === "medium" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
                       <SelectItem value="high">High {suggestedPriority === "high" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
-                      <SelectItem value="urgent">Urgent {suggestedPriority === "urgent" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
+                      <SelectItem value="critical">Critical {suggestedPriority === "critical" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-slate-500">We'll suggest based on severity</p>
+                  {priorityReason && (
+                    <p className="text-xs text-slate-600 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Suggested {suggestedPriority} — {priorityReason}
+                    </p>
+                  )}
+                  {isRecurring && (
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-md p-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <p className="text-xs text-amber-800 font-medium">
+                        Recurring Issue: 3+ tickets here in 6 months
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
