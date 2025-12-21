@@ -614,7 +614,7 @@ Provide your analysis in this exact JSON format:
 
   const getPriorityColor = (priority) => {
     const colors = {
-      urgent: "bg-red-100 text-red-700 border-red-300",
+      critical: "bg-red-100 text-red-700 border-red-300",
       high: "bg-orange-100 text-orange-700 border-orange-300",
       medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
       low: "bg-blue-100 text-blue-700 border-blue-300"
@@ -1185,13 +1185,18 @@ Provide your analysis in this exact JSON format:
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
                     <Badge className={getPriorityColor(ticket.priority)}>
                       {ticket.priority?.charAt(0).toUpperCase() + ticket.priority?.slice(1)}
                     </Badge>
+                  )}
+                  {ticket.priority_reason && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Suggested: {ticket.priority_reason}
+                    </p>
                   )}
                 </div>
 
@@ -1332,11 +1337,18 @@ Provide your analysis in this exact JSON format:
               <CardContent className="space-y-3">
                 <div>
                   <p className="text-sm font-medium text-slate-600">Ticket Scope</p>
-                  <Badge variant="outline" className="mt-1">
-                    {ticket.scope === "ASSET" && "🔧 Asset"}
-                    {ticket.scope === "ROOM" && "🚪 Room"}
-                    {ticket.scope === "BUILDING" && "🏢 Building"}
-                  </Badge>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline">
+                      {ticket.scope === "ASSET" && "🔧 Asset"}
+                      {ticket.scope === "ROOM" && "🚪 Room"}
+                      {ticket.scope === "BUILDING" && "🏢 Building"}
+                    </Badge>
+                    {ticket.recurring_issue && (
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                        Recurring
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 {ticket.scope === "ASSET" && ticket.asset_name && (
