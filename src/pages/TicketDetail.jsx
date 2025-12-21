@@ -1324,6 +1324,57 @@ Provide your analysis in this exact JSON format:
               </CardContent>
             </Card>
 
+            {/* Scope & Intelligence */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm sm:text-base">Scope & Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Ticket Scope</p>
+                  <Badge variant="outline" className="mt-1">
+                    {ticket.scope === "ASSET" && "🔧 Asset"}
+                    {ticket.scope === "ROOM" && "🚪 Room"}
+                    {ticket.scope === "BUILDING" && "🏢 Building"}
+                  </Badge>
+                </div>
+                
+                {ticket.scope === "ASSET" && ticket.asset_name && (
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Affected Asset</p>
+                    <p className="text-sm text-slate-900">{ticket.asset_name}</p>
+                  </div>
+                )}
+                
+                {ticket.scope === "ROOM" && ticket.room_number && (
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Affected Room</p>
+                    <p className="text-sm text-slate-900">{ticket.room_number}</p>
+                  </div>
+                )}
+
+                {ticket.related_tickets && ticket.related_tickets.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-slate-600 mb-2">Related Tickets</p>
+                    <div className="space-y-1">
+                      {ticket.related_tickets.map(relId => (
+                        <Button
+                          key={relId}
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs w-full justify-start"
+                          onClick={() => window.open(createPageUrl('TicketDetail') + `?id=${relId}`, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-2" />
+                          View Related
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Location */}
             <Card>
               <CardHeader>
