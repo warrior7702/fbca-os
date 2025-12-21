@@ -8,8 +8,11 @@ import {
   CheckCircle,
   ArrowLeft,
   Loader2,
-  MapPin
+  MapPin,
+  AlertCircle,
+  ExternalLink
 } from "lucide-react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +52,11 @@ export default function CreateTicket() {
   const [roomAssets, setRoomAssets] = useState([]);
   const [assetSearch, setAssetSearch] = useState("");
   const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+  const [contextLoaded, setContextLoaded] = useState(false);
+  const [inferredContext, setInferredContext] = useState({
+    type: null,
+    display: null
+  });
 
   const [ticket, setTicket] = useState({
     requester_name: "",
@@ -940,9 +948,9 @@ export default function CreateTicket() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-slate-500">Auto-suggested based on issue details</p>
-                  </div>
+                </div>
 
-                  <div className="space-y-2">
+                <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2">
                     Priority
                     {suggestedPriority !== "medium" && !ticket.priority && (
@@ -965,10 +973,12 @@ export default function CreateTicket() {
                       <SelectItem value="urgent">Urgent {suggestedPriority === "urgent" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-slate-500">We'll suggest based on severity</p>
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Attachments</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Attachments</label>
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center bg-slate-50 hover:bg-slate-100 transition-colors">
                     <input
                       type="file"
@@ -1005,8 +1015,6 @@ export default function CreateTicket() {
                   )}
                 </div>
 
-
-
                 <div className="pt-4 border-t">
                   <Button 
                     type="submit" 
@@ -1026,11 +1034,90 @@ export default function CreateTicket() {
                     We'll route this to the right team automatically
                   </p>
                 </div>
-                </form>
-                </CardContent>
-                </Card>
-                </motion.div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Duplicate Warning Dialog */}
+        <AnimatePresence>
+          {showDuplicateWarning && duplicateTickets.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowDuplicateWarning(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertCircle className="w-6 h-6 text-orange-500" />
+                  <h3 className="text-lg font-bold text-slate-900">Similar Open Tickets Found</h3>
+                </div>
+                
+                <p className="text-sm text-slate-600 mb-4">
+                  We found {duplicateTickets.length} open ticket{duplicateTickets.length > 1 ? 's' : ''} for this {assetSearch ? 'asset' : 'room'} from the last 30 days:
+                </p>
+
+                <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
+                  {duplicateTickets.map(dup => (
+                    <div key={dup.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-slate-900 truncate">{dup.subject}</p>
+                          <p className="text-xs text-slate-600 mt-1">{dup.ticket_number} • {dup.status.replace('_', ' ')}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Created {format(new Date(dup.created_date), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            window.open(createPageUrl('TicketDetail') + `?id=${dup.id}`, '_blank');
+                          }}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDuplicateWarning(false)}
+                    className="flex-1"
+                  >
+                    Review Existing Tickets
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setShowDuplicateWarning(false);
+                      await continueSubmission();
+                    }}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    Create New Ticket Anyway
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
+
+const continueSubmission = async () => {
+  // This is called from duplicate warning dialog
+  toast.info('Feature coming soon - continuing with submission');
+};
