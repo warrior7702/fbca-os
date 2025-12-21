@@ -106,6 +106,9 @@ export default function CreateTicket() {
     const assetName = params.get('asset_name');
     const assetCategory = params.get('asset_category');
     
+    let contextDisplay = null;
+    let contextType = null;
+
     if (buildingId) {
       // Wait for buildings to load first
       const loadedBuildings = await base44.entities.Building.list();
@@ -140,19 +143,41 @@ export default function CreateTicket() {
               floor_id: room.floor_id || null
             }));
             setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
+
+            // Set context for room
+            if (!assetName) {
+              contextType = 'room';
+              contextDisplay = {
+                primary: room.room_name || room.room_number || 'Room',
+                secondary: `${building.name}${room.floor_name ? ' • ' + room.floor_name : ''}`
+              };
+            }
           }
+        } else if (!assetName) {
+          // Building-only context
+          contextType = 'building';
+          contextDisplay = {
+            primary: building.name,
+            secondary: 'Building-wide issue'
+          };
         }
       }
     }
     
     if (assetName) {
+      setAssetSearch(assetName);
       setTicket(prev => ({
         ...prev,
-        subject: `Asset Issue: ${assetName}`,
-        scope: "ASSET",
-        asset_name: assetName
+        subject: `Asset Issue: ${assetName}`
       }));
-      setIssueDescription(`Issue with asset: ${assetName}`);
+      
+      // Set context for asset
+      contextType = 'asset';
+      const room = rooms.find(r => r.id === ticket.room_id);
+      contextDisplay = {
+        primary: assetName,
+        secondary: room ? `${room.room_number || room.room_name} • ${ticket.building}` : ticket.building || 'Asset'
+      };
     }
     
     if (assetCategory) {
@@ -165,6 +190,9 @@ export default function CreateTicket() {
         setSuggestedCategory(mappedCategory);
       }
     }
+
+    setInferredContext({ type: contextType, display: contextDisplay });
+    setContextLoaded(true);
   };
 
   // Auto-suggest category, priority based on context
@@ -434,8 +462,8 @@ export default function CreateTicket() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!ticket.requester_name || !ticket.requester_email || !issueDescription) {
-      toast.error("Please fill in all required fields");
+    if (!issueDescription || issueDescription.trim().length < 10) {
+      toast.error("Please describe the issue (at least 10 characters)");
       return;
     }
 
@@ -663,17 +691,42 @@ export default function CreateTicket() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="mb-8"
         >
-          <div className="inline-block p-4 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl shadow-lg mb-4">
-            <TicketIcon className="w-12 h-12 text-white" />
+          <div className="flex items-center gap-4 mb-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="inline-block p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg">
+              <TicketIcon className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Create Service Request
+              </h1>
+              {inferredContext.display && (
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-sm">
+                    {inferredContext.type === 'asset' && '🔧 Asset'}
+                    {inferredContext.type === 'room' && '🚪 Room'}
+                    {inferredContext.type === 'building' && '🏢 Building'}
+                  </Badge>
+                  <span className="text-slate-600 text-sm">
+                    {inferredContext.display.primary}
+                  </span>
+                  {inferredContext.display.secondary && (
+                    <span className="text-slate-400 text-xs">
+                      • {inferredContext.display.secondary}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
-            FBCA Service Request
-          </h1>
-          <p className="text-slate-600 text-lg">
-            Fill out the form below to submit a service request
-          </p>
         </motion.div>
 
         <motion.div
@@ -690,35 +743,38 @@ export default function CreateTicket() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Name<span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      value={ticket.requester_name}
-                      onChange={(e) => setTicket({...ticket, requester_name: e.target.value})}
-                      placeholder="Your full name"
-                      required
-                    />
+                {/* Context is already shown in header, hide these fields if context is loaded */}
+                {!inferredContext.display && (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Name
+                      </label>
+                      <Input
+                        value={ticket.requester_name}
+                        onChange={(e) => setTicket({...ticket, requester_name: e.target.value})}
+                        placeholder="Your full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Email Address
+                      </label>
+                      <Input
+                        type="email"
+                        value={ticket.requester_email}
+                        onChange={(e) => setTicket({...ticket, requester_email: e.target.value})}
+                        placeholder="your.email@fbca.org"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Email Address<span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="email"
-                      value={ticket.requester_email}
-                      onChange={(e) => setTicket({...ticket, requester_email: e.target.value})}
-                      placeholder="your.email@fbca.org"
-                      required
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2 relative">
-                    <label className="text-sm font-medium">Building</label>
+                {/* Location fields - only show if no context */}
+                {!inferredContext.display && (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2 relative">
+                      <label className="text-sm font-medium">Building</label>
                     {loadingBuildings ? (
                       <div className="flex items-center justify-center h-10 border rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
@@ -830,13 +886,37 @@ export default function CreateTicket() {
                         placeholder={selectedBuilding ? "Type room number..." : "Select building first"}
                         disabled={!selectedBuilding}
                       />
-                    )}
-                  </div>
-                </div>
+                      )}
+                      </div>
+                      </div>
+                      )}
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    Category
+                      <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                      What's going on?<span className="text-red-500">*</span>
+                      </label>
+                      <Textarea
+                      value={issueDescription}
+                      onChange={(e) => {
+                      setIssueDescription(e.target.value);
+                      }}
+                      onBlur={(e) => {
+                      if (e.target.value) generateTicketTitle(e.target.value);
+                      }}
+                      placeholder="Describe the issue you're experiencing..."
+                      rows={4}
+                      required
+                      className="text-base"
+                      />
+                      <p className="text-xs text-slate-500">
+                      Be specific about what's not working or what you need help with
+                      </p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                      Category
                     {suggestedCategory && !ticket.category && (
                       <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
                         Suggested: {availableCategories.find(c => c.value === suggestedCategory)?.label}
@@ -859,70 +939,10 @@ export default function CreateTicket() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                  <p className="text-xs text-slate-500">Auto-suggested based on issue details</p>
+                  </div>
 
-                <div className="space-y-2 relative">
-                  <label className="text-sm font-medium">
-                    Asset Name (Optional - for specific equipment issues)
-                  </label>
-                  <Input
-                    value={assetSearch}
-                    onChange={(e) => {
-                      setAssetSearch(e.target.value);
-                      setTicket({...ticket, asset_name: e.target.value});
-                      setShowAssetDropdown(true);
-                    }}
-                    onFocus={() => setShowAssetDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowAssetDropdown(false), 200)}
-                    placeholder="e.g., Projector A1, HVAC Unit 3"
-                  />
-                  {showAssetDropdown && roomAssets.length > 0 && filteredAssets.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredAssets.slice(0, 50).map(asset => (
-                        <div
-                          key={asset.id}
-                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
-                          onClick={() => {
-                            setTicket({...ticket, asset_name: asset.name});
-                            setAssetSearch(asset.name);
-                            setShowAssetDropdown(false);
-                          }}
-                        >
-                          <div className="font-medium">{asset.name}</div>
-                          {asset.model && (
-                            <div className="text-xs text-slate-500">{asset.model}</div>
-                          )}
-                        </div>
-                      ))}
-                      {filteredAssets.length > 50 && (
-                        <div className="px-3 py-2 text-xs text-slate-500 text-center border-t">
-                          Showing 50 of {filteredAssets.length} assets
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-500">Leave blank for general room issues</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Describe Your Issue<span className="text-red-500">*</span>
-                  </label>
-                  <Textarea
-                    value={issueDescription}
-                    onChange={(e) => {
-                      setIssueDescription(e.target.value);
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value) generateTicketTitle(e.target.value);
-                    }}
-                    placeholder="Describe what's wrong or what you need help with..."
-                    rows={4}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
+                  <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2">
                     Priority
                     {suggestedPriority !== "medium" && !ticket.priority && (
@@ -987,33 +1007,29 @@ export default function CreateTicket() {
 
 
 
-                <div className="pt-4">
+                <div className="pt-4 border-t">
                   <Button 
                     type="submit" 
-                    disabled={submitting || loadingSuggestions}
+                    disabled={submitting || !issueDescription.trim()}
                     className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
                   >
-                    {submitting ? "Submitting..." : "Submit Request"}
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Creating Request...
+                      </>
+                    ) : (
+                      "Create Request"
+                    )}
                   </Button>
+                  <p className="text-xs text-center text-slate-500 mt-3">
+                    We'll route this to the right team automatically
+                  </p>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center mt-8"
-        >
-          <p className="text-sm text-slate-500">
-            Need immediate assistance? Contact us at{" "}
-            <a href="mailto:support@fbca.org" className="text-blue-600 hover:underline">
-              support@fbca.org
-            </a>
-          </p>
-        </motion.div>
+                </form>
+                </CardContent>
+                </Card>
+                </motion.div>
       </div>
     </div>
   );
