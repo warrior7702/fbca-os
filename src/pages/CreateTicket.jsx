@@ -62,10 +62,13 @@ export default function CreateTicket() {
     details: "",
     priority: "medium",
     category: "",
-    scope: "ROOM",
     asset_name: "",
     attachments: []
   });
+  const [suggestedCategory, setSuggestedCategory] = useState("");
+  const [suggestedPriority, setSuggestedPriority] = useState("medium");
+  const [duplicateTickets, setDuplicateTickets] = useState([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
 
   useEffect(() => {
     loadCurrentUser();
@@ -159,7 +162,87 @@ export default function CreateTicket() {
           ...prev,
           category: mappedCategory
         }));
+        setSuggestedCategory(mappedCategory);
       }
+    }
+  };
+
+  // Auto-suggest category, priority based on context
+  React.useEffect(() => {
+    if (assetSearch || roomSearch || selectedBuilding) {
+      generateSmartSuggestions();
+    }
+  }, [assetSearch, roomSearch, selectedBuilding]);
+
+  const generateSmartSuggestions = async () => {
+    try {
+      let suggestedCat = "";
+      let suggestedPrio = "medium";
+
+      // Asset-based suggestions
+      if (assetSearch) {
+        const assetLower = assetSearch.toLowerCase();
+        if (assetLower.includes('projector') || assetLower.includes('computer') || 
+            assetLower.includes('screen') || assetLower.includes('audio') || 
+            assetLower.includes('camera') || assetLower.includes('network')) {
+          suggestedCat = "technology";
+        } else if (assetLower.includes('hvac') || assetLower.includes('electrical') || 
+                   assetLower.includes('plumbing')) {
+          suggestedCat = "maintenance";
+          suggestedPrio = "high";
+        }
+      }
+
+      // Room-based suggestions
+      if (roomSearch && !suggestedCat) {
+        const roomLower = roomSearch.toLowerCase();
+        if (roomLower.includes('sanctuary') || roomLower.includes('worship')) {
+          suggestedPrio = "high";
+        }
+      }
+
+      if (suggestedCat) setSuggestedCategory(suggestedCat);
+      if (suggestedPrio) setSuggestedPriority(suggestedPrio);
+    } catch (error) {
+      console.error('Error generating suggestions:', error);
+    }
+  };
+
+  // Check for duplicate tickets before submission
+  const checkDuplicateTickets = async () => {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const allTickets = await base44.entities.Ticket.list();
+      const recentOpenTickets = allTickets.filter(t => {
+        const isOpen = ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status);
+        const isRecent = new Date(t.created_date) >= thirtyDaysAgo;
+        return isOpen && isRecent;
+      });
+
+      const duplicates = recentOpenTickets.filter(t => {
+        // Asset match
+        if (assetSearch && t.asset_name && t.asset_name.toLowerCase() === assetSearch.toLowerCase()) {
+          return true;
+        }
+        // Room match
+        if (ticket.room_id && t.room_id === ticket.room_id) {
+          return true;
+        }
+        return false;
+      });
+
+      if (duplicates.length > 0) {
+        setDuplicateTickets(duplicates);
+        setShowDuplicateWarning(true);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking duplicates:', error);
+      return false;
     }
   };
 
@@ -351,13 +434,28 @@ export default function CreateTicket() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!ticket.requester_name || !ticket.requester_email || !issueDescription || !ticket.category) {
+    if (!ticket.requester_name || !ticket.requester_email || !issueDescription) {
       toast.error("Please fill in all required fields");
       return;
     }
 
+    // Check for duplicates
+    const hasDuplicates = await checkDuplicateTickets();
+    if (hasDuplicates) {
+      return; // Show warning, let user decide
+    }
+
     // Auto-infer scope based on filled fields
-    const inferredScope = ticket.asset_name ? "ASSET" : "ROOM";
+    let inferredScope = "BUILDING";
+    if (assetSearch) {
+      inferredScope = "ASSET";
+    } else if (ticket.room_id || ticket.room_number) {
+      inferredScope = "ROOM";
+    }
+
+    // Auto-suggest category if not set
+    const finalCategory = ticket.category || suggestedCategory || "maintenance";
+    const finalPriority = ticket.priority || suggestedPriority;
     
     // Generate title if not already done
     if (!ticket.subject) {
@@ -387,15 +485,15 @@ export default function CreateTicket() {
         subject: ticket.subject || issueDescription.substring(0, 50) + '...',
         description: issueDescription,
         scope: inferredScope,
-        asset_name: inferredScope === "ASSET" ? ticket.asset_name : null,
+        asset_name: inferredScope === "ASSET" ? assetSearch : null,
         building: ticket.building,
         building_id: ticket.building_id || null,
         floor_id: ticket.floor_id || null,
         room_id: ticket.room_id || null,
         room_number: ticket.room_number || null,
         status: "open",
-        priority: ticket.priority,
-        category: ticket.category,
+        priority: finalPriority,
+        category: finalCategory,
         source: "web_form",
         due_date: tomorrowStr,
         attachments: ticket.attachments,
@@ -737,21 +835,26 @@ export default function CreateTicket() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Category<span className="text-red-500">*</span>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    Category
+                    {suggestedCategory && !ticket.category && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                        Suggested: {availableCategories.find(c => c.value === suggestedCategory)?.label}
+                      </Badge>
+                    )}
                   </label>
                   <Select 
-                    value={ticket.category} 
+                    value={ticket.category || suggestedCategory} 
                     onValueChange={(value) => setTicket({...ticket, category: value})}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category..." />
+                      <SelectValue placeholder="Auto-suggested based on details..." />
                     </SelectTrigger>
                     <SelectContent>
                       {availableCategories.map(cat => (
                         <SelectItem key={cat.value} value={cat.value}>
                           {cat.label}
+                          {cat.value === suggestedCategory && !ticket.category && " (Suggested)"}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -820,9 +923,16 @@ export default function CreateTicket() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Priority</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    Priority
+                    {suggestedPriority !== "medium" && !ticket.priority && (
+                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
+                        Suggested: {suggestedPriority}
+                      </Badge>
+                    )}
+                  </label>
                   <Select 
-                    value={ticket.priority} 
+                    value={ticket.priority || suggestedPriority} 
                     onValueChange={(value) => setTicket({...ticket, priority: value})}
                   >
                     <SelectTrigger>
@@ -830,9 +940,9 @@ export default function CreateTicket() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="medium">Medium {suggestedPriority === "medium" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
+                      <SelectItem value="high">High {suggestedPriority === "high" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
+                      <SelectItem value="urgent">Urgent {suggestedPriority === "urgent" && !ticket.priority ? "(Suggested)" : ""}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
