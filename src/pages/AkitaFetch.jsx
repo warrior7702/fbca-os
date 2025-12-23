@@ -863,17 +863,42 @@ export default function AkitaFetch() {
               <div className="p-4 border-b bg-white">
                 {(() => {
                   const roomTickets = openTicketsByRoom.roomTickets[selectedRoom.id] || [];
-                  const criticalTicket = roomTickets.some(t => 
-                    t.priority === 'critical' || ['fire', 'safety', 'emergency'].some(kw => 
-                      t.subject?.toLowerCase().includes(kw)
+                  const roomAssets = assets.filter(a => a.room_id === selectedRoom.id);
+
+                  // Check for safety/life-safety tickets
+                  const hasSafetyTicket = roomTickets.some(t => 
+                    t.priority === 'critical' || 
+                    ['fire', 'safety', 'emergency', 'life safety', 'water leak', 'flood'].some(kw => 
+                      t.subject?.toLowerCase().includes(kw) || t.description?.toLowerCase().includes(kw)
                     )
                   );
-                  const status = criticalTicket ? 'critical' : roomTickets.length >= 3 ? 'attention' : 'normal';
+
+                  // Count assets with open tickets
+                  const assetsWithTickets = roomAssets.filter(asset => 
+                    openTicketsByRoom.assetTickets[asset.name]?.length > 0
+                  ).length;
+
+                  // Determine status
+                  let status = 'normal';
+                  let explanation = 'No open issues';
+
+                  if (hasSafetyTicket) {
+                    status = 'critical';
+                    explanation = 'Safety or life-safety ticket';
+                  } else if (roomTickets.length > 0) {
+                    status = 'warning';
+                    explanation = `${roomTickets.length} room-level ticket${roomTickets.length > 1 ? 's' : ''}`;
+                  } else if (assetsWithTickets >= 2) {
+                    status = 'warning';
+                    explanation = `${assetsWithTickets} assets with open tickets`;
+                  } else if (assetsWithTickets === 1) {
+                    explanation = '1 asset with open ticket';
+                  }
 
                   const statusConfig = {
                     normal: { color: 'bg-green-50 border-green-200 text-green-800', icon: '✓', label: 'Normal' },
-                    attention: { color: 'bg-orange-50 border-orange-200 text-orange-800', icon: '⚠', label: 'Needs Attention' },
-                    critical: { color: 'bg-red-50 border-red-200 text-red-800', icon: '⚠', label: 'Critical' }
+                    warning: { color: 'bg-orange-50 border-orange-200 text-orange-800', icon: '⚠', label: 'Needs Attention' },
+                    critical: { color: 'bg-red-50 border-red-200 text-red-800', icon: '🚨', label: 'Critical' }
                   };
 
                   const config = statusConfig[status];
@@ -884,12 +909,7 @@ export default function AkitaFetch() {
                         <span className="text-base">{config.icon}</span>
                         <span className="font-semibold text-sm">{config.label}</span>
                       </div>
-                      <p className="text-xs">
-                        {status === 'critical' && 'Critical priority ticket or safety issue'}
-                        {status === 'attention' && `${roomTickets.length} open tickets`}
-                        {status === 'normal' && roomTickets.length === 0 && 'No open tickets'}
-                        {status === 'normal' && roomTickets.length > 0 && `${roomTickets.length} open ticket${roomTickets.length > 1 ? 's' : ''}`}
-                      </p>
+                      <p className="text-xs">{explanation}</p>
                     </div>
                   );
                 })()}
@@ -1237,16 +1257,36 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
         const avgX = roomAssets.reduce((sum, a) => sum + a.x_coord, 0) / roomAssets.length;
         const avgY = roomAssets.reduce((sum, a) => sum + a.y_coord, 0) / roomAssets.length;
 
-        // CRITICAL: Room label visual indicator
-        // Room labels ONLY turn orange when THAT room has room-scoped tickets
-        // Asset tickets do NOT affect room labels - no cascading
-        const hasRoomTicket = openTicketsByRoom.roomTickets[room.id]?.length > 0;
+        // Room label color logic
+        const roomTickets = openTicketsByRoom.roomTickets[room.id] || [];
+        const hasRoomTicket = roomTickets.length > 0;
+
+        // Check for safety/life-safety tickets
+        const hasSafetyTicket = roomTickets.some(t => 
+          t.priority === 'critical' || 
+          ['fire', 'safety', 'emergency', 'life safety', 'water leak', 'flood'].some(kw => 
+            t.subject?.toLowerCase().includes(kw) || t.description?.toLowerCase().includes(kw)
+          )
+        );
+
+        // Count assets with open tickets in this room
+        const assetsWithTickets = roomAssets.filter(asset => 
+          openTicketsByRoom.assetTickets[asset.name]?.length > 0
+        ).length;
+
+        // Determine status
+        let status = 'normal'; // green
+        if (hasSafetyTicket) {
+          status = 'critical'; // red
+        } else if (hasRoomTicket || assetsWithTickets >= 2) {
+          status = 'warning'; // orange
+        }
 
         positions[room.id] = {
           x: avgX * 100,
           y: avgY * 100,
           label: room.room_name || room.name || room.room_number || 'Unnamed',
-          hasTicket: hasRoomTicket,
+          status: status,
           room: room
         };
       }
@@ -1435,7 +1475,9 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
               }}
             >
               <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow ${
-                pos.hasTicket 
+                pos.status === 'critical' 
+                  ? 'border-2 border-red-500 text-red-900' 
+                  : pos.status === 'warning'
                   ? 'border-2 border-orange-500 text-orange-900' 
                   : 'border border-slate-300 text-slate-900'
               }`}>
