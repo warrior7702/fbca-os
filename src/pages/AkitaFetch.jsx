@@ -835,21 +835,69 @@ export default function AkitaFetch() {
             )}
           </ScrollArea>
 
-          {/* Room Details */}
+          {/* Room Details Panel */}
           {selectedRoom && (
-            <div className="border-t p-4 bg-slate-50 max-h-96 overflow-y-auto">
-              <div className="space-y-4 text-sm">
-                <div>
-                  <h4 className="font-semibold text-slate-900 text-base mb-1">
-                    {selectedRoom.description || selectedRoom.room_number || 'Unnamed Room'}
-                  </h4>
-                  <div className="text-xs text-slate-500 space-y-0.5">
-                    <div>Building: {selectedRoom.building_name || 'N/A'}</div>
-                    <div>Floor: {selectedRoom.floor_name || 'N/A'}</div>
+            <div className="border-t bg-slate-50 max-h-96 overflow-y-auto">
+              {/* Room Header */}
+              <div className="p-4 bg-white border-b">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-slate-900 text-base">
+                      {selectedRoom.room_name || selectedRoom.description || 'Unnamed Room'}
+                    </h4>
+                    {selectedRoom.room_number && (
+                      <p className="text-sm text-slate-600">Room {selectedRoom.room_number}</p>
+                    )}
                   </div>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedRoom.category || 'Interior'}
+                  </Badge>
                 </div>
+                <div className="text-xs text-slate-500 space-y-0.5">
+                  <div>{selectedRoom.building_name || 'N/A'}</div>
+                  <div>{selectedRoom.floor_name || 'N/A'}</div>
+                </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+              {/* Room Status */}
+              <div className="p-4 border-b bg-white">
+                {(() => {
+                  const roomTickets = openTicketsByRoom.roomTickets[selectedRoom.id] || [];
+                  const criticalTicket = roomTickets.some(t => 
+                    t.priority === 'critical' || ['fire', 'safety', 'emergency'].some(kw => 
+                      t.subject?.toLowerCase().includes(kw)
+                    )
+                  );
+                  const status = criticalTicket ? 'critical' : roomTickets.length >= 3 ? 'attention' : 'normal';
+
+                  const statusConfig = {
+                    normal: { color: 'bg-green-50 border-green-200 text-green-800', icon: '✓', label: 'Normal' },
+                    attention: { color: 'bg-orange-50 border-orange-200 text-orange-800', icon: '⚠', label: 'Needs Attention' },
+                    critical: { color: 'bg-red-50 border-red-200 text-red-800', icon: '⚠', label: 'Critical' }
+                  };
+
+                  const config = statusConfig[status];
+
+                  return (
+                    <div className={`rounded-lg border p-3 ${config.color}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">{config.icon}</span>
+                        <span className="font-semibold text-sm">{config.label}</span>
+                      </div>
+                      <p className="text-xs">
+                        {status === 'critical' && 'Critical priority ticket or safety issue'}
+                        {status === 'attention' && `${roomTickets.length} open tickets`}
+                        {status === 'normal' && roomTickets.length === 0 && 'No open tickets'}
+                        {status === 'normal' && roomTickets.length > 0 && `${roomTickets.length} open ticket${roomTickets.length > 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="p-4 space-y-4">
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-slate-900">
                       {assets.filter(a => a.room_id === selectedRoom.id).length}
@@ -866,8 +914,8 @@ export default function AkitaFetch() {
 
                 {/* Open Tickets */}
                 {openTicketsByRoom.roomTickets[selectedRoom.id]?.length > 0 && (
-                  <div className="pt-3 border-t">
-                    <h5 className="font-semibold text-xs text-slate-700 mb-2">Open Tickets</h5>
+                  <div>
+                    <h5 className="font-semibold text-xs text-slate-700 mb-2">Open Tickets (Room)</h5>
                     <div className="space-y-2">
                       {openTicketsByRoom.roomTickets[selectedRoom.id].map(ticket => {
                         const createdDate = new Date(ticket.created_date);
@@ -891,53 +939,85 @@ export default function AkitaFetch() {
                   </div>
                 )}
 
-                {/* Assets in Room */}
-                <div className="pt-3 border-t">
-                  <h5 className="font-semibold text-xs text-slate-700 mb-2">Assets in Room</h5>
-                  {assets.filter(a => a.room_id === selectedRoom.id).length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-4">No assets in this room</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {assets.filter(a => a.room_id === selectedRoom.id).map(asset => {
-                        const hasTickets = openTicketsByRoom.assetTickets[asset.name]?.length > 0;
-                        return (
-                          <div
-                            key={asset.id}
-                            className="bg-white rounded-lg border p-2 cursor-pointer hover:border-blue-300 transition-colors"
-                            onClick={() => handleAssetClick(asset)}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="font-medium text-xs text-slate-900">{asset.name}</div>
-                                {asset.model && (
-                                  <div className="text-xs text-slate-500">{asset.model}</div>
-                                )}
-                              </div>
-                              {hasTickets && (
-                                <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                              )}
+                {/* Assets Grouped by Category */}
+                <div>
+                  <h5 className="font-semibold text-xs text-slate-700 mb-2">Assets by Category</h5>
+                  {(() => {
+                    const roomAssets = assets.filter(a => a.room_id === selectedRoom.id);
+                    if (roomAssets.length === 0) {
+                      return <p className="text-xs text-slate-500 text-center py-4">No assets in this room</p>;
+                    }
+
+                    const groupedAssets = roomAssets.reduce((acc, asset) => {
+                      const category = asset.asset_category || 'Uncategorized';
+                      if (!acc[category]) acc[category] = [];
+                      acc[category].push(asset);
+                      return acc;
+                    }, {});
+
+                    return (
+                      <div className="space-y-3">
+                        {Object.entries(groupedAssets).map(([category, categoryAssets]) => (
+                          <div key={category}>
+                            <div className="text-xs font-medium text-slate-600 mb-1.5">{category}</div>
+                            <div className="space-y-1">
+                              {categoryAssets.map(asset => {
+                                const hasTickets = openTicketsByRoom.assetTickets[asset.name]?.length > 0;
+                                return (
+                                  <div
+                                    key={asset.id}
+                                    className="bg-white rounded border p-2 cursor-pointer hover:border-blue-300 transition-colors"
+                                    onClick={() => handleAssetClick(asset)}
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-xs text-slate-900 truncate">{asset.name}</div>
+                                        {asset.model && (
+                                          <div className="text-xs text-slate-500 truncate">{asset.model}</div>
+                                        )}
+                                      </div>
+                                      {hasTickets && (
+                                        <AlertCircle className="w-3.5 h-3.5 text-orange-500 flex-shrink-0 ml-2" />
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="w-full bg-blue-600 hover:bg-blue-700 mt-3"
-                  onClick={() => {
-                    const params = new URLSearchParams();
-                    if (selectedRoom.building_id) params.set('building_id', selectedRoom.building_id);
-                    if (selectedRoom.id) params.set('room_id', selectedRoom.id);
-                    navigate(createPageUrl('CreateTicket') + '?' + params.toString());
-                  }}
-                >
-                  <Ticket className="w-3 h-3 mr-2" />
-                  Create Ticket for Room
-                </Button>
+                {/* Actions */}
+                <div className="space-y-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (selectedRoom.building_id) params.set('building_id', selectedRoom.building_id);
+                      if (selectedRoom.id) params.set('room_id', selectedRoom.id);
+                      navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+                    }}
+                  >
+                    <Ticket className="w-3 h-3 mr-2" />
+                    Create Ticket for Room
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      navigate(createPageUrl('SupportTickets') + `?room_id=${selectedRoom.id}`);
+                    }}
+                  >
+                    View Ticket History
+                  </Button>
+                </div>
               </div>
             </div>
           )}
