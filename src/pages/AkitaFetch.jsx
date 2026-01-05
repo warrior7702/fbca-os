@@ -261,8 +261,8 @@ export default function AkitaFetch() {
 
   // Check if asset has open tickets (asset-scoped only)
   const hasOpenTickets = (asset) => {
-    // Only check direct asset match - room tickets do NOT affect asset pins
-    return openTicketsByRoom.assetTickets[asset.name]?.length > 0;
+    // Only check direct asset_id match - room tickets do NOT affect asset pins
+    return openTicketsByRoom.assetTickets[asset.id]?.length > 0;
   };
 
   // Filtered rooms and groups for autocomplete
@@ -1232,8 +1232,8 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
 
   // Check if asset has open tickets (asset-scoped only)
   const hasOpenTickets = (asset) => {
-    // Only check direct asset match - room tickets do NOT affect asset pins
-    return openTicketsByRoom.assetTickets[asset.name]?.length > 0;
+    // Only check direct asset_id match - room tickets do NOT affect asset pins
+    return openTicketsByRoom.assetTickets[asset.id]?.length > 0;
   };
 
   // Filter assets based on ticket filter
