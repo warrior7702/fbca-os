@@ -43,6 +43,7 @@ export default function CreateTicket() {
   const [levels, setLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [selectedAssetEntity, setSelectedAssetEntity] = useState(null);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [roomSearch, setRoomSearch] = useState("");
@@ -113,26 +114,27 @@ export default function CreateTicket() {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
     const roomId = params.get('room_id');
-    const assetName = params.get('asset_name');
-    const assetCategory = params.get('asset_category');
+    const assetNameParam = params.get('asset_name');
+    const assetCategoryParam = params.get('asset_category');
     
     let contextDisplay = null;
     let contextType = null;
+    let currentTicketState = {};
 
+    // Load buildings first
+    const loadedBuildings = await base44.entities.Building.list();
+    setBuildings(loadedBuildings);
+
+    // Handle Building context
     if (buildingId) {
-      // Wait for buildings to load first
-      const loadedBuildings = await base44.entities.Building.list();
-      setBuildings(loadedBuildings);
-      
       const building = loadedBuildings.find(b => b.id === buildingId);
       if (building) {
         setSelectedBuilding(building);
         setBuildingSearch(building.name);
-        setTicket(prev => ({
-          ...prev,
+        currentTicketState = {
           building: building.name,
           building_id: buildingId
-        }));
+        };
         
         // Load rooms for this building
         const roomsData = await base44.entities.Room.filter({ building_id: buildingId });
@@ -142,20 +144,20 @@ export default function CreateTicket() {
           return aNum.localeCompare(bNum, undefined, { numeric: true });
         });
         setRooms(sortedRooms);
-        
+
+        // Handle Room context
         if (roomId) {
           const room = roomsData.find(r => r.id === roomId);
           if (room) {
-            setTicket(prev => ({
-              ...prev,
+            currentTicketState = {
+              ...currentTicketState,
               room_id: roomId,
               room_number: room.room_number || room.room_name || '',
               floor_id: room.floor_id || null
-            }));
+            };
             setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
-
-            // Set context for room
-            if (!assetName) {
+            
+            if (!assetNameParam) {
               contextType = 'room';
               contextDisplay = {
                 primary: room.room_name || room.room_number || 'Room',
@@ -163,44 +165,57 @@ export default function CreateTicket() {
               };
             }
           }
-        } else if (!assetName) {
-          // Building-only context
+        } else if (!assetNameParam) {
           contextType = 'building';
           contextDisplay = {
             primary: building.name,
             secondary: 'Building-wide issue'
           };
         }
+
+        // Handle Asset context - fetch full asset entity
+        if (assetNameParam) {
+          setAssetSearch(assetNameParam);
+          currentTicketState = {
+            ...currentTicketState,
+            subject: `Asset Issue: ${assetNameParam}`
+          };
+
+          const assetsInBuilding = await base44.entities.Asset.filter({ building_id: buildingId });
+          const asset = assetsInBuilding.find(a => a.name === assetNameParam);
+          if (asset) {
+            setSelectedAssetEntity(asset);
+            currentTicketState = {
+              ...currentTicketState,
+              asset_id: asset.id,
+              room_id: asset.room_id || currentTicketState.room_id,
+              floor_id: asset.floor_id || currentTicketState.floor_id,
+              building_id: asset.building_id || currentTicketState.building_id
+            };
+            
+            const assetRoom = sortedRooms.find(r => r.id === asset.room_id);
+            contextType = 'asset';
+            contextDisplay = {
+              primary: assetNameParam,
+              secondary: assetRoom ? `${assetRoom.room_number || assetRoom.room_name} • ${building.name}` : building.name || 'Asset'
+            };
+          }
+        }
       }
     }
     
-    if (assetName) {
-      setAssetSearch(assetName);
-      setTicket(prev => ({
-        ...prev,
-        subject: `Asset Issue: ${assetName}`
-      }));
-      
-      // Set context for asset
-      contextType = 'asset';
-      const room = rooms.find(r => r.id === ticket.room_id);
-      contextDisplay = {
-        primary: assetName,
-        secondary: room ? `${room.room_number || room.room_name} • ${ticket.building}` : ticket.building || 'Asset'
-      };
-    }
-    
-    if (assetCategory) {
-      const mappedCategory = mapAssetCategoryToTicketCategory(assetCategory);
+    if (assetCategoryParam) {
+      const mappedCategory = mapAssetCategoryToTicketCategory(assetCategoryParam);
       if (mappedCategory) {
-        setTicket(prev => ({
-          ...prev,
+        currentTicketState = {
+          ...currentTicketState,
           category: mappedCategory
-        }));
+        };
         setSuggestedCategory(mappedCategory);
       }
     }
 
+    setTicket(prev => ({...prev, ...currentTicketState}));
     setInferredContext({ type: contextType, display: contextDisplay });
     setContextLoaded(true);
   };
@@ -225,9 +240,9 @@ export default function CreateTicket() {
       const allTickets = await base44.entities.Ticket.list();
       let historicalTickets = [];
 
-      if (assetSearch) {
+      if (selectedAssetEntity) {
         historicalTickets = allTickets.filter(t => 
-          t.asset_name && t.asset_name.toLowerCase() === assetSearch.toLowerCase() &&
+          t.asset_id === selectedAssetEntity.id &&
           new Date(t.created_date) >= sixMonthsAgo
         );
       } else if (ticket.room_id) {
@@ -243,8 +258,8 @@ export default function CreateTicket() {
       }
 
       // Asset-based suggestions
-      if (assetSearch) {
-        const assetLower = assetSearch.toLowerCase();
+      if (selectedAssetEntity) {
+        const assetLower = selectedAssetEntity.name.toLowerCase();
         
         // Safety & Life Safety
         if (assetLower.includes('fire') || assetLower.includes('emergency') || 
@@ -332,7 +347,7 @@ export default function CreateTicket() {
 
       const duplicates = recentOpenTickets.filter(t => {
         // Asset match
-        if (assetSearch && t.asset_name && t.asset_name.toLowerCase() === assetSearch.toLowerCase()) {
+        if (selectedAssetEntity && t.asset_id === selectedAssetEntity.id) {
           return true;
         }
         // Room match
@@ -556,7 +571,7 @@ export default function CreateTicket() {
 
     // Auto-infer scope based on filled fields
     let inferredScope = "BUILDING";
-    if (assetSearch) {
+    if (selectedAssetEntity || assetSearch) {
       inferredScope = "ASSET";
     } else if (ticket.room_id || ticket.room_number) {
       inferredScope = "ROOM";
@@ -587,6 +602,35 @@ export default function CreateTicket() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
       
+      // Determine final IDs based on scope
+      let finalAssetId = null;
+      let finalAssetName = null;
+      let finalRoomId = ticket.room_id;
+      let finalFloorId = ticket.floor_id;
+      let finalBuildingId = ticket.building_id;
+
+      if (inferredScope === "ASSET" && selectedAssetEntity) {
+        finalAssetId = selectedAssetEntity.id;
+        finalAssetName = selectedAssetEntity.name;
+        finalRoomId = selectedAssetEntity.room_id || finalRoomId;
+        finalFloorId = selectedAssetEntity.floor_id || finalFloorId;
+        finalBuildingId = selectedAssetEntity.building_id || finalBuildingId;
+      } else if (inferredScope === "ASSET" && assetSearch) {
+        finalAssetName = assetSearch;
+      }
+
+      if (inferredScope === "ROOM" && finalRoomId) {
+        const room = rooms.find(r => r.id === finalRoomId);
+        if (room) {
+          finalFloorId = room.floor_id || finalFloorId;
+          finalBuildingId = room.building_id || finalBuildingId;
+        }
+      }
+
+      if (inferredScope === "BUILDING" && selectedBuilding) {
+        finalBuildingId = selectedBuilding.id;
+      }
+      
       const ticketData = {
         ticket_number: newTicketNumber,
         requester_email: ticket.requester_email,
@@ -594,11 +638,12 @@ export default function CreateTicket() {
         subject: ticket.subject || issueDescription.substring(0, 50) + '...',
         description: issueDescription,
         scope: inferredScope,
-        asset_name: inferredScope === "ASSET" ? assetSearch : null,
+        asset_id: finalAssetId,
+        asset_name: finalAssetName,
         building: ticket.building,
-        building_id: ticket.building_id || null,
-        floor_id: ticket.floor_id || null,
-        room_id: ticket.room_id || null,
+        building_id: finalBuildingId,
+        floor_id: finalFloorId,
+        room_id: finalRoomId,
         room_number: ticket.room_number || null,
         status: "open",
         priority: finalPriority,
@@ -884,6 +929,7 @@ export default function CreateTicket() {
                               setTicket({...ticket, building: '', building_id: '', room_id: '', room_number: '', floor_id: null});
                               setBuildingSearch('');
                               setRooms([]);
+                              setSelectedBuilding(null);
                             }}
                           >
                             <X className="w-4 h-4" />
@@ -1154,7 +1200,7 @@ export default function CreateTicket() {
                 </div>
                 
                 <p className="text-sm text-slate-600 mb-4">
-                  We found {duplicateTickets.length} open ticket{duplicateTickets.length > 1 ? 's' : ''} for this {assetSearch ? 'asset' : 'room'} from the last 30 days:
+                  We found {duplicateTickets.length} open ticket{duplicateTickets.length > 1 ? 's' : ''} for this {selectedAssetEntity ? 'asset' : 'room'} from the last 30 days:
                 </p>
 
                 <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
