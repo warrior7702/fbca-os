@@ -875,7 +875,7 @@ export default function AkitaFetch() {
 
                   // Count assets with open tickets
                   const assetsWithTickets = roomAssets.filter(asset => 
-                    openTicketsByRoom.assetTickets[asset.name]?.length > 0
+                    openTicketsByRoom.assetTickets[asset.id]?.length > 0
                   ).length;
 
                   // Determine status
@@ -981,9 +981,8 @@ export default function AkitaFetch() {
                           <div key={category}>
                             <div className="text-xs font-medium text-slate-600 mb-1.5">{category}</div>
                             <div className="space-y-1">
-                              {categoryAssets.map(asset => {
-                                const hasTickets = openTicketsByRoom.assetTickets[asset.name]?.length > 0;
-                                return (
+                             {categoryAssets.map(asset => {
+                               return (
                                   <div
                                     key={asset.id}
                                     className="bg-white rounded border p-2 cursor-pointer hover:border-blue-300 transition-colors"
@@ -1506,7 +1505,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
             // Build tooltip text
             let tooltipText = asset.name;
             if (hasTickets) {
-              const assetTickets = openTicketsByRoom.assetTickets[asset.name] || [];
+              const assetTickets = openTicketsByRoom.assetTickets[asset.id] || [];
 
               // Show asset-level tickets only
               assetTickets.forEach(ticket => {
