@@ -134,6 +134,7 @@ export default function CreateTicket() {
         setSelectedBuilding(building);
         setBuildingSearch(building.name);
         currentTicketState = {
+          ...currentTicketState,
           building: building.name,
           building_id: buildingId
         };
@@ -151,13 +152,16 @@ export default function CreateTicket() {
         if (roomId) {
           const room = roomsData.find(r => r.id === roomId);
           if (room) {
+            const roomDisplay = room.room_number 
+              ? `${room.room_number} - ${room.room_name || 'Unnamed'}` 
+              : (room.room_name || room.room_number || 'Room');
+            setRoomSearch(roomDisplay);
             currentTicketState = {
               ...currentTicketState,
               room_id: roomId,
               room_number: room.room_number || room.room_name || '',
               floor_id: room.floor_id || null
             };
-            setRoomSearch(room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name);
             
             if (!assetNameParam) {
               contextType = 'room';
