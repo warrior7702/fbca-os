@@ -614,12 +614,30 @@ export default function AkitaFetch() {
         <div className="w-96 border-l bg-white shadow-sm flex flex-col">
           {/* Search & Filters */}
           <div className="p-4 border-b space-y-3">
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-slate-600" />
-              <h3 className="font-semibold text-sm">Assets</h3>
-              <Badge variant="secondary" className="ml-auto">
-                {filteredAssets.length}
-              </Badge>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-slate-600" />
+                <h3 className="font-semibold text-sm">Assets</h3>
+                <Badge variant="secondary">
+                  {filteredAssets.length}
+                </Badge>
+              </div>
+              {selectedBuilding && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const params = new URLSearchParams();
+                    if (selectedBuilding.id) params.set('building_id', selectedBuilding.id);
+                    if (selectedFloor?.id) params.set('floor_id', selectedFloor.id);
+                    navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+                  }}
+                  className="text-xs"
+                >
+                  <Ticket className="w-3 h-3 mr-1" />
+                  Report Issue
+                </Button>
+              )}
             </div>
 
             <div className="relative">
@@ -805,27 +823,48 @@ export default function AkitaFetch() {
                         onClick={() => setSelectedAsset(asset)}
                       >
                         <CardContent className="p-3">
-                          <div className="font-medium text-sm">{asset.name}</div>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {assetGroup && (
-                              <Badge variant="outline" className="text-xs">
-                                {assetGroup.name}
-                              </Badge>
-                            )}
-                            {asset.room_number && (
-                              <span className="text-xs text-slate-500">
-                                Room {asset.room_number}
-                              </span>
-                            )}
-                          </div>
-                          {asset.x_coord !== null && asset.y_coord !== null ? (
-                            <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              On floor plan
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{asset.name}</div>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {assetGroup && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {assetGroup.name}
+                                  </Badge>
+                                )}
+                                {asset.room_number && (
+                                  <span className="text-xs text-slate-500">
+                                    Room {asset.room_number}
+                                  </span>
+                                )}
+                              </div>
+                              {asset.x_coord !== null && asset.y_coord !== null ? (
+                                <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  On floor plan
+                                </div>
+                              ) : (
+                                <div className="text-xs text-slate-400 mt-1">No location</div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-xs text-slate-400 mt-1">No location</div>
-                          )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const params = new URLSearchParams();
+                                if (asset.building_id) params.set('building_id', asset.building_id);
+                                if (asset.room_id) params.set('room_id', asset.room_id);
+                                if (asset.id) params.set('asset_id', asset.id);
+                                if (asset.asset_category) params.set('asset_category', asset.asset_category);
+                                params.set('asset_name', asset.name);
+                                navigate(createPageUrl('CreateTicket') + '?' + params.toString());
+                              }}
+                            >
+                              <Ticket className="w-3.5 h-3.5 text-slate-500 hover:text-blue-600" />
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     </motion.div>
@@ -1162,6 +1201,7 @@ export default function AkitaFetch() {
                       const params = new URLSearchParams();
                       if (selectedAsset.building_id) params.set('building_id', selectedAsset.building_id);
                       if (selectedAsset.room_id) params.set('room_id', selectedAsset.room_id);
+                      if (selectedAsset.id) params.set('asset_id', selectedAsset.id);
                       if (selectedAsset.asset_category) params.set('asset_category', selectedAsset.asset_category);
                       params.set('asset_name', selectedAsset.name);
                       navigate(createPageUrl('CreateTicket') + '?' + params.toString());
