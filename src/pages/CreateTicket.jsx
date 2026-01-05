@@ -133,12 +133,7 @@ export default function CreateTicket() {
       if (building) {
         setSelectedBuilding(building);
         setBuildingSearch(building.name);
-        currentTicketState = {
-          ...currentTicketState,
-          building: building.name,
-          building_id: buildingId
-        };
-        
+
         // Load rooms for this building
         const roomsData = await base44.entities.Room.filter({ building_id: buildingId });
         const sortedRooms = roomsData.sort((a, b) => {
@@ -156,13 +151,17 @@ export default function CreateTicket() {
               ? `${room.room_number} - ${room.room_name || 'Unnamed'}` 
               : (room.room_name || room.room_number || 'Room');
             setRoomSearch(roomDisplay);
+
+            // Update ticket state with building and room info
             currentTicketState = {
               ...currentTicketState,
+              building: building.name,
+              building_id: buildingId,
               room_id: roomId,
               room_number: room.room_number || room.room_name || '',
               floor_id: room.floor_id || null
             };
-            
+
             if (!assetNameParam) {
               contextType = 'room';
               contextDisplay = {
@@ -172,6 +171,12 @@ export default function CreateTicket() {
             }
           }
         } else if (!assetNameParam) {
+          // No room, just building
+          currentTicketState = {
+            ...currentTicketState,
+            building: building.name,
+            building_id: buildingId
+          };
           contextType = 'building';
           contextDisplay = {
             primary: building.name,
