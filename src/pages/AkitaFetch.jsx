@@ -144,8 +144,8 @@ export default function AkitaFetch() {
 
   // Calculate open tickets per room and asset
   // CRITICAL: Ticket scope rules for visuals
-  // - Asset pins ONLY change based on asset-scoped tickets for THAT asset
-  // - Room indicators ONLY change based on room-scoped tickets for THAT room
+  // - Asset pins ONLY change based on asset-scoped tickets for THAT asset_id
+  // - Room indicators ONLY change based on room-scoped tickets for THAT room_id
   // - NO cascading: asset tickets do NOT affect sibling assets or room visuals
   // - NO cascading: room tickets do NOT affect asset visuals
   // - Building-level or unscoped tickets do NOT affect visuals
@@ -160,17 +160,17 @@ export default function AkitaFetch() {
     );
 
     openTickets.forEach(ticket => {
-      // Track by scope - NEVER mix scopes for visual indicators
+      // Track by scope using IDs - NEVER mix scopes for visual indicators
       if (ticket.scope === "ROOM" && ticket.room_id) {
         if (!roomTickets[ticket.room_id]) {
           roomTickets[ticket.room_id] = [];
         }
         roomTickets[ticket.room_id].push(ticket);
-      } else if (ticket.scope === "ASSET" && ticket.asset_name) {
-        if (!assetTickets[ticket.asset_name]) {
-          assetTickets[ticket.asset_name] = [];
+      } else if (ticket.scope === "ASSET" && ticket.asset_id) {
+        if (!assetTickets[ticket.asset_id]) {
+          assetTickets[ticket.asset_id] = [];
         }
-        assetTickets[ticket.asset_name].push(ticket);
+        assetTickets[ticket.asset_id].push(ticket);
       }
     });
 
@@ -996,7 +996,7 @@ export default function AkitaFetch() {
                                           <div className="text-xs text-slate-500 truncate">{asset.model}</div>
                                         )}
                                       </div>
-                                      {hasTickets && (
+                                      {openTicketsByRoom.assetTickets[asset.id]?.length > 0 && (
                                         <AlertCircle className="w-3.5 h-3.5 text-orange-500 flex-shrink-0 ml-2" />
                                       )}
                                     </div>
@@ -1271,7 +1271,7 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
 
         // Count assets with open tickets in this room
         const assetsWithTickets = roomAssets.filter(asset => 
-          openTicketsByRoom.assetTickets[asset.name]?.length > 0
+          openTicketsByRoom.assetTickets[asset.id]?.length > 0
         ).length;
 
         // Determine status
