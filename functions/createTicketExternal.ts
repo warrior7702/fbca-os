@@ -95,6 +95,20 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Determine scope based on provided IDs/data
+        const assetId = body.asset_id;
+        const roomId = body.room_id;
+        const buildingId = body.building_id;
+        
+        let scope = "BUILDING"; // default
+        if (assetId) {
+            scope = "ASSET";
+        } else if (roomId || roomNumber) {
+            scope = "ROOM";
+        } else if (buildingId || building) {
+            scope = "BUILDING";
+        }
+
         // Create ticket
         const ticket = await base44.asServiceRole.entities.Ticket.create({
             ticket_number: ticketNumber,
@@ -103,8 +117,14 @@ Deno.serve(async (req) => {
             category: category?.toLowerCase(),
             subject: subject || (description?.substring?.(0, 100)) || 'New Ticket',
             description: description || `Ticket created via Spark bot at ${new Date().toLocaleString()}`,
+            scope: scope,
             building: building || null,
+            building_id: buildingId || null,
+            room_id: roomId || null,
             room_number: roomNumber || null,
+            asset_id: assetId || null,
+            asset_name: body.asset_name || null,
+            floor_id: body.floor_id || null,
             status: 'open',
             priority: priority,
             source: source,
