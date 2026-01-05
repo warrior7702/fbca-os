@@ -1502,25 +1502,43 @@ function FloorplanCanvas({ imageUrl, assets, filteredAssets, selectedAsset, onAs
           {Object.entries(roomLabelPositions).map(([roomId, pos]) => (
             <div
               key={roomId}
-              className="absolute cursor-pointer pointer-events-auto"
+              className="absolute pointer-events-auto group"
               style={{
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
                 transform: 'translate(-50%, -50%)'
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (pos.room && onRoomClick) onRoomClick(pos.room);
-              }}
             >
-              <div className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow ${
-                pos.status === 'critical' 
-                  ? 'border-2 border-red-500 text-red-900' 
-                  : pos.status === 'warning'
-                  ? 'border-2 border-orange-500 text-orange-900' 
-                  : 'border border-slate-300 text-slate-900'
-              }`}>
-                {pos.label}
+              <div className="flex items-center gap-1">
+                <div 
+                  className={`bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-lg text-xs font-medium whitespace-nowrap hover:shadow-xl transition-shadow cursor-pointer ${
+                    pos.status === 'critical' 
+                      ? 'border-2 border-red-500 text-red-900' 
+                      : pos.status === 'warning'
+                      ? 'border-2 border-orange-500 text-orange-900' 
+                      : 'border border-slate-300 text-slate-900'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pos.room && onRoomClick) onRoomClick(pos.room);
+                  }}
+                >
+                  {pos.label}
+                </div>
+                <button
+                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 hover:bg-blue-700 text-white rounded-md p-1 shadow-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const params = new URLSearchParams();
+                    if (pos.room.building_id) params.set('building_id', pos.room.building_id);
+                    if (pos.room.id) params.set('room_id', pos.room.id);
+                    onAssetClick(null); // Clear selection
+                    window.location.href = createPageUrl('CreateTicket') + '?' + params.toString();
+                  }}
+                  title="Create ticket for this room"
+                >
+                  <Ticket className="w-3 h-3" />
+                </button>
               </div>
             </div>
           ))}
