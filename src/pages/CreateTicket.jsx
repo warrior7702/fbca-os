@@ -1079,7 +1079,6 @@ export default function CreateTicket() {
                       )}
                       </div>
                       </div>
-                      )}
 
                       <div className="space-y-2">
                       <label className="text-sm font-medium">
@@ -1088,10 +1087,10 @@ export default function CreateTicket() {
                       <Textarea
                       value={issueDescription}
                       onChange={(e) => {
-                      setIssueDescription(e.target.value);
+                        setIssueDescription(e.target.value);
                       }}
                       onBlur={(e) => {
-                      if (e.target.value) generateTicketTitle(e.target.value);
+                        if (e.target.value) generateTicketTitle(e.target.value);
                       }}
                       placeholder="Describe the issue you're experiencing..."
                       rows={4}
@@ -1106,7 +1105,7 @@ export default function CreateTicket() {
                       <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                       <label className="text-sm font-medium flex items-center gap-2">
-                      Category
+                        Category
                     {suggestedCategory && !ticket.category && (
                       <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
                         Suggested: {availableCategories.find(c => c.value === suggestedCategory)?.label}
