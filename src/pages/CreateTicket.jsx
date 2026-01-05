@@ -913,9 +913,8 @@ export default function CreateTicket() {
                         • {inferredContext.display.secondary}
                       </span>
                     )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                    </div>
             </div>
           </div>
         </motion.div>
@@ -961,11 +960,10 @@ export default function CreateTicket() {
                   </div>
                 )}
 
-                {/* Location fields - only show if no context */}
-                {!inferredContext.display && (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2 relative">
-                      <label className="text-sm font-medium">Building</label>
+                {/* Location fields - always show, pre-fill if context exists */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2 relative">
+                    <label className="text-sm font-medium">Building</label>
                     {loadingBuildings ? (
                       <div className="flex items-center justify-center h-10 border rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
