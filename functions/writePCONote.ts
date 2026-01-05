@@ -134,6 +134,32 @@ Deno.serve(async (req) => {
 
     const result = responseText ? JSON.parse(responseText) : { success: true };
 
+    // Save event code locally after sending to PCO
+    try {
+      const existing = await base44.asServiceRole.entities.LocalEventCode.filter({
+        event_id: String(event_id)
+      });
+      
+      if (existing.length === 0) {
+        await base44.asServiceRole.entities.LocalEventCode.create({
+          event_id: String(event_id),
+          event_name: '',
+          event_date: new Date().toISOString(),
+          access_time: access_time || '',
+          door_code: formattedCode
+        });
+        console.log('✅ LocalEventCode created for event:', event_id);
+      } else {
+        await base44.asServiceRole.entities.LocalEventCode.update(existing[0].id, {
+          door_code: formattedCode,
+          access_time: access_time || existing[0].access_time
+        });
+        console.log('✅ LocalEventCode updated for event:', event_id);
+      }
+    } catch (err) {
+      console.error('⚠️ Failed to save LocalEventCode:', err);
+    }
+
     return Response.json({
       ok: true,
       event_id,

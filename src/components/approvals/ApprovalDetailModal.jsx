@@ -71,11 +71,15 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
     setSendingToPCO(true);
     try {
       const badgeCode = `${selectedCardholder.pin}#`;
+      const accessTime = approval.event_starts_at && approval.event_ends_at
+        ? `${format(new Date(approval.event_starts_at), 'h:mm a')} - ${format(new Date(approval.event_ends_at), 'h:mm a')}`
+        : '';
       
       const response = await base44.functions.invoke('writePCONote', {
         request_id: approval.request_id,
         event_id: approval.event_id,
-        badge_code: badgeCode
+        badge_code: badgeCode,
+        access_time: accessTime
       });
 
       if (response.data?.ok) {
