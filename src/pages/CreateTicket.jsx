@@ -837,20 +837,23 @@ export default function CreateTicket() {
                 Create Service Request
               </h1>
               {inferredContext.display && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className="text-sm">
-                    {inferredContext.type === 'asset' && '🔧 Asset'}
-                    {inferredContext.type === 'room' && '🚪 Room'}
-                    {inferredContext.type === 'building' && '🏢 Building'}
-                  </Badge>
-                  <span className="text-slate-600 text-sm">
-                    {inferredContext.display.primary}
-                  </span>
-                  {inferredContext.display.secondary && (
-                    <span className="text-slate-400 text-xs">
-                      • {inferredContext.display.secondary}
+                <div className="mt-2">
+                  <p className="text-xs text-slate-500 mb-1">Ticket will apply to:</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-sm">
+                      {inferredContext.type === 'asset' && '🔧 Asset'}
+                      {inferredContext.type === 'room' && '🚪 Room'}
+                      {inferredContext.type === 'building' && '🏢 Building'}
+                    </Badge>
+                    <span className="text-slate-900 text-sm font-medium">
+                      {inferredContext.display.primary}
                     </span>
-                  )}
+                    {inferredContext.display.secondary && (
+                      <span className="text-slate-500 text-xs">
+                        • {inferredContext.display.secondary}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
