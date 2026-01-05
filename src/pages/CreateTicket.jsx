@@ -1076,36 +1076,36 @@ export default function CreateTicket() {
                         placeholder={selectedBuilding ? "Type room number..." : "Select building first"}
                         disabled={!selectedBuilding}
                       />
-                      )}
-                      </div>
-                      </div>
+                    )}
+                  </div>
+                </div>
 
-                      <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                      What's going on?<span className="text-red-500">*</span>
-                      </label>
-                      <Textarea
-                      value={issueDescription}
-                      onChange={(e) => {
-                        setIssueDescription(e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value) generateTicketTitle(e.target.value);
-                      }}
-                      placeholder="Describe the issue you're experiencing..."
-                      rows={4}
-                      required
-                      className="text-base"
-                      />
-                      <p className="text-xs text-slate-500">
-                      Be specific about what's not working or what you need help with
-                      </p>
-                      </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    What's going on?<span className="text-red-500">*</span>
+                  </label>
+                  <Textarea
+                    value={issueDescription}
+                    onChange={(e) => {
+                      setIssueDescription(e.target.value);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value) generateTicketTitle(e.target.value);
+                    }}
+                    placeholder="Describe the issue you're experiencing..."
+                    rows={4}
+                    required
+                    className="text-base"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Be specific about what's not working or what you need help with
+                  </p>
+                </div>
 
-                      <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                      <label className="text-sm font-medium flex items-center gap-2">
-                        Category
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      Category
                     {suggestedCategory && !ticket.category && (
                       <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
                         Suggested: {availableCategories.find(c => c.value === suggestedCategory)?.label}
