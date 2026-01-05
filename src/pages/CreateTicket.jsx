@@ -345,14 +345,31 @@ export default function CreateTicket() {
         return isOpen && isRecent;
       });
 
+      // Determine current scope
+      let currentScope = "BUILDING";
+      if (selectedAssetEntity || assetSearch) {
+        currentScope = "ASSET";
+      } else if (ticket.room_id || ticket.room_number) {
+        currentScope = "ROOM";
+      }
+
       const duplicates = recentOpenTickets.filter(t => {
-        // Asset match
-        if (selectedAssetEntity && t.asset_id === selectedAssetEntity.id) {
-          return true;
-        }
-        // Room match
-        if (ticket.room_id && t.room_id === ticket.room_id) {
-          return true;
+        // Match based on scope
+        if (currentScope === "ASSET" && t.scope === "ASSET") {
+          // Asset match using asset_id
+          if (selectedAssetEntity && t.asset_id === selectedAssetEntity.id) {
+            return true;
+          }
+        } else if (currentScope === "ROOM" && t.scope === "ROOM") {
+          // Room match using room_id
+          if (ticket.room_id && t.room_id === ticket.room_id) {
+            return true;
+          }
+        } else if (currentScope === "BUILDING" && t.scope === "BUILDING") {
+          // Building match using building_id (optional)
+          if (ticket.building_id && t.building_id === ticket.building_id) {
+            return true;
+          }
         }
         return false;
       });
