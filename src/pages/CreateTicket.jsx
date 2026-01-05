@@ -69,8 +69,9 @@ export default function CreateTicket() {
     room_number: "",
     subject: "",
     details: "",
-    priority: "medium",
+    priority: "",
     category: "",
+    asset_id: "",
     asset_name: "",
     attachments: []
   });
@@ -178,7 +179,8 @@ export default function CreateTicket() {
           setAssetSearch(assetNameParam);
           currentTicketState = {
             ...currentTicketState,
-            subject: `Asset Issue: ${assetNameParam}`
+            subject: `Asset Issue: ${assetNameParam}`,
+            asset_name: assetNameParam
           };
 
           const assetsInBuilding = await base44.entities.Asset.filter({ building_id: buildingId });
@@ -345,19 +347,25 @@ export default function CreateTicket() {
         return isOpen && isRecent;
       });
 
-      // Determine current scope
+      // Determine current scope based on IDs
       let currentScope = "BUILDING";
-      if (selectedAssetEntity || assetSearch) {
+      if (ticket.asset_id) {
         currentScope = "ASSET";
-      } else if (ticket.room_id || ticket.room_number) {
+      } else if (ticket.room_id) {
         currentScope = "ROOM";
+      } else if (ticket.building_id) {
+        currentScope = "BUILDING";
       }
 
       const duplicates = recentOpenTickets.filter(t => {
-        // Match based on scope
+        // Match based on scope using IDs
         if (currentScope === "ASSET" && t.scope === "ASSET") {
           // Asset match using asset_id
-          if (selectedAssetEntity && t.asset_id === selectedAssetEntity.id) {
+          if (ticket.asset_id && t.asset_id === ticket.asset_id) {
+            return true;
+          }
+          // Fallback for older tickets without asset_id
+          if (!ticket.asset_id && assetSearch && t.asset_name?.toLowerCase() === assetSearch.toLowerCase()) {
             return true;
           }
         } else if (currentScope === "ROOM" && t.scope === "ROOM") {
@@ -366,7 +374,7 @@ export default function CreateTicket() {
             return true;
           }
         } else if (currentScope === "BUILDING" && t.scope === "BUILDING") {
-          // Building match using building_id (optional)
+          // Building match using building_id
           if (ticket.building_id && t.building_id === ticket.building_id) {
             return true;
           }
@@ -572,31 +580,33 @@ export default function CreateTicket() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const submitTicket = async ({ bypassDuplicates = false } = {}) => {
     if (!issueDescription || issueDescription.trim().length < 10) {
       toast.error("Please describe the issue (at least 10 characters)");
       return;
     }
 
-    // Check for duplicates
-    const hasDuplicates = await checkDuplicateTickets();
-    if (hasDuplicates) {
-      return; // Show warning, let user decide
+    // Check for duplicates unless bypassed
+    if (!bypassDuplicates) {
+      const hasDuplicates = await checkDuplicateTickets();
+      if (hasDuplicates) {
+        return; // Show warning, let user decide
+      }
     }
 
-    // Auto-infer scope based on filled fields
+    // Auto-infer scope based on IDs only
     let inferredScope = "BUILDING";
-    if (selectedAssetEntity || assetSearch) {
+    if (ticket.asset_id) {
       inferredScope = "ASSET";
-    } else if (ticket.room_id || ticket.room_number) {
+    } else if (ticket.room_id) {
       inferredScope = "ROOM";
+    } else if (ticket.building_id) {
+      inferredScope = "BUILDING";
     }
 
-    // Auto-suggest category if not set
+    // Auto-suggest category/priority if not set
     const finalCategory = ticket.category || suggestedCategory || "maintenance";
-    const finalPriority = ticket.priority || suggestedPriority;
+    const finalPriority = ticket.priority || suggestedPriority || "medium";
     
     // Generate title if not already done
     if (!ticket.subject) {
@@ -746,6 +756,11 @@ export default function CreateTicket() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await submitTicket({ bypassDuplicates: false });
   };
 
   const handleReset = () => {
@@ -1259,7 +1274,7 @@ export default function CreateTicket() {
                   <Button
                     onClick={async () => {
                       setShowDuplicateWarning(false);
-                      await continueSubmission();
+                      await submitTicket({ bypassDuplicates: true });
                     }}
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                   >
@@ -1274,8 +1289,3 @@ export default function CreateTicket() {
     </div>
   );
 }
-
-const continueSubmission = async () => {
-  // This is called from duplicate warning dialog
-  toast.info('Feature coming soon - continuing with submission');
-};
