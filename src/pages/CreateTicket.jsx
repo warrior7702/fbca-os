@@ -115,6 +115,7 @@ export default function CreateTicket() {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
     const roomId = params.get('room_id');
+    const assetId = params.get('asset_id');
     const assetNameParam = params.get('asset_name');
     const assetCategoryParam = params.get('asset_category');
     
@@ -175,21 +176,39 @@ export default function CreateTicket() {
         }
 
         // Handle Asset context - fetch full asset entity
-        if (assetNameParam) {
-          setAssetSearch(assetNameParam);
+        if (assetId || assetNameParam) {
+          if (assetNameParam) setAssetSearch(assetNameParam);
+
           currentTicketState = {
             ...currentTicketState,
-            subject: `Asset Issue: ${assetNameParam}`,
-            asset_name: assetNameParam
+            subject: `Asset Issue: ${assetNameParam || 'Asset'}`,
+            asset_name: assetNameParam || ''
           };
 
-          const assetsInBuilding = await base44.entities.Asset.filter({ building_id: buildingId });
-          const asset = assetsInBuilding.find(a => a.name === assetNameParam);
+          // Try to load asset by ID first, then by name
+          let asset = null;
+          if (assetId) {
+            try {
+              const allAssets = await base44.entities.Asset.list();
+              asset = allAssets.find(a => a.id === assetId);
+            } catch (err) {
+              console.error('Error loading asset by ID:', err);
+            }
+          }
+
+          // Fallback to name search if no ID or asset not found
+          if (!asset && assetNameParam && buildingId) {
+            const assetsInBuilding = await base44.entities.Asset.filter({ building_id: buildingId });
+            asset = assetsInBuilding.find(a => a.name === assetNameParam);
+          }
+
           if (asset) {
             setSelectedAssetEntity(asset);
+            setAssetSearch(asset.name);
             currentTicketState = {
               ...currentTicketState,
               asset_id: asset.id,
+              asset_name: asset.name,
               room_id: asset.room_id || currentTicketState.room_id,
               floor_id: asset.floor_id || currentTicketState.floor_id,
               building_id: asset.building_id || currentTicketState.building_id
