@@ -188,6 +188,7 @@ export default function CreateTicket() {
         // Handle Asset context - fetch full asset entity
         if (assetId || assetNameParam) {
           if (assetNameParam) setAssetSearch(assetNameParam);
+          if (assetId) setUrlAssetId(assetId);
 
           currentTicketState = {
             ...currentTicketState,
@@ -223,7 +224,7 @@ export default function CreateTicket() {
               floor_id: asset.floor_id || currentTicketState.floor_id,
               building_id: asset.building_id || currentTicketState.building_id
             };
-            
+
             const assetRoom = sortedRooms.find(r => r.id === asset.room_id);
             contextType = 'asset';
             contextDisplay = {
