@@ -291,12 +291,27 @@ export default function AkitaFetch() {
       roomLastActivityAt = new Date(Math.max(...dates));
     }
 
+    // Compute roomAssets
+    const roomAssets = assets.filter(a => a.room_id === selectedRoom.id);
+
+    // Compute openAssetTicketsInRoom
+    const openAssetTicketsInRoom = tickets.filter(t => {
+      if (!openStatuses.includes(t.status)) return false;
+      if (!t.asset_id) return false;
+      return roomAssets.some(a => a.id === t.asset_id);
+    });
+
+    // Compute assetsWithOpenTicketsCount
+    const uniqueAssetIds = new Set(openAssetTicketsInRoom.map(t => t.asset_id));
+    const assetsWithOpenTicketsCount = uniqueAssetIds.size;
+
     return {
       openRoomTickets: sortedOpenTickets,
       roomOpenTicketCount: sortedOpenTickets.length,
-      roomLastActivityAt
+      roomLastActivityAt,
+      assetsWithOpenTicketsCount
     };
-  }, [selectedRoom, tickets]);
+  }, [selectedRoom, tickets, assets]);
 
   // Filtered rooms and groups for autocomplete
   // Include Exterior rooms from same building in addition to floor rooms
@@ -1008,6 +1023,19 @@ export default function AkitaFetch() {
                     <div className="text-xs text-slate-600">Open Tickets</div>
                   </div>
                 </div>
+
+                {/* Asset Tickets Summary */}
+                {roomTicketMetrics?.assetsWithOpenTicketsCount > 0 && (
+                  <div className="text-xs text-slate-600 flex items-center justify-between">
+                    <span>Assets with open tickets: {roomTicketMetrics.assetsWithOpenTicketsCount}</span>
+                    <button
+                      onClick={() => navigate(createPageUrl('SupportTickets') + `?room_id=${selectedRoom.id}&scope=ASSET`)}
+                      className="text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      View asset tickets →
+                    </button>
+                  </div>
+                )}
 
                 {/* Open Tickets */}
                 <div>
