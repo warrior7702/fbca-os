@@ -265,6 +265,38 @@ export default function AkitaFetch() {
     return openTicketsByRoom.assetTickets[asset.id]?.length > 0;
   };
 
+  // Room-level ticket aggregation for selected room
+  const roomTicketMetrics = useMemo(() => {
+    if (!selectedRoom) return null;
+
+    const openStatuses = ['open', 'awaiting_information', 'awaiting_parts'];
+    const allRoomTickets = tickets.filter(t => t.room_id === selectedRoom.id);
+    const openRoomTickets = allRoomTickets.filter(t => openStatuses.includes(t.status));
+
+    // Priority order for sorting
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+
+    // Sort by priority (critical first) then by newest created_date
+    const sortedOpenTickets = [...openRoomTickets].sort((a, b) => {
+      const priorityDiff = (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.created_date) - new Date(a.created_date);
+    });
+
+    // Compute last activity
+    let roomLastActivityAt = null;
+    if (allRoomTickets.length > 0) {
+      const dates = allRoomTickets.map(t => new Date(t.last_activity_at || t.created_date));
+      roomLastActivityAt = new Date(Math.max(...dates));
+    }
+
+    return {
+      openRoomTickets: sortedOpenTickets,
+      roomOpenTicketCount: sortedOpenTickets.length,
+      roomLastActivityAt
+    };
+  }, [selectedRoom, tickets]);
+
   // Filtered rooms and groups for autocomplete
   // Include Exterior rooms from same building in addition to floor rooms
   const filteredRooms = useMemo(() => {
