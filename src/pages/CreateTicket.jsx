@@ -391,11 +391,11 @@ export default function CreateTicket() {
         // Match based on scope using IDs
         if (currentScope === "ASSET" && t.scope === "ASSET") {
           // Prefer asset_id matching when available
-          if (ticket.asset_id && t.asset_id === ticket.asset_id) {
+          if (urlAssetId && t.asset_id === urlAssetId) {
             return true;
           }
           // Fallback to asset_name matching if asset_id is missing
-          if (!ticket.asset_id && assetSearch && t.asset_name?.toLowerCase() === assetSearch.toLowerCase()) {
+          if (!urlAssetId && assetSearch && t.asset_name?.toLowerCase() === assetSearch.toLowerCase()) {
             return true;
           }
         } else if (currentScope === "ROOM" && t.scope === "ROOM") {
