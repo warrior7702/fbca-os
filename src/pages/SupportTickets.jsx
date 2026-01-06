@@ -59,6 +59,28 @@ export default function SupportTickets() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [claiming, setClaiming] = useState(null);
+  const [roomIdFilter, setRoomIdFilter] = useState(null);
+  const [scopeFilter, setScopeFilter] = useState(null);
+  const [statusFilterFromUrl, setStatusFilterFromUrl] = useState(null);
+
+  // Apply URL params on initial load
+  useEffect(() => {
+    const roomId = searchParams.get('room_id');
+    const scope = searchParams.get('scope');
+    const status = searchParams.get('status');
+    
+    if (roomId) setRoomIdFilter(roomId);
+    if (scope) setScopeFilter(scope);
+    if (status) {
+      setStatusFilterFromUrl(status);
+      // Set active tab based on status
+      if (status === 'open') {
+        setActiveTab('active');
+      } else if (status === 'resolved') {
+        setActiveTab('resolved');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (ticketId) {
@@ -272,7 +294,12 @@ export default function SupportTickets() {
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
     const matchesCategory = categoryFilter === "all" || ticket.category === categoryFilter;
     
-    return matchesSearch && matchesTab && matchesPriority && matchesCategory;
+    // URL param filters
+    const matchesRoomId = !roomIdFilter || ticket.room_id === roomIdFilter;
+    const matchesScope = !scopeFilter || ticket.scope === scopeFilter;
+    const matchesStatus = !statusFilterFromUrl || ticket.status === statusFilterFromUrl;
+    
+    return matchesSearch && matchesTab && matchesPriority && matchesCategory && matchesRoomId && matchesScope && matchesStatus;
   }).sort((a, b) => {
     // First sort by status
     const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
@@ -293,12 +320,15 @@ export default function SupportTickets() {
     resolved: ticketsToFilter.filter(t => t.status === 'resolved').length
   };
 
-  const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery;
+  const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery || roomIdFilter || scopeFilter || statusFilterFromUrl;
 
   const clearFilters = () => {
     setSearchQuery("");
     setPriorityFilter("all");
     setCategoryFilter("all");
+    setRoomIdFilter(null);
+    setScopeFilter(null);
+    setStatusFilterFromUrl(null);
   };
 
   const handleClaimTicket = async (e, ticketId) => {
