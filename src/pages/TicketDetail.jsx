@@ -89,6 +89,8 @@ export default function TicketDetail() {
   const [dueDateValue, setDueDateValue] = useState("");
   const [relatedTickets, setRelatedTickets] = useState([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
+  const [relatedOpenTickets, setRelatedOpenTickets] = useState([]);
+  const [loadingRelatedOpen, setLoadingRelatedOpen] = useState(false);
 
   const commentsEndRef = useRef(null);
 
@@ -148,6 +150,47 @@ export default function TicketDetail() {
           } finally {
             setLoadingRelated(false);
           }
+        }
+
+        // Load related open tickets based on scope
+        setLoadingRelatedOpen(true);
+        try {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          const allTickets = await base44.entities.Ticket.list();
+          const openStatuses = ['open', 'awaiting_information', 'awaiting_parts'];
+
+          let relatedOpen = allTickets.filter(t => {
+            // Exclude current ticket
+            if (t.id === ticketId) return false;
+
+            // Check status
+            if (!openStatuses.includes(t.status)) return false;
+
+            // Check date
+            if (new Date(t.created_date) < thirtyDaysAgo) return false;
+
+            // Check scope match
+            if (tickets[0].scope === 'ASSET' && tickets[0].asset_id) {
+              return t.asset_id === tickets[0].asset_id;
+            } else if (tickets[0].scope === 'ROOM' && tickets[0].room_id) {
+              return t.room_id === tickets[0].room_id;
+            } else if (tickets[0].scope === 'BUILDING' && tickets[0].building_id) {
+              return t.building_id === tickets[0].building_id;
+            }
+
+            return false;
+          });
+
+          // Sort by created date descending
+          relatedOpen.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+
+          setRelatedOpenTickets(relatedOpen);
+        } catch (error) {
+          console.error('Error loading related open tickets:', error);
+        } finally {
+          setLoadingRelatedOpen(false);
         }
         
         // Calculate time to first response if not set
@@ -1450,6 +1493,57 @@ Provide your analysis in this exact JSON format:
                 </div>
               </CardContent>
             </Card>
+
+            {/* Related Open Tickets */}
+            {relatedOpenTickets.length > 0 && (
+              <Card className="border-2 border-orange-200 bg-orange-50/50">
+                <CardHeader>
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                    Related Open Tickets
+                    <Badge variant="outline" className="ml-auto bg-orange-100 text-orange-700 border-orange-300">
+                      {relatedOpenTickets.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingRelatedOpen ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {relatedOpenTickets.map(rel => (
+                        <div
+                          key={rel.id}
+                          onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${rel.id}`)}
+                          className="p-3 border border-orange-200 rounded-lg hover:bg-white cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="text-xs font-mono text-slate-600">{rel.ticket_number}</p>
+                                <Badge className={`text-xs ${getStatusColor(rel.status)}`}>
+                                  {rel.status.replace('_', ' ')}
+                                </Badge>
+                                <Badge className={`text-xs ${getPriorityColor(rel.priority)}`}>
+                                  {rel.priority}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-slate-900 font-medium truncate">{rel.subject}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Created {format(new Date(rel.created_date), 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                            <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Scope & Intelligence */}
             <Card>
