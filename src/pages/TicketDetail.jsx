@@ -690,15 +690,42 @@ Provide your analysis in this exact JSON format:
           </div>
           
           {canManage && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
-            >
-              <Trash2 className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Delete</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await base44.functions.invoke('createNotification', {
+                      user_email: ticket.requester_email,
+                      type: 'ticket_created',
+                      title: `Ticket ${ticket.ticket_number} Created`,
+                      message: ticket.subject,
+                      related_ticket_id: ticket.id,
+                      related_ticket_number: ticket.ticket_number,
+                      action_url: createPageUrl('SupportTickets') + `?id=${ticket.id}`,
+                      send_email: true
+                    });
+                    toast.success('Email resent to requester');
+                  } catch (error) {
+                    toast.error('Failed to resend email');
+                  }
+                }}
+                className="flex-shrink-0"
+              >
+                <Mail className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Resend Email</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
+              >
+                <Trash2 className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            </div>
           )}
         </div>
 
