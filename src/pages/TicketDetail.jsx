@@ -1339,9 +1339,9 @@ Provide your analysis in this exact JSON format:
                   <p className="text-sm font-medium text-slate-600">Ticket Scope</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline">
-                      {ticket.scope === "ASSET" && "🔧 Asset"}
-                      {ticket.scope === "ROOM" && "🚪 Room"}
-                      {ticket.scope === "BUILDING" && "🏢 Building"}
+                      {(ticket.asset_id || ticket.asset_name) && "🔧 Asset"}
+                      {!(ticket.asset_id || ticket.asset_name) && ticket.room_id && "🚪 Room"}
+                      {!(ticket.asset_id || ticket.asset_name) && !ticket.room_id && ticket.building_id && "🏢 Building"}
                     </Badge>
                     {ticket.recurring_issue && (
                       <Badge className="bg-amber-100 text-amber-800 border-amber-300">
@@ -1351,17 +1351,27 @@ Provide your analysis in this exact JSON format:
                   </div>
                 </div>
                 
-                {ticket.scope === "ASSET" && ticket.asset_name && (
+                {(ticket.asset_id || ticket.asset_name) && (
                   <div>
                     <p className="text-sm font-medium text-slate-600">Affected Asset</p>
                     <p className="text-sm text-slate-900">{ticket.asset_name}</p>
+                    {ticket.asset_id && (
+                      <p className="text-xs text-slate-500 mt-0.5">ID: {ticket.asset_id}</p>
+                    )}
                   </div>
                 )}
                 
-                {ticket.scope === "ROOM" && ticket.room_number && (
+                {!(ticket.asset_id || ticket.asset_name) && ticket.room_id && ticket.room_number && (
                   <div>
                     <p className="text-sm font-medium text-slate-600">Affected Room</p>
                     <p className="text-sm text-slate-900">{ticket.room_number}</p>
+                  </div>
+                )}
+                
+                {!(ticket.asset_id || ticket.asset_name) && !ticket.room_id && ticket.building && (
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Affected Building</p>
+                    <p className="text-sm text-slate-900">{ticket.building}</p>
                   </div>
                 )}
 
