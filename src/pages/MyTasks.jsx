@@ -471,11 +471,11 @@ export default function MyTasks() {
 
   const getTicketPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-500';
+      case 'critical': return 'bg-red-600';
       case 'high': return 'bg-orange-500';
       case 'medium': return 'bg-yellow-500';
       case 'low': return 'bg-blue-500';
-      default: return 'bg-slate-500';
+      default: return 'bg-slate-400';
     }
   };
 
@@ -673,9 +673,9 @@ export default function MyTasks() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-2 p-2 sm:p-3 bg-white rounded-lg border border-slate-200 hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => navigate(createPageUrl('SupportTickets'))}
+                  onClick={() => navigate(`/ticketdetail?id=${ticket.id}`)}
                 >
-                  <div className={`w-1 h-full rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
+                  <div className={`w-1 self-stretch rounded-full ${getTicketPriorityColor(ticket.priority)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-semibold text-xs sm:text-sm text-slate-900 truncate">
