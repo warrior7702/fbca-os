@@ -28,7 +28,9 @@ import {
   Zap,
   Workflow,
   CalendarDays,
-  Trash2
+  Trash2,
+  MapPin,
+  Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -732,6 +734,83 @@ Provide your analysis in this exact JSON format:
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Content - 2/3 width */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Context Section */}
+            <Card className="border-2 border-blue-200 bg-blue-50/50">
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  Context
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-sm font-semibold">
+                    {ticket.scope === 'ASSET' && '🔧 ASSET'}
+                    {ticket.scope === 'ROOM' && '🚪 ROOM'}
+                    {ticket.scope === 'BUILDING' && '🏢 BUILDING'}
+                  </Badge>
+                  {ticket.building && (
+                    <span className="text-sm text-slate-900 font-medium">
+                      {ticket.building}
+                    </span>
+                  )}
+                  {ticket.room_number && (
+                    <>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-sm text-slate-700">
+                        {ticket.room_number}
+                      </span>
+                    </>
+                  )}
+                  {ticket.scope === 'ASSET' && ticket.asset_name && (
+                    <>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-sm text-slate-900 font-medium">
+                        {ticket.asset_name}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (ticket.building_id) params.set('building_id', ticket.building_id);
+                      if (ticket.floor_id) params.set('floor_id', ticket.floor_id);
+                      if (ticket.room_id) params.set('room_id', ticket.room_id);
+                      if (ticket.asset_id) params.set('asset_id', ticket.asset_id);
+                      navigate(createPageUrl('AkitaFetch') + (params.toString() ? `?${params.toString()}` : ''));
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-initial"
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Open in Map
+                  </Button>
+                  {ticket.scope === 'ASSET' && ticket.asset_id && (
+                    <Button
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        if (ticket.building_id) params.set('building_id', ticket.building_id);
+                        if (ticket.floor_id) params.set('floor_id', ticket.floor_id);
+                        if (ticket.room_id) params.set('room_id', ticket.room_id);
+                        if (ticket.asset_id) params.set('asset_id', ticket.asset_id);
+                        navigate(createPageUrl('AkitaFetch') + (params.toString() ? `?${params.toString()}` : ''));
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 sm:flex-initial"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Asset
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Ticket Details */}
             <Card>
               <CardHeader>
