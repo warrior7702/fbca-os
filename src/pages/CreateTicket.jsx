@@ -826,7 +826,7 @@ export default function CreateTicket() {
                 message: ticketData.subject,
                 related_ticket_id: createdTicket.id,
                 related_ticket_number: newTicketNumber,
-                action_url: `/support-tickets?id=${createdTicket.id}`,
+                action_url: createPageUrl('SupportTickets') + `?id=${createdTicket.id}`,
                 send_email: true
               });
             }
