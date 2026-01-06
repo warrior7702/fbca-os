@@ -681,6 +681,11 @@ export default function MyTasks() {
                       <Badge variant="outline" className="text-[10px] sm:text-xs">
                         {ticket.status}
                       </Badge>
+                      {ticket.scope && (
+                        <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                          {ticket.scope}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-[10px] sm:text-xs text-slate-600 line-clamp-2 mb-1 sm:mb-2">
                       {ticket.description}
