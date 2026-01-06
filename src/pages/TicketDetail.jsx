@@ -134,6 +134,20 @@ export default function TicketDetail() {
           setDueDateValue("");
         }
         
+        // Load related tickets if any
+        if (tickets[0].related_tickets && tickets[0].related_tickets.length > 0) {
+          setLoadingRelated(true);
+          try {
+            const allTickets = await base44.entities.Ticket.list();
+            const related = allTickets.filter(t => tickets[0].related_tickets.includes(t.id));
+            setRelatedTickets(related);
+          } catch (error) {
+            console.error('Error loading related tickets:', error);
+          } finally {
+            setLoadingRelated(false);
+          }
+        }
+        
         // Calculate time to first response if not set
         if (adminStatus && !tickets[0].time_to_first_response && tickets[0].comments?.length > 0) {
           const firstStaffComment = tickets[0].comments.find(c => c.author_email !== tickets[0].requester_email);
