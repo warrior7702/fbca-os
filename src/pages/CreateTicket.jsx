@@ -58,6 +58,7 @@ export default function CreateTicket() {
     type: null,
     display: null
   });
+  const [urlAssetId, setUrlAssetId] = useState(null);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
