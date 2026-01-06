@@ -295,6 +295,26 @@ export default function MyTasks() {
           assigned_to: user.email,
           status: { $in: ['open', 'awaiting_information', 'awaiting_parts'] }
         }, '-updated_date');
+        
+        // Sort tickets by priority, due date, then last activity
+        const priorityRank = { 'critical': 1, 'high': 2, 'medium': 3, 'low': 4 };
+        allTickets.sort((a, b) => {
+          // First by priority
+          const aPriority = priorityRank[a.priority] || 5;
+          const bPriority = priorityRank[b.priority] || 5;
+          if (aPriority !== bPriority) return aPriority - bPriority;
+          
+          // Then by due date (earliest first, no due date last)
+          const aDue = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+          const bDue = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+          if (aDue !== bDue) return aDue - bDue;
+          
+          // Then by last activity (most recent first)
+          const aActivity = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0;
+          const bActivity = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0;
+          return bActivity - aActivity;
+        });
+        
         setSupportTickets(allTickets);
         
         // Load user's departments and department tickets
