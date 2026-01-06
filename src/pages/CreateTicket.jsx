@@ -119,7 +119,7 @@ export default function CreateTicket() {
     const assetId = params.get('asset_id');
     const assetNameParam = params.get('asset_name');
     const assetCategoryParam = params.get('asset_category');
-    
+
     let contextDisplay = null;
     let contextType = null;
     let currentTicketState = {};
@@ -128,15 +128,51 @@ export default function CreateTicket() {
     const loadedBuildings = await base44.entities.Building.list();
     setBuildings(loadedBuildings);
 
+    // If asset_id exists, immediately set it and mark as asset context
+    if (assetId) {
+      setUrlAssetId(assetId);
+      currentTicketState.asset_id = assetId;
+      contextType = 'asset';
+    }
+
+    // If asset_id exists but no building_id, fetch asset first to derive building/room/floor
+    let derivedBuildingId = buildingId;
+    let derivedRoomId = roomId;
+    let asset = null;
+
+    if (assetId && !buildingId) {
+      try {
+        const allAssets = await base44.entities.Asset.list();
+        asset = allAssets.find(a => a.id === assetId);
+        if (asset) {
+          derivedBuildingId = asset.building_id;
+          derivedRoomId = asset.room_id || derivedRoomId;
+          setSelectedAssetEntity(asset);
+          setAssetSearch(asset.name);
+          currentTicketState = {
+            ...currentTicketState,
+            asset_id: asset.id,
+            asset_name: asset.name,
+            building_id: asset.building_id,
+            room_id: asset.room_id,
+            floor_id: asset.floor_id,
+            subject: `Asset Issue: ${asset.name}`
+          };
+        }
+      } catch (err) {
+        console.error('Error loading asset by ID:', err);
+      }
+    }
+
     // Handle Building context
-    if (buildingId) {
-      const building = loadedBuildings.find(b => b.id === buildingId);
+    if (derivedBuildingId) {
+      const building = loadedBuildings.find(b => b.id === derivedBuildingId);
       if (building) {
         setSelectedBuilding(building);
         setBuildingSearch(building.name);
 
         // Load rooms for this building
-        const roomsData = await base44.entities.Room.filter({ building_id: buildingId });
+        const roomsData = await base44.entities.Room.filter({ building_id: derivedBuildingId });
         const sortedRooms = roomsData.sort((a, b) => {
           const aNum = a.room_number || a.room_name || '';
           const bNum = b.room_number || b.room_name || '';
@@ -144,26 +180,30 @@ export default function CreateTicket() {
         });
         setRooms(sortedRooms);
 
+        // Update building info in ticket state
+        currentTicketState = {
+          ...currentTicketState,
+          building: building.name,
+          building_id: derivedBuildingId
+        };
+
         // Handle Room context
-        if (roomId) {
-          const room = roomsData.find(r => r.id === roomId);
+        if (derivedRoomId) {
+          const room = roomsData.find(r => r.id === derivedRoomId);
           if (room) {
             const roomDisplay = room.room_number 
               ? `${room.room_number} - ${room.room_name || 'Unnamed'}` 
               : (room.room_name || room.room_number || 'Room');
             setRoomSearch(roomDisplay);
 
-            // Update ticket state with building and room info
             currentTicketState = {
               ...currentTicketState,
-              building: building.name,
-              building_id: buildingId,
-              room_id: roomId,
+              room_id: derivedRoomId,
               room_number: room.room_number || room.room_name || '',
-              floor_id: room.floor_id || null
+              floor_id: room.floor_id || currentTicketState.floor_id
             };
 
-            if (!assetNameParam) {
+            if (!assetId && !assetNameParam) {
               contextType = 'room';
               contextDisplay = {
                 primary: room.room_name || room.room_number || 'Room',
@@ -171,13 +211,8 @@ export default function CreateTicket() {
               };
             }
           }
-        } else if (!assetNameParam) {
+        } else if (!assetId && !assetNameParam) {
           // No room, just building
-          currentTicketState = {
-            ...currentTicketState,
-            building: building.name,
-            building_id: buildingId
-          };
           contextType = 'building';
           contextDisplay = {
             primary: building.name,
@@ -185,19 +220,19 @@ export default function CreateTicket() {
           };
         }
 
-        // Handle Asset context - fetch full asset entity
-        if (assetId || assetNameParam) {
+        // Handle Asset context - fetch full asset entity if not already loaded
+        if ((assetId || assetNameParam) && !asset) {
           if (assetNameParam) setAssetSearch(assetNameParam);
-          if (assetId) setUrlAssetId(assetId);
 
-          currentTicketState = {
-            ...currentTicketState,
-            subject: `Asset Issue: ${assetNameParam || 'Asset'}`,
-            asset_name: assetNameParam || ''
-          };
+          if (!currentTicketState.asset_name) {
+            currentTicketState = {
+              ...currentTicketState,
+              subject: `Asset Issue: ${assetNameParam || 'Asset'}`,
+              asset_name: assetNameParam || ''
+            };
+          }
 
           // Try to load asset by ID first, then by name
-          let asset = null;
           if (assetId) {
             try {
               const allAssets = await base44.entities.Asset.list();
@@ -208,8 +243,8 @@ export default function CreateTicket() {
           }
 
           // Fallback to name search if no ID or asset not found
-          if (!asset && assetNameParam && buildingId) {
-            const assetsInBuilding = await base44.entities.Asset.filter({ building_id: buildingId });
+          if (!asset && assetNameParam && derivedBuildingId) {
+            const assetsInBuilding = await base44.entities.Asset.filter({ building_id: derivedBuildingId });
             asset = assetsInBuilding.find(a => a.name === assetNameParam);
           }
 
@@ -224,18 +259,38 @@ export default function CreateTicket() {
               floor_id: asset.floor_id || currentTicketState.floor_id,
               building_id: asset.building_id || currentTicketState.building_id
             };
-
-            const assetRoom = sortedRooms.find(r => r.id === asset.room_id);
-            contextType = 'asset';
-            contextDisplay = {
-              primary: assetNameParam,
-              secondary: assetRoom ? `${assetRoom.room_number || assetRoom.room_name} • ${building.name}` : building.name || 'Asset'
-            };
           }
+        }
+
+        // Set asset context display
+        if (assetId || assetNameParam) {
+          const assetRoom = sortedRooms.find(r => r.id === currentTicketState.room_id);
+          contextType = 'asset';
+          contextDisplay = {
+            primary: asset?.name || assetNameParam || 'Asset',
+            secondary: assetRoom ? `${assetRoom.room_number || assetRoom.room_name} • ${building.name}` : building.name
+          };
         }
       }
     }
-    
+
+    // Handle asset context without building (edge case)
+    if ((assetId || assetNameParam) && !derivedBuildingId) {
+      if (assetNameParam) setAssetSearch(assetNameParam);
+      contextType = 'asset';
+      contextDisplay = {
+        primary: asset?.name || assetNameParam || 'Asset',
+        secondary: 'Asset'
+      };
+      if (!currentTicketState.asset_name) {
+        currentTicketState = {
+          ...currentTicketState,
+          asset_name: assetNameParam || asset?.name || '',
+          subject: `Asset Issue: ${assetNameParam || asset?.name || 'Asset'}`
+        };
+      }
+    }
+
     if (assetCategoryParam) {
       const mappedCategory = mapAssetCategoryToTicketCategory(assetCategoryParam);
       if (mappedCategory) {
