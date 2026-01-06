@@ -1004,31 +1004,49 @@ export default function AkitaFetch() {
                 </div>
 
                 {/* Open Tickets */}
-                {openTicketsByRoom.roomTickets[selectedRoom.id]?.length > 0 && (
-                  <div>
-                    <h5 className="font-semibold text-xs text-slate-700 mb-2">Open Tickets (Room)</h5>
-                    <div className="space-y-2">
-                      {openTicketsByRoom.roomTickets[selectedRoom.id].map(ticket => {
-                        const createdDate = new Date(ticket.created_date);
-                        const daysOld = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-                        return (
-                          <div key={ticket.id} className="bg-white rounded-lg border p-2">
-                            <div className="font-medium text-xs text-slate-900 mb-1">{ticket.subject}</div>
-                            <div className="flex items-center gap-2 flex-wrap text-xs">
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {ticket.category}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {ticket.status.replace(/_/g, ' ')}
-                              </Badge>
-                              <span className="text-slate-500">{daysOld}d old</span>
+                <div>
+                  <h5 className="font-semibold text-xs text-slate-700 mb-2">Open Tickets (Room)</h5>
+                  {roomTicketMetrics?.roomOpenTicketCount === 0 ? (
+                    <p className="text-xs text-slate-500">No open tickets for this room</p>
+                  ) : (
+                    <>
+                      <div className="space-y-2 mb-2">
+                        {roomTicketMetrics?.openRoomTickets.slice(0, 3).map(ticket => {
+                          const createdDate = new Date(ticket.created_date);
+                          const formattedDate = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          return (
+                            <div 
+                              key={ticket.id} 
+                              className="bg-white rounded-lg border p-2 cursor-pointer hover:border-blue-300 transition-colors"
+                              onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${ticket.id}`)}
+                            >
+                              <div className="font-medium text-xs text-slate-900 mb-1 truncate">{ticket.subject}</div>
+                              <div className="flex items-center gap-2 flex-wrap text-xs">
+                                <Badge variant="outline" className={`text-xs capitalize ${
+                                  ticket.priority === 'critical' ? 'border-red-500 text-red-700' :
+                                  ticket.priority === 'high' ? 'border-orange-500 text-orange-700' :
+                                  'border-slate-300'
+                                }`}>
+                                  {ticket.priority}
+                                </Badge>
+                                <span className="text-slate-600">{ticket.status.replace(/_/g, ' ')}</span>
+                                <span className="text-slate-400 ml-auto">{formattedDate}</span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                          );
+                        })}
+                      </div>
+                      {roomTicketMetrics?.roomOpenTicketCount > 3 && (
+                        <button
+                          onClick={() => navigate(createPageUrl('SupportTickets') + `?room_id=${selectedRoom.id}&status=open`)}
+                          className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          View all {roomTicketMetrics.roomOpenTicketCount} room tickets →
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
 
                 {/* Assets Grouped by Category */}
                 <div>
