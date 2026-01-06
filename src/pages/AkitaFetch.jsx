@@ -927,6 +927,11 @@ export default function AkitaFetch() {
                 <div className="text-xs text-slate-500 space-y-0.5">
                   <div>{selectedRoom.building_name || 'N/A'}</div>
                   <div>{selectedRoom.floor_name || 'N/A'}</div>
+                  <div className="mt-1">
+                    Last activity: {roomTicketMetrics?.roomLastActivityAt 
+                      ? formatDistanceToNow(roomTicketMetrics.roomLastActivityAt, { addSuffix: true })
+                      : 'No activity yet'}
+                  </div>
                 </div>
               </div>
 
