@@ -91,6 +91,8 @@ export default function TicketDetail() {
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [relatedOpenTickets, setRelatedOpenTickets] = useState([]);
   const [loadingRelatedOpen, setLoadingRelatedOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
 
   const commentsEndRef = useRef(null);
 
@@ -494,6 +496,52 @@ export default function TicketDetail() {
     }
   };
 
+  const handleClaimTicket = async () => {
+    setClaiming(true);
+    try {
+      const response = await base44.functions.invoke('claimTicket', {
+        ticket_id: ticketId
+      });
+      
+      if (response.data.success) {
+        setTicket({
+          ...ticket,
+          assigned_to: response.data.assigned_to,
+          assigned_to_name: response.data.assigned_to_name
+        });
+        toast.success('Ticket claimed');
+      }
+    } catch (error) {
+      console.error('Error claiming ticket:', error);
+      toast.error('Failed to claim ticket');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleUnassignTicket = async () => {
+    setUnassigning(true);
+    try {
+      const response = await base44.functions.invoke('unassignTicket', {
+        ticket_id: ticketId
+      });
+      
+      if (response.data.success) {
+        setTicket({
+          ...ticket,
+          assigned_to: null,
+          assigned_to_name: null
+        });
+        toast.success('Ticket unassigned');
+      }
+    } catch (error) {
+      console.error('Error unassigning ticket:', error);
+      toast.error('Failed to unassign ticket');
+    } finally {
+      setUnassigning(false);
+    }
+  };
+
   const handleStartEditLocation = () => {
     setTempBuilding(ticket.building || "");
     setTempRoomNumber(ticket.room_number || "");
@@ -733,45 +781,106 @@ Provide your analysis in this exact JSON format:
               </div>
             </div>
           </div>
-          
-          {canManage && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await base44.functions.invoke('createNotification', {
-                      user_email: ticket.requester_email,
-                      type: 'ticket_created',
-                      title: `Ticket ${ticket.ticket_number} Created`,
-                      message: ticket.subject,
-                      related_ticket_id: ticket.id,
-                      related_ticket_number: ticket.ticket_number,
-                      action_url: createPageUrl('SupportTickets') + `?id=${ticket.id}`,
-                      send_email: true
-                    });
-                    toast.success('Email resent to requester');
-                  } catch (error) {
-                    toast.error('Failed to resend email');
-                  }
-                }}
-                className="flex-shrink-0"
-              >
-                <Mail className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Resend Email</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
-              >
-                <Trash2 className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Delete</span>
-              </Button>
-            </div>
-          )}
+
+          <div className="flex gap-2 flex-wrap">
+            {/* Assignment Actions */}
+            {(canManage || isWorker) && (
+              <>
+                {!ticket.assigned_to && (
+                  <Button
+                    onClick={handleClaimTicket}
+                    disabled={claiming}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {claiming ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <User className="w-4 h-4 mr-2" />
+                    )}
+                    Claim Ticket
+                  </Button>
+                )}
+                {ticket.assigned_to === user?.email && (
+                  <>
+                    <Button
+                      onClick={handleUnassignTicket}
+                      disabled={unassigning}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {unassigning ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4 mr-2" />
+                      )}
+                      Unassign
+                    </Button>
+                    <Button
+                      onClick={() => handleStatusChange('resolved')}
+                      disabled={updatingStatus}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {updatingStatus ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                      )}
+                      Mark Resolved
+                    </Button>
+                  </>
+                )}
+                {ticket.assigned_to && ticket.assigned_to !== user?.email && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-md border border-slate-200">
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm text-slate-700">
+                      Assigned to {ticket.assigned_to_name}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {canManage && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await base44.functions.invoke('createNotification', {
+                        user_email: ticket.requester_email,
+                        type: 'ticket_created',
+                        title: `Ticket ${ticket.ticket_number} Created`,
+                        message: ticket.subject,
+                        related_ticket_id: ticket.id,
+                        related_ticket_number: ticket.ticket_number,
+                        action_url: createPageUrl('SupportTickets') + `?id=${ticket.id}`,
+                        send_email: true
+                      });
+                      toast.success('Email resent to requester');
+                    } catch (error) {
+                      toast.error('Failed to resend email');
+                    }
+                  }}
+                  className="flex-shrink-0"
+                >
+                  <Mail className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Resend Email</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
