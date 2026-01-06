@@ -325,34 +325,11 @@ export default function MyTasks() {
             if (userData) {
               setUserDepartments(userData.departments || []);
               
-              // Get all tickets for department
-              const allDeptTickets = await base44.entities.Ticket.list('-created_date');
-              
-              // Filter for department tickets
-              const getDepartment = (category) => {
-                const deptMap = {
-                  'technology': 'it',
-                  'technical': 'it',
-                  'maintenance': 'facilities',
-                  'cleaning': 'facilities',
-                  'facility': 'facilities',
-                  'facility_cleaning': 'facilities',
-                  'av_production': 'comms',
-                  'marketing': 'comms',
-                  'social_media': 'comms',
-                  'communications': 'comms'
-                };
-                return deptMap[category] || 'other';
-              };
-              
-              const deptFiltered = allDeptTickets.filter(t => {
-                const ticketDept = getDepartment(t.category);
-                return userData.departments.some(dept => 
-                  ticketDept === dept.toLowerCase().replace(' ', '_')
-                ) && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status);
-              });
-              
-              setDeptTickets(deptFiltered);
+              // Department-wide ticket fetch disabled for performance
+              // TODO: Re-enable when department tickets are displayed in UI
+              // const allDeptTickets = await base44.entities.Ticket.list('-created_date');
+              // const deptFiltered = allDeptTickets.filter(...);
+              // setDeptTickets(deptFiltered);
               
               // Load dept tasks from database
               try {
