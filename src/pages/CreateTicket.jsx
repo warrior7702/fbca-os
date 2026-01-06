@@ -1266,8 +1266,8 @@ export default function CreateTicket() {
 
                 <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
                   {duplicateTickets.map(dup => (
-                    <div key={dup.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                      <div className="flex items-start justify-between gap-2">
+                    <div key={dup.id} className="border-2 border-blue-200 rounded-lg p-3 bg-blue-50">
+                      <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm text-slate-900 truncate">{dup.subject}</p>
                           <p className="text-xs text-slate-600 mt-1">{dup.ticket_number} • {dup.status.replace('_', ' ')}</p>
@@ -1275,6 +1275,15 @@ export default function CreateTicket() {
                             Created {format(new Date(dup.created_date), 'MMM d, yyyy')}
                           </p>
                         </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => navigate(createPageUrl('TicketDetail') + `?id=${dup.id}`)}
+                          size="sm"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        >
+                          Use This Ticket
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1295,16 +1304,17 @@ export default function CreateTicket() {
                     onClick={() => setShowDuplicateWarning(false)}
                     className="flex-1"
                   >
-                    Review Existing Tickets
+                    Cancel
                   </Button>
                   <Button
                     onClick={async () => {
                       setShowDuplicateWarning(false);
                       await submitTicket({ bypassDuplicates: true });
                     }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    variant="outline"
+                    className="flex-1 text-slate-600"
                   >
-                    Create New Ticket Anyway
+                    Create New Anyway
                   </Button>
                 </div>
               </motion.div>
