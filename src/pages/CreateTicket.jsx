@@ -388,11 +388,11 @@ export default function CreateTicket() {
       const duplicates = recentOpenTickets.filter(t => {
         // Match based on scope using IDs
         if (currentScope === "ASSET" && t.scope === "ASSET") {
-          // Asset match using asset_id
+          // Prefer asset_id matching when available
           if (ticket.asset_id && t.asset_id === ticket.asset_id) {
             return true;
           }
-          // Fallback for older tickets without asset_id
+          // Fallback to asset_name matching if asset_id is missing
           if (!ticket.asset_id && assetSearch && t.asset_name?.toLowerCase() === assetSearch.toLowerCase()) {
             return true;
           }
