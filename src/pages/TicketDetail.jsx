@@ -1394,20 +1394,37 @@ Provide your analysis in this exact JSON format:
                 {ticket.related_tickets && ticket.related_tickets.length > 0 && (
                   <div>
                     <p className="text-sm font-medium text-slate-600 mb-2">Related Tickets</p>
-                    <div className="space-y-1">
-                      {ticket.related_tickets.map(relId => (
-                        <Button
-                          key={relId}
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs w-full justify-start"
-                          onClick={() => window.open(createPageUrl('TicketDetail') + `?id=${relId}`, '_blank')}
-                        >
-                          <ExternalLink className="w-3 h-3 mr-2" />
-                          View Related
-                        </Button>
-                      ))}
-                    </div>
+                    {loadingRelated ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {relatedTickets.map(rel => (
+                          <div
+                            key={rel.id}
+                            onClick={() => window.open(createPageUrl('TicketDetail') + `?id=${rel.id}`, '_blank')}
+                            className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-mono text-slate-600">{rel.ticket_number}</p>
+                                  <Badge className={`text-xs ${getStatusColor(rel.status)}`}>
+                                    {rel.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-slate-900 font-medium truncate mt-1">{rel.subject}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  {format(new Date(rel.created_date), 'MMM d, yyyy')}
+                                </p>
+                              </div>
+                              <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
