@@ -666,14 +666,17 @@ export default function CreateTicket() {
       let finalFloorId = ticket.floor_id;
       let finalBuildingId = ticket.building_id;
 
-      if (inferredScope === "ASSET" && selectedAssetEntity) {
-        finalAssetId = selectedAssetEntity.id;
-        finalAssetName = selectedAssetEntity.name;
-        finalRoomId = selectedAssetEntity.room_id || finalRoomId;
-        finalFloorId = selectedAssetEntity.floor_id || finalFloorId;
-        finalBuildingId = selectedAssetEntity.building_id || finalBuildingId;
-      } else if (inferredScope === "ASSET" && assetSearch) {
-        finalAssetName = assetSearch;
+      if (inferredScope === "ASSET") {
+        if (selectedAssetEntity) {
+          finalAssetId = selectedAssetEntity.id;
+          finalAssetName = selectedAssetEntity.name;
+          finalRoomId = selectedAssetEntity.room_id || finalRoomId;
+          finalFloorId = selectedAssetEntity.floor_id || finalFloorId;
+          finalBuildingId = selectedAssetEntity.building_id || finalBuildingId;
+        } else {
+          finalAssetId = urlAssetId;
+          finalAssetName = assetSearch;
+        }
       }
 
       if (inferredScope === "ROOM" && finalRoomId) {
