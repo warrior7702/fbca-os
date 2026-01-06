@@ -242,7 +242,7 @@ export default function TicketDetail() {
             message: comment.content,
             related_ticket_id: ticketId,
             related_ticket_number: ticket.ticket_number,
-            action_url: `/support-tickets?id=${ticketId}`,
+            action_url: createPageUrl('SupportTickets') + `?id=${ticketId}`,
             send_email: true
           });
         } catch (notifyError) {
@@ -280,7 +280,7 @@ export default function TicketDetail() {
                 message: `${comment.author_name}: ${comment.content.substring(0, 100)}...`,
                 related_ticket_id: ticketId,
                 related_ticket_number: ticket.ticket_number,
-                action_url: `/support-tickets?id=${ticketId}`,
+                action_url: createPageUrl('SupportTickets') + `?id=${ticketId}`,
                 send_email: false // Only in-app notification for workers
               });
             }
@@ -335,7 +335,7 @@ export default function TicketDetail() {
             message: `Your ticket ${statusMessages[newStatus]}`,
             related_ticket_id: ticketId,
             related_ticket_number: ticket.ticket_number,
-            action_url: `/support-tickets?id=${ticketId}`,
+            action_url: createPageUrl('SupportTickets') + `?id=${ticketId}`,
             send_email: true
           });
         } catch (notifyError) {
