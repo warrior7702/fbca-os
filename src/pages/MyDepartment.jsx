@@ -1073,7 +1073,7 @@ export default function MyDepartment() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${
-            userDepartments.some(d => d.toLowerCase() === 'facilities') 
+            (userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities'))
               ? (!isPreviewMode ? 'grid-cols-5' : 'grid-cols-6')
               : (!isPreviewMode ? 'grid-cols-4' : 'grid-cols-5')
           }`}>
@@ -1108,7 +1108,7 @@ export default function MyDepartment() {
                 <span className="sm:hidden">Rooms</span>
               </TabsTrigger>
             )}
-            {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+            {(userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities')) && (
               <TabsTrigger value="eventops">
                 <CalendarClock className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Event Ops</span>
@@ -2943,7 +2943,7 @@ export default function MyDepartment() {
             </TabsContent>
           )}
 
-          {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+          {(userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities')) && (
             <TabsContent value="eventops" className="space-y-6">
               <Tabs value={opsTabView} onValueChange={setOpsTabView}>
                 <TabsList className="grid w-full grid-cols-3">
