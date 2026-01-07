@@ -60,7 +60,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, subDays, isAfter, isBefore, differenceInHours, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeptTaskDetailModal from "@/components/tasks/DeptTaskDetailModal";
 import RoutineTaskDetailModal from "@/components/tasks/RoutineTaskDetailModal";
@@ -1024,7 +1024,7 @@ export default function MyDepartment() {
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <Tooltip 
+                            <RechartsTooltip 
                               formatter={(value, name) => [value, 'Tickets']}
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                             />
@@ -1061,7 +1061,7 @@ export default function MyDepartment() {
                         <LineChart data={monthlyActivityData}>
                           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                          <Tooltip 
+                          <RechartsTooltip 
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                           />
                           <Legend wrapperStyle={{ fontSize: '12px' }} />
