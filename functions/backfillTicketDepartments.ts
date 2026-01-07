@@ -13,8 +13,12 @@ Deno.serve(async (req) => {
     // Get all tickets
     const allTickets = await base44.asServiceRole.entities.Ticket.list();
     
-    // Filter tickets missing assigned_department
-    const ticketsToUpdate = allTickets.filter(t => !t.assigned_department && t.category);
+    // Filter tickets missing assigned_department (and have scope to avoid validation errors)
+    const ticketsToUpdate = allTickets.filter(t => 
+      !t.assigned_department && 
+      t.category && 
+      t.scope // Only update tickets with scope field to avoid validation errors
+    );
     
     console.log(`Found ${ticketsToUpdate.length} tickets missing assigned_department`);
     
