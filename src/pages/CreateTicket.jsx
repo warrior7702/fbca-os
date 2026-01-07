@@ -86,7 +86,6 @@ export default function CreateTicket() {
 
   useEffect(() => {
     loadCurrentUser();
-    loadBuildingsFromDB();
     loadURLParams();
   }, []);
 
@@ -172,9 +171,10 @@ export default function CreateTicket() {
     let contextType = null;
     let currentTicketState = {};
 
-    // Load buildings first
+    // Load buildings
     const loadedBuildings = await base44.entities.Building.list();
     setBuildings(loadedBuildings);
+    setLoadingBuildings(false);
 
     // If asset_id exists, immediately set it and mark as asset context
     if (assetId) {
@@ -524,18 +524,7 @@ export default function CreateTicket() {
 
 
 
-  const loadBuildingsFromDB = async () => {
-    setLoadingBuildings(true);
-    try {
-      const buildingsData = await base44.entities.Building.list();
-      setBuildings(buildingsData);
-    } catch (error) {
-      console.error('Error loading buildings:', error);
-      toast.error('Failed to load buildings');
-    } finally {
-      setLoadingBuildings(false);
-    }
-  };
+
 
   const handleBuildingChange = async (buildingId) => {
     const building = buildings.find(b => b.id === buildingId);
@@ -685,6 +674,11 @@ export default function CreateTicket() {
   const submitTicket = async ({ bypassDuplicates = false } = {}) => {
     if (!issueDescription || issueDescription.trim().length < 10) {
       toast.error("Please describe the issue (at least 10 characters)");
+      return;
+    }
+
+    if (!ticket.building_id && !selectedBuilding) {
+      toast.error("Please select a building");
       return;
     }
 
@@ -1359,7 +1353,7 @@ export default function CreateTicket() {
                 </div>
                 
                 <p className="text-sm text-slate-600 mb-4">
-                  We found {duplicateTickets.length} open ticket{duplicateTickets.length > 1 ? 's' : ''} for this {selectedAssetEntity ? 'asset' : 'room'} from the last 30 days:
+                  We found {duplicateTickets.length} open ticket{duplicateTickets.length > 1 ? 's' : ''} for this {inferredContext.type === 'asset' ? 'asset' : inferredContext.type === 'room' ? 'room' : 'building'} from the last 30 days:
                 </p>
 
                 <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
