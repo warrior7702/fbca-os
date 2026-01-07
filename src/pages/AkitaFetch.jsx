@@ -751,17 +751,24 @@ export default function AkitaFetch() {
                       const count = roomAssetCounts[room.id] || 0;
                       const label = room.room_name || room.name || room.room_number || 'Unnamed';
                       return (
-                        <div
-                          key={room.id}
-                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
-                          onClick={() => {
-                            setRoomFilter(room.id);
-                            setRoomSearch(room.room_number ? `${room.room_number} – ${label}` : label);
-                            setShowRoomDropdown(false);
-                          }}
-                        >
-                          {room.room_number ? `${room.room_number} – ` : ''}{label} ({count})
-                        </div>
+                       <div
+                         key={room.id}
+                         className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                         onClick={() => {
+                           setRoomFilter(room.id);
+                           setRoomSearch(room.room_number ? `${room.room_number} – ${label}` : label);
+                           setShowRoomDropdown(false);
+                         }}
+                       >
+                         <div className="flex items-center justify-between gap-2">
+                           <span>{room.room_number ? `${room.room_number} – ` : ''}{label} ({count})</span>
+                           {room.bookable && (
+                             <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
+                               Bookable
+                             </Badge>
+                           )}
+                         </div>
+                       </div>
                       );
                     })}
                     {filteredRooms.length > 50 && (
@@ -936,9 +943,21 @@ export default function AkitaFetch() {
                       <p className="text-sm text-slate-600">Room {selectedRoom.room_number}</p>
                     )}
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {selectedRoom.category || 'Interior'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {selectedRoom.category || 'Interior'}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        selectedRoom.bookable 
+                          ? 'bg-green-50 text-green-700 border-green-300' 
+                          : 'bg-slate-50 text-slate-600 border-slate-300'
+                      }`}
+                    >
+                      {selectedRoom.bookable ? 'Bookable' : 'Not Bookable'}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="text-xs text-slate-500 space-y-0.5">
                   <div>{selectedRoom.building_name || 'N/A'}</div>
