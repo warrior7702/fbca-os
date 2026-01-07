@@ -1046,32 +1046,32 @@ export default function CreateTicket() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Context is already shown in header, hide these fields if context is loaded */}
-                {!inferredContext.display && (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Name
-                      </label>
-                      <Input
-                        value={ticket.requester_name}
-                        onChange={(e) => setTicket({...ticket, requester_name: e.target.value})}
-                        placeholder="Your full name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Email Address
-                      </label>
-                      <Input
-                        type="email"
-                        value={ticket.requester_email}
-                        onChange={(e) => setTicket({...ticket, requester_email: e.target.value})}
-                        placeholder="your.email@fbca.org"
-                      />
-                    </div>
+                {/* Requester identity fields - always visible */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Name
+                    </label>
+                    <Input
+                      value={ticket.requester_name}
+                      onChange={(e) => setTicket({...ticket, requester_name: e.target.value})}
+                      placeholder="Your full name"
+                    />
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Email Address
+                    </label>
+                    <Input
+                      type="email"
+                      value={ticket.requester_email}
+                      onChange={(e) => setTicket({...ticket, requester_email: e.target.value})}
+                      placeholder="your.email@fbca.org"
+                      disabled={!!ticket.requester_email}
+                      className={!!ticket.requester_email ? 'bg-slate-50' : ''}
+                    />
+                  </div>
+                </div>
 
                 {/* Location fields - always show, pre-fill if context exists */}
                 <div className="grid md:grid-cols-2 gap-4">
