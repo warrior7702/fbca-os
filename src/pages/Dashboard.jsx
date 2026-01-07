@@ -50,7 +50,7 @@ const defaultApps = [
 
 const systemApps = [
   {
-    name: "AkitaFetch",
+    name: "FBCA Campus Hub",
     path: "AkitaFetch",
     icon: Building2,
     color: "text-blue-500",
