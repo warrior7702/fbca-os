@@ -692,11 +692,6 @@ export default function CreateTicket() {
       return;
     }
 
-    if (!ticket.building_id && !selectedBuilding) {
-      toast.error("Please select a building");
-      return;
-    }
-
     // Check for duplicates unless bypassed
     if (!bypassDuplicates) {
       const hasDuplicates = await checkDuplicateTickets();
