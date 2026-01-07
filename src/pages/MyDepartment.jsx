@@ -67,6 +67,9 @@ import RoutineTaskDetailModal from "@/components/tasks/RoutineTaskDetailModal";
 import ProjectsTab from "@/components/department/ProjectsTab";
 import { differenceInSeconds } from "date-fns";
 import { FolderKanban } from "lucide-react";
+import TodayTomorrowBoard from "@/components/eventops/TodayTomorrowBoard";
+import RoomTimelineTab from "@/components/eventops/RoomTimelineTab";
+import QueueTab from "@/components/eventops/QueueTab";
 
 function RoomFlowCountdown({ pcoEvents }) {
   const [now, setNow] = useState(new Date());
@@ -207,6 +210,9 @@ export default function MyDepartment() {
   const [showProjects, setShowProjects] = useState(false);
   const [projectsCount, setProjectsCount] = useState(0);
   const [projects, setProjects] = useState([]);
+  const [opsTasks, setOpsTasks] = useState([]);
+  const [loadingOpsTasks, setLoadingOpsTasks] = useState(false);
+  const [opsTabView, setOpsTabView] = useState('board');
 
   const normalizeDept = (s) => (s || '')
     .toLowerCase()
@@ -261,6 +267,13 @@ export default function MyDepartment() {
   useEffect(() => {
     loadData(); // Async - main data (will call loadDeptTasks after getting userDepartments)
   }, []);
+
+  // Load ops tasks when Event Ops tab is selected
+  useEffect(() => {
+    if (activeTab === 'eventops' && opsTasks.length === 0 && !loadingOpsTasks) {
+      loadOpsTasks();
+    }
+  }, [activeTab]);
 
   // Lazy load PCO events only when Room Flow tab is selected
   useEffect(() => {
@@ -377,6 +390,60 @@ export default function MyDepartment() {
       console.error('Error loading PCO facilities events:', error);
     } finally {
       setLoadingPcoEvents(false);
+    }
+  };
+
+  const loadOpsTasks = async () => {
+    setLoadingOpsTasks(true);
+    try {
+      const allTasks = await base44.entities.Ops_Task.list('-due_at');
+      
+      // Enrich with event and room data
+      const enrichedTasks = await Promise.all(allTasks.map(async (task) => {
+        let eventTitle = null;
+        let roomName = null;
+
+        // Try to get event title
+        if (task.pco_event_instance_id) {
+          try {
+            const events = await base44.entities.PCO_Event.filter({ 
+              pco_instance_id: task.pco_event_instance_id 
+            });
+            if (events.length > 0) {
+              eventTitle = events[0].title;
+            }
+          } catch (err) {
+            console.error('Error fetching event:', err);
+          }
+        }
+
+        // Try to get room name
+        if (task.room_id) {
+          try {
+            const rooms = await base44.entities.Room.filter({ id: task.room_id });
+            if (rooms.length > 0) {
+              const room = rooms[0];
+              roomName = room.room_number 
+                ? `${room.room_number} - ${room.room_name || 'Unnamed'}` 
+                : room.room_name;
+            }
+          } catch (err) {
+            console.error('Error fetching room:', err);
+          }
+        }
+
+        return {
+          ...task,
+          event_title: eventTitle,
+          room_name: roomName
+        };
+      }));
+
+      setOpsTasks(enrichedTasks);
+    } catch (error) {
+      console.error('Error loading ops tasks:', error);
+    } finally {
+      setLoadingOpsTasks(false);
     }
   };
 
@@ -1007,8 +1074,8 @@ export default function MyDepartment() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${
             userDepartments.some(d => d.toLowerCase() === 'facilities') 
-              ? (!isPreviewMode ? 'grid-cols-4' : 'grid-cols-5')
-              : (!isPreviewMode ? 'grid-cols-3' : 'grid-cols-4')
+              ? (!isPreviewMode ? 'grid-cols-5' : 'grid-cols-6')
+              : (!isPreviewMode ? 'grid-cols-4' : 'grid-cols-5')
           }`}>
             <TabsTrigger value="overview">
               {userRole === 'requester' || userRole === 'worker' ? (
@@ -1039,6 +1106,13 @@ export default function MyDepartment() {
                 <LayoutGrid className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Room Flow</span>
                 <span className="sm:hidden">Rooms</span>
+              </TabsTrigger>
+            )}
+            {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+              <TabsTrigger value="eventops">
+                <CalendarClock className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Event Ops</span>
+                <span className="sm:hidden">Ops</span>
               </TabsTrigger>
             )}
             {isPreviewMode && (
@@ -2866,6 +2940,49 @@ export default function MyDepartment() {
                   </Badge>
                 </CardContent>
               </Card>
+            </TabsContent>
+          )}
+
+          {userDepartments.some(d => d.toLowerCase() === 'facilities') && (
+            <TabsContent value="eventops" className="space-y-6">
+              <Tabs value={opsTabView} onValueChange={setOpsTabView}>
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="board">Today/Tomorrow</TabsTrigger>
+                  <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
+                  <TabsTrigger value="queue">Queue</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="board" className="mt-6">
+                  {loadingOpsTasks ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+                    </div>
+                  ) : (
+                    <TodayTomorrowBoard 
+                      tasks={opsTasks} 
+                      onTaskClick={(task) => toast.info('Task detail view coming soon')}
+                    />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="timeline" className="mt-6">
+                  <RoomTimelineTab />
+                </TabsContent>
+
+                <TabsContent value="queue" className="mt-6">
+                  {loadingOpsTasks ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+                    </div>
+                  ) : (
+                    <QueueTab 
+                      tasks={opsTasks}
+                      onTaskUpdate={loadOpsTasks}
+                      onTaskClick={(task) => toast.info('Task detail view coming soon')}
+                    />
+                  )}
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           )}
 
