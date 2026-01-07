@@ -430,7 +430,7 @@ export default function AkitaFetch() {
                   </div>
                 ) : buildings.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-4">
-                    No buildings found. Run AkitaSync import first.
+                    No buildings found. Import facility data first.
                   </p>
                 ) : (
                   buildings.map(building => {
