@@ -18,11 +18,12 @@ import {
   Briefcase,
   FileSpreadsheet,
   Trophy,
-  Play, // New Import
-  Wifi, // New Import
-  Battery, // New Import
-  Printer, // New Import
-  X // New Import for close button
+  Play,
+  Wifi,
+  Battery,
+  Printer,
+  X,
+  Church
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ const defaultApps = [
   { id: "calendar", name: "Church Calendar", icon: CalendarIcon, color: "from-blue-600 to-cyan-500", path: "Calendar" },
   { id: "mymeetings", name: "My Meetings", icon: Video, color: "from-purple-500 to-pink-500", path: "MyMeetings" },
   { id: "mydepartment", name: "My Department", icon: Building2, color: "from-violet-500 to-purple-600", path: "MyDepartment" },
+  { id: "campushub", name: "FBCA Campus Hub", icon: Church, color: "from-blue-600 to-sky-500", path: "AkitaFetch" },
   { id: "communications", name: "Communications Request", icon: MessageSquare, color: "from-purple-500 to-pink-500", path: "WorkflowHub" },
   { id: "foodservice", name: "Hospitality", icon: UtensilsCrossed, color: "from-green-500 to-emerald-500", path: "FoodService" },
   { id: "support", name: "Support Requests", icon: Ticket, color: "from-amber-500 to-yellow-500", path: "Ticketing" },
@@ -106,14 +108,15 @@ const getDefaultPositions = () => {
     calendar: { row: 0, col: 3 },
     mymeetings: { row: 0, col: 4 },
     mydepartment: { row: 1, col: 0 },
-    communications: { row: 1, col: 1 },
-    foodservice: { row: 1, col: 2 },
-    support: { row: 1, col: 3 },
-    staffdir: { row: 1, col: 4 },
-    documents: { row: 2, col: 0 },
-    inboxhelper: { row: 2, col: 1 },
-    planningtool: { row: 2, col: 2 },
-    sharepoint: { row: 2, col: 3 },
+    campushub: { row: 1, col: 1 },
+    communications: { row: 1, col: 2 },
+    foodservice: { row: 1, col: 3 },
+    support: { row: 1, col: 4 },
+    staffdir: { row: 2, col: 0 },
+    documents: { row: 2, col: 1 },
+    inboxhelper: { row: 2, col: 2 },
+    planningtool: { row: 2, col: 3 },
+    sharepoint: { row: 2, col: 4 },
     settings: { row: 5, col: 0 }
   };
 };
