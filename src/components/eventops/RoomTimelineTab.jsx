@@ -25,7 +25,7 @@ export default function RoomTimelineTab() {
 
   const loadRooms = async () => {
     try {
-      const roomsData = await base44.entities.PCO_BookableRoom.filter({ is_active: true });
+      const roomsData = await base44.entities.PCO_BookableRoom.filter({ is_bookable: true });
       setRooms(roomsData);
     } catch (error) {
       console.error('Error loading rooms:', error);
