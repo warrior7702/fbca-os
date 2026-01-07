@@ -210,6 +210,23 @@ export default function MyDepartment() {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const getLocationDisplay = (ticket) => {
+    if (!ticket) return null;
+    
+    if (ticket.scope === 'ASSET' && ticket.asset_name) {
+      return `${ticket.asset_name}${ticket.room_number ? ` → ${ticket.room_number}` : ''}${ticket.building ? ` → ${ticket.building.replace(/_/g, ' ')}` : ''}`;
+    } else if (ticket.scope === 'ROOM' && ticket.room_number) {
+      return `${ticket.room_number}${ticket.floor_name ? ` → ${ticket.floor_name}` : ''}${ticket.building ? ` → ${ticket.building.replace(/_/g, ' ')}` : ''}`;
+    } else if (ticket.scope === 'BUILDING' && ticket.building) {
+      return ticket.building.replace(/_/g, ' ');
+    } else if (ticket.building) {
+      // Fallback for tickets without scope but with building
+      return `${ticket.building.replace(/_/g, ' ')}${ticket.room_number ? ` → ${ticket.room_number}` : ''}`;
+    }
+    
+    return null;
+  };
+
   useEffect(() => {
     loadData(); // Async - main data (will call loadDeptTasks after getting userDepartments)
   }, []);
@@ -1619,19 +1636,25 @@ export default function MyDepartment() {
                                   {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                                    <span>{ticket.ticket_number}</span>
-                                    <span>•</span>
-                                    <span>Created {format(new Date(ticket.created_date), 'MMM d')}</span>
-                                    <Badge className={`text-xs ${
-                                      ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
-                                      ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                      {ticket.priority}
-                                    </Badge>
-                                  </div>
+                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                   <span>{ticket.ticket_number}</span>
+                                   <span>•</span>
+                                   <span>Created {format(new Date(ticket.created_date), 'MMM d')}</span>
+                                   <Badge className={`text-xs ${
+                                     ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                     ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                     'bg-yellow-100 text-yellow-700'
+                                   }`}>
+                                     {ticket.priority}
+                                   </Badge>
+                                 </div>
+                                 {getLocationDisplay(ticket) && (
+                                   <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                     <MapPin className="w-3 h-3" />
+                                     <span className="truncate">{getLocationDisplay(ticket)}</span>
+                                   </div>
+                                 )}
                                 </div>
                               </div>
                             </div>
@@ -1695,24 +1718,30 @@ export default function MyDepartment() {
                                   {getInitials(ticket.assigned_to_name)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                                    <span>{ticket.ticket_number}</span>
-                                    {ticket.assigned_to_name && (
-                                      <>
-                                        <span>•</span>
-                                        <span>{ticket.assigned_to_name}</span>
-                                      </>
-                                    )}
-                                    <Badge className={`text-xs ${
-                                      ticket.status === 'awaiting_information' ? 'bg-yellow-100 text-yellow-700' :
-                                      ticket.status === 'awaiting_parts' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-purple-100 text-purple-700'
-                                    }`}>
-                                      {ticket.status === 'awaiting_information' ? 'Awaiting Info' :
-                                       ticket.status === 'awaiting_parts' ? 'Awaiting Parts' : 'In Progress'}
-                                    </Badge>
-                                  </div>
+                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                   <span>{ticket.ticket_number}</span>
+                                   {ticket.assigned_to_name && (
+                                     <>
+                                       <span>•</span>
+                                       <span>{ticket.assigned_to_name}</span>
+                                     </>
+                                   )}
+                                   <Badge className={`text-xs ${
+                                     ticket.status === 'awaiting_information' ? 'bg-yellow-100 text-yellow-700' :
+                                     ticket.status === 'awaiting_parts' ? 'bg-orange-100 text-orange-700' :
+                                     'bg-purple-100 text-purple-700'
+                                   }`}>
+                                     {ticket.status === 'awaiting_information' ? 'Awaiting Info' :
+                                      ticket.status === 'awaiting_parts' ? 'Awaiting Parts' : 'In Progress'}
+                                   </Badge>
+                                 </div>
+                                 {getLocationDisplay(ticket) && (
+                                   <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                     <MapPin className="w-3 h-3" />
+                                     <span className="truncate">{getLocationDisplay(ticket)}</span>
+                                   </div>
+                                 )}
                                 </div>
                               </div>
                             </div>
@@ -1776,16 +1805,22 @@ export default function MyDepartment() {
                                   {getInitials(ticket.assigned_to_name)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                                    <span>{ticket.ticket_number}</span>
-                                    {ticket.resolved_at && (
-                                      <>
-                                        <span>•</span>
-                                        <span>Resolved {format(new Date(ticket.resolved_at), 'MMM d')}</span>
-                                      </>
-                                    )}
-                                  </div>
+                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                   <span>{ticket.ticket_number}</span>
+                                   {ticket.resolved_at && (
+                                     <>
+                                       <span>•</span>
+                                       <span>Resolved {format(new Date(ticket.resolved_at), 'MMM d')}</span>
+                                     </>
+                                   )}
+                                 </div>
+                                 {getLocationDisplay(ticket) && (
+                                   <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                     <MapPin className="w-3 h-3" />
+                                     <span className="truncate">{getLocationDisplay(ticket)}</span>
+                                   </div>
+                                 )}
                                 </div>
                               </div>
                             </div>
@@ -2041,12 +2076,18 @@ export default function MyDepartment() {
                                     >
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
-                                          <p className="font-semibold text-slate-900 text-sm truncate">
-                                            {ticket.subject}
-                                          </p>
-                                          <p className="text-xs text-slate-600 mt-1">
-                                            {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
-                                          </p>
+                                         <p className="font-semibold text-slate-900 text-sm truncate">
+                                           {ticket.subject}
+                                         </p>
+                                         <p className="text-xs text-slate-600 mt-1">
+                                           {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
+                                         </p>
+                                         {getLocationDisplay(ticket) && (
+                                           <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                             <MapPin className="w-3 h-3" />
+                                             <span className="truncate">{getLocationDisplay(ticket)}</span>
+                                           </div>
+                                         )}
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                           <Badge variant="outline" className={`text-xs ${
@@ -2157,6 +2198,12 @@ export default function MyDepartment() {
                                     {ticket.category?.replace(/_/g, ' ')}
                                   </Badge>
                                 </div>
+                                {getLocationDisplay(ticket) && (
+                                  <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                    <MapPin className="w-3 h-3" />
+                                    <span className="truncate">{getLocationDisplay(ticket)}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))
@@ -2770,6 +2817,12 @@ export default function MyDepartment() {
                             <p className="text-xs text-slate-600 mt-1">
                               {ticket.ticket_number} • Requires multiple departments
                             </p>
+                            {getLocationDisplay(ticket) && (
+                              <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                <MapPin className="w-3 h-3" />
+                                <span className="truncate">{getLocationDisplay(ticket)}</span>
+                              </div>
+                            )}
                           </div>
                           <Badge className="bg-purple-100 text-purple-700 border-purple-300">
                             Multi-dept
