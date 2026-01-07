@@ -1664,7 +1664,21 @@ export default function MyDepartment() {
                                   {ticket.assigned_to_name ? getInitials(ticket.assigned_to_name) : '?'}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                 <div className="flex items-center gap-2">
+                                   <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                   {ticket.recurring_issue && (
+                                     <TooltipProvider>
+                                       <Tooltip>
+                                         <TooltipTrigger>
+                                           <RepeatIcon className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                         </TooltipTrigger>
+                                         <TooltipContent>
+                                           <p>Recurring issue (3+ in last 6 months)</p>
+                                         </TooltipContent>
+                                       </Tooltip>
+                                     </TooltipProvider>
+                                   )}
+                                 </div>
                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                    <span>{ticket.ticket_number}</span>
                                    <span>•</span>
@@ -1747,7 +1761,21 @@ export default function MyDepartment() {
                                   {getInitials(ticket.assigned_to_name)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                 <div className="flex items-center gap-2">
+                                   <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
+                                   {ticket.recurring_issue && (
+                                     <TooltipProvider>
+                                       <Tooltip>
+                                         <TooltipTrigger>
+                                           <RepeatIcon className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                         </TooltipTrigger>
+                                         <TooltipContent>
+                                           <p>Recurring issue (3+ in last 6 months)</p>
+                                         </TooltipContent>
+                                       </Tooltip>
+                                     </TooltipProvider>
+                                   )}
+                                 </div>
                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                    <span>{ticket.ticket_number}</span>
                                    {ticket.assigned_to_name && (
@@ -2119,9 +2147,23 @@ export default function MyDepartment() {
                                     >
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
-                                         <p className="font-semibold text-slate-900 text-sm truncate">
-                                           {ticket.subject}
-                                         </p>
+                                         <div className="flex items-center gap-2">
+                                           <p className="font-semibold text-slate-900 text-sm truncate">
+                                             {ticket.subject}
+                                           </p>
+                                           {ticket.recurring_issue && (
+                                             <TooltipProvider>
+                                               <Tooltip>
+                                                 <TooltipTrigger>
+                                                   <RepeatIcon className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                                 </TooltipTrigger>
+                                                 <TooltipContent>
+                                                   <p>Recurring issue (3+ in last 6 months)</p>
+                                                 </TooltipContent>
+                                               </Tooltip>
+                                             </TooltipProvider>
+                                           )}
+                                         </div>
                                          <p className="text-xs text-slate-600 mt-1">
                                            {ticket.ticket_number} • {format(new Date(ticket.created_date), 'MMM d')}
                                          </p>
@@ -2858,7 +2900,21 @@ export default function MyDepartment() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
-                            <p className="font-semibold text-slate-900 text-sm">{ticket.subject}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-slate-900 text-sm">{ticket.subject}</p>
+                              {ticket.recurring_issue && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <RepeatIcon className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Recurring issue (3+ in last 6 months)</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-600 mt-1">
                               {ticket.ticket_number} • Requires multiple departments
                             </p>
