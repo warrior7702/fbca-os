@@ -24,7 +24,8 @@ import {
   FileSpreadsheet,
   Menu,
   X,
-  Printer
+  Printer,
+  Church
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -99,9 +100,8 @@ const systemApps = [
   {
     name: "FBCA Campus Hub",
     path: "AkitaFetch",
-    icon: Building2,
+    icon: Church,
     color: "text-blue-500",
-    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/1d4b6425d_akitafetch_hybrid_32x32.png",
     action: null
   },
   {
@@ -410,11 +410,7 @@ export default function Layout({ children, currentPageName }) {
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="FBCA Campus Hub"
                 >
-                  <img 
-                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/1d4b6425d_akitafetch_hybrid_32x32.png"
-                    alt="FBCA Campus Hub"
-                    className="w-5 h-5"
-                  />
+                  <Church className="w-4 h-4 text-white/80" />
                 </motion.div>
               </Link>
               <motion.div

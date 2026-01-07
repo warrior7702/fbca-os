@@ -54,9 +54,8 @@ const systemApps = [
   {
     name: "FBCA Campus Hub",
     path: "AkitaFetch",
-    icon: Building2,
+    icon: Church,
     color: "text-blue-500",
-    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/af69470b7_akitafetch_hybrid_64x64.png",
     action: null
   },
   {
