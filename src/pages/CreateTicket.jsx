@@ -123,12 +123,20 @@ export default function CreateTicket() {
       const assetLower = (asset.name || '').toLowerCase();
       const assetCategory = (asset.category || '').toLowerCase();
       
-      if (assetLower.includes('av') || assetLower.includes('audio') || assetLower.includes('video') ||
-          assetLower.includes('computer') || assetLower.includes('network') || assetLower.includes('projector') ||
-          assetLower.includes('screen') || assetLower.includes('camera') || assetLower.includes('printer') ||
-          assetCategory.includes('av') || assetCategory.includes('network') || assetCategory.includes('technology')) {
+      // Technology indicators in BOTH name and category
+      const techKeywords = ['av', 'audio', 'video', 'computer', 'network', 'projector', 
+                            'screen', 'camera', 'printer', 'technology', 'it'];
+      
+      const isTechFromName = techKeywords.some(kw => assetLower.includes(kw));
+      const isTechFromCategory = techKeywords.some(kw => assetCategory.includes(kw));
+      
+      if (isTechFromName || isTechFromCategory) {
         department = 'IT';
-        reason = `From asset type: ${asset.name}`;
+        reason = isTechFromName && isTechFromCategory 
+          ? `From asset name and category: ${asset.name}`
+          : isTechFromName 
+            ? `From asset name: ${asset.name}`
+            : `From asset category: ${asset.category}`;
         return { department, reason };
       }
     }
@@ -785,12 +793,19 @@ export default function CreateTicket() {
       if (inferredScope === "BUILDING" && selectedBuilding) {
         finalBuildingId = selectedBuilding.id;
       }
-      
+
+      // Create assetHint for department determination
+      const assetHint = selectedAssetEntity || (finalAssetId ? {
+        id: finalAssetId,
+        name: finalAssetName,
+        category: assetCategoryParam || null
+      } : null);
+
       // Determine assigned department and reason
       const { department: assignedDept, reason: deptReason } = determineAssignedDepartment(
         finalCategory,
         inferredScope,
-        selectedAssetEntity
+        assetHint
       );
       
       const ticketData = {
