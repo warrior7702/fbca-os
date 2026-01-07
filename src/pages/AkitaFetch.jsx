@@ -404,7 +404,7 @@ export default function AkitaFetch() {
             <div className="flex items-center gap-2">
               <Building2 className="w-6 h-6 text-blue-600" />
               <div>
-                <h1 className="text-xl font-bold text-slate-900">AkitaFetch</h1>
+                <h1 className="text-xl font-bold text-slate-900">FBCA Campus Hub</h1>
                 <p className="text-xs text-slate-600">Facility Browser & Asset Manager</p>
               </div>
             </div>

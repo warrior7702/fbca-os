@@ -97,7 +97,7 @@ const apps = [
 
 const systemApps = [
   {
-    name: "AkitaFetch",
+    name: "FBCA Campus Hub",
     path: "AkitaFetch",
     icon: Building2,
     color: "text-blue-500",
@@ -408,11 +408,11 @@ export default function Layout({ children, currentPageName }) {
                 <motion.div
                   whileHover={{ scale: 1.1 }}
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                  title="AkitaFetch"
+                  title="FBCA Campus Hub"
                 >
                   <img 
                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/1d4b6425d_akitafetch_hybrid_32x32.png"
-                    alt="AkitaFetch"
+                    alt="FBCA Campus Hub"
                     className="w-5 h-5"
                   />
                 </motion.div>
