@@ -823,7 +823,7 @@ export default function CreateTicket() {
       // Generate AI solution using ChatGPT
       try {
         const solution = await base44.integrations.Core.InvokeLLM({
-          prompt: `You are a facilities/IT support expert at a church. Analyze this support ticket and provide a helpful solution or troubleshooting steps:\n\nIssue: ${issueDescription}\nCategory: ${ticket.category}\nBuilding: ${ticket.building}\nRoom: ${ticket.room_number || 'Not specified'}\n\nProvide a clear, actionable solution or next steps.`,
+          prompt: `You are a facilities/IT support expert at a church. Analyze this support ticket and provide a helpful solution or troubleshooting steps:\n\nIssue: ${issueDescription}\nCategory: ${finalCategory}\nBuilding: ${ticket.building || 'Not specified'}\nRoom: ${ticket.room_number || 'Not specified'}\n\nProvide a clear, actionable solution or next steps.`,
           add_context_from_internet: false
         });
         if (solution) {
