@@ -86,8 +86,15 @@ export default function CreateTicket() {
 
   useEffect(() => {
     loadCurrentUser();
-    loadURLParams();
+    loadBuildingsFromDB();
   }, []);
+
+  // Run URL params processing once buildings are loaded
+  useEffect(() => {
+    if (buildings.length > 0 && !contextLoaded) {
+      loadURLParams();
+    }
+  }, [buildings]);
 
   // Map asset categories to ticket categories
   const mapAssetCategoryToTicketCategory = (assetCategory) => {
@@ -159,6 +166,19 @@ export default function CreateTicket() {
     return { department, reason };
   };
 
+  const loadBuildingsFromDB = async () => {
+    setLoadingBuildings(true);
+    try {
+      const buildingsData = await base44.entities.Building.list();
+      setBuildings(buildingsData);
+    } catch (error) {
+      console.error('Error loading buildings:', error);
+      toast.error('Failed to load buildings');
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
   const loadURLParams = async () => {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
@@ -170,11 +190,6 @@ export default function CreateTicket() {
     let contextDisplay = null;
     let contextType = null;
     let currentTicketState = {};
-
-    // Load buildings
-    const loadedBuildings = await base44.entities.Building.list();
-    setBuildings(loadedBuildings);
-    setLoadingBuildings(false);
 
     // If asset_id exists, immediately set it and mark as asset context
     if (assetId) {
@@ -214,7 +229,7 @@ export default function CreateTicket() {
 
     // Handle Building context
     if (derivedBuildingId) {
-      const building = loadedBuildings.find(b => b.id === derivedBuildingId);
+      const building = buildings.find(b => b.id === derivedBuildingId);
       if (building) {
         setSelectedBuilding(building);
         setBuildingSearch(building.name);
