@@ -325,11 +325,42 @@ export default function MyTasks() {
             if (userData) {
               setUserDepartments(userData.departments || []);
               
-              // Department-wide ticket fetch disabled for performance
-              // TODO: Re-enable when department tickets are displayed in UI
-              // const allDeptTickets = await base44.entities.Ticket.list('-created_date');
-              // const deptFiltered = allDeptTickets.filter(...);
-              // setDeptTickets(deptFiltered);
+              // Load department tickets using assigned_department field
+              if (userData.departments && userData.departments.length > 0) {
+                try {
+                  const allDeptTickets = await base44.entities.Ticket.list('-created_date');
+                  const deptFiltered = allDeptTickets.filter(ticket => {
+                    if (!ticket.category || !['technology', 'cleaning', 'maintenance'].includes(ticket.category)) {
+                      return false;
+                    }
+                    if (ticket.status === 'archived' || ticket.status === 'resolved') {
+                      return false;
+                    }
+                    
+                    // Primary: Use assigned_department (case-insensitive)
+                    if (ticket.assigned_department) {
+                      return userData.departments.some(d => 
+                        d.toLowerCase() === ticket.assigned_department.toLowerCase()
+                      );
+                    }
+                    
+                    // Fallback: Map category to department
+                    const categoryDeptMap = {
+                      'technology': 'IT',
+                      'cleaning': 'Facilities',
+                      'maintenance': 'Facilities'
+                    };
+                    const ticketDept = categoryDeptMap[ticket.category];
+                    return ticketDept && userData.departments.some(d => 
+                      d.toLowerCase() === ticketDept.toLowerCase()
+                    );
+                  });
+                  setDeptTickets(deptFiltered);
+                } catch (err) {
+                  console.error('Error loading department tickets:', err);
+                  setDeptTickets([]);
+                }
+              }
               
               // Load dept tasks from database
               try {
