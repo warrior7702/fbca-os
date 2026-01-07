@@ -208,6 +208,11 @@ export default function MyDepartment() {
   const [projectsCount, setProjectsCount] = useState(0);
   const [projects, setProjects] = useState([]);
 
+  const normalizeDept = (s) => (s || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, '_');
+
   const getInitials = (name) => {
     if (!name) return '??';
     const parts = name.trim().split(' ');
@@ -321,8 +326,7 @@ export default function MyDepartment() {
         // Filter by department if set, or show all if user is in preview mode
         if (!t.department) return true; // Tasks without department show everywhere
         return departments.some(d => 
-          d.toLowerCase() === t.department?.toLowerCase() ||
-          d.toLowerCase().replace(' ', '_') === t.department?.toLowerCase()
+          normalizeDept(d) === normalizeDept(t.department)
         );
       });
       const mappedRoutineTasks = dbRoutineTasks.map(t => ({
@@ -768,16 +772,15 @@ export default function MyDepartment() {
     let isInUserDept = false;
     
     if (ticket.assigned_department) {
-      // Primary: Use assigned_department (case-insensitive)
+      // Primary: Use assigned_department (normalized)
       isInUserDept = userDepartments.some(dept => 
-        dept.toLowerCase() === ticket.assigned_department.toLowerCase()
+        normalizeDept(dept) === normalizeDept(ticket.assigned_department)
       );
     } else {
       // Fallback: Use getTicketDeptId which has category mapping
       const ticketDeptId = getTicketDeptId(ticket);
       isInUserDept = userDepartments.some(dept => 
-        ticketDeptId === dept.toLowerCase().replace(' ', '_') ||
-        ticketDeptId === dept.toLowerCase()
+        normalizeDept(dept) === ticketDeptId
       );
     }
     
@@ -2303,15 +2306,13 @@ export default function MyDepartment() {
                         {unassignedTickets.filter(t => {
                           const ticketDeptId = getTicketDeptId(t);
                           return userDepartments.some(d => 
-                            ticketDeptId === d.toLowerCase().replace(' ', '_') ||
-                            ticketDeptId === d.toLowerCase()
+                            normalizeDept(d) === ticketDeptId
                           ) || isPreviewMode;
                         }).length > 0 ? (
                           unassignedTickets.filter(t => {
                             const ticketDeptId = getTicketDeptId(t);
                             return userDepartments.some(d => 
-                              ticketDeptId === d.toLowerCase().replace(' ', '_') ||
-                              ticketDeptId === d.toLowerCase()
+                              normalizeDept(d) === ticketDeptId
                             ) || isPreviewMode;
                           }).map((ticket) => (
                             <div
