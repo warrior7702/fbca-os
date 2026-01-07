@@ -198,6 +198,19 @@ Provide helpful, detailed, and actionable answers. Only suggest navigation when 
     }
   };
 
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const response = await base44.functions.invoke('backfillTicketDepartments');
+      setBackfillResults(response.data);
+    } catch (error) {
+      console.error('Backfill failed:', error);
+      setBackfillResults({ error: error.message });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   if (initializing) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
