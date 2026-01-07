@@ -25,7 +25,7 @@ export default function RoomTimelineTab() {
 
   const loadRooms = async () => {
     try {
-      const roomsData = await base44.entities.Room.list();
+      const roomsData = await base44.entities.PCO_BookableRoom.filter({ is_active: true });
       setRooms(roomsData);
     } catch (error) {
       console.error('Error loading rooms:', error);
@@ -84,7 +84,7 @@ export default function RoomTimelineTab() {
             <SelectContent>
               {rooms.map(room => (
                 <SelectItem key={room.id} value={room.id}>
-                  {room.room_number ? `${room.room_number} - ${room.room_name || 'Unnamed'}` : room.room_name}
+                  {room.name}
                 </SelectItem>
               ))}
             </SelectContent>
