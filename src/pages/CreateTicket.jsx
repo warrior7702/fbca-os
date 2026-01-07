@@ -849,16 +849,19 @@ export default function CreateTicket() {
       try {
         const rolesResponse = await base44.functions.invoke('getUsersWithTicketRoles');
         if (rolesResponse.data.success) {
-          const getDepartment = (category) => {
+          // Use assigned_department as source of truth, fallback to category mapping
+          let department = ticketData.assigned_department;
+          
+          if (!department) {
+            // Fallback: map from category
             const deptMap = {
               'technology': 'IT',
               'cleaning': 'Facilities',
               'maintenance': 'Facilities'
             };
-            return deptMap[category] || null;
-          };
+            department = deptMap[ticketData.category] || null;
+          }
 
-          const department = getDepartment(ticket.category);
           if (department) {
             const departmentWorkers = rolesResponse.data.allUsers.filter(user => 
               user.ticket_role === 'worker' && 
