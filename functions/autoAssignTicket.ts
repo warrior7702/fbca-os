@@ -17,17 +17,29 @@ Deno.serve(async (req) => {
     }
     const ticket = tickets[0];
 
-    // Assignment rules based on category
+    // Use assigned_department as source of truth, fallback to category mapping
+    let department = ticket.assigned_department;
+    
+    if (!department) {
+      // Fallback: map from category
+      const deptMap = {
+        'technology': 'IT',
+        'cleaning': 'Facilities',
+        'maintenance': 'Facilities'
+      };
+      department = deptMap[ticket.category] || null;
+    }
+
+    // Assignment rules based on department
     const assignmentRules = {
-      // Technology tickets go to Billy Nelms
-      technology: { email: 'billy.nelms@fbca.org', name: 'Billy Nelms' },
+      // IT tickets go to Billy Nelms
+      'IT': { email: 'billy.nelms@fbca.org', name: 'Billy Nelms' },
       
-      // Cleaning and maintenance - leave unassigned for pool pickup
-      cleaning: null,
-      maintenance: null
+      // Facilities - leave unassigned for pool pickup
+      'Facilities': null
     };
 
-    const rule = assignmentRules[ticket.category];
+    const rule = assignmentRules[department];
     
     // If no rule or rule is null (pool), leave unassigned
     if (!rule) {
