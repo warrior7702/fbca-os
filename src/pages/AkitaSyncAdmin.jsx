@@ -155,7 +155,7 @@ export default function AkitaSyncAdmin() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">AkitaSync Import</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Facility Data Import</h1>
             <p className="text-sm text-slate-600">Import floors, rooms, and assets from AkitaBox exports</p>
           </div>
         </div>
