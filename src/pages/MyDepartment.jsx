@@ -922,43 +922,53 @@ export default function MyDepartment() {
               </p>
             </div>
           </div>
-          {/* Show/Hide All Button */}
+          {/* New Ticket & Show/Hide All Buttons */}
           {(userRole === 'requester' || userRole === 'worker' || userRole === 'admin') && !isPreviewMode && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const allOpen = showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets;
-                if (allOpen) {
-                  // Hide all
-                  setShowDeptTasks(false);
-                  setShowRoutineTasks(false);
-                  setShowOpenTickets(false);
-                  setShowInProgressTickets(false);
-                  setShowResolvedTickets(false);
-                } else {
-                  // Show all
-                  setShowDeptTasks(true);
-                  setShowRoutineTasks(true);
-                  setShowOpenTickets(true);
-                  setShowInProgressTickets(true);
-                  setShowResolvedTickets(true);
-                }
-              }}
-              className="flex items-center gap-1"
-            >
-              {(showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets) ? (
-                <>
-                  <EyeOff className="w-4 h-4" />
-                  <span className="hidden sm:inline">Hide All</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4" />
-                  <span className="hidden sm:inline">Show All</span>
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => navigate(createPageUrl('CreateTicket') + window.location.search)}
+                size="sm"
+                className="bg-violet-600 hover:bg-violet-700"
+              >
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">New Ticket</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allOpen = showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets;
+                  if (allOpen) {
+                    // Hide all
+                    setShowDeptTasks(false);
+                    setShowRoutineTasks(false);
+                    setShowOpenTickets(false);
+                    setShowInProgressTickets(false);
+                    setShowResolvedTickets(false);
+                  } else {
+                    // Show all
+                    setShowDeptTasks(true);
+                    setShowRoutineTasks(true);
+                    setShowOpenTickets(true);
+                    setShowInProgressTickets(true);
+                    setShowResolvedTickets(true);
+                  }
+                }}
+                className="flex items-center gap-1"
+              >
+                {(showDeptTasks && showRoutineTasks && showOpenTickets && showInProgressTickets && showResolvedTickets) ? (
+                  <>
+                    <EyeOff className="w-4 h-4" />
+                    <span className="hidden sm:inline">Hide All</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span className="hidden sm:inline">Show All</span>
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -2292,8 +2302,7 @@ export default function MyDepartment() {
                       Tickets Needing Assignment ({unassignedTickets.filter(t => {
                         const ticketDeptId = getTicketDeptId(t);
                         return userDepartments.some(d => 
-                          ticketDeptId === d.toLowerCase().replace(' ', '_') ||
-                          ticketDeptId === d.toLowerCase()
+                          normalizeDept(d) === ticketDeptId
                         ) || isPreviewMode;
                       }).length})
                     </CardTitle>
