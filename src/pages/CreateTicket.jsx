@@ -727,16 +727,6 @@ export default function CreateTicket() {
       }
     }
 
-    // Auto-infer scope based on IDs only
-    let inferredScope = "BUILDING";
-    if (ticket.asset_id) {
-      inferredScope = "ASSET";
-    } else if (ticket.room_id) {
-      inferredScope = "ROOM";
-    } else if (ticket.building_id) {
-      inferredScope = "BUILDING";
-    }
-
     // Auto-suggest category/priority if not set
     const finalCategory = ticket.category || suggestedCategory || "maintenance";
     const finalPriority = ticket.priority || suggestedPriority || "medium";
@@ -792,6 +782,16 @@ export default function CreateTicket() {
 
       if (inferredScope === "BUILDING" && selectedBuilding) {
         finalBuildingId = selectedBuilding.id;
+      }
+
+      // Infer scope based on final resolved IDs
+      let inferredScope = "BUILDING";
+      if (finalAssetId) {
+        inferredScope = "ASSET";
+      } else if (finalRoomId) {
+        inferredScope = "ROOM";
+      } else if (finalBuildingId) {
+        inferredScope = "BUILDING";
       }
 
       // Create assetHint for department determination
