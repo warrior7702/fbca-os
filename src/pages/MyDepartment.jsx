@@ -168,6 +168,7 @@ export default function MyDepartment() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState("all");
   const [expandedDepts, setExpandedDepts] = useState(['it', 'facilities', 'comms', 'print_shop', 'hospitality']);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -718,6 +719,7 @@ export default function MyDepartment() {
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
     const matchesSource = sourceFilter === "all" || ticket.source === sourceFilter;
+    const matchesScope = scopeFilter === "all" || ticket.scope === scopeFilter;
     
     // Filter based on user role - show ALL department tickets
     const ticketDept = getDepartment(ticket.category);
@@ -738,7 +740,7 @@ export default function MyDepartment() {
     }
     
     // Default (operations manager, etc.)
-    return matchesStatus && matchesPriority && matchesSource;
+    return matchesStatus && matchesPriority && matchesSource && matchesScope;
   });
 
   const ticketsByDept = {
@@ -819,12 +821,13 @@ export default function MyDepartment() {
   const statusData = getTicketsByStatus();
   const monthlyActivityData = getMonthlyActivityByDept();
 
-  const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || sourceFilter !== "all";
+  const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || sourceFilter !== "all" || scopeFilter !== "all";
 
   const clearFilters = () => {
     setStatusFilter("all");
     setPriorityFilter("all");
     setSourceFilter("all");
+    setScopeFilter("all");
   };
 
   if (loading) {
@@ -1967,7 +1970,7 @@ export default function MyDepartment() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="All Status" />
@@ -1992,6 +1995,18 @@ export default function MyDepartment() {
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={scopeFilter} onValueChange={setScopeFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Scopes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Scopes</SelectItem>
+                      <SelectItem value="ASSET">Asset-level</SelectItem>
+                      <SelectItem value="ROOM">Room-level</SelectItem>
+                      <SelectItem value="BUILDING">Building-level</SelectItem>
                     </SelectContent>
                   </Select>
 
