@@ -227,6 +227,25 @@ export default function MyDepartment() {
     return null;
   };
 
+  const getScopeBadge = (scope) => {
+    if (!scope) return null;
+    
+    const scopeConfig = {
+      'ASSET': { label: 'Asset', className: 'bg-blue-100 text-blue-700 border-blue-300' },
+      'ROOM': { label: 'Room', className: 'bg-amber-100 text-amber-700 border-amber-300' },
+      'BUILDING': { label: 'Building', className: 'bg-slate-100 text-slate-700 border-slate-300' }
+    };
+    
+    const config = scopeConfig[scope];
+    if (!config) return null;
+    
+    return (
+      <Badge variant="outline" className={`text-xs ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
   useEffect(() => {
     loadData(); // Async - main data (will call loadDeptTasks after getting userDepartments)
   }, []);
@@ -1637,7 +1656,7 @@ export default function MyDepartment() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                    <span>{ticket.ticket_number}</span>
                                    <span>•</span>
                                    <span>Created {format(new Date(ticket.created_date), 'MMM d')}</span>
@@ -1648,6 +1667,7 @@ export default function MyDepartment() {
                                    }`}>
                                      {ticket.priority}
                                    </Badge>
+                                   {getScopeBadge(ticket.scope)}
                                  </div>
                                  {getLocationDisplay(ticket) && (
                                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
@@ -1719,7 +1739,7 @@ export default function MyDepartment() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                  <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                                 <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
                                    <span>{ticket.ticket_number}</span>
                                    {ticket.assigned_to_name && (
                                      <>
@@ -1735,6 +1755,7 @@ export default function MyDepartment() {
                                      {ticket.status === 'awaiting_information' ? 'Awaiting Info' :
                                       ticket.status === 'awaiting_parts' ? 'Awaiting Parts' : 'In Progress'}
                                    </Badge>
+                                   {getScopeBadge(ticket.scope)}
                                  </div>
                                  {getLocationDisplay(ticket) && (
                                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
@@ -1859,7 +1880,7 @@ export default function MyDepartment() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1">
                               <p className="font-semibold text-slate-900 text-sm">{ticket.subject}</p>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 flex-wrap">
                                 <span>{ticket.ticket_number}</span>
                                 <span>•</span>
                                 <Clock className="w-3 h-3" />
@@ -1872,6 +1893,7 @@ export default function MyDepartment() {
                                     </Badge>
                                   </>
                                 )}
+                                {getScopeBadge(ticket.scope)}
                               </div>
                             </div>
                             <Badge className="bg-red-100 text-red-700 border-red-300">
@@ -2107,6 +2129,7 @@ export default function MyDepartment() {
                                           }`}>
                                             {ticket.priority}
                                           </Badge>
+                                          {getScopeBadge(ticket.scope)}
                                         </div>
                                       </div>
                                     </div>
@@ -2185,7 +2208,7 @@ export default function MyDepartment() {
                               <GripVertical className="w-4 h-4 text-orange-400 mt-1 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-slate-900 text-sm truncate">{ticket.subject}</p>
-                                <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                                <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 flex-wrap">
                                   <span>{ticket.ticket_number}</span>
                                   <Badge className={`text-xs ${
                                     ticket.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -2194,6 +2217,7 @@ export default function MyDepartment() {
                                   }`}>
                                     {ticket.priority}
                                   </Badge>
+                                  {getScopeBadge(ticket.scope)}
                                   <Badge variant="outline" className="text-xs">
                                     {ticket.category?.replace(/_/g, ' ')}
                                   </Badge>
