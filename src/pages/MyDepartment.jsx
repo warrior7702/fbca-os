@@ -213,6 +213,7 @@ export default function MyDepartment() {
   const [opsTasks, setOpsTasks] = useState([]);
   const [loadingOpsTasks, setLoadingOpsTasks] = useState(false);
   const [opsTabView, setOpsTabView] = useState('board');
+  const [opsIncludeAllCategories, setOpsIncludeAllCategories] = useState(false);
 
   const normalizeDept = (s) => (s || '')
     .toLowerCase()
@@ -274,6 +275,13 @@ export default function MyDepartment() {
       loadOpsTasks();
     }
   }, [activeTab]);
+
+  // Reload ops tasks when category filter changes
+  useEffect(() => {
+    if (activeTab === 'eventops' && !loadingOpsTasks) {
+      loadOpsTasks();
+    }
+  }, [opsIncludeAllCategories]);
 
   // Lazy load PCO events only when Room Flow tab is selected
   useEffect(() => {
@@ -398,8 +406,15 @@ export default function MyDepartment() {
     try {
       const allTasks = await base44.entities.Ops_Task.list('-due_at');
       
+      // Filter by task_type - only room_setup and maintenance unless admin enabled all
+      const filteredTasks = opsIncludeAllCategories 
+        ? allTasks 
+        : allTasks.filter(task => 
+            task.task_type === 'room_setup' || task.task_type === 'maintenance'
+          );
+      
       // Enrich with event and room data
-      const enrichedTasks = await Promise.all(allTasks.map(async (task) => {
+      const enrichedTasks = await Promise.all(filteredTasks.map(async (task) => {
         let eventTitle = null;
         let roomName = null;
 
@@ -435,7 +450,10 @@ export default function MyDepartment() {
         return {
           ...task,
           event_title: eventTitle,
-          room_name: roomName
+          room_name: roomName,
+          group: task.task_type === 'room_setup' ? 'Room Setup' : 
+                 task.task_type === 'maintenance' ? 'Maintenance' : 
+                 task.task_type === 'cleaning_alert' ? 'Cleaning' : 'Other'
         };
       }));
 
@@ -2945,6 +2963,32 @@ export default function MyDepartment() {
 
           {(userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities')) && (
             <TabsContent value="eventops" className="space-y-6">
+              {/* Admin Settings */}
+              {userRole === 'admin' && (
+                <Card className="border-2 border-violet-200 bg-violet-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-sm text-slate-900">Category Filter</p>
+                        <p className="text-xs text-slate-600">
+                          {opsIncludeAllCategories 
+                            ? 'Showing all task categories' 
+                            : 'Showing only Room Setup & Maintenance'}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOpsIncludeAllCategories(!opsIncludeAllCategories)}
+                        className={opsIncludeAllCategories ? 'bg-violet-100 border-violet-300' : ''}
+                      >
+                        {opsIncludeAllCategories ? 'Show Core Only' : 'Show All Categories'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Tabs value={opsTabView} onValueChange={setOpsTabView}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="board">Today/Tomorrow</TabsTrigger>
