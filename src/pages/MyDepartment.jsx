@@ -727,21 +727,37 @@ export default function MyDepartment() {
     const matchesSource = sourceFilter === "all" || ticket.source === sourceFilter;
     const matchesScope = scopeFilter === "all" || ticket.scope === scopeFilter;
     
-    // Filter based on user role - show ALL department tickets
-    const ticketDept = getDepartment(ticket.category);
-    const isInUserDept = userDepartments.some(dept => 
-      ticketDept === dept.toLowerCase().replace(' ', '_') ||
-      ticketDept === dept.toLowerCase()
-    );
+    // Only show open-status tickets
+    const openStatuses = ['open', 'awaiting_information', 'awaiting_parts'];
+    if (!openStatuses.includes(ticket.status) && statusFilter === 'all') {
+      // Allow resolved/closed only if explicitly filtered
+      if (!['resolved', 'closed'].includes(ticket.status)) {
+        return false;
+      }
+    }
+    
+    // Filter based on user role - use assigned_department (primary) or category (fallback)
+    let isInUserDept = false;
+    
+    if (ticket.assigned_department) {
+      // Primary: Use assigned_department (case-insensitive)
+      isInUserDept = userDepartments.some(dept => 
+        dept.toLowerCase() === ticket.assigned_department.toLowerCase()
+      );
+    } else {
+      // Fallback: Map category to department
+      const ticketDept = getDepartment(ticket.category);
+      isInUserDept = userDepartments.some(dept => 
+        ticketDept === dept.toLowerCase().replace(' ', '_') ||
+        ticketDept === dept.toLowerCase()
+      );
+    }
     
     if (userRole === 'requester') {
-      // Requesters see all tickets in their department
       return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     } else if (userRole === 'worker') {
-      // Workers see all tickets in their department
       return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     } else if (userRole === 'admin') {
-      // Admins see everything in their departments
       return matchesStatus && matchesPriority && matchesSource && isInUserDept;
     }
     
