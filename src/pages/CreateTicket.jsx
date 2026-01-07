@@ -817,7 +817,7 @@ export default function CreateTicket() {
         scope: inferredScope,
         asset_id: finalAssetId,
         asset_name: finalAssetName,
-        building: ticket.building,
+        building: selectedBuilding?.name || ticket.building || null,
         building_id: finalBuildingId,
         floor_id: finalFloorId,
         room_id: finalRoomId,
