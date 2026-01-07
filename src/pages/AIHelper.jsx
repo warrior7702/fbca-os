@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -68,6 +67,8 @@ export default function AIHelper() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResults, setBackfillResults] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
