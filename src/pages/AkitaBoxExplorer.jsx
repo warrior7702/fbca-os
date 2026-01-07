@@ -36,7 +36,8 @@ export default function AkitaBoxExplorer() {
       color: "from-blue-500 to-cyan-600",
       description: "Browse buildings, floors, rooms, and spaces",
       status: "active",
-      path: "AkitaFetch"
+      path: "AkitaFetch",
+      userFacingName: "FBCA Campus Hub"
     },
     {
       id: "assets",
@@ -45,7 +46,8 @@ export default function AkitaBoxExplorer() {
       color: "from-purple-500 to-pink-600",
       description: "Track equipment, HVAC, electrical, and more",
       status: "active",
-      path: "AkitaFetch"
+      path: "AkitaFetch",
+      userFacingName: "FBCA Campus Hub"
     },
     {
       id: "floorplans",
