@@ -232,25 +232,65 @@ Provide helpful, detailed, and actionable answers. Only suggest navigation when 
     <div className="h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 p-4 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <motion.div
-            animate={{
-              scale: [1, 1.1, 1],
-              rotate: [0, 5, -5, 0]
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg"
-          >
-            <Sparkles className="w-6 h-6 text-white" />
-          </motion.div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">The Light</h1>
-            <p className="text-sm text-slate-600">Your AI assistant for FBCA OS</p>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, -5, 0]
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg"
+            >
+              <Sparkles className="w-6 h-6 text-white" />
+            </motion.div>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-slate-900">The Light</h1>
+              <p className="text-sm text-slate-600">Your AI assistant for FBCA OS</p>
+            </div>
+            {user?.role === 'admin' && (
+              <Button 
+                onClick={handleBackfill}
+                disabled={backfilling}
+                variant="outline"
+                size="sm"
+              >
+                {backfilling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  'Backfill Ticket Departments'
+                )}
+              </Button>
+            )}
           </div>
+          
+          {backfillResults && (
+            <Card className="mt-3">
+              <CardContent className="p-3">
+                {backfillResults.error ? (
+                  <p className="text-sm text-red-600">Error: {backfillResults.error}</p>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-green-600">{backfillResults.message}</p>
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <p>Total tickets processed: {backfillResults.results.total}</p>
+                      <p>Updated: {backfillResults.results.updated}</p>
+                      <p>IT: {backfillResults.results.byDepartment.IT}</p>
+                      <p>Facilities: {backfillResults.results.byDepartment.Facilities}</p>
+                      <p>Skipped: {backfillResults.results.skipped}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
