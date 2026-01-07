@@ -461,8 +461,29 @@ export default function MyDepartment() {
     );
   };
 
-  const getDepartment = (category) => {
-    const deptMap = {
+  const getTicketDeptId = (ticket) => {
+    // 1) Primary: Use assigned_department if present
+    if (ticket.assigned_department) {
+      const deptLower = ticket.assigned_department.toLowerCase()
+        .replace(/[-_\s]+/g, ''); // Normalize: remove hyphens, underscores, spaces
+      
+      // Map to dept IDs (case-insensitive, normalized)
+      const deptMap = {
+        'it': 'it',
+        'facilities': 'facilities',
+        'cleaning': 'facilities', // Map Cleaning to Facilities
+        'communications': 'comms',
+        'comms': 'comms',
+        'printshop': 'print_shop',
+        'hospitality': 'hospitality'
+      };
+      
+      const mappedDept = deptMap[deptLower];
+      if (mappedDept) return mappedDept;
+    }
+    
+    // 2) Fallback: Use category mapping (existing logic)
+    const categoryDeptMap = {
       'technology': 'it',
       'maintenance': 'facilities',
       'cleaning': 'facilities',
@@ -471,7 +492,14 @@ export default function MyDepartment() {
       'social_media': 'comms',
       'communications': 'comms'
     };
-    return deptMap[category] || 'other';
+    
+    if (ticket.category) {
+      const mappedDept = categoryDeptMap[ticket.category];
+      if (mappedDept) return mappedDept;
+    }
+    
+    // 3) Default
+    return 'other';
   };
 
   const getEscalations = () => {
@@ -539,11 +567,11 @@ export default function MyDepartment() {
     };
 
     return {
-      it: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'it')),
-      facilities: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'facilities')),
-      comms: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'comms')),
-      print_shop: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'print_shop')),
-      hospitality: calculateAvgResolution(resolvedTickets.filter(t => getDepartment(t.category) === 'hospitality'))
+      it: calculateAvgResolution(resolvedTickets.filter(t => getTicketDeptId(t) === 'it')),
+      facilities: calculateAvgResolution(resolvedTickets.filter(t => getTicketDeptId(t) === 'facilities')),
+      comms: calculateAvgResolution(resolvedTickets.filter(t => getTicketDeptId(t) === 'comms')),
+      print_shop: calculateAvgResolution(resolvedTickets.filter(t => getTicketDeptId(t) === 'print_shop')),
+      hospitality: calculateAvgResolution(resolvedTickets.filter(t => getTicketDeptId(t) === 'hospitality'))
     };
   };
 
@@ -745,11 +773,11 @@ export default function MyDepartment() {
         dept.toLowerCase() === ticket.assigned_department.toLowerCase()
       );
     } else {
-      // Fallback: Map category to department
-      const ticketDept = getDepartment(ticket.category);
+      // Fallback: Use getTicketDeptId which has category mapping
+      const ticketDeptId = getTicketDeptId(ticket);
       isInUserDept = userDepartments.some(dept => 
-        ticketDept === dept.toLowerCase().replace(' ', '_') ||
-        ticketDept === dept.toLowerCase()
+        ticketDeptId === dept.toLowerCase().replace(' ', '_') ||
+        ticketDeptId === dept.toLowerCase()
       );
     }
     
@@ -766,12 +794,12 @@ export default function MyDepartment() {
   });
 
   const ticketsByDept = {
-    it: filteredTickets.filter(t => getDepartment(t.category) === 'it'),
-    facilities: filteredTickets.filter(t => getDepartment(t.category) === 'facilities'),
-    comms: filteredTickets.filter(t => getDepartment(t.category) === 'comms'),
-    print_shop: filteredTickets.filter(t => getDepartment(t.category) === 'print_shop'),
-    hospitality: filteredTickets.filter(t => getDepartment(t.category) === 'hospitality'),
-    other: filteredTickets.filter(t => getDepartment(t.category) === 'other')
+    it: filteredTickets.filter(t => getTicketDeptId(t) === 'it'),
+    facilities: filteredTickets.filter(t => getTicketDeptId(t) === 'facilities'),
+    comms: filteredTickets.filter(t => getTicketDeptId(t) === 'comms'),
+    print_shop: filteredTickets.filter(t => getTicketDeptId(t) === 'print_shop'),
+    hospitality: filteredTickets.filter(t => getTicketDeptId(t) === 'hospitality'),
+    other: filteredTickets.filter(t => getTicketDeptId(t) === 'other')
   };
 
   const getDeptStats = (deptTickets) => ({
@@ -2259,8 +2287,11 @@ export default function MyDepartment() {
                     <CardTitle className="flex items-center gap-2">
                       <UserPlus className="w-5 h-5 text-orange-600" />
                       Tickets Needing Assignment ({unassignedTickets.filter(t => {
-                        const ticketDept = getDepartment(t.category);
-                        return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                        const ticketDeptId = getTicketDeptId(t);
+                        return userDepartments.some(d => 
+                          ticketDeptId === d.toLowerCase().replace(' ', '_') ||
+                          ticketDeptId === d.toLowerCase()
+                        ) || isPreviewMode;
                       }).length})
                     </CardTitle>
                   </CardHeader>
@@ -2270,22 +2301,18 @@ export default function MyDepartment() {
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-slate-600 mb-2">Drag to assign:</p>
                         {unassignedTickets.filter(t => {
-                          // Primary: Use assigned_department
-                          if (t.assigned_department) {
-                            return userDepartments.some(d => d.toLowerCase() === t.assigned_department.toLowerCase()) || isPreviewMode;
-                          }
-                          // Fallback: Map category to department
-                          const ticketDept = getDepartment(t.category);
-                          return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                          const ticketDeptId = getTicketDeptId(t);
+                          return userDepartments.some(d => 
+                            ticketDeptId === d.toLowerCase().replace(' ', '_') ||
+                            ticketDeptId === d.toLowerCase()
+                          ) || isPreviewMode;
                         }).length > 0 ? (
                           unassignedTickets.filter(t => {
-                            // Primary: Use assigned_department
-                            if (t.assigned_department) {
-                              return userDepartments.some(d => d.toLowerCase() === t.assigned_department.toLowerCase()) || isPreviewMode;
-                            }
-                            // Fallback: Map category to department
-                            const ticketDept = getDepartment(t.category);
-                            return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
+                            const ticketDeptId = getTicketDeptId(t);
+                            return userDepartments.some(d => 
+                              ticketDeptId === d.toLowerCase().replace(' ', '_') ||
+                              ticketDeptId === d.toLowerCase()
+                            ) || isPreviewMode;
                           }).map((ticket) => (
                             <div
                               key={ticket.id}
