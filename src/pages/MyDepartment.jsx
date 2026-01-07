@@ -432,15 +432,12 @@ export default function MyDepartment() {
           }
         }
 
-        // Try to get room name
+        // Try to get room name from PCO_BookableRoom
         if (task.room_id) {
           try {
-            const rooms = await base44.entities.Room.filter({ id: task.room_id });
+            const rooms = await base44.entities.PCO_BookableRoom.filter({ id: task.room_id });
             if (rooms.length > 0) {
-              const room = rooms[0];
-              roomName = room.room_number 
-                ? `${room.room_number} - ${room.room_name || 'Unnamed'}` 
-                : room.room_name;
+              roomName = rooms[0].name;
             }
           } catch (err) {
             console.error('Error fetching room:', err);
