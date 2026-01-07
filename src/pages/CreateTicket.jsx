@@ -113,6 +113,45 @@ export default function CreateTicket() {
     return 'maintenance';
   };
 
+  // Determine assigned department and reason
+  const determineAssignedDepartment = (category, scope, asset) => {
+    let department = null;
+    let reason = null;
+
+    // Check if asset implies technology (for ASSET scope)
+    if (scope === "ASSET" && asset) {
+      const assetLower = (asset.name || '').toLowerCase();
+      const assetCategory = (asset.category || '').toLowerCase();
+      
+      if (assetLower.includes('av') || assetLower.includes('audio') || assetLower.includes('video') ||
+          assetLower.includes('computer') || assetLower.includes('network') || assetLower.includes('projector') ||
+          assetLower.includes('screen') || assetLower.includes('camera') || assetLower.includes('printer') ||
+          assetCategory.includes('av') || assetCategory.includes('network') || assetCategory.includes('technology')) {
+        department = 'IT';
+        reason = `From asset type: ${asset.name}`;
+        return { department, reason };
+      }
+    }
+
+    // Infer from category
+    if (category === 'technology') {
+      department = 'IT';
+      reason = 'From category: technology';
+    } else if (category === 'maintenance') {
+      department = 'Facilities';
+      reason = 'From category: maintenance';
+    } else if (category === 'cleaning') {
+      department = 'Facilities';
+      reason = 'From category: cleaning';
+    } else {
+      // Default
+      department = 'Facilities';
+      reason = 'Defaulted to Facilities';
+    }
+
+    return { department, reason };
+  };
+
   const loadURLParams = async () => {
     const params = new URLSearchParams(window.location.search);
     const buildingId = params.get('building_id');
@@ -747,6 +786,13 @@ export default function CreateTicket() {
         finalBuildingId = selectedBuilding.id;
       }
       
+      // Determine assigned department and reason
+      const { department: assignedDept, reason: deptReason } = determineAssignedDepartment(
+        finalCategory,
+        inferredScope,
+        selectedAssetEntity
+      );
+      
       const ticketData = {
         ticket_number: newTicketNumber,
         requester_email: ticket.requester_email,
@@ -765,6 +811,8 @@ export default function CreateTicket() {
         priority: finalPriority,
         priority_reason: priorityReason || null,
         category: finalCategory,
+        assigned_department: assignedDept,
+        assigned_department_reason: deptReason,
         recurring_issue: isRecurring,
         source: "web_form",
         due_date: tomorrowStr,
