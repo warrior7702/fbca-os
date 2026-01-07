@@ -2270,10 +2270,20 @@ export default function MyDepartment() {
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-slate-600 mb-2">Drag to assign:</p>
                         {unassignedTickets.filter(t => {
+                          // Primary: Use assigned_department
+                          if (t.assigned_department) {
+                            return userDepartments.some(d => d.toLowerCase() === t.assigned_department.toLowerCase()) || isPreviewMode;
+                          }
+                          // Fallback: Map category to department
                           const ticketDept = getDepartment(t.category);
                           return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
                         }).length > 0 ? (
                           unassignedTickets.filter(t => {
+                            // Primary: Use assigned_department
+                            if (t.assigned_department) {
+                              return userDepartments.some(d => d.toLowerCase() === t.assigned_department.toLowerCase()) || isPreviewMode;
+                            }
+                            // Fallback: Map category to department
                             const ticketDept = getDepartment(t.category);
                             return userDepartments.some(d => ticketDept === d.toLowerCase().replace(' ', '_')) || isPreviewMode;
                           }).map((ticket) => (
