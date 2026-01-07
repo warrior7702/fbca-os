@@ -830,6 +830,8 @@ export default function CreateTicket() {
         assigned_department_reason: deptReason,
         recurring_issue: isRecurring,
         source: "web_form",
+        source_context_type: inferredContext.type || null,
+        source_context_url: window.location.href,
         due_date: tomorrowStr,
         attachments: ticket.attachments,
         last_activity_at: new Date().toISOString()
