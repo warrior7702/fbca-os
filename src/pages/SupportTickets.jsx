@@ -113,13 +113,6 @@ export default function SupportTickets() {
     };
   }, [ticketId]);
 
-  // Also refresh when component re-renders without ticketId (navigating back)
-  useEffect(() => {
-    if (!ticketId && !loading) {
-      loadData();
-    }
-  }, []);
-
   const loadData = async () => {
     setLoading(true);
     try {
@@ -150,11 +143,17 @@ export default function SupportTickets() {
       let ticketsData;
       let myRequests = [];
 
+      // Fetch tickets based on role with optimized queries
       if (adminStatus) {
-        // Admins see all tickets
-        ticketsData = await base44.entities.Ticket.list('-created_date');
+        // Admins see all support tickets (exclude archived to reduce data load)
+        const allTickets = await base44.entities.Ticket.list('-created_date');
+        ticketsData = allTickets.filter(t => 
+          t.category && 
+          ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
+          t.status !== 'archived'
+        );
       } else if (workerStatus) {
-        // Workers see department tickets they're working on
+        // Workers: Fetch all, filter client-side (unavoidable without complex queries)
         const allTickets = await base44.entities.Ticket.list('-created_date');
         
         // Map category to department
@@ -167,15 +166,18 @@ export default function SupportTickets() {
           return deptMap[category] || null;
         };
         
-        // Filter to their department tickets
+        // Filter to their department tickets + support categories + not archived
         ticketsData = allTickets.filter(t => {
+          if (!t.category || t.status === 'archived') return false;
+          if (!['technology', 'cleaning', 'maintenance'].includes(t.category)) return false;
+          
           const ticketDept = getDepartment(t.category);
           return ticketDept && departments.some(d => 
             d.toLowerCase() === ticketDept.toLowerCase()
           );
         });
         
-        // Also get tickets they personally requested (separate list)
+        // Personal requests (separate list)
         myRequests = allTickets.filter(t => 
           t.requester_email === currentUser.email &&
           t.category && 
@@ -183,19 +185,16 @@ export default function SupportTickets() {
           t.status !== 'archived'
         );
       } else {
-        // Regular users only see their own requests
-        ticketsData = await base44.entities.Ticket.filter({
+        // Regular users: fetch only their tickets
+        const userTickets = await base44.entities.Ticket.filter({
           requester_email: currentUser.email
         });
+        ticketsData = userTickets.filter(t => 
+          t.category && 
+          ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
+          t.status !== 'archived'
+        );
       }
-      
-      // Filter to show only support request tickets (technology, cleaning, maintenance)
-      // Exclude workflow/communications tickets and archived tickets
-      ticketsData = ticketsData.filter(t => 
-        t.category && 
-        ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
-        t.status !== 'archived'
-      );
       
       setTickets(ticketsData);
       setMyRequestedTickets(myRequests);
@@ -311,14 +310,18 @@ export default function SupportTickets() {
     return aDue - bDue;
   });
 
-  const stats = {
-    total: ticketsToFilter.length,
-    active: ticketsToFilter.filter(t => ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length,
-    open: ticketsToFilter.filter(t => t.status === 'open').length,
-    awaiting_info: ticketsToFilter.filter(t => t.status === 'awaiting_information').length,
-    awaiting_parts: ticketsToFilter.filter(t => t.status === 'awaiting_parts').length,
-    resolved: ticketsToFilter.filter(t => t.status === 'resolved').length
-  };
+  // Calculate stats in single pass for performance
+  const stats = ticketsToFilter.reduce((acc, t) => {
+    acc.total++;
+    if (['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)) {
+      acc.active++;
+    }
+    if (t.status === 'open') acc.open++;
+    if (t.status === 'awaiting_information') acc.awaiting_info++;
+    if (t.status === 'awaiting_parts') acc.awaiting_parts++;
+    if (t.status === 'resolved') acc.resolved++;
+    return acc;
+  }, { total: 0, active: 0, open: 0, awaiting_info: 0, awaiting_parts: 0, resolved: 0 });
 
   const hasFilters = priorityFilter !== "all" || categoryFilter !== "all" || searchQuery || roomIdFilter || scopeFilter || statusFilterFromUrl;
 
@@ -498,11 +501,14 @@ export default function SupportTickets() {
             </TabsTrigger>
             <TabsTrigger value="pool" className="gap-2">
               Unassigned Pool
-              {tickets.filter(t => !t.assigned_to && ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length > 0 && (
-                <Badge className="ml-1 bg-orange-500">
-                  {tickets.filter(t => !t.assigned_to && ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length}
-                </Badge>
-              )}
+              {(() => {
+                const unassignedCount = tickets.filter(t => !t.assigned_to && ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(t.status)).length;
+                return unassignedCount > 0 && (
+                  <Badge className="ml-1 bg-orange-500">
+                    {unassignedCount}
+                  </Badge>
+                );
+              })()}
             </TabsTrigger>
             <TabsTrigger value="resolved" className="gap-2">
               Resolved
