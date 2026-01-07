@@ -369,27 +369,22 @@ export default function CreateTicket() {
       const reasons = [];
 
       // Check for recurring issues (3+ tickets in 6 months)
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      try {
+        const countResponse = await base44.functions.invoke('countTicketsInLastMonthsForScope', {
+          asset_id: selectedAssetEntity?.id || urlAssetId || null,
+          room_id: ticket.room_id || null,
+          months: 6
+        });
 
-      const allTickets = await base44.entities.Ticket.list();
-      let historicalTickets = [];
-
-      if (selectedAssetEntity) {
-        historicalTickets = allTickets.filter(t => 
-          t.asset_id === selectedAssetEntity.id &&
-          new Date(t.created_date) >= sixMonthsAgo
-        );
-      } else if (ticket.room_id) {
-        historicalTickets = allTickets.filter(t => 
-          t.room_id === ticket.room_id &&
-          new Date(t.created_date) >= sixMonthsAgo
-        );
-      }
-
-      if (historicalTickets.length >= 3) {
-        setIsRecurring(true);
-        reasons.push("recurring issue");
+        if (countResponse.data?.success && countResponse.data.count >= 3) {
+          setIsRecurring(true);
+          reasons.push("recurring issue");
+        } else {
+          setIsRecurring(false);
+        }
+      } catch (error) {
+        console.error('Error checking recurring issues:', error);
+        setIsRecurring(false);
       }
 
       // Asset-based suggestions
@@ -450,11 +445,7 @@ export default function CreateTicket() {
         reasons.push("building-wide issue");
       }
 
-      // Repeated ticket (+1 level)
-      if (historicalTickets.length > 0 && historicalTickets.length < 3 && basePrio !== "critical") {
-        basePrio = basePrio === "low" ? "medium" : basePrio === "medium" ? "high" : "critical";
-        reasons.push("repeated issue");
-      }
+
 
       if (suggestedCat) setSuggestedCategory(suggestedCat);
       setSuggestedPriority(basePrio);
@@ -470,53 +461,31 @@ export default function CreateTicket() {
   // Check for duplicate tickets before submission
   const checkDuplicateTickets = async () => {
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const allTickets = await base44.entities.Ticket.list();
-      const recentOpenTickets = allTickets.filter(t => {
-        const isOpen = ['open', 'awaiting_information', 'awaiting_parts'].includes(t.status);
-        const isRecent = new Date(t.created_date) >= thirtyDaysAgo;
-        return isOpen && isRecent;
-      });
-
       // Determine current scope based on IDs
       let currentScope = "BUILDING";
-      if (ticket.asset_id) {
+      let scopeAssetId = urlAssetId || ticket.asset_id || null;
+      let scopeRoomId = ticket.room_id || null;
+      let scopeBuildingId = ticket.building_id || null;
+
+      if (scopeAssetId) {
         currentScope = "ASSET";
-      } else if (ticket.room_id) {
+      } else if (scopeRoomId) {
         currentScope = "ROOM";
-      } else if (ticket.building_id) {
+      } else if (scopeBuildingId) {
         currentScope = "BUILDING";
       }
 
-      const duplicates = recentOpenTickets.filter(t => {
-        // Match based on scope using IDs
-        if (currentScope === "ASSET" && t.scope === "ASSET") {
-          // Prefer asset_id matching when available
-          if (urlAssetId && t.asset_id === urlAssetId) {
-            return true;
-          }
-          // Fallback to asset_name matching if asset_id is missing
-          if (!urlAssetId && assetSearch && t.asset_name?.toLowerCase() === assetSearch.toLowerCase()) {
-            return true;
-          }
-        } else if (currentScope === "ROOM" && t.scope === "ROOM") {
-          // Room match using room_id
-          if (ticket.room_id && t.room_id === ticket.room_id) {
-            return true;
-          }
-        } else if (currentScope === "BUILDING" && t.scope === "BUILDING") {
-          // Building match using building_id
-          if (ticket.building_id && t.building_id === ticket.building_id) {
-            return true;
-          }
-        }
-        return false;
+      // Call backend function to get recent open tickets for this scope
+      const response = await base44.functions.invoke('getRecentOpenTicketsForScope', {
+        scope: currentScope,
+        asset_id: scopeAssetId,
+        room_id: scopeRoomId,
+        building_id: scopeBuildingId,
+        days: 30
       });
 
-      if (duplicates.length > 0) {
-        setDuplicateTickets(duplicates);
+      if (response.data?.success && response.data.tickets?.length > 0) {
+        setDuplicateTickets(response.data.tickets);
         setShowDuplicateWarning(true);
         return true;
       }
