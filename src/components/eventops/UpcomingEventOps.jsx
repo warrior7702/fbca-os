@@ -51,6 +51,16 @@ export default function UpcomingEventOps() {
         .sort((a, b) => parseISO(a.starts_at) - parseISO(b.starts_at));
       
       setEventOpsItems(upcomingItems);
+
+      // Find max last_synced_at from all items
+      const syncDates = allItems
+        .filter(item => item.last_synced_at)
+        .map(item => new Date(item.last_synced_at));
+      
+      if (syncDates.length > 0) {
+        const maxSyncDate = new Date(Math.max(...syncDates));
+        setLastSyncedAt(maxSyncDate);
+      }
     } catch (error) {
       console.error('Error loading event ops items:', error);
       toast.error('Failed to load upcoming events');
