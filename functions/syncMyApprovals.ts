@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+import { fetchPCO } from './utils/pcoConfig.js';
 
 const A = (x) => Array.isArray(x) ? x : [];
 
@@ -71,9 +72,11 @@ Deno.serve(async (req) => {
 
         // STEP 1: Get my PCO person ID
         console.log('📝 STEP 1: Getting my PCO person ID...');
-        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        const meResponse = await fetchPCO(
+            base44,
+            '/calendar/v2/me',
+            accessToken
+        );
 
         if (!meResponse.ok) {
             console.log('❌ Failed to get PCO user:', meResponse.status);
@@ -86,9 +89,10 @@ Deno.serve(async (req) => {
 
         // STEP 2: Get ALL approval groups
         console.log('📝 STEP 2: Getting all approval groups...');
-        const groupsResponse = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        const groupsResponse = await fetchPCO(
+            base44,
+            '/calendar/v2/resource_approval_groups?per_page=100',
+            accessToken
         );
 
         if (!groupsResponse.ok) {
@@ -115,9 +119,10 @@ Deno.serve(async (req) => {
             
             console.log(`🔍 Checking group: ${group.attributes?.name}`);
             
-            const membersResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            const membersResponse = await fetchPCO(
+                base44,
+                `/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+                accessToken
             );
             
             if (membersResponse.ok) {
@@ -145,9 +150,10 @@ Deno.serve(async (req) => {
             await delay(100);
             
             // Map resources to groups
-            const resourcesResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            const resourcesResponse = await fetchPCO(
+                base44,
+                `/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+                accessToken
             );
 
             if (resourcesResponse.ok) {
@@ -186,7 +192,7 @@ Deno.serve(async (req) => {
         // STEP 4: Get pending requests
         console.log('📝 STEP 4: Fetching all pending resource requests...');
         let allRequests = [];
-        let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource';
+        let nextUrl = '/calendar/v2/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource';
         
         const eventMap = {};
         const resourceMap = {};
@@ -197,9 +203,7 @@ Deno.serve(async (req) => {
             
             console.log(`  - Fetching page ${pageCount + 1}...`);
             
-            const requestsResponse = await fetch(nextUrl, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            const requestsResponse = await fetchPCO(base44, nextUrl, accessToken);
 
             if (!requestsResponse.ok) {
                 console.log(`  ❌ Failed to fetch page ${pageCount + 1}: ${requestsResponse.status}`);
@@ -255,7 +259,7 @@ Deno.serve(async (req) => {
         const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
         
         const eventInstanceMap = {};
-        let instanceNextUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
+        let instanceNextUrl = `/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
         let instancePageCount = 0;
         
         while (instanceNextUrl && instancePageCount < 20) {
@@ -263,9 +267,7 @@ Deno.serve(async (req) => {
             
             console.log(`  - Fetching instance page ${instancePageCount + 1}...`);
             
-            const instancesResponse = await fetch(instanceNextUrl, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            const instancesResponse = await fetchPCO(base44, instanceNextUrl, accessToken);
             
             if (!instancesResponse.ok) {
                 console.log(`  ❌ Failed to fetch instance page ${instancePageCount + 1}: ${instancesResponse.status}`);
