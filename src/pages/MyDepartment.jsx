@@ -70,6 +70,7 @@ import { FolderKanban } from "lucide-react";
 import TodayTomorrowBoard from "@/components/eventops/TodayTomorrowBoard";
 import RoomTimelineTab from "@/components/eventops/RoomTimelineTab";
 import QueueTab from "@/components/eventops/QueueTab";
+import UpcomingEventOps from "@/components/eventops/UpcomingEventOps";
 
 function RoomFlowCountdown({ pcoEvents }) {
   const [now, setNow] = useState(new Date());
@@ -3024,6 +3025,9 @@ export default function MyDepartment() {
                   )}
                 </TabsContent>
               </Tabs>
+
+              {/* Upcoming Event Ops Section */}
+              <UpcomingEventOps />
             </TabsContent>
           )}
 
