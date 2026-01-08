@@ -24,6 +24,7 @@ export default function UpcomingEventOps() {
   const [eventOpsItems, setEventOpsItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedEventIds, setExpandedEventIds] = useState([]);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useEffect(() => {
     loadEventOpsItems();
