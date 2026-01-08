@@ -146,6 +146,9 @@ export default function UpcomingEventOps() {
     );
   }
 
+  // Check if sync is stale (older than 2 hours)
+  const isSyncStale = lastSyncedAt && differenceInHours(new Date(), lastSyncedAt) > 2;
+
   return (
     <Card>
       <CardHeader>
@@ -157,6 +160,32 @@ export default function UpcomingEventOps() {
           </Badge>
         </CardTitle>
       </CardHeader>
+      
+      {/* Last Synced Banner */}
+      {lastSyncedAt && (
+        <div className={`px-6 py-2 border-b flex items-center justify-between ${
+          isSyncStale 
+            ? 'bg-amber-50 border-amber-200' 
+            : 'bg-slate-50 border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2 text-sm">
+            {isSyncStale ? (
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            ) : (
+              <RefreshCw className="w-4 h-4 text-slate-500" />
+            )}
+            <span className={isSyncStale ? 'text-amber-700 font-medium' : 'text-slate-600'}>
+              Last synced: {format(lastSyncedAt, 'MMM d, h:mm a')}
+            </span>
+            {isSyncStale && (
+              <span className="text-xs text-amber-600">
+                (over 2 hours ago)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      
       <CardContent>
         <div className="space-y-6">
           {sortedDateKeys.map(dateKey => {
