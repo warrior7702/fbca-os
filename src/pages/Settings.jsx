@@ -100,8 +100,6 @@ export default function Settings() {
       
       if (urlParams.get('connected') === 'pco') {
         toast.success('Planning Center connected successfully!');
-      } else if (urlParams.get('connected') === 'clickup') {
-        toast.success('ClickUp connected successfully!');
       } else if (urlParams.get('connected') === 'microsoft') {
         toast.success('Microsoft 365 connected successfully!');
       } else if (urlParams.get('error')) {
@@ -381,28 +379,7 @@ export default function Settings() {
     }
   };
 
-  const handleConnectClickUp = () => {
-    const vercelUrl = "https://pco-webhook.vercel.app";
-    const appUrl = window.location.origin;
-    const settingsUrl = `${appUrl}/Settings`;
-    const state = user.id;
-    
-    window.location.href = `${vercelUrl}/api/clickup-auth?state=${state}&redirect_url=${encodeURIComponent(settingsUrl)}`;
-  };
 
-  const handleDisconnectClickUp = async () => {
-    try {
-      await base44.auth.updateMe({
-        clickup_access_token: null,
-        clickup_refresh_token: null,
-        clickup_token_expires_at: null
-      });
-      toast.success("ClickUp disconnected");
-      loadUser();
-    } catch (error) {
-      toast.error("Failed to disconnect");
-    }
-  };
 
   const handleConnectMicrosoft = () => {
     // SSO users should never need to manually connect
@@ -611,16 +588,6 @@ export default function Settings() {
                 onDisconnect={handleDisconnectPCO}
                 description="Sync calendars, events, and service planning"
                 color="blue"
-              />
-
-              <ConnectionStatusCard
-                title="ClickUp"
-                icon={CheckSquare}
-                isConnected={!!user?.clickup_access_token}
-                onConnect={handleConnectClickUp}
-                onDisconnect={handleDisconnectClickUp}
-                description="Manage tasks, projects, and workflows"
-                color="purple"
               />
 
               {/* Microsoft 365 Card - ONLY show if NOT an SSO user */}
