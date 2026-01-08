@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { fetchPCO } from './utils/pcoConfig.js';
 
 const A = (x) => Array.isArray(x) ? x : [];
 
@@ -60,12 +61,10 @@ Deno.serve(async (req) => {
         // Fetch all rooms from PCO
         console.log('📝 Fetching rooms from PCO...');
         let allRooms = [];
-        let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/rooms?per_page=100';
+        let nextUrl = '/calendar/v2/rooms?per_page=100';
         
         while (nextUrl) {
-            const roomsResponse = await fetch(nextUrl, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            const roomsResponse = await fetchPCO(base44, nextUrl, accessToken);
 
             if (!roomsResponse.ok) {
                 throw new Error(`Failed to fetch rooms: ${roomsResponse.status}`);
