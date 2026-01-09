@@ -78,7 +78,22 @@ Deno.serve(async (req) => {
       nextUrl = data.links?.next || null;
     }
     
-    logs.push(`Fetched ${allRooms.length} rooms from PCO`);
+    logs.push(`Fetched ${allRooms.length} resources from PCO`);
+    
+    // Filter out service resources (not physical rooms)
+    const serviceResourceNames = [
+      'av', 'building access', 'catering', 'childcare', 'display boards',
+      'emergency response', 'police presence', 'host', 'maintenance',
+      'people movers', 'technology', 'registration tables', 'room setup',
+      'tv cart', 'food service', 'photographer', 'mystery resource'
+    ];
+    
+    allRooms = allRooms.filter(room => {
+      const roomName = (room.attributes?.name || '').toLowerCase();
+      return !serviceResourceNames.some(service => roomName.includes(service));
+    });
+    
+    logs.push(`Filtered to ${allRooms.length} physical rooms (excluded service resources)`);
     
     // Get all Campus Hub rooms
     const campusHubRooms = await base44.asServiceRole.entities.Room.list();
