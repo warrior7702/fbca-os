@@ -93,9 +93,8 @@ Deno.serve(async (req) => {
     for (const pcoRoom of allRooms) {
       const pcoRoomId = pcoRoom.id;
       const pcoRoomName = pcoRoom.attributes?.name || 'Unknown';
-      const isBookable = pcoRoom.attributes?.bookable === true;
-      
-      logs.push(`PCO Room: ${pcoRoomName} (${pcoRoomId}) - bookable: ${pcoRoom.attributes?.bookable} -> ${isBookable}`);
+      // PCO doesn't return bookable attribute when true - only when false
+      const isBookable = pcoRoom.attributes?.bookable !== false;
       
       // Try to find matching Campus Hub room by pco_resource_id
       let campusRoom = campusHubRooms.find(r => r.pco_resource_id === pcoRoomId);
