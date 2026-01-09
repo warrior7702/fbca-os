@@ -71,6 +71,9 @@ import TodayTomorrowBoard from "@/components/eventops/TodayTomorrowBoard";
 import RoomTimelineTab from "@/components/eventops/RoomTimelineTab";
 import QueueTab from "@/components/eventops/QueueTab";
 import UpcomingEventOps from "@/components/eventops/UpcomingEventOps";
+import EventOpsQueue from "@/components/eventops/EventOpsQueue";
+import EventOpsDetailDrawer from "@/components/eventops/EventOpsDetailDrawer";
+import RoomHeatMap from "@/components/eventops/RoomHeatMap";
 
 function RoomFlowCountdown({ pcoEvents }) {
   const [now, setNow] = useState(new Date());
@@ -215,6 +218,9 @@ export default function MyDepartment() {
   const [loadingOpsTasks, setLoadingOpsTasks] = useState(false);
   const [opsTabView, setOpsTabView] = useState('board');
   const [opsIncludeAllCategories, setOpsIncludeAllCategories] = useState(false);
+  const [selectedEventOps, setSelectedEventOps] = useState(null);
+  const [roomFilterId, setRoomFilterId] = useState(null);
+  const [roomFilterDate, setRoomFilterDate] = useState(null);
 
   const normalizeDept = (s) => (s || '')
     .toLowerCase()
@@ -2961,73 +2967,32 @@ export default function MyDepartment() {
 
           {(userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities')) && (
             <TabsContent value="eventops" className="space-y-6">
-              {/* Admin Settings */}
-              {userRole === 'admin' && (
-                <Card className="border-2 border-violet-200 bg-violet-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-sm text-slate-900">Category Filter</p>
-                        <p className="text-xs text-slate-600">
-                          {opsIncludeAllCategories 
-                            ? 'Showing all task categories' 
-                            : 'Showing only Room Setup & Maintenance'}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setOpsIncludeAllCategories(!opsIncludeAllCategories)}
-                        className={opsIncludeAllCategories ? 'bg-violet-100 border-violet-300' : ''}
-                      >
-                        {opsIncludeAllCategories ? 'Show Core Only' : 'Show All Categories'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Event Ops Queue */}
+              <EventOpsQueue 
+                onEventClick={(event) => setSelectedEventOps(event)}
+                roomFilter={roomFilterId}
+                dateFilter={roomFilterDate}
+              />
 
-              <Tabs value={opsTabView} onValueChange={setOpsTabView}>
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="board">Today/Tomorrow</TabsTrigger>
-                  <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
-                  <TabsTrigger value="queue">Queue</TabsTrigger>
-                </TabsList>
+              {/* Room Heat Map */}
+              <RoomHeatMap 
+                onCellClick={(roomId, date) => {
+                  setRoomFilterId(roomId);
+                  setRoomFilterDate(date);
+                  toast.info(`Filtered to room on ${format(new Date(date), 'MMM d')}`);
+                }}
+              />
 
-                <TabsContent value="board" className="mt-6">
-                  {loadingOpsTasks ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
-                    </div>
-                  ) : (
-                    <TodayTomorrowBoard 
-                      tasks={opsTasks} 
-                      onTaskClick={(task) => toast.info('Task detail view coming soon')}
-                    />
-                  )}
-                </TabsContent>
-
-                <TabsContent value="timeline" className="mt-6">
-                  <RoomTimelineTab />
-                </TabsContent>
-
-                <TabsContent value="queue" className="mt-6">
-                  {loadingOpsTasks ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
-                    </div>
-                  ) : (
-                    <QueueTab 
-                      tasks={opsTasks}
-                      onTaskUpdate={loadOpsTasks}
-                      onTaskClick={(task) => toast.info('Task detail view coming soon')}
-                    />
-                  )}
-                </TabsContent>
-              </Tabs>
-
-              {/* Upcoming Event Ops Section */}
-              <UpcomingEventOps />
+              {/* Event Ops Detail Drawer */}
+              <EventOpsDetailDrawer
+                event={selectedEventOps}
+                isOpen={!!selectedEventOps}
+                onClose={() => setSelectedEventOps(null)}
+                onUpdate={() => {
+                  // Refresh queue
+                  setSelectedEventOps(null);
+                }}
+              />
             </TabsContent>
           )}
 
