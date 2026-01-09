@@ -87,7 +87,10 @@ Deno.serve(async (req) => {
             const errorText = await tokenResponse.text();
             console.error('❌ Token exchange failed:', tokenResponse.status);
             console.error('❌ Response:', errorText);
-            return Response.redirect(buildRedirectUrl('tab=integrations&error=token_exchange_failed'), 302);
+            return new Response(null, {
+                status: 302,
+                headers: { 'Location': buildRedirectUrl('tab=integrations&error=token_exchange_failed') }
+            });
         }
 
         const tokens = await tokenResponse.json();
