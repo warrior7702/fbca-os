@@ -28,13 +28,19 @@ Deno.serve(async (req) => {
         // Handle PCO OAuth error
         if (error) {
             console.error('❌ PCO returned error:', error);
-            return Response.redirect(buildRedirectUrl('tab=integrations&error=pco_auth_failed'), 302);
+            return new Response(null, {
+                status: 302,
+                headers: { 'Location': buildRedirectUrl('tab=integrations&error=pco_auth_failed') }
+            });
         }
 
         // Validate required parameters
         if (!code || !state) {
             console.error('❌ Missing required parameters');
-            return Response.redirect(buildRedirectUrl('tab=integrations&error=missing_params'), 302);
+            return new Response(null, {
+                status: 302,
+                headers: { 'Location': buildRedirectUrl('tab=integrations&error=missing_params') }
+            });
         }
 
         console.log('✅ Parameters validated');
