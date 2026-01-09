@@ -144,6 +144,6 @@ Deno.serve(async (req) => {
         
         const url = new URL(req.url);
         const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-        return Response.redirect(`${redirectBase}/settings?tab=integrations&error=callback_failed`, 302);
+        return Response.redirect(`${redirectBase}/#/Settings?tab=integrations&error=callback_failed`, 302);
     }
 });
