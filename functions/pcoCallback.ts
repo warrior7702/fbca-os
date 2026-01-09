@@ -143,10 +143,22 @@ Deno.serve(async (req) => {
         console.log('🎉 Success! Redirecting to:', successUrl);
         console.log('========================================');
         
-        return new Response(null, {
-            status: 302,
+        // Use HTML meta refresh as backup for redirect
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="refresh" content="0;url=${successUrl}">
+    <script>window.location.href="${successUrl}";</script>
+</head>
+<body>
+    <p>Redirecting to settings...</p>
+</body>
+</html>`;
+        
+        return new Response(html, {
+            status: 200,
             headers: {
-                'Location': successUrl
+                'Content-Type': 'text/html',
             }
         });
 
