@@ -59,7 +59,10 @@ Deno.serve(async (req) => {
         
         if (!clientId || !clientSecret) {
             console.error('❌ Missing PCO credentials');
-            return Response.redirect(buildRedirectUrl('tab=integrations&error=pco_credentials_missing'), 302);
+            return new Response(null, {
+                status: 302,
+                headers: { 'Location': buildRedirectUrl('tab=integrations&error=pco_credentials_missing') }
+            });
         }
 
         console.log('✅ PCO credentials found');
