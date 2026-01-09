@@ -60,9 +60,9 @@ Deno.serve(async (req) => {
     const accessToken = await refreshPCOToken(base44.asServiceRole, user);
     logs.push('PCO token refreshed');
     
-    // Fetch all resources of type "Room" from PCO
+    // Fetch all rooms from PCO (use /rooms endpoint, not /resources)
     let allRooms = [];
-    let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/resources?where[resource_type]=Room&per_page=100';
+    let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/rooms?per_page=100';
     
     while (nextUrl) {
       const response = await fetch(nextUrl, {
@@ -78,22 +78,7 @@ Deno.serve(async (req) => {
       nextUrl = data.links?.next || null;
     }
     
-    logs.push(`Fetched ${allRooms.length} resources from PCO`);
-    
-    // Filter out service resources (not physical rooms)
-    const serviceResourceNames = [
-      'av', 'building access', 'catering', 'childcare', 'display boards',
-      'emergency response', 'police presence', 'host', 'maintenance',
-      'people movers', 'technology', 'registration tables', 'room setup',
-      'tv cart', 'food service', 'photographer', 'mystery resource'
-    ];
-    
-    allRooms = allRooms.filter(room => {
-      const roomName = (room.attributes?.name || '').toLowerCase();
-      return !serviceResourceNames.some(service => roomName.includes(service));
-    });
-    
-    logs.push(`Filtered to ${allRooms.length} physical rooms (excluded service resources)`);
+    logs.push(`Fetched ${allRooms.length} rooms from PCO`);
     
     // Get all Campus Hub rooms
     const campusHubRooms = await base44.asServiceRole.entities.Room.list();
