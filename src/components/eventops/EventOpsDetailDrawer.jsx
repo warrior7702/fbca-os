@@ -290,7 +290,7 @@ export default function EventOpsDetailDrawer({ event, isOpen, onClose, onUpdate 
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Notes</label>
                       <Textarea
-                        value={room.notes || ""}
+                        defaultValue={room.notes || ""}
                         onChange={(e) => {
                           // Debounced update
                           clearTimeout(window.notesTimeout);
