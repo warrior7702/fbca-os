@@ -2967,6 +2967,35 @@ export default function MyDepartment() {
 
           {(userRole === 'admin' || userDepartments.some(d => d.toLowerCase() === 'facilities')) && (
             <TabsContent value="eventops" className="space-y-6">
+              {/* Active Filters Display */}
+              {(roomFilterId || roomFilterDate) && (
+                <Card className="border-2 border-amber-300 bg-amber-50">
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Filter className="w-4 h-4 text-amber-700" />
+                      <span className="font-medium text-amber-900">Active filters applied</span>
+                      {roomFilterDate && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                          {format(new Date(roomFilterDate), 'MMM d')}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRoomFilterId(null);
+                        setRoomFilterDate(null);
+                        toast.success('Filters cleared');
+                      }}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Clear Filters
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Event Ops Queue */}
               <EventOpsQueue 
                 onEventClick={(event) => setSelectedEventOps(event)}
@@ -2989,7 +3018,7 @@ export default function MyDepartment() {
                 isOpen={!!selectedEventOps}
                 onClose={() => setSelectedEventOps(null)}
                 onUpdate={() => {
-                  // Refresh queue
+                  // Refresh queue - could reload events here
                   setSelectedEventOps(null);
                 }}
               />
