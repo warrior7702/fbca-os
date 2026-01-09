@@ -67,6 +67,7 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
+import BookableRoomsAdmin from './pages/BookableRoomsAdmin';
 import __Layout from './Layout.jsx';
 
 
@@ -140,6 +141,7 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
+    "BookableRoomsAdmin": BookableRoomsAdmin,
 }
 
 export const pagesConfig = {
