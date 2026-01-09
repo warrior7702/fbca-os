@@ -126,12 +126,17 @@ Deno.serve(async (req) => {
         console.log('✅ User updated successfully');
         console.log('⏱️ Total time:', elapsed, 'ms');
 
-        // Redirect to settings with success (lowercase!)
+        // Redirect to settings with success
         const successUrl = buildRedirectUrl(`tab=integrations&connected=pco&t=${Date.now()}`);
         console.log('🎉 Success! Redirecting to:', successUrl);
         console.log('========================================');
         
-        return Response.redirect(successUrl, 302);
+        return new Response(null, {
+            status: 302,
+            headers: {
+                'Location': successUrl
+            }
+        });
 
     } catch (error) {
         const elapsed = Date.now() - startTime;
