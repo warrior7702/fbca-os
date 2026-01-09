@@ -60,9 +60,9 @@ Deno.serve(async (req) => {
     const accessToken = await refreshPCOToken(base44.asServiceRole, user);
     logs.push('PCO token refreshed');
     
-    // Fetch all rooms from PCO (use /rooms endpoint, not /resources)
+    // Fetch all rooms from PCO
     let allRooms = [];
-    let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/rooms?per_page=100';
+    let nextUrl = 'https://api.planningcenteronline.com/calendar/v2/resources?where[resource_type]=Room&per_page=100';
     
     while (nextUrl) {
       const response = await fetch(nextUrl, {
