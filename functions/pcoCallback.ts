@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
         // Helper to build redirect URL
         const buildRedirectUrl = (params) => {
             const redirectBase = baseUrl || `${url.protocol}//${url.host}`;
-            return `${redirectBase}/#/Settings?${params}`;
+            return `${redirectBase}/Settings?${params}`;
         };
 
         // Handle PCO OAuth error
