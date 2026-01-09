@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     logs.push(`Found ${campusHubRooms.length} rooms in Campus Hub`);
     
     let matched = 0;
-    let unmatched = 0;
+    let created = 0;
     let updated = 0;
     const unmatchedRooms = [];
     
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       }
       
       if (campusRoom) {
-        // Update Campus Hub room with PCO bookable status
+        // Update existing Campus Hub room with PCO bookable status
         try {
           await base44.asServiceRole.entities.Room.update(campusRoom.id, {
             pco_resource_id: pcoRoomId,
@@ -123,16 +123,27 @@ Deno.serve(async (req) => {
           logs.push(`Error updating room ${campusRoom.room_number}: ${err.message}`);
         }
       } else {
-        unmatched++;
-        unmatchedRooms.push({
-          pco_id: pcoRoomId,
-          pco_name: pcoRoomName,
-          is_bookable: isBookable
-        });
+        // Create new Campus Hub room from PCO room
+        try {
+          await base44.asServiceRole.entities.Room.create({
+            akita_room_id: `pco_${pcoRoomId}`,
+            room_name: pcoRoomName,
+            room_number: pcoRoomName,
+            pco_resource_id: pcoRoomId,
+            is_bookable: isBookable,
+            bookable_source: 'PCO',
+            category: 'Interior',
+            status: 'Active',
+            last_pco_sync_at: new Date().toISOString()
+          });
+          created++;
+        } catch (err) {
+          logs.push(`Error creating room ${pcoRoomName}: ${err.message}`);
+        }
       }
     }
     
-    logs.push(`Matched: ${matched}, Unmatched: ${unmatched}, Updated: ${updated}`);
+    logs.push(`Matched: ${matched}, Created: ${created}, Updated: ${updated}`);
     
     const durationMs = Date.now() - startTime;
     
@@ -142,10 +153,9 @@ Deno.serve(async (req) => {
         pco_rooms_total: allRooms.length,
         campus_hub_rooms_total: campusHubRooms.length,
         matched,
-        unmatched,
+        created,
         updated
       },
-      unmatched_pco_rooms: unmatchedRooms,
       duration_ms: durationMs,
       logs
     });
