@@ -4,36 +4,50 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     
-    const body = await req.json();
-    const { requester_email, limit = 5 } = body;
+    const body = await req.json().catch(() => ({}));
+    const { requester_email: providedEmail, limit = 10 } = body;
 
-    // Validate requester_email
-    if (!requester_email || typeof requester_email !== 'string') {
-      return Response.json({ error: 'requester_email required' }, { status: 400 });
+    // Determine requester email
+    let requesterEmail = providedEmail;
+    
+    if (!requesterEmail) {
+      // Try to get from authenticated user
+      try {
+        const user = await base44.auth.me();
+        requesterEmail = user?.email;
+      } catch (error) {
+        // No authenticated user, that's ok - we'll check below
+      }
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(requester_email)) {
-      return Response.json({ error: 'requester_email required' }, { status: 400 });
+    // If still no email, return error
+    if (!requesterEmail) {
+      return Response.json({ 
+        success: false, 
+        error: 'No requester_email provided and no authenticated user found' 
+      }, { status: 200 });
     }
 
-    // Enforce max limit of 10
-    const effectiveLimit = Math.min(Math.max(1, limit), 10);
+    // Enforce max limit of 25
+    const effectiveLimit = Math.min(Math.max(1, limit), 25);
 
-    // Query open tickets for this user
-    const tickets = await base44.entities.Ticket.filter(
-      { 
-        requester_email: requester_email,
-        status: 'open'
-      },
-      '-created_date',
-      effectiveLimit
-    );
+    // Query tickets with open-like statuses
+    const allTickets = await base44.entities.Ticket.list('-created_date');
+    
+    const openStatuses = ['open', 'awaiting_information', 'awaiting_parts'];
+    const filteredTickets = allTickets
+      .filter(ticket => 
+        ticket.requester_email === requesterEmail && 
+        openStatuses.includes(ticket.status)
+      )
+      .slice(0, effectiveLimit);
 
     // Return only the specified fields
     const response = {
-      tickets: tickets.map(ticket => ({
+      success: true,
+      requester_email: requesterEmail,
+      count: filteredTickets.length,
+      tickets: filteredTickets.map(ticket => ({
         ticket_number: ticket.ticket_number,
         subject: ticket.subject,
         status: ticket.status,
@@ -45,6 +59,9 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in getMyOpenTickets:', error);
-    return Response.json({ error: 'internal_error' }, { status: 500 });
+    return Response.json({ 
+      success: false, 
+      error: 'Internal server error occurred' 
+    }, { status: 200 });
   }
 });
