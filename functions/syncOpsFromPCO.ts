@@ -111,8 +111,8 @@ Deno.serve(async (req) => {
     const targetGroupIds = [roomSetupsGroup?.id, maintenanceGroup?.id].filter(Boolean);
     logs.push(`Target groups: ${targetGroupIds.join(', ')}`);
     
-    // Fetch event instances
-    const eventsUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=starts_at&where[starts_at][gte]=${startStr}&where[starts_at][lte]=${endStr}&per_page=100&include=event,resource_bookings`;
+    // Fetch event instances with resource requests for answers
+    const eventsUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=starts_at&where[starts_at][gte]=${startStr}&where[starts_at][lte]=${endStr}&per_page=100&include=event,resource_bookings,event.resource_requests`;
     const eventsData = await fetchPCOData(accessToken, eventsUrl);
     
     logs.push(`Fetched ${eventsData.data?.length || 0} events`);
@@ -174,6 +174,12 @@ Deno.serve(async (req) => {
           i.relationships?.event_instance?.data?.id === instanceId
         ) || [];
         
+        // Get resource requests for approval answers
+        const resourceRequests = eventsData.included?.filter(i => 
+          i.type === 'ResourceRequest' && 
+          i.relationships?.event?.data?.id === eventId
+        ) || [];
+        
         // Check if any bookings are for Room Setups or Maintenance
         let needsRoomSetup = false;
         let needsMaintenance = false;
@@ -198,6 +204,21 @@ Deno.serve(async (req) => {
         
         // Calculate setup_due_at (60 minutes before start)
         const setupDueAt = new Date(new Date(startsAt).getTime() - 60 * 60 * 1000);
+        
+        // Extract approval answers
+        const roomSetupsAnswers = {};
+        const maintenanceAnswers = {};
+        
+        for (const request of resourceRequests) {
+          const approvalGroupId = request.relationships?.resource_approval_group?.data?.id;
+          const requestData = request.attributes || {};
+          
+          if (approvalGroupId === roomSetupsGroup?.id) {
+            Object.assign(roomSetupsAnswers, requestData.approval_answers || {});
+          } else if (approvalGroupId === maintenanceGroup?.id) {
+            Object.assign(maintenanceAnswers, requestData.approval_answers || {});
+          }
+        }
         
         // Calculate alerts
         const eventDate = new Date(startsAt);
@@ -224,7 +245,14 @@ Deno.serve(async (req) => {
           rooms_count: eventRooms.length,
           alert_saturday_night_priority: alertSaturdayNightPriority,
           last_synced_at: new Date().toISOString(),
-          raw_pco: instance
+          raw_pco: {
+            instance,
+            event: eventDetails,
+            approval_answers: {
+              room_setups: roomSetupsAnswers,
+              maintenance: maintenanceAnswers
+            }
+          }
         };
         
         // Only update PCO-derived fields if record exists

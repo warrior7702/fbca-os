@@ -9,15 +9,16 @@ import { format, parseISO, addDays, isWithinInterval, startOfDay } from "date-fn
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-export default function EventOpsQueue({ onEventClick }) {
+export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState("all");
   const [dayRangeFilter, setDayRangeFilter] = useState("next_14_days");
+  const [rooms, setRooms] = useState([]);
 
   useEffect(() => {
     loadEvents();
-  }, [dayRangeFilter]);
+  }, [dayRangeFilter, roomFilter, dateFilter]);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -36,7 +37,7 @@ export default function EventOpsQueue({ onEventClick }) {
         endDate = addDays(now, 14);
       }
       
-      const filtered = allEvents.filter(event => {
+      let filtered = allEvents.filter(event => {
         const eventStart = parseISO(event.starts_at);
         return isWithinInterval(eventStart, {
           start: startOfDay(now),
@@ -44,7 +45,31 @@ export default function EventOpsQueue({ onEventClick }) {
         });
       });
       
+      // Apply room filter if set
+      if (roomFilter) {
+        const roomOpsRecords = await base44.entities.RoomOps.filter({ room_pco_resource_id: roomFilter });
+        const eventIds = roomOpsRecords.map(r => r.pco_event_id);
+        filtered = filtered.filter(e => eventIds.includes(e.pco_event_id));
+      }
+      
+      // Apply date filter if set
+      if (dateFilter) {
+        const filterDate = startOfDay(new Date(dateFilter));
+        const filterDateEnd = addDays(filterDate, 1);
+        filtered = filtered.filter(event => {
+          const eventStart = parseISO(event.starts_at);
+          return isWithinInterval(eventStart, {
+            start: filterDate,
+            end: filterDateEnd
+          });
+        });
+      }
+      
       setEvents(filtered);
+      
+      // Load rooms for display
+      const allRooms = await base44.entities.Room.filter({ is_bookable: true });
+      setRooms(allRooms);
     } catch (error) {
       console.error('Error loading events:', error);
       toast.error('Failed to load events');

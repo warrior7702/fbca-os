@@ -142,7 +142,7 @@ export default function RoomHeatMap({ onCellClick }) {
                       <td
                         key={date}
                         onClick={() => {
-                          if (dayData && onCellClick) {
+                          if (onCellClick) {
                             onCellClick(room.room_id, date);
                           }
                         }}

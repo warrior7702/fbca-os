@@ -117,6 +117,32 @@ export default function EventOpsDetailDrawer({ event, isOpen, onClose, onUpdate 
             {event.owner_name && (
               <p className="text-sm text-slate-600">Owner: {event.owner_name}</p>
             )}
+            
+            {/* Approval Answers */}
+            {event.raw_pco?.approval_answers && (
+              <div className="mt-3 space-y-2">
+                {event.needs_room_setup && Object.keys(event.raw_pco.approval_answers.room_setups || {}).length > 0 && (
+                  <div className="bg-blue-50 rounded p-2 border border-blue-200">
+                    <p className="text-xs font-semibold text-blue-900 mb-1">Room Setup Details:</p>
+                    {Object.entries(event.raw_pco.approval_answers.room_setups).map(([q, a]) => (
+                      <p key={q} className="text-xs text-slate-700">
+                        <span className="font-medium">{q}:</span> {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {event.needs_maintenance && Object.keys(event.raw_pco.approval_answers.maintenance || {}).length > 0 && (
+                  <div className="bg-orange-50 rounded p-2 border border-orange-200">
+                    <p className="text-xs font-semibold text-orange-900 mb-1">Maintenance Details:</p>
+                    {Object.entries(event.raw_pco.approval_answers.maintenance).map(([q, a]) => (
+                      <p key={q} className="text-xs text-slate-700">
+                        <span className="font-medium">{q}:</span> {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Rooms List */}
