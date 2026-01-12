@@ -1216,10 +1216,16 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="meetings">Meetings</TabsTrigger>
             <TabsTrigger value="notes">
               AI Notes
+              {allMeetingNotes.filter(n => n.summary).length > 0 && (
+                <Badge variant="secondary" className="ml-2">{allMeetingNotes.filter(n => n.summary).length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="recordings">
+              Recordings
               {allMeetingNotes.length > 0 && (
                 <Badge variant="secondary" className="ml-2">{allMeetingNotes.length}</Badge>
               )}
@@ -1595,6 +1601,161 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="recordings" className="space-y-6 mt-6">
+            {loadingNotes ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-600">Loading recordings...</p>
+              </div>
+            ) : allMeetingNotes.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Mic className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No recordings yet</h3>
+                  <p className="text-slate-600">Start recording meetings to see them here.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {allMeetingNotes.map((note) => {
+                  const isProcessed = !!note.summary;
+                  return (
+                    <Card key={note.id} className={`border-2 ${isProcessed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-slate-900">{note.meeting_subject || 'Untitled Meeting'}</h3>
+                              {isProcessed ? (
+                                <Badge className="bg-green-600 text-white">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Processed
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-600 text-white">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Not Processed
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="space-y-1 text-sm text-slate-600">
+                              <p className="flex items-center gap-2">
+                                <CalendarIcon className="w-4 h-4" />
+                                {format(new Date(note.meeting_date), 'PPp')}
+                              </p>
+                              {note.recording_duration && (
+                                <p className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4" />
+                                  Duration: {Math.floor(note.recording_duration / 60)}m {note.recording_duration % 60}s
+                                </p>
+                              )}
+                              {note.audio_url && (
+                                <p className="flex items-center gap-2">
+                                  <Download className="w-4 h-4" />
+                                  <a 
+                                    href={note.audio_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline truncate"
+                                  >
+                                    {note.audio_url}
+                                  </a>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {!isProcessed && (
+                              <Button
+                                onClick={async () => {
+                                  if (!note.audio_url) {
+                                    toast.error('No audio URL found');
+                                    return;
+                                  }
+                                  
+                                  setProcessingNotes(true);
+                                  const processingToast = toast.loading("Reprocessing audio with AI...");
+                                  
+                                  try {
+                                    const timeoutPromise = new Promise((_, reject) =>
+                                      setTimeout(() => reject(new Error('AI processing timed out after 10 minutes.')), 600000)
+                                    );
+                                    
+                                    const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
+                                      audio_url: note.audio_url,
+                                      meeting_subject: note.meeting_subject,
+                                      meeting_date: note.meeting_date,
+                                      attendees: note.speakers || []
+                                    });
+                                    
+                                    const notesResponse = await Promise.race([notesPromise, timeoutPromise]);
+                                    
+                                    if (!notesResponse.data || notesResponse.data.error) {
+                                      throw new Error(notesResponse.data?.error || 'Failed to generate notes');
+                                    }
+                                    
+                                    await base44.entities.MeetingNote.update(note.id, {
+                                      summary: notesResponse.data.summary || '',
+                                      key_points: notesResponse.data.key_points || [],
+                                      outline: notesResponse.data.outline || [],
+                                      action_items: notesResponse.data.action_items || [],
+                                      speakers: notesResponse.data.speakers || [],
+                                      transcript: notesResponse.data.transcript || '',
+                                      transcript_segments: notesResponse.data.transcript_segments || []
+                                    });
+                                    
+                                    await loadAllMeetingNotes(user);
+                                    toast.success("Notes generated successfully!", { id: processingToast });
+                                  } catch (error) {
+                                    console.error("Error reprocessing:", error);
+                                    toast.error(`Failed: ${error.message}`, { id: processingToast });
+                                  } finally {
+                                    setProcessingNotes(false);
+                                  }
+                                }}
+                                disabled={processingNotes}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                {processingNotes ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Process with AI
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            {isProcessed && (
+                              <Button
+                                onClick={() => setViewingNoteDetail(note)}
+                                variant="outline"
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                View Notes
+                              </Button>
+                            )}
+                            <Button
+                              onClick={() => handleDeleteNote(note.id)}
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
