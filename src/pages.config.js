@@ -7,6 +7,7 @@ import AkitaSyncAdmin from './pages/AkitaSyncAdmin';
 import Approvals from './pages/Approvals';
 import AssignmentRules from './pages/AssignmentRules';
 import BackfillEventCodes from './pages/BackfillEventCodes';
+import BookableRoomsAdmin from './pages/BookableRoomsAdmin';
 import BrandAssets from './pages/BrandAssets';
 import Buildings from './pages/Buildings';
 import Calendar from './pages/Calendar';
@@ -67,7 +68,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import BookableRoomsAdmin from './pages/BookableRoomsAdmin';
 import __Layout from './Layout.jsx';
 
 
@@ -81,6 +81,7 @@ export const PAGES = {
     "Approvals": Approvals,
     "AssignmentRules": AssignmentRules,
     "BackfillEventCodes": BackfillEventCodes,
+    "BookableRoomsAdmin": BookableRoomsAdmin,
     "BrandAssets": BrandAssets,
     "Buildings": Buildings,
     "Calendar": Calendar,
@@ -141,7 +142,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "BookableRoomsAdmin": BookableRoomsAdmin,
 }
 
 export const pagesConfig = {
