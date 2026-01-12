@@ -405,6 +405,7 @@ export default function MyMeetings() {
 
     setProcessingNotes(true);
     const processingToast = toast.loading("Starting AI processing...");
+    let savedNoteId = null;
 
     try {
       console.log('🎙️ Step 1: Uploading audio file...');
@@ -419,9 +420,24 @@ export default function MyMeetings() {
 
       console.log('✅ Audio uploaded successfully');
       console.log('File URL:', uploadResponse.file_url);
-      toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
 
-      console.log('🤖 Step 2: Generating meeting notes with AI...');
+      // SAVE RECORDING IMMEDIATELY - before AI processing
+      console.log('💾 Step 2: Saving recording to database (before AI processing)...');
+      toast.loading("Audio saved! Processing with AI...", { id: processingToast });
+      
+      const savedNote = await base44.entities.MeetingNote.create({
+        meeting_id: selectedMeeting.id,
+        meeting_subject: selectedMeeting.subject,
+        meeting_date: selectedMeeting.start,
+        user_email: user.email,
+        audio_url: uploadResponse.file_url,
+        recording_duration: recordingTime
+      });
+      
+      savedNoteId = savedNote.id;
+      console.log('✅ Recording saved with ID:', savedNoteId);
+
+      console.log('🤖 Step 3: Generating meeting notes with AI...');
 
       // Prepare attendees data
       const attendeesData = selectedMeeting.attendees?.map(a => ({
@@ -438,7 +454,7 @@ export default function MyMeetings() {
 
       // Set a longer timeout for AI processing
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Please try again or contact support if this persists.')), 600000)
+        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Your recording has been saved and you can retry processing from the Recordings tab.')), 600000)
       );
 
       const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
@@ -463,26 +479,20 @@ export default function MyMeetings() {
         throw new Error(notesResponse.data.error);
       }
 
-      toast.loading("Saving notes...", { id: processingToast });
+      toast.loading("Updating notes...", { id: processingToast });
 
-      console.log('💾 Step 3: Saving notes to database...');
-      const savedNote = await base44.entities.MeetingNote.create({
-        meeting_id: selectedMeeting.id,
-        meeting_subject: selectedMeeting.subject,
-        meeting_date: selectedMeeting.start,
-        user_email: user.email,
-        audio_url: uploadResponse.file_url,
+      console.log('💾 Step 4: Updating notes with AI results...');
+      await base44.entities.MeetingNote.update(savedNoteId, {
         summary: notesResponse.data.summary || '',
         key_points: notesResponse.data.key_points || [],
         outline: notesResponse.data.outline || [],
         action_items: notesResponse.data.action_items || [],
         speakers: notesResponse.data.speakers || [],
         transcript: notesResponse.data.transcript || '',
-        transcript_segments: notesResponse.data.transcript_segments || [],
-        recording_duration: recordingTime
+        transcript_segments: notesResponse.data.transcript_segments || []
       });
 
-      console.log('💾 Notes saved to database with ID:', savedNote.id);
+      console.log('💾 Notes updated in database');
 
       setMeetingNotes(notesResponse.data);
       setSavedNotes(savedNote);
@@ -496,7 +506,15 @@ export default function MyMeetings() {
       console.error("❌ Error generating notes:", error);
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
-      toast.error(`Failed: ${error.message}`, { id: processingToast });
+      
+      // Reload notes to show the saved recording even if AI failed
+      if (savedNoteId) {
+        await loadAllMeetingNotes(user);
+        toast.error(`${error.message} Check the Recordings tab to retry.`, { id: processingToast, duration: 6000 });
+        setActiveTab('recordings');
+      } else {
+        toast.error(`Failed: ${error.message}`, { id: processingToast });
+      }
     } finally {
       setProcessingNotes(false);
       console.log('🏁 Generate notes process complete');
@@ -1058,6 +1076,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
 
     setProcessingNotes(true);
     const processingToast = toast.loading("Starting AI processing...");
+    let savedNoteId = null;
 
     try {
       toast.loading("Uploading audio...", { id: processingToast });
@@ -1066,7 +1085,23 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
         file: new File([audioBlob], 'meeting-recording.mp3', { type: 'audio/mpeg' })
       });
 
-      toast.loading("Audio uploaded! Processing with AI... (this may take 30-60 seconds)", { id: processingToast });
+      // Use selectedCalendarEvent for meeting_id and meeting_date if available
+      const meetingIdForNotes = selectedCalendarEvent?.id || ('adhoc-' + Date.now());
+      const meetingDateForNotes = selectedCalendarEvent?.start || new Date().toISOString();
+
+      // SAVE RECORDING IMMEDIATELY - before AI processing
+      toast.loading("Audio saved! Processing with AI...", { id: processingToast });
+      
+      const savedNote = await base44.entities.MeetingNote.create({
+        meeting_id: meetingIdForNotes,
+        meeting_subject: adHocMeetingTitle,
+        meeting_date: meetingDateForNotes,
+        user_email: user.email,
+        audio_url: uploadResponse.file_url,
+        recording_duration: recordingTime
+      });
+      
+      savedNoteId = savedNote.id;
 
       const attendeesData = adHocAttendees.map(a => ({
         name: a.name,
@@ -1074,12 +1109,8 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
       }));
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Please try again or contact support if this persists.')), 600000)
+        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Your recording has been saved and you can retry processing from the Recordings tab.')), 600000)
       );
-
-      // Use selectedCalendarEvent for meeting_id and meeting_date if available
-      const meetingIdForNotes = selectedCalendarEvent?.id || ('adhoc-' + Date.now());
-      const meetingDateForNotes = selectedCalendarEvent?.start || new Date().toISOString();
 
       const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
         audio_url: uploadResponse.file_url,
@@ -1094,22 +1125,16 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
         throw new Error(notesResponse.data?.error || 'Failed to generate notes');
       }
 
-      toast.loading("Saving notes...", { id: processingToast });
+      toast.loading("Updating notes...", { id: processingToast });
 
-      const savedNote = await base44.entities.MeetingNote.create({
-        meeting_id: meetingIdForNotes,
-        meeting_subject: adHocMeetingTitle,
-        meeting_date: meetingDateForNotes,
-        user_email: user.email,
-        audio_url: uploadResponse.file_url,
+      await base44.entities.MeetingNote.update(savedNoteId, {
         summary: notesResponse.data.summary || '',
         key_points: notesResponse.data.key_points || [],
         outline: notesResponse.data.outline || [],
         action_items: notesResponse.data.action_items || [],
         speakers: notesResponse.data.speakers || [],
         transcript: notesResponse.data.transcript || '',
-        transcript_segments: notesResponse.data.transcript_segments || [],
-        recording_duration: recordingTime
+        transcript_segments: notesResponse.data.transcript_segments || []
       });
 
       setMeetingNotes(notesResponse.data);
@@ -1130,7 +1155,16 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
 
     } catch (error) {
       console.error("Error generating notes:", error);
-      toast.error(`Failed: ${error.message}`, { id: processingToast });
+      
+      // Reload notes to show the saved recording even if AI failed
+      if (savedNoteId) {
+        await loadAllMeetingNotes(user);
+        toast.error(`${error.message} Check the Recordings tab to retry.`, { id: processingToast, duration: 6000 });
+        setActiveTab('recordings');
+        setShowAdHocRecording(false);
+      } else {
+        toast.error(`Failed: ${error.message}`, { id: processingToast });
+      }
     } finally {
       setProcessingNotes(false);
     }
