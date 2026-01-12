@@ -438,7 +438,7 @@ export default function MyMeetings() {
 
       // Set a longer timeout for AI processing
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AI processing timed out after 2 minutes. Please try again or with a shorter recording.')), 120000)
+        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Please try again or contact support if this persists.')), 600000)
       );
 
       const notesPromise = base44.functions.invoke('transcribeMeetingAudio', {
@@ -1074,7 +1074,7 @@ ${notesData.transcript ? '\nTranscript:\n' + notesData.transcript : ''}
       }));
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AI processing timed out after 2 minutes.')), 120000)
+        setTimeout(() => reject(new Error('AI processing timed out after 10 minutes. Please try again or contact support if this persists.')), 600000)
       );
 
       // Use selectedCalendarEvent for meeting_id and meeting_date if available
