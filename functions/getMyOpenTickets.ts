@@ -28,19 +28,14 @@ Deno.serve(async (req) => {
       }, { status: 200 });
     }
 
-    // Enforce max limit of 25
-    const effectiveLimit = Math.min(Math.max(1, limit), 25);
-
-    // Query tickets with open-like statuses
-    const allTickets = await base44.entities.Ticket.list('-created_date');
-    
+    // Query tickets with open-like statuses using service role for admin access
     const openStatuses = ['open', 'awaiting_information', 'awaiting_parts'];
-    const filteredTickets = allTickets
-      .filter(ticket => 
-        ticket.requester_email === requesterEmail && 
-        openStatuses.includes(ticket.status)
-      )
-      .slice(0, effectiveLimit);
+    const allTickets = await base44.asServiceRole.entities.Ticket.list('-created_date');
+    
+    const filteredTickets = allTickets.filter(ticket => 
+      ticket.requester_email === requesterEmail && 
+      openStatuses.includes(ticket.status)
+    );
 
     // Return only the specified fields
     const response = {
