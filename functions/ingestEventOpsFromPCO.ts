@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         ends_at: event.ends_at,
         approval_status: event.approval_status || null,
         percent_approved: event.percent_approved || null,
-        flags: event.flags || {},
+        flags: (event.flags && typeof event.flags === 'object' && !Array.isArray(event.flags)) ? event.flags : {},
         raw_payload: event,
         last_synced_at: now
       };
