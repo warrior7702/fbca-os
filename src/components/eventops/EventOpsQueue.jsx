@@ -23,7 +23,7 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
   const loadEvents = async () => {
     setLoading(true);
     try {
-      const allEvents = await base44.entities.EventOps.list('-starts_at');
+      const allEvents = await base44.entities.EventOps.list('starts_at');
       
       // Apply day range filter
       const now = new Date();
