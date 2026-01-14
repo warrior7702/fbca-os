@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
 
     let totalRooms = 0;
     let totalResources = 0;
+    let skippedInvalid = [];
 
     // Process each event
     for (const event of payload.events) {
@@ -76,9 +77,41 @@ Deno.serve(async (req) => {
       // Process resources for this event
       if (event.resources && Array.isArray(event.resources)) {
         for (const resource of event.resources) {
+          // Derive pco_resource_id using fallback chain
+          let pcoResourceId = 
+            resource.pco_resource_id ||
+            resource.pcoResourceId ||
+            resource.resource_id ||
+            resource.resourceId ||
+            resource.id;
+
+          // If still missing, build synthetic ID
+          if (!pcoResourceId || typeof pcoResourceId !== 'string' || pcoResourceId.trim() === '') {
+            if (resource.booking_id || resource.bookingId || resource.pco_booking_id) {
+              const bookingId = resource.booking_id || resource.bookingId || resource.pco_booking_id;
+              pcoResourceId = `booking:${bookingId}`;
+            } else if (resource.name) {
+              // Sanitize name to stable string
+              const sanitizedName = String(resource.name).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+              pcoResourceId = `fallback:${event.event_id}:${sanitizedName}`;
+            }
+          }
+
+          // Validate we have a valid ID
+          if (!pcoResourceId || typeof pcoResourceId !== 'string' || pcoResourceId.trim() === '') {
+            console.warn(`⚠️ Skipping resource: missing pco_resource_id for event ${event.event_id}`);
+            skippedInvalid.push({
+              event_id: event.event_id,
+              name: resource.name || 'unknown',
+              original_keys: Object.keys(resource),
+              reason: 'missing_pco_resource_id'
+            });
+            continue;
+          }
+
           const resourceData = {
             event_id: event.event_id,
-            pco_resource_id: resource.id,
+            pco_resource_id: pcoResourceId,
             approval_group_name: resource.approval_group_name || null,
             approval_status: resource.approval_status || null,
             quantity: resource.quantity || 1,
@@ -95,7 +128,7 @@ Deno.serve(async (req) => {
             
             const existingRooms = await base44.asServiceRole.entities.EventOpsRoom.filter({
               event_id: event.event_id,
-              pco_resource_id: resource.id
+              pco_resource_id: pcoResourceId
             });
 
             if (existingRooms.length > 0) {
@@ -112,7 +145,7 @@ Deno.serve(async (req) => {
 
             const existingResources = await base44.asServiceRole.entities.EventOpsResource.filter({
               event_id: event.event_id,
-              pco_resource_id: resource.id
+              pco_resource_id: pcoResourceId
             });
 
             if (existingResources.length > 0) {
@@ -153,6 +186,9 @@ Deno.serve(async (req) => {
     }
 
     console.log(`\n🎉 Ingest complete: ${payload.events.length} events, ${totalRooms} rooms, ${totalResources} resources`);
+    if (skippedInvalid.length > 0) {
+      console.warn(`⚠️ Skipped ${skippedInvalid.length} invalid items:`, skippedInvalid);
+    }
 
     return Response.json({
       ok: true,
@@ -160,8 +196,10 @@ Deno.serve(async (req) => {
         events: payload.events.length,
         rooms: totalRooms,
         resources: totalResources,
+        skipped_invalid: skippedInvalid.length,
         timestamp: now
-      }
+      },
+      skipped_items: skippedInvalid
     });
 
   } catch (error) {
