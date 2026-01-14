@@ -37,11 +37,18 @@ Deno.serve(async (req) => {
     const allTickets = await base44.asServiceRole.entities.Ticket.list();
     const ticketNumber = `TKT-${String(allTickets.length + 1).padStart(6, '0')}`;
 
+    // Determine scope based on provided fields
+    let scope = 'BUILDING'; // default
+    if (room_number) {
+      scope = 'ROOM';
+    }
+
     // Create ticket
     const ticketData = {
       ticket_number: ticketNumber,
       subject: subject,
       description: body,
+      scope: scope,
       category: ticketCategory,
       source: 'email',
       status: 'open',
