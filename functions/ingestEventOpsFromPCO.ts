@@ -54,6 +54,10 @@ Deno.serve(async (req) => {
         event_id: event.event_id
       });
 
+      // Collect room and resource IDs for this event
+      const eventRoomIds = [];
+      const eventResourceIds = [];
+
       const eventData = {
         event_id: event.event_id,
         event_name: event.name || event.title,
@@ -62,9 +66,14 @@ Deno.serve(async (req) => {
         approval_status: event.approval_status || null,
         percent_approved: event.percent_approved || null,
         flags: (event.flags && typeof event.flags === 'object' && !Array.isArray(event.flags)) ? event.flags : {},
+        categories: event.categories || {},
         raw_payload: event,
         last_synced_at: now
       };
+
+      // Add linkage arrays
+      eventData.linked_room_ids = eventRoomIds;
+      eventData.linked_resource_ids = eventResourceIds;
 
       if (existingEvents.length > 0) {
         await base44.asServiceRole.entities.EventOpsEvent.update(existingEvents[0].id, eventData);
@@ -97,16 +106,14 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Validate we have a valid ID
+          // Validate we have a valid ID, or generate synthetic one
           if (!pcoResourceId || typeof pcoResourceId !== 'string' || pcoResourceId.trim() === '') {
-            console.warn(`⚠️ Skipping resource: missing pco_resource_id for event ${event.event_id}`);
-            skippedInvalid.push({
-              event_id: event.event_id,
-              name: resource.name || 'unknown',
-              original_keys: Object.keys(resource),
-              reason: 'missing_pco_resource_id'
-            });
-            continue;
+            // Generate synthetic ID
+            const kind = resource.kind || 'unknown';
+            const name = (resource.name || 'unnamed').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+            const approvalGroup = resource.approval_group_name ? `:${resource.approval_group_name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}` : '';
+            pcoResourceId = `synthetic:${kind}:${name}${approvalGroup}`;
+            console.log(`  🔧 Generated synthetic ID: ${pcoResourceId}`);
           }
 
           const resourceData = {
@@ -125,6 +132,7 @@ Deno.serve(async (req) => {
           if (isRoom) {
             // Process as room
             resourceData.room_name = resource.name;
+            eventRoomIds.push(pcoResourceId);
             
             const existingRooms = await base44.asServiceRole.entities.EventOpsRoom.filter({
               event_id: event.event_id,
@@ -142,6 +150,7 @@ Deno.serve(async (req) => {
             resourceData.resource_name = resource.name;
             resourceData.kind = resource.kind || 'Resource';
             resourceData.category = resource.category || null;
+            eventResourceIds.push(pcoResourceId);
 
             const existingResources = await base44.asServiceRole.entities.EventOpsResource.filter({
               event_id: event.event_id,
@@ -157,6 +166,99 @@ Deno.serve(async (req) => {
           }
         }
       }
+    }
+
+    // Process top-level rooms array
+    console.log('\n📦 Processing top-level rooms array...');
+    if (payload.rooms && Array.isArray(payload.rooms)) {
+      for (const room of payload.rooms) {
+        // Derive pco_resource_id
+        let pcoResourceId = 
+          room.pco_resource_id ||
+          room.pcoResourceId ||
+          room.resource_id ||
+          room.resourceId ||
+          room.id;
+
+        // Generate synthetic ID if needed
+        if (!pcoResourceId || typeof pcoResourceId !== 'string' || pcoResourceId.trim() === '') {
+          const name = (room.name || 'unnamed').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          const approvalGroup = room.approval_group_name ? `:${room.approval_group_name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}` : '';
+          pcoResourceId = `synthetic:Room:${name}${approvalGroup}`;
+          console.log(`  🔧 Generated synthetic room ID: ${pcoResourceId}`);
+        }
+
+        const roomData = {
+          event_id: room.event_id || null,
+          pco_resource_id: pcoResourceId,
+          room_name: room.name,
+          approval_group_name: room.approval_group_name || null,
+          approval_status: room.approval_status || null,
+          quantity: room.quantity || 1,
+          answers: room.answers || [],
+          last_synced_at: now
+        };
+
+        const existingRooms = await base44.asServiceRole.entities.EventOpsRoom.filter({
+          pco_resource_id: pcoResourceId
+        });
+
+        if (existingRooms.length > 0) {
+          await base44.asServiceRole.entities.EventOpsRoom.update(existingRooms[0].id, roomData);
+        } else {
+          await base44.asServiceRole.entities.EventOpsRoom.create(roomData);
+          totalRooms++;
+        }
+      }
+      console.log(`  ✅ Processed ${payload.rooms.length} top-level rooms`);
+    }
+
+    // Process top-level resources array
+    console.log('\n📦 Processing top-level resources array...');
+    if (payload.resources && Array.isArray(payload.resources)) {
+      for (const resource of payload.resources) {
+        // Derive pco_resource_id
+        let pcoResourceId = 
+          resource.pco_resource_id ||
+          resource.pcoResourceId ||
+          resource.resource_id ||
+          resource.resourceId ||
+          resource.id;
+
+        // Generate synthetic ID if needed
+        if (!pcoResourceId || typeof pcoResourceId !== 'string' || pcoResourceId.trim() === '') {
+          const kind = resource.kind || 'Resource';
+          const name = (resource.name || 'unnamed').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          const approvalGroup = resource.approval_group_name ? `:${resource.approval_group_name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}` : '';
+          pcoResourceId = `synthetic:${kind}:${name}${approvalGroup}`;
+          console.log(`  🔧 Generated synthetic resource ID: ${pcoResourceId}`);
+        }
+
+        const resourceData = {
+          event_id: resource.event_id || null,
+          pco_resource_id: pcoResourceId,
+          resource_name: resource.name,
+          kind: resource.kind || 'Resource',
+          category: resource.category || null,
+          approval_group_name: resource.approval_group_name || null,
+          approval_status: resource.approval_status || null,
+          quantity: resource.quantity || 1,
+          answers: resource.answers || [],
+          last_synced_at: now
+        };
+
+        const existingResources = await base44.asServiceRole.entities.EventOpsResource.filter({
+          pco_resource_id: pcoResourceId
+        });
+
+        if (existingResources.length > 0) {
+          await base44.asServiceRole.entities.EventOpsResource.update(existingResources[0].id, resourceData);
+        } else {
+          await base44.asServiceRole.entities.EventOpsResource.create(resourceData);
+          totalResources++;
+        }
+      }
+      console.log(`  ✅ Processed ${payload.resources.length} top-level resources`);
     }
 
     // Update sync state
