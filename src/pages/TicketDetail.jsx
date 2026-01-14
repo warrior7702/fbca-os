@@ -362,13 +362,10 @@ export default function TicketDetail() {
         updateData.archived_at = new Date().toISOString();
       }
 
-      await base44.asServiceRole.entities.Ticket.update(ticketId, updateData);
+      await base44.entities.Ticket.update(ticketId, updateData);
       
-      // Refresh ticket data from server
-      const refreshedTickets = await base44.entities.Ticket.filter({ id: ticketId });
-      if (refreshedTickets && refreshedTickets.length > 0) {
-        setTicket(refreshedTickets[0]);
-      }
+      // Update local state immediately
+      setTicket({ ...ticket, ...updateData });
       
       toast.success(`Ticket ${newStatus}`);
 
