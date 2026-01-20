@@ -178,7 +178,8 @@ export default function MyApprovals() {
 
   const loadApprovals = async () => {
     try {
-      const response = await base44.functions.invoke('getMyPendingApprovals');
+      // Auto-sync on page load to get fresh data
+      const response = await base44.functions.invoke('syncMyApprovals');
       setApprovals(response.data.pending_approvals || []);
       setLastSync(new Date());
     } catch (error) {
