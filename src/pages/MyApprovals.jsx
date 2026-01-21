@@ -172,6 +172,8 @@ export default function MyApprovals() {
       
       console.log('📊 Total approvals from API:', (data.approvals || []).length);
       console.log('👤 User email:', currentUser.email);
+      console.log('🔍 Sample approval object:', data.approvals?.[0]);
+      console.log('🔍 All approval objects:', data.approvals);
       
       // Extract unique approval groups from the data
       const allGroups = [...new Set((data.approvals || []).map(a => a.approvalGroupName).filter(Boolean))];
