@@ -131,6 +131,8 @@ export default function TicketDetail() {
 
       const tickets = await base44.entities.Ticket.filter({ id: ticketId });
       if (tickets && tickets.length > 0) {
+        console.log('📋 Loaded ticket:', tickets[0]);
+        console.log('🔍 Ticket scope:', tickets[0].scope);
         setTicket(tickets[0]);
         // Initialize due date value
         const dueDate = tickets[0].due_date;
@@ -347,6 +349,15 @@ export default function TicketDetail() {
   const handleStatusChange = async (newStatus) => {
     setUpdatingStatus(true);
     try {
+      console.log('🎫 Current ticket object:', ticket);
+      console.log('🔍 ticket.scope value:', ticket.scope);
+      
+      if (!ticket.scope) {
+        toast.error('Error: Ticket scope is missing. Cannot update ticket.');
+        setUpdatingStatus(false);
+        return;
+      }
+      
       const updateData = {
         status: newStatus,
         last_activity_at: new Date().toISOString(),
