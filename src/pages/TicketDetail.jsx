@@ -363,11 +363,15 @@ export default function TicketDetail() {
       }
 
       console.log('🔄 Updating ticket status to:', newStatus, 'for ticket:', ticketId);
-      await base44.entities.Ticket.update(ticketId, updateData);
-      console.log('✅ Ticket status updated successfully');
+      const result = await base44.entities.Ticket.update(ticketId, updateData);
+      console.log('✅ Ticket status updated successfully:', result);
       
-      // Update local state immediately
-      setTicket({ ...ticket, ...updateData });
+      // Re-fetch to ensure we have latest data
+      const refreshedTickets = await base44.entities.Ticket.filter({ id: ticketId });
+      if (refreshedTickets && refreshedTickets.length > 0) {
+        setTicket(refreshedTickets[0]);
+        console.log('✅ Ticket refreshed from database');
+      }
       
       toast.success(`Ticket ${newStatus}!`);
 
@@ -394,11 +398,6 @@ export default function TicketDetail() {
           console.warn('Status notification failed:', notifyError);
         }
       }
-
-      // Navigate back to tickets list after a short delay to show the toast
-      setTimeout(() => {
-        navigate(createPageUrl('SupportTickets'));
-      }, 500);
     } catch (error) {
       console.error('❌ Error updating status:', error);
       toast.error('Failed to update status: ' + error.message);
@@ -827,7 +826,11 @@ Provide your analysis in this exact JSON format:
                       Unassign
                     </Button>
                     <Button
-                      onClick={() => handleStatusChange('resolved')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Mark Resolved clicked');
+                        handleStatusChange('resolved');
+                      }}
                       disabled={updatingStatus}
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
@@ -1412,7 +1415,10 @@ Provide your analysis in this exact JSON format:
                   {canManage ? (
                     <Select 
                       value={ticket.status} 
-                      onValueChange={handleStatusChange}
+                      onValueChange={(newStatus) => {
+                        console.log('Status change triggered:', newStatus);
+                        handleStatusChange(newStatus);
+                      }}
                       disabled={updatingStatus}
                     >
                       <SelectTrigger>
@@ -1423,6 +1429,7 @@ Provide your analysis in this exact JSON format:
                         <SelectItem value="awaiting_information">Awaiting Information</SelectItem>
                         <SelectItem value="awaiting_parts">Awaiting Parts</SelectItem>
                         <SelectItem value="resolved">Resolved</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
