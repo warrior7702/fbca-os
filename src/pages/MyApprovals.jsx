@@ -206,7 +206,14 @@ export default function MyApprovals() {
         resource_id: approval.resource_id
       });
 
-      if (response.data?.answers && Object.keys(response.data.answers).length > 0) {
+      if (response.data?.detailed_answers && response.data.detailed_answers.length > 0) {
+        // New format with detailed answers from /event_resource_requests/{id}/answers
+        setAnswerPreviews(prev => ({
+          ...prev,
+          [approval.request_id]: response.data.detailed_answers
+        }));
+      } else if (response.data?.answers && Object.keys(response.data.answers).length > 0) {
+        // Fallback to old format
         const answeredQuestions = response.data.questions
           .filter(q => response.data.answers[q.id])
           .map(q => ({
