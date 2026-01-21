@@ -2,8 +2,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { fetchPCO } from './utils/pcoConfig.js';
 
 const A = (x) => Array.isArray(x) ? x : [];
-
-// Helper to add delay between API calls
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function refreshTokenIfNeeded(base44, user) {
