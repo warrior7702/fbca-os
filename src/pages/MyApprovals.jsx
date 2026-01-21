@@ -384,6 +384,19 @@ export default function MyApprovals() {
           iconColor="from-orange-500 to-red-500"
           action={
             <div className="flex gap-2">
+              <Button 
+                onClick={async () => {
+                  const response = await fetch('https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100');
+                  const data = await response.json();
+                  console.log('🐛 DEBUG - Raw API response:', data);
+                  console.log('🐛 DEBUG - First approval:', data.approvals?.[0]);
+                  console.log('🐛 DEBUG - Approval groups structure:', data.approvals?.[0]?.approval_groups);
+                }} 
+                variant="ghost" 
+                size="sm"
+              >
+                🐛 Debug
+              </Button>
               <Button onClick={() => setShowCalendar(true)} variant="outline" size="sm">
                 <Calendar className="w-4 h-4 mr-2" />
                 Calendar
