@@ -349,7 +349,8 @@ export default function TicketDetail() {
     try {
       const updateData = {
         status: newStatus,
-        last_activity_at: new Date().toISOString()
+        last_activity_at: new Date().toISOString(),
+        scope: ticket.scope // Required field
       };
 
       if (newStatus === 'resolved') {
