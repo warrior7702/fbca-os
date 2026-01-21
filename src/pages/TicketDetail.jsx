@@ -362,12 +362,14 @@ export default function TicketDetail() {
         updateData.archived_at = new Date().toISOString();
       }
 
+      console.log('🔄 Updating ticket status to:', newStatus, 'for ticket:', ticketId);
       await base44.entities.Ticket.update(ticketId, updateData);
+      console.log('✅ Ticket status updated successfully');
       
       // Update local state immediately
       setTicket({ ...ticket, ...updateData });
       
-      toast.success(`Ticket ${newStatus}`);
+      toast.success(`Ticket ${newStatus}!`);
 
       // Send notification to requester about status change
       const statusMessages = {
@@ -392,9 +394,14 @@ export default function TicketDetail() {
           console.warn('Status notification failed:', notifyError);
         }
       }
+
+      // Navigate back to tickets list after a short delay to show the toast
+      setTimeout(() => {
+        navigate(createPageUrl('SupportTickets'));
+      }, 500);
     } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
+      console.error('❌ Error updating status:', error);
+      toast.error('Failed to update status: ' + error.message);
     } finally {
       setUpdatingStatus(false);
     }
