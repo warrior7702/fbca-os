@@ -725,12 +725,22 @@ export default function CreateTicket() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
       
-      // Determine final IDs based on scope
+      // Infer scope FIRST based on final resolved IDs
+      let inferredScope = "BUILDING";
       let finalAssetId = null;
       let finalAssetName = null;
       let finalRoomId = ticket.room_id;
       let finalFloorId = ticket.floor_id;
       let finalBuildingId = ticket.building_id;
+
+      // Determine scope from context
+      if (urlAssetId || ticket.asset_id || selectedAssetEntity) {
+        inferredScope = "ASSET";
+      } else if (ticket.room_id) {
+        inferredScope = "ROOM";
+      } else if (ticket.building_id) {
+        inferredScope = "BUILDING";
+      }
 
       if (inferredScope === "ASSET") {
         if (selectedAssetEntity) {
@@ -755,16 +765,6 @@ export default function CreateTicket() {
 
       if (inferredScope === "BUILDING" && selectedBuilding) {
         finalBuildingId = selectedBuilding.id;
-      }
-
-      // Infer scope based on final resolved IDs
-      let inferredScope = "BUILDING";
-      if (finalAssetId) {
-        inferredScope = "ASSET";
-      } else if (finalRoomId) {
-        inferredScope = "ROOM";
-      } else if (finalBuildingId) {
-        inferredScope = "BUILDING";
       }
 
       // Create assetHint for department determination
