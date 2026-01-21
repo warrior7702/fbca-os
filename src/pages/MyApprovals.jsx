@@ -209,12 +209,23 @@ export default function MyApprovals() {
       
       // Filter to only approvals user can approve
       const myApprovals = (data.approvals || []).filter(approval => {
-        return approval.approval_groups?.some(group => 
+        const hasMatch = approval.approval_groups?.some(group => 
           userGroups.includes(group.name)
         );
+        
+        if (!hasMatch) {
+          console.log('❌ Filtered out:', {
+            event: approval.eventName,
+            resource: approval.resourceName,
+            approvalGroups: approval.approval_groups?.map(g => g.name)
+          });
+        }
+        
+        return hasMatch;
       });
       
       console.log('✅ Filtered approvals for user:', myApprovals.length);
+      console.log('🔍 My approvals:', myApprovals);
       
       // Group by event for better UI
       const groupedByEvent = myApprovals.reduce((acc, approval) => {
