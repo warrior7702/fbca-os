@@ -699,7 +699,6 @@ export default function MyApprovals() {
     </div>
   );
 }
-                  <motion.div
                     key={approval.request_id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
