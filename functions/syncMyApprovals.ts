@@ -41,7 +41,8 @@ async function refreshTokenIfNeeded(base44, user) {
 
 Deno.serve(async (req) => {
     console.log('========================================');
-    console.log('🔄 SYNC MY APPROVALS - DETAILED DEBUG v2');
+    console.log('🔄 SYNC MY APPROVALS - DETAILED DEBUG');
+    console.log('Request received at:', new Date().toISOString());
     console.log('========================================');
     
     try {
