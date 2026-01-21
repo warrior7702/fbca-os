@@ -44,6 +44,25 @@ async function fetchPCOData(accessToken, url) {
   return await response.json();
 }
 
+async function fetchResourceRequestAnswers(accessToken, requestId) {
+  try {
+    const url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${requestId}/answers?per_page=100`;
+    const data = await fetchPCOData(accessToken, url);
+    
+    if (!data.data || data.data.length === 0) return [];
+    
+    return data.data.map(answer => ({
+      question: answer.attributes?.question || '',
+      answer: answer.attributes?.answer || '',
+      question_id: answer.relationships?.resource_question?.data?.id || null,
+      kind: answer.attributes?.kind || null
+    }));
+  } catch (error) {
+    console.warn(`Failed to fetch answers for request ${requestId}:`, error);
+    return [];
+  }
+}
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
   const logs = [];
@@ -205,18 +224,35 @@ Deno.serve(async (req) => {
         // Calculate setup_due_at (60 minutes before start)
         const setupDueAt = new Date(new Date(startsAt).getTime() - 60 * 60 * 1000);
         
-        // Extract approval answers
+        // Extract approval answers with detailed answers per request
         const roomSetupsAnswers = {};
         const maintenanceAnswers = {};
+        const detailedAnswers = { room_setups: [], maintenance: [] };
         
         for (const request of resourceRequests) {
           const approvalGroupId = request.relationships?.resource_approval_group?.data?.id;
           const requestData = request.attributes || {};
+          const requestId = request.id;
+          
+          // Fetch detailed answers from /event_resource_requests/{id}/answers
+          const answers = await fetchResourceRequestAnswers(accessToken, requestId);
           
           if (approvalGroupId === roomSetupsGroup?.id) {
             Object.assign(roomSetupsAnswers, requestData.approval_answers || {});
+            if (answers.length > 0) {
+              detailedAnswers.room_setups.push({
+                resource_name: requestData.resource_name || 'Unknown',
+                answers: answers
+              });
+            }
           } else if (approvalGroupId === maintenanceGroup?.id) {
             Object.assign(maintenanceAnswers, requestData.approval_answers || {});
+            if (answers.length > 0) {
+              detailedAnswers.maintenance.push({
+                resource_name: requestData.resource_name || 'Unknown',
+                answers: answers
+              });
+            }
           }
         }
         
@@ -251,7 +287,8 @@ Deno.serve(async (req) => {
             approval_answers: {
               room_setups: roomSetupsAnswers,
               maintenance: maintenanceAnswers
-            }
+            },
+            detailed_answers: detailedAnswers
           }
         };
         
