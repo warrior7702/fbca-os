@@ -262,7 +262,7 @@ export default function MyApprovals() {
       setUserGroups(userGroups);
       
       const response = await fetch(
-        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
       );
       
       if (!response.ok) {
