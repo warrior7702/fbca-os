@@ -39,7 +39,7 @@ async function refreshTokenIfNeeded(base44, user) {
 
 Deno.serve(async (req) => {
     console.log('========================================');
-    console.log('🔄 SYNC MY APPROVALS - DETAILED DEBUG');
+    console.log('🔄 SYNC MY APPROVALS - DEPLOYMENT TEST');
     console.log('Request received at:', new Date().toISOString());
     console.log('========================================');
     
@@ -254,8 +254,8 @@ Deno.serve(async (req) => {
         // STEP 6: Get future event instances
         console.log('📝 STEP 6: Fetching future event instances...');
         const now = new Date();
-        const startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
-        const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+        const startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
         
         const eventInstanceMap = {};
         let instanceNextUrl = `/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
