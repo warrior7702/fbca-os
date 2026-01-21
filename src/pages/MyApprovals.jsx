@@ -70,6 +70,7 @@ export default function MyApprovals() {
   const [lastSync, setLastSync] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [sendingCode, setSendingCode] = useState(null);
+  const [userGroups, setUserGroups] = useState([]);
 
   const getGroupColor = (groupName) => {
     const name = groupName?.toLowerCase() || '';
@@ -157,6 +158,8 @@ export default function MyApprovals() {
 
   const loadApprovals = async () => {
     try {
+      const currentUser = await base44.auth.me();
+      
       const response = await fetch(
         'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
       );
@@ -166,6 +169,14 @@ export default function MyApprovals() {
       }
       
       const data = await response.json();
+      
+      console.log('📊 Total approvals from API:', (data.approvals || []).length);
+      console.log('👤 User email:', currentUser.email);
+      
+      // Extract unique approval groups from the data
+      const allGroups = [...new Set((data.approvals || []).map(a => a.approvalGroupName).filter(Boolean))];
+      console.log('📋 All approval groups in data:', allGroups);
+      setUserGroups(allGroups);
       
       // Group by event for better UI
       const groupedByEvent = (data.approvals || []).reduce((acc, approval) => {
@@ -222,6 +233,11 @@ export default function MyApprovals() {
       
       const approvalsList = Object.values(groupedByEvent);
       const totalCount = (data.approvals || []).length;
+      
+      console.log('📊 Total approvals from API:', totalCount);
+      const allGroups = [...new Set((data.approvals || []).map(a => a.approvalGroupName).filter(Boolean))];
+      console.log('📋 All approval groups:', allGroups);
+      setUserGroups(allGroups);
       
       toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''}`);
       setApprovals(approvalsList);
@@ -296,6 +312,16 @@ export default function MyApprovals() {
                   </span>
                 )}
               </div>
+              {userGroups.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <span className="text-xs text-slate-500">Your groups:</span>
+                  {userGroups.map((group) => (
+                    <Badge key={group} variant="outline" className="text-xs">
+                      {group}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           }
           iconColor="from-orange-500 to-red-500"
