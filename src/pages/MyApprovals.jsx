@@ -192,9 +192,9 @@ export default function MyApprovals() {
       const userGroups = await getUserGroups(currentUser.email);
       setUserGroups(userGroups);
       
-      // Fetch all pending approvals
+      // Fetch all pending approvals with full details including approval groups
       const response = await fetch(
-        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
       );
       
       if (!response.ok) {
