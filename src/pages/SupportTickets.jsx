@@ -287,7 +287,7 @@ export default function SupportTickets() {
     } else if (activeTab === "pool") {
       matchesTab = !ticket.assigned_to && ['open', 'in_progress', 'awaiting_information', 'awaiting_parts'].includes(ticket.status);
     } else if (activeTab === "resolved") {
-      matchesTab = ticket.status === 'resolved';
+      matchesTab = ['resolved', 'archived'].includes(ticket.status);
     }
     
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
@@ -319,7 +319,7 @@ export default function SupportTickets() {
     if (t.status === 'open') acc.open++;
     if (t.status === 'awaiting_information') acc.awaiting_info++;
     if (t.status === 'awaiting_parts') acc.awaiting_parts++;
-    if (t.status === 'resolved') acc.resolved++;
+    if (['resolved', 'archived'].includes(t.status)) acc.resolved++;
     return acc;
   }, { total: 0, active: 0, open: 0, awaiting_info: 0, awaiting_parts: 0, resolved: 0 });
 
@@ -571,7 +571,7 @@ export default function SupportTickets() {
           </Card>
 
           <TabsContent value={activeTab} className="space-y-4">
-            {['open', 'awaiting_information', 'awaiting_parts', 'resolved'].map(status => {
+            {['open', 'awaiting_information', 'awaiting_parts', 'resolved', 'archived'].map(status => {
               const statusTickets = filteredTickets.filter(t => t.status === status);
               if (statusTickets.length === 0) return null;
               
@@ -579,13 +579,15 @@ export default function SupportTickets() {
                 'open': 'Open',
                 'awaiting_information': 'Awaiting Information',
                 'awaiting_parts': 'Awaiting Parts',
-                'resolved': 'Resolved'
+                'resolved': 'Resolved',
+                'archived': 'Archived'
               };
               const statusColors = {
                 'open': 'text-blue-700 bg-blue-50 border-blue-200',
                 'awaiting_information': 'text-yellow-700 bg-yellow-50 border-yellow-200',
                 'awaiting_parts': 'text-orange-700 bg-orange-50 border-orange-200',
-                'resolved': 'text-green-700 bg-green-50 border-green-200'
+                'resolved': 'text-green-700 bg-green-50 border-green-200',
+                'archived': 'text-slate-700 bg-slate-50 border-slate-200'
               };
               
               return (
