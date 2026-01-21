@@ -179,8 +179,16 @@ export default function MyApprovals() {
   const loadApprovals = async () => {
     try {
       // Auto-sync on page load to get fresh data from Vercel
+      const currentUser = await base44.auth.me();
+      
       const response = await fetch(
-        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100',
+        {
+          headers: {
+            'Authorization': `Bearer ${currentUser.pco_access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       
       if (!response.ok) {
@@ -326,8 +334,16 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
+      const currentUser = await base44.auth.me();
+      
       const response = await fetch(
-        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100',
+        {
+          headers: {
+            'Authorization': `Bearer ${currentUser.pco_access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       
       if (!response.ok) {
