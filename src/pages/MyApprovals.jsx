@@ -178,9 +178,17 @@ export default function MyApprovals() {
 
   const loadApprovals = async () => {
     try {
-      // Auto-sync on page load to get fresh data
-      const response = await base44.functions.invoke('syncApprovals');
-      setApprovals(response.data.pending_approvals || []);
+      // Auto-sync on page load to get fresh data from Vercel
+      const response = await fetch(
+        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setApprovals(data.approvals || []);
       setLastSync(new Date());
     } catch (error) {
       console.error('Error loading approvals:', error);
@@ -318,16 +326,23 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await base44.functions.invoke('syncApprovals');
-
-      if (response.data.success) {
-        toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
-        setApprovals(response.data.pending_approvals || []);
-        setAnswerPreviews({});
-        setPostedDoorCodes({});
-        setSmartSuggestions({});
-        setLastSync(new Date());
+      const response = await fetch(
+        'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      const approvalsList = data.approvals || [];
+      
+      toast.success(`Synced ${approvalsList.length} pending approval${approvalsList.length !== 1 ? 's' : ''}`);
+      setApprovals(approvalsList);
+      setAnswerPreviews({});
+      setPostedDoorCodes({});
+      setSmartSuggestions({});
+      setLastSync(new Date());
     } catch (error) {
       console.error('Sync error:', error);
       toast.error('Failed to sync approvals');
