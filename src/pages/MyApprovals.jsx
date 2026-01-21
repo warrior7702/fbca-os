@@ -699,12 +699,6 @@ export default function MyApprovals() {
     </div>
   );
 }
-                const colors = getGroupColor(approval.approval_group_name);
-                const previewAnswers = answerPreviews[approval.request_id] || [];
-                const postedCode = postedDoorCodes[approval.request_id];
-                const smartSuggestion = smartSuggestions[approval.request_id];
-
-                return (
                   <motion.div
                     key={approval.request_id}
                     initial={{ opacity: 0, y: 20 }}
