@@ -179,7 +179,7 @@ export default function MyApprovals() {
   const loadApprovals = async () => {
     try {
       // Auto-sync on page load to get fresh data
-      const response = await base44.functions.invoke('syncMyApprovals');
+      const response = await base44.functions.invoke('syncApprovals');
       setApprovals(response.data.pending_approvals || []);
       setLastSync(new Date());
     } catch (error) {
@@ -318,7 +318,7 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await base44.functions.invoke('syncMyApprovals');
+      const response = await base44.functions.invoke('syncApprovals');
 
       if (response.data.success) {
         toast.success(`Synced ${response.data.count} pending approval${response.data.count !== 1 ? 's' : ''}`);
