@@ -156,10 +156,43 @@ export default function MyApprovals() {
     }
   };
 
+  const getUserGroups = async (userEmail) => {
+    const cacheKey = `approval_groups_${userEmail}`;
+    const cached = localStorage.getItem(cacheKey);
+    
+    if (cached) {
+      const { groups, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+      if (age < 24 * 60 * 60 * 1000) {
+        console.log('📦 Using cached approval groups:', groups);
+        return groups;
+      }
+    }
+    
+    console.log('🌐 Fetching approval groups from API...');
+    const response = await fetch(
+      `https://pco-webhook.vercel.app/api/cron/pco-sync?userGroups=1&email=${encodeURIComponent(userEmail)}`
+    );
+    const data = await response.json();
+    
+    localStorage.setItem(cacheKey, JSON.stringify({
+      groups: data.approvalGroupNames,
+      timestamp: Date.now()
+    }));
+    
+    console.log('✅ User approval groups:', data.approvalGroupNames);
+    return data.approvalGroupNames;
+  };
+
   const loadApprovals = async () => {
     try {
       const currentUser = await base44.auth.me();
       
+      // Get user's approval groups
+      const userGroups = await getUserGroups(currentUser.email);
+      setUserGroups(userGroups);
+      
+      // Fetch all pending approvals
       const response = await fetch(
         'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
       );
@@ -172,16 +205,19 @@ export default function MyApprovals() {
       
       console.log('📊 Total approvals from API:', (data.approvals || []).length);
       console.log('👤 User email:', currentUser.email);
-      console.log('🔍 Sample approval object:', data.approvals?.[0]);
-      console.log('🔍 All approval objects:', data.approvals);
+      console.log('👥 User groups:', userGroups);
       
-      // Extract unique approval groups from the data
-      const allGroups = [...new Set((data.approvals || []).map(a => a.approvalGroupName).filter(Boolean))];
-      console.log('📋 All approval groups in data:', allGroups);
-      setUserGroups(allGroups);
+      // Filter to only approvals user can approve
+      const myApprovals = (data.approvals || []).filter(approval => {
+        return approval.approval_groups?.some(group => 
+          userGroups.includes(group.name)
+        );
+      });
+      
+      console.log('✅ Filtered approvals for user:', myApprovals.length);
       
       // Group by event for better UI
-      const groupedByEvent = (data.approvals || []).reduce((acc, approval) => {
+      const groupedByEvent = myApprovals.reduce((acc, approval) => {
         if (!acc[approval.eventId]) {
           acc[approval.eventId] = {
             eventId: approval.eventId,
@@ -208,6 +244,12 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
+      const currentUser = await base44.auth.me();
+      
+      // Get user's approval groups
+      const userGroups = await getUserGroups(currentUser.email);
+      setUserGroups(userGroups);
+      
       const response = await fetch(
         'https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100'
       );
@@ -218,8 +260,15 @@ export default function MyApprovals() {
       
       const data = await response.json();
       
+      // Filter to only approvals user can approve
+      const myApprovals = (data.approvals || []).filter(approval => {
+        return approval.approval_groups?.some(group => 
+          userGroups.includes(group.name)
+        );
+      });
+      
       // Group by event
-      const groupedByEvent = (data.approvals || []).reduce((acc, approval) => {
+      const groupedByEvent = myApprovals.reduce((acc, approval) => {
         if (!acc[approval.eventId]) {
           acc[approval.eventId] = {
             eventId: approval.eventId,
@@ -234,12 +283,7 @@ export default function MyApprovals() {
       }, {});
       
       const approvalsList = Object.values(groupedByEvent);
-      const totalCount = (data.approvals || []).length;
-      
-      console.log('📊 Total approvals from API:', totalCount);
-      const allGroups = [...new Set((data.approvals || []).map(a => a.approvalGroupName).filter(Boolean))];
-      console.log('📋 All approval groups:', allGroups);
-      setUserGroups(allGroups);
+      const totalCount = myApprovals.length;
       
       toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''}`);
       setApprovals(approvalsList);
