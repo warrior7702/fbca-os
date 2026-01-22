@@ -9,21 +9,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'PCO not connected' }, { status: 401 });
     }
 
-    const { windowDays = 180 } = await req.json().catch(() => ({}));
+    const { windowDays = 180, groups = [] } = await req.json().catch(() => ({}));
+    const userGroups = Array.isArray(groups) ? groups : [];
 
-    // Calculate date range
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + windowDays);
-
-    const startStr = today.toISOString().split('T')[0];
-    const endStr = endDate.toISOString().split('T')[0];
-
-    console.log(`📅 Fetching events from ${startStr} to ${endStr}`);
-
-    // Get user's approval groups
-    const groupsResponse = await base44.functions.invoke("getUserGroups", {});
-    const userGroups = groupsResponse?.data?.approvalGroupNames || [];
     console.log(`👤 User groups: ${userGroups.join(", ")}`);
 
     if (userGroups.length === 0) {
@@ -35,6 +23,16 @@ Deno.serve(async (req) => {
         message: "User not assigned to any approval groups"
       });
     }
+
+    // Calculate date range
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + windowDays);
+
+    const startStr = today.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    console.log(`📅 Fetching events from ${startStr} to ${endStr}`);
 
     // Fetch events in the date range
     const eventsUrl = `https://api.planningcenteronline.com/calendar/v2/events?filter=future&per_page=100`;
