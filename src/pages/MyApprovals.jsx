@@ -119,8 +119,9 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromPCO = useCallback(async ({ email, windowDays = 180, maxEvents = 500 }) => {
-    const url = `${PCO_SYNC_URL}?approvals=1&windowDays=${windowDays}&maxEvents=${maxEvents}&email=${encodeURIComponent(email)}`;
+  const fetchApprovalsFromPCO = useCallback(async ({ groups, windowDays = 180, maxEvents = 500 }) => {
+    const groupsParam = Array.isArray(groups) ? groups.join(",") : "";
+    const url = `${PCO_SYNC_URL}?approvals=1&windowDays=${windowDays}&maxEvents=${maxEvents}&groups=${encodeURIComponent(groupsParam)}`;
     const res = await fetch(url);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.ok === false) {
@@ -152,7 +153,7 @@ export default function MyApprovals() {
         return;
       }
 
-      const api = await fetchApprovalsFromPCO({ email: me.email, windowDays: 180, maxEvents: 500 });
+      const api = await fetchApprovalsFromPCO({ groups, windowDays: 180, maxEvents: 500 });
 
       console.log('🔍 API Response:', {
         totalApprovals: api.approvals?.length || 0,
@@ -162,29 +163,7 @@ export default function MyApprovals() {
 
       const approvals = Array.isArray(api.approvals) ? api.approvals : [];
       
-      // prefer `approvalGroupNames: string[]` if provided by API
-      const filtered = approvals.filter(a => {
-        const names =
-          Array.isArray(a.approvalGroupNames) ? a.approvalGroupNames :
-          normalizeGroupNames(a.approvalGroups);
-
-        const hasMatch = names.some(n => groups.includes(n));
-        
-        if (!hasMatch && a.eventName) {
-          console.log('❌ No match:', {
-            event: a.eventName,
-            resource: a.resourceName,
-            approvalGroupsOnItem: names,
-            userGroups: groups
-          });
-        }
-
-        return hasMatch;
-      });
-
-      console.log('✅ Filtered approvals:', filtered.length, 'out of', approvals.length);
-
-      const grouped = groupByEvent(filtered);
+      const grouped = groupByEvent(approvals);
       setGroupedApprovals(grouped);
       setLastSync(new Date());
 
