@@ -29,22 +29,17 @@ export default function ApprovalsDebug() {
         hasPCOToken: !!user?.pco_access_token
       };
 
-      // Get user groups
-      const groupsResponse = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?userGroups=1&email=${encodeURIComponent(user.email)}`
-      );
-      const groupsData = await groupsResponse.json();
-      debug.userGroups = groupsData.approvalGroupNames || [];
+      // Get user groups from our backend
+      const groupsResponse = await base44.functions.invoke('getUserGroups', {});
+      debug.userGroups = groupsResponse.data.approvalGroupNames || [];
 
-      // Get all approvals (wider window)
-      const approvalsResponse = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(user.email)}`
-      );
-      const approvalsData = await approvalsResponse.json();
+      // Get all approvals from our backend (180 days)
+      const approvalsResponse = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
+      const approvalsData = approvalsResponse.data;
       debug.apiRawResponse = {
+        totalEvents: approvalsData.totalEvents,
         totalReturned: approvalsData.approvals?.length || 0,
-        hasMore: approvalsData.hasMore,
-        params: approvalsData.params
+        windowDays: approvalsData.windowDays
       };
       debug.allApprovals = approvalsData.approvals || [];
 
