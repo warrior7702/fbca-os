@@ -21,6 +21,21 @@ Deno.serve(async (req) => {
 
     console.log(`📅 Fetching events from ${startStr} to ${endStr}`);
 
+    // Get user's approval groups
+    const groupsResponse = await base44.functions.invoke("getUserGroups", {});
+    const userGroups = groupsResponse?.data?.approvalGroupNames || [];
+    console.log(`👤 User groups: ${userGroups.join(", ")}`);
+
+    if (userGroups.length === 0) {
+      return Response.json({
+        success: true,
+        totalEvents: 0,
+        totalApprovals: 0,
+        approvals: [],
+        message: "User not assigned to any approval groups"
+      });
+    }
+
     // Fetch events in the date range
     const eventsUrl = `https://api.planningcenteronline.com/calendar/v2/events?filter=future&per_page=100`;
     
@@ -78,19 +93,26 @@ Deno.serve(async (req) => {
               };
             }).filter(g => g.id);
 
-            allApprovals.push({
-              resourceRequestId: request.id,
-              eventId: eventId,
-              eventName: eventName,
-              eventStartsAt: eventStartsAt,
-              eventEndsAt: eventEndsAt,
-              resourceId: resourceId,
-              resourceName: resource?.attributes?.name || 'Unknown',
-              approvalGroups: approvalGroups,
-              quantity: request.attributes.quantity || 1,
-              type: resource?.attributes?.kind || 'resource',
-              status: status
-            });
+            // Check if any approval group matches user's groups
+            const matchesUserGroup = approvalGroups.some(ag => 
+              userGroups.includes(ag.name)
+            );
+
+            if (matchesUserGroup) {
+              allApprovals.push({
+                resourceRequestId: request.id,
+                eventId: eventId,
+                eventName: eventName,
+                eventStartsAt: eventStartsAt,
+                eventEndsAt: eventEndsAt,
+                resourceId: resourceId,
+                resourceName: resource?.attributes?.name || 'Unknown',
+                approvalGroups: approvalGroups,
+                quantity: request.attributes.quantity || 1,
+                type: resource?.attributes?.kind || 'resource',
+                status: status
+              });
+            }
           }
         }
       }
