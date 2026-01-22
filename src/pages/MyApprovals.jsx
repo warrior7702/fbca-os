@@ -203,7 +203,7 @@ export default function MyApprovals() {
       console.log('🔵 Total approvals from API:', data.approvals?.length || 0);
       console.log('🔵 Total events checked:', data.totalEvents);
       console.log('🔵 User approval groups:', userGroups);
-      console.log('🔵 Sample approval groups:', data.approvals?.[0]?.approvalGroups);
+      console.log('🔵 Sample approval:', data.approvals?.[0]);
       
       if (!userGroups || userGroups.length === 0) {
         console.log('⚠️ No approval groups found for user');
@@ -255,8 +255,9 @@ export default function MyApprovals() {
     } catch (error) {
       console.error('❌ Error loading approvals:', error);
       toast.error('Failed to load approvals: ' + error.message);
-    } finally {
       setLoading(false);
+    } finally {
+      if (loading) setLoading(false);
     }
   };
 
