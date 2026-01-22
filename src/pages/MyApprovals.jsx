@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   ClipboardCheck,
   Calendar,
@@ -13,17 +12,15 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
-  MapPin,
-  Users,
-  Key,
-  User,
-  Sparkles
+  MapPin
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+
+const PCO_SYNC_URL = "https://pco-webhook.vercel.app/api/cron/pco-sync";
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -43,15 +40,13 @@ const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
 const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-4xl w-full h-[90vh] shadow-lg flex flex-col">
         <h2 className="text-2xl font-bold mb-4">Approval Calendar</h2>
         <div className="flex-grow overflow-hidden">
           <ApprovalCalendar
             approvals={approvals}
-            onApprovalClick={(approval) => {
-              window.open('https://calendar.planningcenteronline.com/approvals', '_blank');
-            }}
+            onApprovalClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
           />
         </div>
         <div className="mt-4 flex justify-end">
@@ -62,293 +57,167 @@ const FullApprovalCalendarModal = ({ isOpen, onClose, approvals }) => {
   );
 };
 
+// Normalize groups from API (string[] or {name}[])
+function normalizeGroupNames(maybeGroups) {
+  if (!Array.isArray(maybeGroups)) return [];
+  return maybeGroups
+    .map(g => (typeof g === "string" ? g : g?.name))
+    .filter(Boolean);
+}
+
+// Group approvals by event
+function groupByEvent(items) {
+  const map = new Map();
+  for (const a of items) {
+    const key = a.eventId;
+    if (!map.has(key)) {
+      map.set(key, {
+        eventId: a.eventId,
+        eventName: a.eventName,
+        eventStartsAt: a.eventStartsAt,
+        eventEndsAt: a.eventEndsAt,
+        items: []
+      });
+    }
+    map.get(key).items.push(a);
+  }
+  return Array.from(map.values());
+}
+
 export default function MyApprovals() {
-  const [approvals, setApprovals] = useState([]);
+  const [user, setUser] = useState(null);
+  const [userGroups, setUserGroups] = useState([]);
+  const [groupedApprovals, setGroupedApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [user, setUser] = useState(null);
   const [lastSync, setLastSync] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [sendingCode, setSendingCode] = useState(null);
-  const [userGroups, setUserGroups] = useState([]);
+  const [approvingId, setApprovingId] = useState(null);
 
-  const getGroupColor = (groupName) => {
-    const name = groupName?.toLowerCase() || '';
+  const pendingCount = useMemo(
+    () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
+    [groupedApprovals]
+  );
 
-    if (name.includes('building') || name.includes('access')) {
-      return {
-        border: 'border-blue-300',
-        bg: 'bg-blue-50',
-        badge: 'bg-blue-100 text-blue-700',
-        icon: 'text-blue-600'
-      };
+  const getUserGroups = useCallback(async (email) => {
+    const cacheKey = `approval_groups_${email}`;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (cached) {
+      try {
+        const { groups, timestamp } = JSON.parse(cached);
+        if (Array.isArray(groups) && (Date.now() - timestamp) < 24 * 60 * 60 * 1000) {
+          return groups;
+        }
+      } catch {}
     }
 
-    if (name.includes('technology') || name.includes('it') || name.includes('equipment')) {
-      return {
-        border: 'border-purple-300',
-        bg: 'bg-purple-50',
-        badge: 'bg-purple-100 text-purple-700',
-        icon: 'text-purple-600'
-      };
-    }
+    const response = await base44.functions.invoke("getUserGroups", {});
+    const groups = response?.data?.approvalGroupNames || [];
 
-    if (name.includes('av') || name.includes('audio') || name.includes('visual') || name.includes('production')) {
-      return {
-        border: 'border-green-300',
-        bg: 'bg-green-50',
-        badge: 'bg-green-100 text-green-700',
-        icon: 'text-green-600'
-      };
-    }
-
-    if (name.includes('kitchen') || name.includes('food') || name.includes('catering')) {
-      return {
-        border: 'border-orange-300',
-        bg: 'bg-orange-50',
-        badge: 'bg-orange-100 text-orange-700',
-        icon: 'text-orange-600'
-      };
-    }
-
-    if (name.includes('vehicle') || name.includes('transport')) {
-      return {
-        border: 'border-cyan-300',
-        bg: 'bg-cyan-50',
-        badge: 'bg-cyan-100 text-cyan-700',
-        icon: 'text-cyan-600'
-      };
-    }
-
-    return {
-      border: 'border-slate-300',
-      bg: 'bg-slate-50',
-      badge: 'bg-slate-100 text-slate-700',
-      icon: 'text-slate-600'
-    };
-  };
-
-  useEffect(() => {
-    loadUser();
-    loadApprovals();
+    localStorage.setItem(cacheKey, JSON.stringify({ groups, timestamp: Date.now() }));
+    return groups;
   }, []);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !syncing) {
-        console.log('👁️ Page became visible - auto-syncing...');
-        handleSync();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [syncing]);
-
-  const loadUser = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-    } catch (error) {
-      console.error("Error loading user:", error);
+  const fetchApprovalsFromPCO = useCallback(async ({ email, windowDays = 180, maxEvents = 500 }) => {
+    const url = `${PCO_SYNC_URL}?approvals=1&windowDays=${windowDays}&maxEvents=${maxEvents}&email=${encodeURIComponent(email)}`;
+    const res = await fetch(url);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || `PCO sync error (${res.status})`);
     }
-  };
+    return data;
+  }, []);
 
-  const getUserGroups = async (userEmail) => {
-    const cacheKey = `approval_groups_${userEmail}`;
-    const cached = localStorage.getItem(cacheKey);
-    
-    if (cached) {
-      const { groups, timestamp } = JSON.parse(cached);
-      const age = Date.now() - timestamp;
-      if (age < 24 * 60 * 60 * 1000) {
-        return groups;
-      }
-    }
-    
-    const response = await base44.functions.invoke('getUserGroups', {});
-    const data = response.data;
-    
-    localStorage.setItem(cacheKey, JSON.stringify({
-      groups: data.approvalGroupNames || [],
-      timestamp: Date.now()
-    }));
-    
-    return data.approvalGroupNames || [];
-  };
-
-  const loadApprovals = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      console.log('🔵 User email:', currentUser?.email);
-      
-      if (!currentUser?.email) {
-        toast.error('User email not found');
-        return;
-      }
-      
-      // Get user's approval groups (cached)
-      const userGroups = await getUserGroups(currentUser.email);
-      console.log('🔵 User approval groups:', userGroups);
-      setUserGroups(userGroups);
-      
-      // Fetch all pending approvals (180 days)
-      const response = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(currentUser.email)}`
-      );
-      const data = await response.json();
-      
-      console.log('🔵 Total approvals from API:', data.approvals?.length || 0);
-      console.log('🔵 Total events checked:', data.totalEvents);
-      console.log('🔵 User approval groups:', userGroups);
-      console.log('🔵 Sample approval:', data.approvals?.[0]);
-      
-      if (!userGroups || userGroups.length === 0) {
-        console.log('⚠️ No approval groups found for user');
-        setApprovals([]);
-        setLastSync(new Date());
-        toast.info('You are not assigned to any approval groups');
-        return;
-      }
-      
-      // Filter to only approvals user can approve
-      const myApprovals = (data.approvals || []).filter(approval => {
-        const groupNames = (approval.approvalGroups || []).map(g => g?.name || g).filter(Boolean);
-        const hasMatch = groupNames.some(name => userGroups.includes(name));
-        if (!hasMatch && approval.approvalGroups) {
-          console.log('❌ No match for approval:', {
-            eventName: approval.eventName,
-            approvalGroupsOnRequest: groupNames,
-            userGroups: userGroups
-          });
-        }
-        return hasMatch;
-      });
-      
-      console.log('🔵 Filtered approvals for user:', myApprovals.length);
-      
-      // Group by event for better UI
-      const groupedByEvent = myApprovals.reduce((acc, approval) => {
-        if (!acc[approval.eventId]) {
-          acc[approval.eventId] = {
-            eventId: approval.eventId,
-            eventName: approval.eventName,
-            eventStartsAt: approval.eventStartsAt,
-            eventEndsAt: approval.eventEndsAt,
-            items: []
-          };
-        }
-        acc[approval.eventId].items.push(approval);
-        return acc;
-      }, {});
-      
-      setApprovals(Object.values(groupedByEvent));
-      setLastSync(new Date());
-      
-      if (myApprovals.length === 0) {
-        toast.info(`No pending approvals for groups: ${userGroups.join(', ')}`);
-      } else {
-        toast.success(`Found ${myApprovals.length} pending approval${myApprovals.length !== 1 ? 's' : ''}`);
-      }
-    } catch (error) {
-      console.error('❌ Error loading approvals:', error);
-      toast.error('Failed to load approvals: ' + error.message);
-      setLoading(false);
-    } finally {
-      if (loading) setLoading(false);
-    }
-  };
-
-  const handleSync = async () => {
+  const refresh = useCallback(async ({ showToast = false } = {}) => {
     setSyncing(true);
     try {
-      const currentUser = await base44.auth.me();
-      
-      if (!currentUser?.email) {
-        toast.error('User email not found');
+      const me = await base44.auth.me();
+      setUser(me);
+
+      if (!me?.email) {
+        toast.error("User email not found");
+        setGroupedApprovals([]);
+        setUserGroups([]);
         return;
       }
-      
-      const userGroups = await getUserGroups(currentUser.email);
-      setUserGroups(userGroups);
-      
-      const response = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(currentUser.email)}`
-      );
-      const data = await response.json();
-      
-      if (!userGroups || userGroups.length === 0) {
-        setApprovals([]);
+
+      const groups = await getUserGroups(me.email);
+      setUserGroups(groups);
+
+      if (!groups || groups.length === 0) {
+        setGroupedApprovals([]);
         setLastSync(new Date());
-        toast.info('No approval groups assigned');
+        if (showToast) toast.info("You are not assigned to any approval groups.");
         return;
       }
-      
-      const myApprovals = (data.approvals || []).filter(approval => {
-        const groupNames = (approval.approvalGroups || []).map(g => g?.name || g).filter(Boolean);
-        return groupNames.some(name => userGroups.includes(name));
+
+      const api = await fetchApprovalsFromPCO({ email: me.email, windowDays: 180, maxEvents: 500 });
+
+      const approvals = Array.isArray(api.approvals) ? api.approvals : [];
+      // prefer `approvalGroupNames: string[]` if provided by API
+      const filtered = approvals.filter(a => {
+        const names =
+          Array.isArray(a.approvalGroupNames) ? a.approvalGroupNames :
+          normalizeGroupNames(a.approvalGroups);
+
+        return names.some(n => groups.includes(n));
       });
-      
-      const groupedByEvent = myApprovals.reduce((acc, approval) => {
-        if (!acc[approval.eventId]) {
-          acc[approval.eventId] = {
-            eventId: approval.eventId,
-            eventName: approval.eventName,
-            eventStartsAt: approval.eventStartsAt,
-            eventEndsAt: approval.eventEndsAt,
-            items: []
-          };
-        }
-        acc[approval.eventId].items.push(approval);
-        return acc;
-      }, {});
-      
-      const approvalsList = Object.values(groupedByEvent);
-      const totalCount = myApprovals.length;
-      
-      setApprovals(approvalsList);
+
+      const grouped = groupByEvent(filtered);
+      setGroupedApprovals(grouped);
       setLastSync(new Date());
-      toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''} from ${data.totalEvents} events`);
-    } catch (error) {
-      console.error('Sync error:', error);
-      toast.error('Failed to sync approvals');
+
+      if (showToast) {
+        if (filtered.length === 0) {
+          toast.info(`No pending approvals for: ${groups.join(", ")}`);
+        } else {
+          toast.success(`Found ${filtered.length} pending approval${filtered.length !== 1 ? "s" : ""}`);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error(`Failed to load approvals: ${e.message}`);
     } finally {
       setSyncing(false);
+      setLoading(false);
     }
-  };
+  }, [fetchApprovalsFromPCO, getUserGroups]);
 
-  const handleApprove = async (resourceRequestId, eventId) => {
-    try {
-      setSendingCode(resourceRequestId);
-      
-      const response = await base44.functions.invoke('approvePCOResourceRequest', {
-        resourceRequestId
-      });
-      
-      if (response.data.success) {
-        // Remove approved item from state
-        setApprovals(prev => 
-          prev.map(event => ({
-            ...event,
-            items: event.items.filter(item => item.resourceRequestId !== resourceRequestId)
-          }))
-          .filter(event => event.items.length > 0)
-        );
-        
-        toast.success('Approved successfully!');
-      } else {
-        toast.error('Failed to approve: ' + (response.data.error || 'Unknown error'));
+  useEffect(() => {
+    refresh({ showToast: false });
+  }, [refresh]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible" && !syncing) {
+        refresh({ showToast: false });
       }
-      
-    } catch (error) {
-      console.error('Error approving:', error);
-      toast.error('Error: ' + error.message);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refresh, syncing]);
+
+  const approve = useCallback(async (resourceRequestId) => {
+    setApprovingId(resourceRequestId);
+    try {
+      const resp = await base44.functions.invoke("approvePCOResourceRequest", { resourceRequestId });
+      if (!resp?.data?.success) throw new Error(resp?.data?.error || "Unknown approval error");
+
+      // Optimistic remove
+      setGroupedApprovals(prev =>
+        prev
+          .map(ev => ({ ...ev, items: ev.items.filter(i => i.resourceRequestId !== resourceRequestId) }))
+          .filter(ev => ev.items.length > 0)
+      );
+      toast.success("Approved successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error(`Failed to approve: ${e.message}`);
     } finally {
-      setSendingCode(null);
+      setApprovingId(null);
     }
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -372,20 +241,19 @@ export default function MyApprovals() {
           description={
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span>{(approvals || []).reduce((sum, event) => sum + event.items.length, 0)} pending approval{(approvals || []).reduce((sum, event) => sum + event.items.length, 0) !== 1 ? 's' : ''}</span>
+                <span>{pendingCount} pending approval{pendingCount !== 1 ? "s" : ""}</span>
                 {lastSync && (
                   <span className="text-xs text-slate-500">
-                    • Last synced: {format(lastSync, 'h:mm a')}
+                    • Last synced: {format(lastSync, "h:mm a")}
                   </span>
                 )}
               </div>
-              {userGroups && userGroups.length > 0 && (
+
+              {userGroups?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   <span className="text-xs text-slate-500">Your groups:</span>
-                  {userGroups.map((group) => (
-                    <Badge key={group} variant="outline" className="text-xs">
-                      {group}
-                    </Badge>
+                  {userGroups.map(g => (
+                    <Badge key={g} variant="outline" className="text-xs">{g}</Badge>
                   ))}
                 </div>
               )}
@@ -398,8 +266,9 @@ export default function MyApprovals() {
                 <Calendar className="w-4 h-4 mr-2" />
                 Calendar
               </Button>
+
               <Button
-                onClick={handleSync}
+                onClick={() => refresh({ showToast: true })}
                 disabled={syncing}
                 className="bg-orange-600 hover:bg-orange-700 text-white"
                 size="sm"
@@ -422,104 +291,97 @@ export default function MyApprovals() {
 
         <div className="space-y-4">
           <AnimatePresence>
-            {!approvals || approvals.length === 0 || approvals.every(event => event.items.length === 0) ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+            {pendingCount === 0 ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
                     <h3 className="text-xl font-semibold text-slate-900 mb-2">All Caught Up!</h3>
                     <p className="text-slate-600 text-center max-w-md">
-                      No pending approvals at the moment. Check back later or sync to refresh.
+                      No pending approvals at the moment.
                     </p>
                   </CardContent>
                 </Card>
               </motion.div>
             ) : (
-              approvals.map((eventGroup) => {
-                const colors = getGroupColor('default');
-                
-                return (
-                  <motion.div
-                    key={eventGroup.eventId}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className={`border-2 rounded-lg ${colors.border} ${colors.bg} hover:shadow-lg transition-all`}
-                  >
-                    <Card className="border-0 bg-transparent">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-xl mb-2">{eventGroup.eventName}</CardTitle>
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-                              <div className="flex items-center gap-1">
-                                <Calendar className={`w-4 h-4 ${colors.icon}`} />
-                                {eventGroup.eventStartsAt ? format(parseISO(eventGroup.eventStartsAt), 'EEE, MMM d, yyyy') : 'Date not set'}
-                              </div>
-                              <span>•</span>
-                              <div className="flex items-center gap-1">
-                                <Clock className={`w-4 h-4 ${colors.icon}`} />
-                                {eventGroup.eventStartsAt ? format(parseISO(eventGroup.eventStartsAt), 'h:mm a') : 'Time not set'}
-                              </div>
+              groupedApprovals.map(eventGroup => (
+                <motion.div
+                  key={eventGroup.eventId}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="border-2 rounded-lg border-slate-300 bg-slate-50 hover:shadow-lg transition-all"
+                >
+                  <Card className="border-0 bg-transparent">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-xl mb-2">{eventGroup.eventName}</CardTitle>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4 text-slate-600" />
+                              {eventGroup.eventStartsAt ? format(parseISO(eventGroup.eventStartsAt), "EEE, MMM d, yyyy") : "Date not set"}
+                            </div>
+                            <span>•</span>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4 text-slate-600" />
+                              {eventGroup.eventStartsAt ? format(parseISO(eventGroup.eventStartsAt), "h:mm a") : "Time not set"}
                             </div>
                           </div>
-                          <Badge className={`${colors.badge} flex items-center gap-1`}>
-                            <AlertCircle className="w-3 h-3" />
-                            {eventGroup.items.length} Pending
-                          </Badge>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {eventGroup.items.map((item) => (
-                          <div 
-                            key={item.resourceRequestId}
-                            className="p-3 bg-white/60 rounded-lg border border-slate-200"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <MapPin className={`w-4 h-4 ${colors.icon}`} />
-                                <span className="font-medium text-slate-900">{item.resourceName}</span>
-                                {item.type === 'room' && <span className="text-xs">🏢</span>}
-                                {item.type === 'resource' && <span className="text-xs">📦</span>}
-                              </div>
-                              <Badge className={colors.badge} variant="outline">
-                                Qty: {item.quantity}
-                              </Badge>
-                            </div>
+                        <Badge className="bg-slate-100 text-slate-700 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {eventGroup.items.length} Pending
+                        </Badge>
+                      </div>
+                    </CardHeader>
 
-                            <div className="flex gap-2 mt-3">
-                              <Button
-                                onClick={() => handleApprove(item.resourceRequestId, eventGroup.eventId)}
-                                disabled={sendingCode === item.resourceRequestId}
-                                className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                                size="sm"
-                              >
-                                {sendingCode === item.resourceRequestId ? (
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                )}
-                                Approve
-                              </Button>
-                              <Button
-                                onClick={() => window.open('https://calendar.planningcenteronline.com/approvals', '_blank')}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </Button>
+                    <CardContent className="space-y-3">
+                      {eventGroup.items.map(item => (
+                        <div
+                          key={item.resourceRequestId}
+                          className="p-3 bg-white/60 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-slate-600" />
+                              <span className="font-medium text-slate-900">{item.resourceName}</span>
+                              {item.type === "room" && <span className="text-xs">🏢</span>}
+                              {item.type === "resource" && <span className="text-xs">📦</span>}
                             </div>
+                            <Badge className="bg-slate-100 text-slate-700" variant="outline">
+                              Qty: {item.quantity ?? 1}
+                            </Badge>
                           </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })
+
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              onClick={() => approve(item.resourceRequestId)}
+                              disabled={approvingId === item.resourceRequestId}
+                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                              size="sm"
+                            >
+                              {approvingId === item.resourceRequestId ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                              )}
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
             )}
           </AnimatePresence>
         </div>
@@ -528,14 +390,16 @@ export default function MyApprovals() {
       <FullApprovalCalendarModal
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
-        approvals={approvals.flatMap(event => event.items.map(item => ({
-          ...item,
-          event_name: event.eventName,
-          event_starts_at: event.eventStartsAt,
-          event_ends_at: event.eventEndsAt,
-          request_id: item.resourceRequestId,
-          resource_name: item.resourceName
-        })))}
+        approvals={groupedApprovals.flatMap(ev =>
+          ev.items.map(item => ({
+            ...item,
+            event_name: ev.eventName,
+            event_starts_at: ev.eventStartsAt,
+            event_ends_at: ev.eventEndsAt,
+            request_id: item.resourceRequestId,
+            resource_name: item.resourceName
+          }))
+        )}
       />
     </div>
   );
