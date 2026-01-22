@@ -194,6 +194,15 @@ export default function MyApprovals() {
       console.log('🔵 User approval groups:', userGroups);
       setUserGroups(userGroups);
       
+      // Fetch all pending approvals from our backend (180 days)
+      const response = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
+      const data = response.data;
+      
+      console.log('🔵 Total approvals from API:', data.approvals?.length || 0);
+      console.log('🔵 Total events checked:', data.totalEvents);
+      console.log('🔵 User approval groups:', userGroups);
+      console.log('🔵 Sample approval groups:', data.approvals?.[0]?.approvalGroups);
+      
       if (!userGroups || userGroups.length === 0) {
         console.log('⚠️ No approval groups found for user');
         setApprovals([]);
@@ -201,14 +210,6 @@ export default function MyApprovals() {
         toast.info('You are not assigned to any approval groups');
         return;
       }
-      
-      // Fetch all pending approvals from our backend (180 days)
-      const response = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
-      const data = response.data;
-      
-      console.log('🔵 Total approvals from API:', data.approvals?.length || 0);
-      console.log('🔵 Total events checked:', data.totalEvents);
-      console.log('🔵 Sample approval groups:', data.approvals?.[0]?.approvalGroups);
       
       // Filter to only approvals user can approve
       const myApprovals = (data.approvals || []).filter(approval => {
