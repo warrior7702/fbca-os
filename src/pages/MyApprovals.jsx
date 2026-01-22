@@ -320,13 +320,11 @@ export default function MyApprovals() {
     try {
       setSendingCode(resourceRequestId);
       
-      const response = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approve=1&resourceRequestId=${resourceRequestId}`
-      );
+      const response = await base44.functions.invoke('approvePCOResourceRequest', {
+        resourceRequestId
+      });
       
-      const result = await response.json();
-      
-      if (result.success) {
+      if (response.data.success) {
         // Remove approved item from state
         setApprovals(prev => 
           prev.map(event => ({
@@ -338,7 +336,7 @@ export default function MyApprovals() {
         
         toast.success('Approved successfully!');
       } else {
-        toast.error('Failed to approve: ' + (result.response?.errors?.[0]?.detail || 'Unknown error'));
+        toast.error('Failed to approve: ' + (response.data.error || 'Unknown error'));
       }
       
     } catch (error) {
