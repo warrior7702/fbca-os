@@ -358,14 +358,14 @@ export default function MyApprovals() {
           description={
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span>{approvals.reduce((sum, event) => sum + event.items.length, 0)} pending approval{approvals.reduce((sum, event) => sum + event.items.length, 0) !== 1 ? 's' : ''}</span>
+                <span>{(approvals || []).reduce((sum, event) => sum + event.items.length, 0)} pending approval{(approvals || []).reduce((sum, event) => sum + event.items.length, 0) !== 1 ? 's' : ''}</span>
                 {lastSync && (
                   <span className="text-xs text-slate-500">
                     • Last synced: {format(lastSync, 'h:mm a')}
                   </span>
                 )}
               </div>
-              {userGroups.length > 0 && (
+              {userGroups && userGroups.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   <span className="text-xs text-slate-500">Your groups:</span>
                   {userGroups.map((group) => (
@@ -408,7 +408,7 @@ export default function MyApprovals() {
 
         <div className="space-y-4">
           <AnimatePresence>
-            {approvals.length === 0 || approvals.every(event => event.items.length === 0) ? (
+            {!approvals || approvals.length === 0 || approvals.every(event => event.items.length === 0) ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
