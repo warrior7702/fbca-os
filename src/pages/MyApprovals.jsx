@@ -270,22 +270,15 @@ export default function MyApprovals() {
       const userGroups = await getUserGroups(currentUser.email);
       setUserGroups(userGroups);
       
+      const response = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
+      const data = response.data;
+      
       if (!userGroups || userGroups.length === 0) {
         setApprovals([]);
         setLastSync(new Date());
         toast.info('No approval groups assigned');
         return;
       }
-      
-      const response = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
       
       const myApprovals = (data.approvals || []).filter(approval => 
         approval.approvalGroups?.some(group => userGroups.includes(group.name))
@@ -310,7 +303,7 @@ export default function MyApprovals() {
       
       setApprovals(approvalsList);
       setLastSync(new Date());
-      toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''}`);
+      toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''} from ${data.totalEvents} events`);
     } catch (error) {
       console.error('Sync error:', error);
       toast.error('Failed to sync approvals');
