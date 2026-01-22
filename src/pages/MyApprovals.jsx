@@ -164,35 +164,43 @@ export default function MyApprovals() {
       const { groups, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
       if (age < 24 * 60 * 60 * 1000) {
-        console.log('📦 Using cached approval groups:', groups);
         return groups;
       }
     }
     
-    console.log('🌐 Fetching approval groups from API...');
     const response = await fetch(
       `https://pco-webhook.vercel.app/api/cron/pco-sync?userGroups=1&email=${encodeURIComponent(userEmail)}`
     );
     const data = await response.json();
     
     localStorage.setItem(cacheKey, JSON.stringify({
-      groups: data.approvalGroupNames,
+      groups: data.approvalGroupNames || [],
       timestamp: Date.now()
     }));
     
-    console.log('✅ User approval groups:', data.approvalGroupNames);
-    return data.approvalGroupNames;
+    return data.approvalGroupNames || [];
   };
 
   const loadApprovals = async () => {
     try {
       const currentUser = await base44.auth.me();
       
-      // Get user's approval groups
+      if (!currentUser?.email) {
+        toast.error('User email not found');
+        return;
+      }
+      
+      // Get user's approval groups (cached)
       const userGroups = await getUserGroups(currentUser.email);
       setUserGroups(userGroups);
       
-      // Fetch all pending approvals with full details including approval groups
+      if (!userGroups || userGroups.length === 0) {
+        setApprovals([]);
+        setLastSync(new Date());
+        return;
+      }
+      
+      // Fetch all pending approvals
       const response = await fetch(
         `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
       );
@@ -203,29 +211,10 @@ export default function MyApprovals() {
       
       const data = await response.json();
       
-      console.log('📊 Total approvals from API:', (data.approvals || []).length);
-      console.log('👤 User email:', currentUser.email);
-      console.log('👥 User groups:', userGroups);
-      
       // Filter to only approvals user can approve
-      const myApprovals = (data.approvals || []).filter(approval => {
-        const hasMatch = approval.approvalGroups?.some(group => 
-          userGroups.includes(group.name)
-        );
-        
-        if (!hasMatch) {
-          console.log('❌ Filtered out:', {
-            event: approval.eventName,
-            resource: approval.resourceName,
-            approvalGroups: approval.approvalGroups?.map(g => g.name)
-          });
-        }
-        
-        return hasMatch;
-      });
-      
-      console.log('✅ Filtered approvals for user:', myApprovals.length);
-      console.log('🔍 My approvals:', myApprovals);
+      const myApprovals = (data.approvals || []).filter(approval => 
+        approval.approvalGroups?.some(group => userGroups.includes(group.name))
+      );
       
       // Group by event for better UI
       const groupedByEvent = myApprovals.reduce((acc, approval) => {
@@ -255,50 +244,9 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const currentUser = await base44.auth.me();
-      
-      // Get user's approval groups
-      const userGroups = await getUserGroups(currentUser.email);
-      setUserGroups(userGroups);
-      
-      const response = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Filter to only approvals user can approve
-      const myApprovals = (data.approvals || []).filter(approval => {
-        return approval.approvalGroups?.some(group => 
-          userGroups.includes(group.name)
-        );
-      });
-      
-      // Group by event
-      const groupedByEvent = myApprovals.reduce((acc, approval) => {
-        if (!acc[approval.eventId]) {
-          acc[approval.eventId] = {
-            eventId: approval.eventId,
-            eventName: approval.eventName,
-            eventStartsAt: approval.eventStartsAt,
-            eventEndsAt: approval.eventEndsAt,
-            items: []
-          };
-        }
-        acc[approval.eventId].items.push(approval);
-        return acc;
-      }, {});
-      
-      const approvalsList = Object.values(groupedByEvent);
-      const totalCount = myApprovals.length;
-      
+      await loadApprovals();
+      const totalCount = approvals.reduce((sum, event) => sum + event.items.length, 0);
       toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''}`);
-      setApprovals(approvalsList);
-      setLastSync(new Date());
     } catch (error) {
       console.error('Sync error:', error);
       toast.error('Failed to sync approvals');
@@ -384,19 +332,6 @@ export default function MyApprovals() {
           iconColor="from-orange-500 to-red-500"
           action={
             <div className="flex gap-2">
-              <Button 
-                onClick={async () => {
-                  const response = await fetch('https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100');
-                  const data = await response.json();
-                  console.log('🐛 DEBUG - Raw API response:', data);
-                  console.log('🐛 DEBUG - First approval:', data.approvals?.[0]);
-                  console.log('🐛 DEBUG - Approval groups structure:', data.approvals?.[0]?.approval_groups);
-                }} 
-                variant="ghost" 
-                size="sm"
-              >
-                🐛 Debug
-              </Button>
               <Button onClick={() => setShowCalendar(true)} variant="outline" size="sm">
                 <Calendar className="w-4 h-4 mr-2" />
                 Calendar
