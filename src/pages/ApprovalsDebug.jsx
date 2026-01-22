@@ -151,18 +151,39 @@ export default function ApprovalsDebug() {
           </CardContent>
         </Card>
 
-        {/* Summary */}
+        {/* API Response Details */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-orange-600" />
-              Summary
+              API Response
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <span className="font-semibold">Total Approvals from API:</span> {debugData.allApprovals.length}
+              <span className="font-semibold">Total Approvals from API:</span>{' '}
+              <span className="text-xl font-bold">{debugData.allApprovals.length}</span>
             </div>
+            <div className="text-sm text-slate-600">
+              Window: 180 days | Max: 500 events
+            </div>
+            {debugData.apiRawResponse && (
+              <div className="mt-2 p-2 bg-slate-100 rounded text-xs">
+                <pre>{JSON.stringify(debugData.apiRawResponse, null, 2)}</pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-blue-600" />
+              Filtering Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
             <div>
               <span className="font-semibold">Approvals Matching Your Groups:</span>{' '}
               <span className={debugData.filteredApprovals.length > 0 ? 'text-green-600 font-bold' : 'text-red-600'}>
