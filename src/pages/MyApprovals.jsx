@@ -244,8 +244,56 @@ export default function MyApprovals() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await loadApprovals();
-      const totalCount = approvals.reduce((sum, event) => sum + event.items.length, 0);
+      const currentUser = await base44.auth.me();
+      
+      if (!currentUser?.email) {
+        toast.error('User email not found');
+        return;
+      }
+      
+      const userGroups = await getUserGroups(currentUser.email);
+      setUserGroups(userGroups);
+      
+      if (!userGroups || userGroups.length === 0) {
+        setApprovals([]);
+        setLastSync(new Date());
+        toast.info('No approval groups assigned');
+        return;
+      }
+      
+      const response = await fetch(
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(currentUser.email)}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      const myApprovals = (data.approvals || []).filter(approval => 
+        approval.approvalGroups?.some(group => userGroups.includes(group.name))
+      );
+      
+      const groupedByEvent = myApprovals.reduce((acc, approval) => {
+        if (!acc[approval.eventId]) {
+          acc[approval.eventId] = {
+            eventId: approval.eventId,
+            eventName: approval.eventName,
+            eventStartsAt: approval.eventStartsAt,
+            eventEndsAt: approval.eventEndsAt,
+            items: []
+          };
+        }
+        acc[approval.eventId].items.push(approval);
+        return acc;
+      }, {});
+      
+      const approvalsList = Object.values(groupedByEvent);
+      const totalCount = myApprovals.length;
+      
+      setApprovals(approvalsList);
+      setLastSync(new Date());
       toast.success(`Synced ${totalCount} pending approval${totalCount !== 1 ? 's' : ''}`);
     } catch (error) {
       console.error('Sync error:', error);
