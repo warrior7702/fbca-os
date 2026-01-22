@@ -26,49 +26,32 @@ Deno.serve(async (req) => {
     }
 
     let approvalGroupNames: string[] = [];
-    let mode = 'user_token';
+    let mode = 'app_credentials'; // Default to app credentials
     let lastError: string | null = null;
 
-    if (user?.pco_access_token) {
-      const auth = { Authorization: `Bearer ${user.pco_access_token}` };
-      const meUrl = 'https://api.planningcenteronline.com/people/v2/me';
-      const me = await fetchJson(meUrl, auth);
-
-      if (me.ok && (me.data as any)?.data?.id) {
-        const pcoUserId = (me.data as any).data.id;
-        const groupsUrl = `https://api.planningcenteronline.com/calendar/v2/people/${pcoUserId}/resource_approval_groups?per_page=100`;
-        const groups = await fetchJson(groupsUrl, auth);
-
-        if (groups.ok) {
-          approvalGroupNames = ((groups.data as any)?.data || []).map((g: any) => g.attributes?.name).filter(Boolean);
-        } else {
-          lastError = `User-token groups failed: ${groups.status} ${groups.text || ''}`.trim();
-        }
-      } else {
-        lastError = `User-token me failed: ${me.status} ${me.text || ''}`.trim();
-      }
+    // Always use app credentials since user token is unreliable
+    const appAuth = basicAuthHeader();
+    if (!appAuth) {
+      return Response.json({
+        error: 'PCO app credentials not configured',
+        success: false
+      }, { status: 500 });
     }
 
-    if (approvalGroupNames.length === 0) {
-      const appAuth = basicAuthHeader();
-      if (appAuth) {
-        mode = 'app_credentials';
-        const searchUrl = `https://api.planningcenteronline.com/people/v2/people?per_page=10&where[search]=${encodeURIComponent(user.email)}`;
-        const people = await fetchJson(searchUrl, appAuth);
-        const personId = (people.data as any)?.data?.[0]?.id;
+    const searchUrl = `https://api.planningcenteronline.com/people/v2/people?per_page=10&where[search]=${encodeURIComponent(user.email)}`;
+    const people = await fetchJson(searchUrl, appAuth);
+    const personId = (people.data as any)?.data?.[0]?.id;
 
-        if (people.ok && personId) {
-          const groupsUrl = `https://api.planningcenteronline.com/calendar/v2/people/${personId}/resource_approval_groups?per_page=100`;
-          const groups = await fetchJson(groupsUrl, appAuth);
-          if (groups.ok) {
-            approvalGroupNames = ((groups.data as any)?.data || []).map((g: any) => g.attributes?.name).filter(Boolean);
-          } else {
-            lastError = `App-cred groups failed: ${groups.status} ${groups.text || ''}`.trim();
-          }
-        } else {
-          lastError = `App-cred people lookup failed: ${people.status} ${people.text || ''}`.trim();
-        }
+    if (people.ok && personId) {
+      const groupsUrl = `https://api.planningcenteronline.com/calendar/v2/people/${personId}/resource_approval_groups?per_page=100`;
+      const groups = await fetchJson(groupsUrl, appAuth);
+      if (groups.ok) {
+        approvalGroupNames = ((groups.data as any)?.data || []).map((g: any) => g.attributes?.name).filter(Boolean);
+      } else {
+        lastError = `Groups lookup failed: ${groups.status} ${groups.text || ''}`.trim();
       }
+    } else {
+      lastError = `People lookup failed: ${people.status} ${people.text || ''}`.trim();
     }
 
     return Response.json({
@@ -82,7 +65,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Error fetching user groups:', error);
     return Response.json({
-      error: error.message
+      error: error.message,
+      success: false
     }, { status: 500 });
   }
 });
