@@ -168,10 +168,11 @@ export default function MyApprovals() {
       setLastSync(new Date());
 
       if (showToast) {
-        if (filtered.length === 0) {
+        const totalPending = grouped.reduce((sum, ev) => sum + (ev.items?.length || 0), 0);
+        if (totalPending === 0) {
           toast.info(`No pending approvals for: ${groups.join(", ")}`);
         } else {
-          toast.success(`Found ${filtered.length} pending approval${filtered.length !== 1 ? "s" : ""}`);
+          toast.success(`Found ${totalPending} pending approval${totalPending !== 1 ? "s" : ""}`);
         }
       }
     } catch (e) {
