@@ -215,11 +215,12 @@ export default function MyApprovals() {
       
       // Filter to only approvals user can approve
       const myApprovals = (data.approvals || []).filter(approval => {
-        const hasMatch = approval.approvalGroups?.some(group => userGroups.includes(group.name));
+        const groupNames = (approval.approvalGroups || []).map(g => g?.name || g).filter(Boolean);
+        const hasMatch = groupNames.some(name => userGroups.includes(name));
         if (!hasMatch && approval.approvalGroups) {
           console.log('❌ No match for approval:', {
             eventName: approval.eventName,
-            approvalGroupsOnRequest: approval.approvalGroups.map(g => g.name),
+            approvalGroupsOnRequest: groupNames,
             userGroups: userGroups
           });
         }
@@ -284,9 +285,10 @@ export default function MyApprovals() {
         return;
       }
       
-      const myApprovals = (data.approvals || []).filter(approval => 
-        approval.approvalGroups?.some(group => userGroups.includes(group.name))
-      );
+      const myApprovals = (data.approvals || []).filter(approval => {
+        const groupNames = (approval.approvalGroups || []).map(g => g?.name || g).filter(Boolean);
+        return groupNames.some(name => userGroups.includes(name));
+      });
       
       const groupedByEvent = myApprovals.reduce((acc, approval) => {
         if (!acc[approval.eventId]) {
