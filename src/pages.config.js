@@ -68,6 +68,7 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
+import ApprovalsDebug from './pages/ApprovalsDebug';
 import __Layout from './Layout.jsx';
 
 
@@ -142,6 +143,7 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
+    "ApprovalsDebug": ApprovalsDebug,
 }
 
 export const pagesConfig = {
