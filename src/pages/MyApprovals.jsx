@@ -168,10 +168,8 @@ export default function MyApprovals() {
       }
     }
     
-    const response = await fetch(
-      `https://pco-webhook.vercel.app/api/cron/pco-sync?userGroups=1&email=${encodeURIComponent(userEmail)}`
-    );
-    const data = await response.json();
+    const response = await base44.functions.invoke('getUserGroups', {});
+    const data = response.data;
     
     localStorage.setItem(cacheKey, JSON.stringify({
       groups: data.approvalGroupNames || [],
