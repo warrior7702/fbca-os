@@ -184,6 +184,7 @@ export default function MyApprovals() {
   const loadApprovals = async () => {
     try {
       const currentUser = await base44.auth.me();
+      console.log('🔵 User email:', currentUser?.email);
       
       if (!currentUser?.email) {
         toast.error('User email not found');
@@ -192,11 +193,14 @@ export default function MyApprovals() {
       
       // Get user's approval groups (cached)
       const userGroups = await getUserGroups(currentUser.email);
+      console.log('🔵 User approval groups:', userGroups);
       setUserGroups(userGroups);
       
       if (!userGroups || userGroups.length === 0) {
+        console.log('⚠️ No approval groups found for user');
         setApprovals([]);
         setLastSync(new Date());
+        toast.info('You are not assigned to any approval groups');
         return;
       }
       
@@ -210,11 +214,23 @@ export default function MyApprovals() {
       }
       
       const data = await response.json();
+      console.log('🔵 Total approvals from API:', data.approvals?.length || 0);
+      console.log('🔵 Sample approval groups:', data.approvals?.[0]?.approvalGroups);
       
       // Filter to only approvals user can approve
-      const myApprovals = (data.approvals || []).filter(approval => 
-        approval.approvalGroups?.some(group => userGroups.includes(group.name))
-      );
+      const myApprovals = (data.approvals || []).filter(approval => {
+        const hasMatch = approval.approvalGroups?.some(group => userGroups.includes(group.name));
+        if (!hasMatch && approval.approvalGroups) {
+          console.log('❌ No match for approval:', {
+            eventName: approval.eventName,
+            approvalGroupsOnRequest: approval.approvalGroups.map(g => g.name),
+            userGroups: userGroups
+          });
+        }
+        return hasMatch;
+      });
+      
+      console.log('🔵 Filtered approvals for user:', myApprovals.length);
       
       // Group by event for better UI
       const groupedByEvent = myApprovals.reduce((acc, approval) => {
@@ -233,9 +249,15 @@ export default function MyApprovals() {
       
       setApprovals(Object.values(groupedByEvent));
       setLastSync(new Date());
+      
+      if (myApprovals.length === 0) {
+        toast.info(`No pending approvals for groups: ${userGroups.join(', ')}`);
+      } else {
+        toast.success(`Found ${myApprovals.length} pending approval${myApprovals.length !== 1 ? 's' : ''}`);
+      }
     } catch (error) {
-      console.error('Error loading approvals:', error);
-      toast.error('Failed to load approvals');
+      console.error('❌ Error loading approvals:', error);
+      toast.error('Failed to load approvals: ' + error.message);
     } finally {
       setLoading(false);
     }
