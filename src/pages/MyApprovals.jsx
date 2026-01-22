@@ -272,8 +272,10 @@ export default function MyApprovals() {
       const userGroups = await getUserGroups(currentUser.email);
       setUserGroups(userGroups);
       
-      const response = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
-      const data = response.data;
+      const response = await fetch(
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(currentUser.email)}`
+      );
+      const data = await response.json();
       
       if (!userGroups || userGroups.length === 0) {
         setApprovals([]);
