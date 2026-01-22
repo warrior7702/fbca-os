@@ -134,6 +134,6 @@ Deno.serve(async (req) => {
     return Response.json({
       success: false,
       error: error.message || 'Unknown error'
-    }, { status: 500 });
+    }, { status: 200 });
   }
 });
