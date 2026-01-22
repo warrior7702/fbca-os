@@ -154,15 +154,35 @@ export default function MyApprovals() {
 
       const api = await fetchApprovalsFromPCO({ email: me.email, windowDays: 180, maxEvents: 500 });
 
+      console.log('🔍 API Response:', {
+        totalApprovals: api.approvals?.length || 0,
+        totalEvents: api.totalEvents,
+        sampleApproval: api.approvals?.[0]
+      });
+
       const approvals = Array.isArray(api.approvals) ? api.approvals : [];
+      
       // prefer `approvalGroupNames: string[]` if provided by API
       const filtered = approvals.filter(a => {
         const names =
           Array.isArray(a.approvalGroupNames) ? a.approvalGroupNames :
           normalizeGroupNames(a.approvalGroups);
 
-        return names.some(n => groups.includes(n));
+        const hasMatch = names.some(n => groups.includes(n));
+        
+        if (!hasMatch && a.eventName) {
+          console.log('❌ No match:', {
+            event: a.eventName,
+            resource: a.resourceName,
+            approvalGroupsOnItem: names,
+            userGroups: groups
+          });
+        }
+
+        return hasMatch;
       });
+
+      console.log('✅ Filtered approvals:', filtered.length, 'out of', approvals.length);
 
       const grouped = groupByEvent(filtered);
       setGroupedApprovals(grouped);
