@@ -122,12 +122,26 @@ export default function MyApprovals() {
   const fetchApprovalsFromPCO = useCallback(async ({ groups, windowDays = 180, maxEvents = 500 }) => {
     const groupsParam = Array.isArray(groups) ? groups.join(",") : "";
     const url = `${PCO_SYNC_URL}?approvals=1&windowDays=${windowDays}&maxEvents=${maxEvents}&groups=${encodeURIComponent(groupsParam)}`;
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data?.ok === false) {
-      throw new Error(data?.error || `PCO sync error (${res.status})`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || `PCO sync error (${res.status})`);
+      }
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - PCO sync taking too long');
+      }
+      throw error;
     }
-    return data;
   }, []);
 
   const refresh = useCallback(async ({ showToast = false } = {}) => {

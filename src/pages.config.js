@@ -5,6 +5,7 @@ import AkitaBoxExplorer from './pages/AkitaBoxExplorer';
 import AkitaFetch from './pages/AkitaFetch';
 import AkitaSyncAdmin from './pages/AkitaSyncAdmin';
 import Approvals from './pages/Approvals';
+import ApprovalsDebug from './pages/ApprovalsDebug';
 import AssignmentRules from './pages/AssignmentRules';
 import BackfillEventCodes from './pages/BackfillEventCodes';
 import BookableRoomsAdmin from './pages/BookableRoomsAdmin';
@@ -37,6 +38,7 @@ import Me from './pages/Me';
 import MediaPlayer from './pages/MediaPlayer';
 import MeetingNotes from './pages/MeetingNotes';
 import MicrosoftLogin from './pages/MicrosoftLogin';
+import MyApprovals from './pages/MyApprovals';
 import MyDepartment from './pages/MyDepartment';
 import MyMeetings from './pages/MyMeetings';
 import MyTasks from './pages/MyTasks';
@@ -67,8 +69,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import ApprovalsDebug from './pages/ApprovalsDebug';
-import MyApprovals from './pages/MyApprovals';
 import __Layout from './Layout.jsx';
 
 
@@ -80,6 +80,7 @@ export const PAGES = {
     "AkitaFetch": AkitaFetch,
     "AkitaSyncAdmin": AkitaSyncAdmin,
     "Approvals": Approvals,
+    "ApprovalsDebug": ApprovalsDebug,
     "AssignmentRules": AssignmentRules,
     "BackfillEventCodes": BackfillEventCodes,
     "BookableRoomsAdmin": BookableRoomsAdmin,
@@ -112,6 +113,7 @@ export const PAGES = {
     "MediaPlayer": MediaPlayer,
     "MeetingNotes": MeetingNotes,
     "MicrosoftLogin": MicrosoftLogin,
+    "MyApprovals": MyApprovals,
     "MyDepartment": MyDepartment,
     "MyMeetings": MyMeetings,
     "MyTasks": MyTasks,
@@ -142,8 +144,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "ApprovalsDebug": ApprovalsDebug,
-    "MyApprovals": MyApprovals,
 }
 
 export const pagesConfig = {
