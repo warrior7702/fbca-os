@@ -146,6 +146,7 @@ export default function MyApprovals() {
       }
 
       const groups = await getUserGroups(me.email);
+      console.log("✅ userGroups from getUserGroups:", groups);
       setUserGroups(groups);
 
       if (!groups || groups.length === 0) {
@@ -157,6 +158,9 @@ export default function MyApprovals() {
 
       const api = await fetchApprovalsFromPCO({ windowDays: 180 });
 
+      console.log('📦 approvals API raw data:', api);
+      console.log('📦 approvals array:', api.approvals);
+      console.log('📦 first approval:', api.approvals?.[0]);
       console.log('🔍 API Response:', {
         totalApprovals: api.approvals?.length || 0,
         totalEvents: api.totalEvents,
