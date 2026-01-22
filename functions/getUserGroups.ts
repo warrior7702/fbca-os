@@ -1,8 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 function basicAuthHeader() {
-  const id = Deno.env.get('PCO_APP_ID') || '';
-  const secret = Deno.env.get('PCO_APP_SECRET') || '';
+  const id = Deno.env.get('PCO_CLIENT_ID') || '';
+  const secret = Deno.env.get('PCO_CLIENT_SECRET') || '';
   if (!id || !secret) return null;
   const token = btoa(`${id}:${secret}`);
   return { Authorization: `Basic ${token}` };
