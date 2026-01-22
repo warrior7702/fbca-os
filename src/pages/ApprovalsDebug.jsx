@@ -32,22 +32,27 @@ export default function ApprovalsDebug() {
       // Get user groups from our backend
       const groupsResponse = await base44.functions.invoke('getUserGroups', {});
       debug.userGroups = groupsResponse.data.approvalGroupNames || [];
+      debug.groupMode = groupsResponse.data.mode;
+      debug.groupWarning = groupsResponse.data.warning || null;
 
       // Get all approvals (180 days)
+      const groupsParam = debug.userGroups.join(',');
       const approvalsResponse = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(user.email)}`
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&groups=${encodeURIComponent(groupsParam)}`
       );
       const approvalsData = await approvalsResponse.json();
       debug.apiRawResponse = {
         totalEvents: approvalsData.totalEvents,
         totalReturned: approvalsData.approvals?.length || 0,
-        windowDays: approvalsData.windowDays
+        windowDays: approvalsData.windowDays,
+        mode: approvalsData.mode,
+        globalFailed: approvalsData.globalFailed
       };
       debug.allApprovals = approvalsData.approvals || [];
 
       // Filter and track matches
       debug.allApprovals.forEach(approval => {
-        const approvalGroupNames = approval.approvalGroups?.map(g => g.name) || [];
+        const approvalGroupNames = approval.approvalGroupNames || approval.approvalGroups?.map(g => g.name) || [];
         const hasMatch = approvalGroupNames.some(name => debug.userGroups.includes(name));
         
         if (hasMatch) {
@@ -136,17 +141,23 @@ export default function ApprovalsDebug() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {debugData.userGroups.length === 0 ? (
-              <p className="text-red-600">❌ No approval groups found!</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {debugData.userGroups.map(group => (
-                  <Badge key={group} variant="outline">{group}</Badge>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {debugData.userGroups.length === 0 ? (
+          <p className="text-red-600">❌ No approval groups found!</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {debugData.userGroups.map(group => (
+              <Badge key={group} variant="outline">{group}</Badge>
+            ))}
+          </div>
+        )}
+        {debugData.groupMode && (
+          <p className="text-xs text-slate-500 mt-2">Mode: {debugData.groupMode}</p>
+        )}
+        {debugData.groupWarning && (
+          <p className="text-xs text-red-600 mt-1">Warning: {debugData.groupWarning}</p>
+        )}
+      </CardContent>
+    </Card>
 
         {/* API Response Details */}
         <Card>
