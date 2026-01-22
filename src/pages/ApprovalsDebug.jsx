@@ -33,9 +33,11 @@ export default function ApprovalsDebug() {
       const groupsResponse = await base44.functions.invoke('getUserGroups', {});
       debug.userGroups = groupsResponse.data.approvalGroupNames || [];
 
-      // Get all approvals from our backend (180 days)
-      const approvalsResponse = await base44.functions.invoke('fetchPendingApprovals', { windowDays: 180 });
-      const approvalsData = approvalsResponse.data;
+      // Get all approvals (180 days)
+      const approvalsResponse = await fetch(
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(user.email)}`
+      );
+      const approvalsData = await approvalsResponse.json();
       debug.apiRawResponse = {
         totalEvents: approvalsData.totalEvents,
         totalReturned: approvalsData.approvals?.length || 0,
