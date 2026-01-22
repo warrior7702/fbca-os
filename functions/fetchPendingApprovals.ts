@@ -9,9 +9,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'PCO not connected' }, { status: 401 });
     }
 
-    const { windowDays = 180, groups = [] } = await req.json().catch(() => ({}));
-    const userGroups = Array.isArray(groups) ? groups : [];
+    const { windowDays = 180 } = await req.json().catch(() => ({}));
 
+    // Get user's approval groups
+    const groupsResponse = await base44.functions.invoke("getUserGroups", {});
+    const userGroups = groupsResponse?.data?.approvalGroupNames || [];
+    
     console.log(`👤 User groups: ${userGroups.join(", ")}`);
 
     if (userGroups.length === 0) {

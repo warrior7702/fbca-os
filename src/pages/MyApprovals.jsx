@@ -119,11 +119,8 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromPCO = useCallback(async ({ groups, windowDays = 180 }) => {
-    const response = await base44.functions.invoke("fetchPendingApprovals", { 
-      groups: groups,
-      windowDays 
-    });
+  const fetchApprovalsFromPCO = useCallback(async ({ windowDays = 180 }) => {
+    const response = await base44.functions.invoke("fetchPendingApprovals", { windowDays });
     
     if (!response?.data?.success) {
       throw new Error(response?.data?.error || "Failed to fetch approvals");
@@ -159,7 +156,7 @@ export default function MyApprovals() {
         return;
       }
 
-      const api = await fetchApprovalsFromPCO({ groups, windowDays: 180 });
+      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
 
       console.log('📦 approvals API raw data:', api);
       console.log('📦 approvals array:', api.approvals);
