@@ -20,7 +20,7 @@ import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 
-const PCO_SYNC_URL = "https://pco-webhook.vercel.app/api/cron/pco-sync";
+// Removed external webhook URL - using backend function instead
 
 const AppHeader = ({ icon: Icon, title, description, iconColor, action }) => (
   <div className="flex items-center justify-between">
@@ -119,29 +119,17 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromPCO = useCallback(async ({ groups, windowDays = 180, maxEvents = 500 }) => {
-    const groupsParam = Array.isArray(groups) ? groups.join(",") : "";
-    const url = `${PCO_SYNC_URL}?approvals=1&windowDays=${windowDays}&maxEvents=${maxEvents}&groups=${encodeURIComponent(groupsParam)}`;
+  const fetchApprovalsFromPCO = useCallback(async ({ windowDays = 180 }) => {
+    const response = await base44.functions.invoke("fetchPendingApprovals", { windowDays });
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-    
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok === false) {
-        throw new Error(data?.error || `PCO sync error (${res.status})`);
-      }
-      return data;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - PCO sync taking too long');
-      }
-      throw error;
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.error || "Failed to fetch approvals");
     }
+    
+    return {
+      approvals: response.data.approvals || [],
+      totalEvents: response.data.totalEvents || 0
+    };
   }, []);
 
   const refresh = useCallback(async ({ showToast = false } = {}) => {
@@ -167,7 +155,7 @@ export default function MyApprovals() {
         return;
       }
 
-      const api = await fetchApprovalsFromPCO({ groups, windowDays: 180, maxEvents: 500 });
+      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
 
       console.log('🔍 API Response:', {
         totalApprovals: api.approvals?.length || 0,
