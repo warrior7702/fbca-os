@@ -31,35 +31,25 @@ export default function ApprovalDetailModal({ approval, onClose, onApprove, onDe
 
   const loadDetails = async () => {
     setLoading(true);
-    setError(null); // Reset error state on new load
-    console.log('🔍 Loading approval details for:', approval.request_id);
+    setError(null);
     
-    try {
-      const response = await base44.functions.invoke('getApprovalDetails', {
-        request_id: approval.request_id,
-        event_id: approval.event_id,
-        resource_id: approval.resource_id
-      });
-
-      console.log('📊 Details response:', response.data);
-      
-      if (response.data?.ok) {
-        setDetails(response.data);
-        console.log('✅ Questions:', response.data.questions?.length || 0);
-        console.log('✅ Answers:', Object.keys(response.data.answers || {}).length);
-      } else {
-        const errorMessage = response.data?.error || 'Failed to load details';
-        toast.error(errorMessage);
-        setError(errorMessage);
+    // Details are now in the approval object from the new API
+    setDetails({
+      ok: true,
+      questions: [],
+      answers: {},
+      event: {
+        name: approval.event_name,
+        starts_at: approval.event_starts_at,
+        ends_at: approval.event_ends_at
+      },
+      resource: {
+        name: approval.resource_name,
+        quantity: approval.quantity
       }
-    } catch (error) {
-      console.error('❌ Failed to load details:', error);
-      const errorMessage = 'Failed to load details: ' + error.message;
-      toast.error(errorMessage);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    });
+    
+    setLoading(false);
   };
 
   const sendToPlanningCenter = async () => {
