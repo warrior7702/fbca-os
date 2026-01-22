@@ -36,11 +36,16 @@ export default function ApprovalsDebug() {
       const groupsData = await groupsResponse.json();
       debug.userGroups = groupsData.approvalGroupNames || [];
 
-      // Get all approvals
+      // Get all approvals (wider window)
       const approvalsResponse = await fetch(
-        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=30&maxEvents=100&email=${encodeURIComponent(user.email)}`
+        `https://pco-webhook.vercel.app/api/cron/pco-sync?approvals=1&windowDays=180&maxEvents=500&email=${encodeURIComponent(user.email)}`
       );
       const approvalsData = await approvalsResponse.json();
+      debug.apiRawResponse = {
+        totalReturned: approvalsData.approvals?.length || 0,
+        hasMore: approvalsData.hasMore,
+        params: approvalsData.params
+      };
       debug.allApprovals = approvalsData.approvals || [];
 
       // Filter and track matches
