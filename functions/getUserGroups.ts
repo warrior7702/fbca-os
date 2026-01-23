@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       return Response.json({
         error: 'PCO app credentials not configured',
         success: false
-      }, { status: 500 });
+      }, { status: 200 });
     }
 
     const searchUrl = `https://api.planningcenteronline.com/people/v2/people?per_page=10&where[search]=${encodeURIComponent(user.email)}`;
@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Error fetching user groups:', error);
     return Response.json({
-      error: error.message,
+      error: error.message || 'Unknown error',
       success: false
-    }, { status: 500 });
+    }, { status: 200 });
   }
 });
