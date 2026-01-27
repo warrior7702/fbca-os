@@ -100,9 +100,11 @@ Deno.serve(async (req) => {
             }).filter(g => g.id);
 
             // Check if any approval group matches user's groups
+            console.log(`    📋 Approval groups: ${approvalGroups.map(g => g.name).join(', ')}`);
             const matchesUserGroup = approvalGroups.some(ag => 
               userGroups.includes(ag.name)
             );
+            console.log(`    ${matchesUserGroup ? '✅' : '❌'} Matches user groups: ${matchesUserGroup}`);
 
             if (matchesUserGroup) {
               allApprovals.push({
