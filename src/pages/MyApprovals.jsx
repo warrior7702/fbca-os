@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 // Removed external webhook URL - using backend function instead
 
@@ -95,8 +95,10 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedApproval, setSelectedApproval] = useState(null);
+  const [expandedApproval, setExpandedApproval] = useState(null);
+  const [approvalDetails, setApprovalDetails] = useState({});
+  const [selectedCardholders, setSelectedCardholders] = useState({});
+  const [sendingToPCO, setSendingToPCO] = useState({});
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -240,22 +242,120 @@ export default function MyApprovals() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh, syncing]);
 
-  const handleApprovalClick = useCallback((item, eventGroup) => {
-    setSelectedApproval({
-      ...item,
-      eventName: eventGroup.eventName,
-      eventStartsAt: eventGroup.eventStartsAt,
-      eventEndsAt: eventGroup.eventEndsAt,
-      eventId: eventGroup.eventId
-    });
-    setShowDetailModal(true);
+  const loadApprovalDetails = useCallback(async (requestId) => {
+    if (approvalDetails[requestId]) return; // Already loaded
+    
+    try {
+      const response = await base44.functions.invoke('getApprovalDetails', { request_id: requestId });
+      if (response.data?.ok) {
+        setApprovalDetails(prev => ({ ...prev, [requestId]: response.data }));
+      }
+    } catch (error) {
+      console.error('Error loading approval details:', error);
+    }
+  }, [approvalDetails]);
+
+  const toggleExpanded = useCallback((requestId) => {
+    if (expandedApproval === requestId) {
+      setExpandedApproval(null);
+    } else {
+      setExpandedApproval(requestId);
+      loadApprovalDetails(requestId);
+    }
+  }, [expandedApproval, loadApprovalDetails]);
+
+  const handleCardholderSelect = useCallback((requestId, cardholder) => {
+    setSelectedCardholders(prev => ({ ...prev, [requestId]: cardholder }));
   }, []);
 
-  const handleApprovalSuccess = useCallback(() => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-    refresh({ showToast: true });
-  }, [refresh]);
+  const sendToPCO = useCallback(async (requestId, eventGroup, item) => {
+    const cardholder = selectedCardholders[requestId];
+    if (!cardholder?.pin) {
+      toast.error('Please select a cardholder first');
+      return;
+    }
+
+    setSendingToPCO(prev => ({ ...prev, [requestId]: true }));
+    try {
+      const badgeCode = `${cardholder.pin}#`;
+      const accessTime = eventGroup.eventStartsAt && eventGroup.eventEndsAt
+        ? `${format(new Date(eventGroup.eventStartsAt), 'h:mm a')} - ${format(new Date(eventGroup.eventEndsAt), 'h:mm a')}`
+        : '';
+      
+      const response = await base44.functions.invoke('writePCONote', {
+        request_id: requestId,
+        event_id: eventGroup.eventId,
+        badge_code: badgeCode,
+        access_time: accessTime
+      });
+
+      if (response.data?.ok) {
+        toast.success('Door code sent to Planning Center!');
+      } else {
+        toast.error('Failed to send to Planning Center');
+      }
+    } catch (error) {
+      console.error('Error sending to PCO:', error);
+      toast.error('Failed to send to Planning Center');
+    } finally {
+      setSendingToPCO(prev => ({ ...prev, [requestId]: false }));
+    }
+  }, [selectedCardholders]);
+
+  const approve = useCallback(async (requestId, eventGroup, item) => {
+    setApprovingId(requestId);
+    try {
+      const cardholder = selectedCardholders[requestId];
+      const payload = {
+        request_id: requestId,
+        action: 'approve',
+        event_id: eventGroup.eventId,
+        event_name: eventGroup.eventName,
+        event_date: eventGroup.eventStartsAt
+      };
+      
+      if (cardholder?.pin) {
+        payload.door_code = `${cardholder.pin}#`;
+        payload.cardholder_name = cardholder.name;
+        payload.cardholder_member_id = cardholder.member_id;
+        payload.access_time = eventGroup.eventStartsAt && eventGroup.eventEndsAt
+          ? `${format(new Date(eventGroup.eventStartsAt), 'h:mm a')} - ${format(new Date(eventGroup.eventEndsAt), 'h:mm a')}`
+          : '';
+      }
+
+      const response = await base44.functions.invoke('approveResourceRequest', payload);
+
+      if (response.data?.ok) {
+        toast.success('Request approved successfully!');
+        
+        // Save locally
+        if (cardholder?.pin) {
+          try {
+            await base44.entities.LocalEventCode.create({
+              pco_event_id: eventGroup.eventId,
+              event_name: eventGroup.eventName,
+              event_date: eventGroup.eventStartsAt,
+              resource_name: item.resourceName,
+              door_code: cardholder.pin,
+              cardholder_name: cardholder.name,
+              member_id: cardholder.member_id
+            });
+          } catch (e) {
+            console.error('Failed to save local event code:', e);
+          }
+        }
+
+        refresh({ showToast: false });
+      } else {
+        toast.error(response.data?.error || 'Failed to approve');
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      toast.error('Failed to approve request');
+    } finally {
+      setApprovingId(null);
+    }
+  }, [selectedCardholders, refresh]);
 
   if (loading) {
     return (
@@ -451,16 +551,6 @@ export default function MyApprovals() {
             resource_name: item.resourceName
           }))
         )}
-      />
-
-      <ApprovalDetailModal
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedApproval(null);
-        }}
-        approval={selectedApproval}
-        onApprovalSuccess={handleApprovalSuccess}
       />
     </div>
   );
