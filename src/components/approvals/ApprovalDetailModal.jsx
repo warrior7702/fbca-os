@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import CardholderLookup from "./CardholderLookup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function ApprovalDetailModal({ approval, onClose, onApprove, onDeny }) {
+export default function ApprovalDetailModal({ approval, isOpen, onClose, onApprovalSuccess }) {
+  const onApprove = onApprovalSuccess;
+  const onDeny = onApprovalSuccess;
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState(null);
   const [approving, setApproving] = useState(false);
