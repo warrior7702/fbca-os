@@ -38,7 +38,6 @@ import Me from './pages/Me';
 import MediaPlayer from './pages/MediaPlayer';
 import MeetingNotes from './pages/MeetingNotes';
 import MicrosoftLogin from './pages/MicrosoftLogin';
-import MyApprovals from './pages/MyApprovals';
 import MyDepartment from './pages/MyDepartment';
 import MyMeetings from './pages/MyMeetings';
 import MyTasks from './pages/MyTasks';
@@ -69,6 +68,7 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
+import MyApprovals from './pages/MyApprovals';
 import __Layout from './Layout.jsx';
 
 
@@ -113,7 +113,6 @@ export const PAGES = {
     "MediaPlayer": MediaPlayer,
     "MeetingNotes": MeetingNotes,
     "MicrosoftLogin": MicrosoftLogin,
-    "MyApprovals": MyApprovals,
     "MyDepartment": MyDepartment,
     "MyMeetings": MyMeetings,
     "MyTasks": MyTasks,
@@ -144,6 +143,7 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
+    "MyApprovals": MyApprovals,
 }
 
 export const pagesConfig = {
