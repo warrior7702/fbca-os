@@ -76,9 +76,11 @@ Deno.serve(async (req) => {
         // Process each resource request
         for (const request of requestsData.data || []) {
           const status = request.attributes.status;
-          
+          console.log(`  📋 Request ID ${request.id} - Status: ${status}`);
+
           // Only include pending requests
           if (status === 'pending' || status === 'awaiting_approval') {
+            console.log(`    ✅ Status is pending/awaiting`);
             // Find the resource in included data
             const resourceId = request.relationships?.resource?.data?.id;
             const resource = requestsData.included?.find(
