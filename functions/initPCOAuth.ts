@@ -27,7 +27,7 @@ Deno.serve((req) => {
         }
 
         const redirectUri = `${appUrl}/functions/pcoCallback`;
-        const scope = 'calendar resources';
+        const scope = 'calendar';
         
         const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
         
