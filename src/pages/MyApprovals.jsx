@@ -119,27 +119,17 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromDatabase = useCallback(async (userEmail) => {
-    // Fetch pending approvals from database that belong to this user
-    const approvals = await base44.entities.PendingApproval.filter(
-      { user_email: userEmail, approval_status: 'P' },
-      '-event_starts_at',
-      100
-    );
+  const fetchApprovalsFromPCO = useCallback(async ({ windowDays = 180 }) => {
+    const response = await base44.functions.invoke("fetchPendingApprovals", { windowDays });
     
-    return approvals.map(approval => ({
-      resourceRequestId: approval.request_id,
-      eventId: approval.event_id,
-      eventName: approval.event_name,
-      eventStartsAt: approval.event_starts_at,
-      eventEndsAt: approval.event_ends_at,
-      resourceId: approval.resource_id,
-      resourceName: approval.resource_name,
-      approvalGroups: [{ name: approval.approval_group_name }],
-      quantity: approval.quantity,
-      type: 'resource',
-      status: approval.approval_status === 'P' ? 'pending' : approval.approval_status
-    }));
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.error || "Failed to fetch approvals");
+    }
+    
+    return {
+      approvals: response.data.approvals || [],
+      totalEvents: response.data.totalEvents || 0
+    };
   }, []);
 
   const refresh = useCallback(async ({ showToast = false } = {}) => {
@@ -166,13 +156,10 @@ export default function MyApprovals() {
         return;
       }
 
-      // Sync from PCO to database first
-      await base44.functions.invoke("syncMyApprovals", {});
-      
-      // Now fetch from database
-      const approvals = await fetchApprovalsFromDatabase(me.email);
+      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
+      const approvals = Array.isArray(api.approvals) ? api.approvals : [];
 
-      console.log('📦 approvals from database:', approvals);
+      console.log('📦 approvals from PCO:', approvals);
       console.log('🔍 Total approvals:', approvals.length);
       
       const grouped = groupByEvent(approvals);
@@ -194,7 +181,7 @@ export default function MyApprovals() {
       setSyncing(false);
       setLoading(false);
     }
-  }, [fetchApprovalsFromDatabase, getUserGroups]);
+  }, [fetchApprovalsFromPCO, getUserGroups]);
 
   useEffect(() => {
     refresh({ showToast: false });
