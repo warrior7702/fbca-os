@@ -119,18 +119,28 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromPCO = useCallback(async ({ windowDays = 180 }) => {
-    const response = await base44.functions.invoke("fetchPendingApprovals", { windowDays });
+  const fetchApprovalsFromDatabase = useCallback(async () => {
+    // Fetch pending approvals from database that belong to this user
+    const approvals = await base44.entities.PendingApproval.filter(
+      { user_email: user.email, approval_status: 'P' },
+      '-event_starts_at',
+      100
+    );
     
-    if (!response?.data?.success) {
-      throw new Error(response?.data?.error || "Failed to fetch approvals");
-    }
-    
-    return {
-      approvals: response.data.approvals || [],
-      totalEvents: response.data.totalEvents || 0
-    };
-  }, []);
+    return approvals.map(approval => ({
+      resourceRequestId: approval.request_id,
+      eventId: approval.event_id,
+      eventName: approval.event_name,
+      eventStartsAt: approval.event_starts_at,
+      eventEndsAt: approval.event_ends_at,
+      resourceId: approval.resource_id,
+      resourceName: approval.resource_name,
+      approvalGroups: [{ name: approval.approval_group_name }],
+      quantity: approval.quantity,
+      type: 'resource',
+      status: approval.approval_status === 'P' ? 'pending' : approval.approval_status
+    }));
+  }, [user?.email]);
 
   const refresh = useCallback(async ({ showToast = false } = {}) => {
     setSyncing(true);
@@ -156,18 +166,10 @@ export default function MyApprovals() {
         return;
       }
 
-      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
+      const approvals = await fetchApprovalsFromDatabase();
 
-      console.log('📦 approvals API raw data:', api);
-      console.log('📦 approvals array:', api.approvals);
-      console.log('📦 first approval:', api.approvals?.[0]);
-      console.log('🔍 API Response:', {
-        totalApprovals: api.approvals?.length || 0,
-        totalEvents: api.totalEvents,
-        sampleApproval: api.approvals?.[0]
-      });
-
-      const approvals = Array.isArray(api.approvals) ? api.approvals : [];
+      console.log('📦 approvals from database:', approvals);
+      console.log('🔍 Total approvals:', approvals.length);
       
       const grouped = groupByEvent(approvals);
       setGroupedApprovals(grouped);
