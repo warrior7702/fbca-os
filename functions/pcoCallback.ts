@@ -57,8 +57,11 @@ Deno.serve(async (req) => {
         const clientId = Deno.env.get('PCO_CLIENT_ID');
         const clientSecret = Deno.env.get('PCO_CLIENT_SECRET');
         
+        console.log('🔍 PCO_CLIENT_ID exists:', !!clientId);
+        console.log('🔍 PCO_CLIENT_SECRET exists:', !!clientSecret);
+        
         if (!clientId || !clientSecret) {
-            console.error('❌ Missing PCO credentials');
+            console.error('❌ Missing PCO credentials - ID:', !!clientId, 'Secret:', !!clientSecret);
             return new Response(null, {
                 status: 302,
                 headers: { 'Location': buildRedirectUrl('tab=integrations&error=pco_credentials_missing') }
