@@ -190,7 +190,7 @@ export default function MyApprovals() {
       setSyncing(false);
       setLoading(false);
     }
-  }, [fetchApprovalsFromPCO, getUserGroups]);
+  }, [fetchApprovalsFromDatabase, getUserGroups]);
 
   useEffect(() => {
     refresh({ showToast: false });
