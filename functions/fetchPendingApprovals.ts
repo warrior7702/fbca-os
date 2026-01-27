@@ -62,13 +62,16 @@ Deno.serve(async (req) => {
 
       // Fetch resource requests for this event
       const requestsUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_requests?include=resource,resource.resource_approval_groups&per_page=100`;
-      
+
       const requestsResponse = await fetch(requestsUrl, {
         headers: { 'Authorization': `Bearer ${user.pco_access_token}` }
       });
 
+      console.log(`📊 Event "${eventName}" - Resource requests response: ${requestsResponse.status}`);
+
       if (requestsResponse.ok) {
         const requestsData = await requestsResponse.json();
+        console.log(`📊 Event "${eventName}" - Found ${requestsData.data?.length || 0} resource requests`);
         
         // Process each resource request
         for (const request of requestsData.data || []) {
