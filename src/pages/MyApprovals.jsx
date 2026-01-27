@@ -93,10 +93,41 @@ export default function MyApprovals() {
   const [lastSync, setLastSync] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
     [groupedApprovals]
+  );
+
+  const groupCounts = useMemo(() => {
+    const counts = {};
+    groupedApprovals.forEach(event => {
+      event.items.forEach(item => {
+        const groupName = item.approvalGroups?.[0]?.name;
+        if (groupName) {
+          counts[groupName] = (counts[groupName] || 0) + 1;
+        }
+      });
+    });
+    return counts;
+  }, [groupedApprovals]);
+
+  const filteredGroupedApprovals = useMemo(() => {
+    if (!selectedGroup) return groupedApprovals;
+    return groupedApprovals
+      .map(event => ({
+        ...event,
+        items: event.items.filter(item => 
+          item.approvalGroups?.some(g => g.name === selectedGroup)
+        )
+      }))
+      .filter(event => event.items.length > 0);
+  }, [groupedApprovals, selectedGroup]);
+
+  const displayPendingCount = useMemo(
+    () => (filteredGroupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
+    [filteredGroupedApprovals]
   );
 
   const getUserGroups = useCallback(async (email) => {
@@ -249,7 +280,7 @@ export default function MyApprovals() {
           description={
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span>{pendingCount} pending approval{pendingCount !== 1 ? "s" : ""}</span>
+                <span>{displayPendingCount} pending approval{displayPendingCount !== 1 ? "s" : ""}{selectedGroup ? ` in ${selectedGroup}` : ''}</span>
                 {lastSync && (
                   <span className="text-xs text-slate-500">
                     • Last synced: {format(lastSync, "h:mm a")}
@@ -261,8 +292,26 @@ export default function MyApprovals() {
                 <div className="flex flex-wrap gap-1 mt-1">
                   <span className="text-xs text-slate-500">Your groups:</span>
                   {userGroups.map(g => (
-                    <Badge key={g} variant="outline" className="text-xs">{g}</Badge>
+                    <Badge 
+                      key={g} 
+                      variant={selectedGroup === g ? "default" : "outline"} 
+                      className={`text-xs cursor-pointer transition-all hover:scale-105 ${
+                        selectedGroup === g ? 'bg-orange-600 text-white' : ''
+                      }`}
+                      onClick={() => setSelectedGroup(selectedGroup === g ? null : g)}
+                    >
+                      {g} {groupCounts[g] > 0 && `(${groupCounts[g]})`}
+                    </Badge>
                   ))}
+                  {selectedGroup && (
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs cursor-pointer hover:bg-slate-200"
+                      onClick={() => setSelectedGroup(null)}
+                    >
+                      Clear filter
+                    </Badge>
+                  )}
                 </div>
               )}
             </div>
@@ -299,20 +348,20 @@ export default function MyApprovals() {
 
         <div className="space-y-4">
           <AnimatePresence>
-            {pendingCount === 0 ? (
+            {displayPendingCount === 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
                     <h3 className="text-xl font-semibold text-slate-900 mb-2">All Caught Up!</h3>
                     <p className="text-slate-600 text-center max-w-md">
-                      No pending approvals at the moment.
+                      {selectedGroup ? `No pending approvals in ${selectedGroup}` : 'No pending approvals at the moment.'}
                     </p>
                   </CardContent>
                 </Card>
               </motion.div>
             ) : (
-              groupedApprovals.map(eventGroup => (
+              filteredGroupedApprovals.map(eventGroup => (
                 <motion.div
                   key={eventGroup.eventId}
                   initial={{ opacity: 0, y: 20 }}
