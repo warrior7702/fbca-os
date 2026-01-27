@@ -119,10 +119,10 @@ export default function MyApprovals() {
     return groups;
   }, []);
 
-  const fetchApprovalsFromDatabase = useCallback(async () => {
+  const fetchApprovalsFromDatabase = useCallback(async (userEmail) => {
     // Fetch pending approvals from database that belong to this user
     const approvals = await base44.entities.PendingApproval.filter(
-      { user_email: user.email, approval_status: 'P' },
+      { user_email: userEmail, approval_status: 'P' },
       '-event_starts_at',
       100
     );
@@ -140,7 +140,7 @@ export default function MyApprovals() {
       type: 'resource',
       status: approval.approval_status === 'P' ? 'pending' : approval.approval_status
     }));
-  }, [user?.email]);
+  }, []);
 
   const refresh = useCallback(async ({ showToast = false } = {}) => {
     setSyncing(true);
@@ -166,7 +166,11 @@ export default function MyApprovals() {
         return;
       }
 
-      const approvals = await fetchApprovalsFromDatabase();
+      // Sync from PCO to database first
+      await base44.functions.invoke("syncMyApprovals", {});
+      
+      // Now fetch from database
+      const approvals = await fetchApprovalsFromDatabase(me.email);
 
       console.log('📦 approvals from database:', approvals);
       console.log('🔍 Total approvals:', approvals.length);
