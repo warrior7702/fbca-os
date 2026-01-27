@@ -184,16 +184,6 @@ export default function MyApprovals() {
   const refresh = useCallback(async ({ showToast = false, force = false } = {}) => {
     setSyncing(true);
     try {
-      // Sync from PCO first to ensure we have latest data
-      const syncResponse = await base44.functions.invoke("syncMyApprovals", { 
-        force,
-        windowDays: 90 // Get 90 days forward
-      });
-      
-      if (!syncResponse?.data?.success) {
-        console.warn("Sync warning:", syncResponse?.data?.error);
-      }
-
       const me = await base44.auth.me();
       setUser(me);
 
@@ -202,6 +192,18 @@ export default function MyApprovals() {
         setGroupedApprovals([]);
         setUserGroups([]);
         return;
+      }
+
+      // Sync from PCO to ensure we have latest data
+      if (force || showToast) {
+        const syncResponse = await base44.functions.invoke("syncMyApprovals", { 
+          force,
+          windowDays: 90 // Get 90 days forward
+        });
+        
+        if (!syncResponse?.data?.success) {
+          console.warn("Sync warning:", syncResponse?.data?.error);
+        }
       }
 
       const groups = await getUserGroups(me.email);
@@ -255,25 +257,30 @@ export default function MyApprovals() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh, syncing]);
 
-  const loadApprovalDetails = useCallback(async (requestId) => {
+  const loadApprovalDetails = useCallback(async (requestId, resourceId) => {
     if (approvalDetails[requestId]) return; // Already loaded
     
     try {
-      const response = await base44.functions.invoke('getApprovalDetails', { request_id: requestId });
+      const response = await base44.functions.invoke('getApprovalDetails', { 
+        request_id: requestId,
+        resource_id: resourceId 
+      });
       if (response.data?.ok) {
         setApprovalDetails(prev => ({ ...prev, [requestId]: response.data }));
       }
     } catch (error) {
       console.error('Error loading approval details:', error);
+      // Set empty details to avoid repeated attempts
+      setApprovalDetails(prev => ({ ...prev, [requestId]: { questions: [], answers: {} } }));
     }
   }, [approvalDetails]);
 
-  const toggleExpanded = useCallback((requestId) => {
+  const toggleExpanded = useCallback((requestId, resourceId) => {
     if (expandedApproval === requestId) {
       setExpandedApproval(null);
     } else {
       setExpandedApproval(requestId);
-      loadApprovalDetails(requestId);
+      loadApprovalDetails(requestId, resourceId);
     }
   }, [expandedApproval, loadApprovalDetails]);
 
@@ -519,7 +526,7 @@ export default function MyApprovals() {
                           >
                             <div 
                               className="p-3 cursor-pointer hover:bg-slate-50"
-                              onClick={() => toggleExpanded(item.resourceRequestId)}
+                              onClick={() => toggleExpanded(item.resourceRequestId, item.resourceId)}
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-2 flex-1">
