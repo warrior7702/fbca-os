@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 
 // Removed external webhook URL - using backend function instead
 
@@ -95,8 +94,6 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedApproval, setSelectedApproval] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -240,24 +237,26 @@ export default function MyApprovals() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh, syncing]);
 
-  const handleApprovalClick = useCallback((item, eventGroup) => {
-    setSelectedApproval({
-      request_id: item.resourceRequestId,
-      event_id: item.eventId || eventGroup.eventId,
-      event_name: eventGroup.eventName,
-      event_starts_at: eventGroup.eventStartsAt,
-      event_ends_at: eventGroup.eventEndsAt,
-      resource_name: item.resourceName,
-      quantity: item.quantity
-    });
-    setShowDetailModal(true);
-  }, []);
+  const approve = useCallback(async (resourceRequestId) => {
+    setApprovingId(resourceRequestId);
+    try {
+      const resp = await base44.functions.invoke("approvePCOResourceRequest", { resourceRequestId });
+      if (!resp?.data?.success) throw new Error(resp?.data?.error || "Unknown approval error");
 
-  const handleApprovalSuccess = useCallback(() => {
-    setShowDetailModal(false);
-    setSelectedApproval(null);
-    refresh({ showToast: true });
-  }, [refresh]);
+      // Optimistic remove
+      setGroupedApprovals(prev =>
+        prev
+          .map(ev => ({ ...ev, items: ev.items.filter(i => i.resourceRequestId !== resourceRequestId) }))
+          .filter(ev => ev.items.length > 0)
+      );
+      toast.success("Approved successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error(`Failed to approve: ${e.message}`);
+    } finally {
+      setApprovingId(null);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -414,11 +413,16 @@ export default function MyApprovals() {
 
                           <div className="flex gap-2 mt-3">
                             <Button
-                              onClick={() => handleApprovalClick(item, eventGroup)}
+                              onClick={() => approve(item.resourceRequestId)}
+                              disabled={approvingId === item.resourceRequestId}
                               className="bg-green-600 hover:bg-green-700 text-white flex-1"
                               size="sm"
                             >
-                              <CheckCircle className="w-4 h-4 mr-2" />
+                              {approvingId === item.resourceRequestId ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                              )}
                               Approve
                             </Button>
                             <Button
@@ -453,16 +457,6 @@ export default function MyApprovals() {
             resource_name: item.resourceName
           }))
         )}
-      />
-
-      <ApprovalDetailModal
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedApproval(null);
-        }}
-        approval={selectedApproval}
-        onApprovalSuccess={handleApprovalSuccess}
       />
     </div>
   );
