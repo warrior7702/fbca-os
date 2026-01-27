@@ -12,7 +12,9 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
-  MapPin
+  MapPin,
+  ChevronDown,
+  Send
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -20,6 +22,7 @@ import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
 import CardholderLookup from "../components/approvals/CardholderLookup";
+import { Label } from "@/components/ui/label";
 
 // Removed external webhook URL - using backend function instead
 
@@ -178,9 +181,19 @@ export default function MyApprovals() {
     }));
   }, [user?.email]);
 
-  const refresh = useCallback(async ({ showToast = false } = {}) => {
+  const refresh = useCallback(async ({ showToast = false, force = false } = {}) => {
     setSyncing(true);
     try {
+      // Sync from PCO first to ensure we have latest data
+      const syncResponse = await base44.functions.invoke("syncMyApprovals", { 
+        force,
+        windowDays: 90 // Get 90 days forward
+      });
+      
+      if (!syncResponse?.data?.success) {
+        console.warn("Sync warning:", syncResponse?.data?.error);
+      }
+
       const me = await base44.auth.me();
       setUser(me);
 
@@ -493,42 +506,125 @@ export default function MyApprovals() {
                     </CardHeader>
 
                     <CardContent className="space-y-3">
-                      {eventGroup.items.map(item => (
-                        <div
-                          key={item.resourceRequestId}
-                          className="p-3 bg-white/60 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4 text-slate-600" />
-                              <span className="font-medium text-slate-900">{item.resourceName}</span>
-                              {item.type === "room" && <span className="text-xs">🏢</span>}
-                              {item.type === "resource" && <span className="text-xs">📦</span>}
+                      {eventGroup.items.map((item, idx) => {
+                        const isExpanded = expandedApproval === item.resourceRequestId;
+                        const details = approvalDetails[item.resourceRequestId];
+                        const cardholder = selectedCardholders[item.resourceRequestId];
+                        const isSending = sendingToPCO[item.resourceRequestId];
+                        
+                        return (
+                          <div
+                            key={item.resourceRequestId}
+                            className="bg-white/60 rounded-lg border border-slate-200 overflow-hidden"
+                          >
+                            <div 
+                              className="p-3 cursor-pointer hover:bg-slate-50"
+                              onClick={() => toggleExpanded(item.resourceRequestId)}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <MapPin className="w-4 h-4 text-slate-600" />
+                                  <span className="font-medium text-slate-900">{item.resourceName}</span>
+                                  {details?.questions?.length > 0 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {details.questions.length} Questions
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge className="bg-slate-100 text-slate-700" variant="outline">
+                                    Qty: {item.quantity ?? 1}
+                                  </Badge>
+                                  <ChevronDown 
+                                    className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            <Badge className="bg-slate-100 text-slate-700" variant="outline">
-                              Qty: {item.quantity ?? 1}
-                            </Badge>
-                          </div>
 
-                          <div className="flex gap-2 mt-3">
-                            <Button
-                              onClick={() => handleApprovalClick(item, eventGroup)}
-                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                              size="sm"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Approve
-                            </Button>
-                            <Button
-                              onClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
+                            {isExpanded && (
+                              <div className="px-3 pb-3 space-y-3 border-t border-slate-200 pt-3 bg-white">
+                                {/* Questions and Answers */}
+                                {details?.questions?.length > 0 && (
+                                  <div className="space-y-2">
+                                    {details.questions.map((question) => {
+                                      const answer = details.answers?.[question.id];
+                                      if (!answer) return null;
+                                      
+                                      return (
+                                        <div key={question.id} className="p-2 bg-slate-50 rounded border border-slate-200">
+                                          <p className="text-xs font-semibold text-slate-500 mb-1">
+                                            {question.question}
+                                          </p>
+                                          <p className="text-sm text-slate-900">{answer}</p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Cardholder Lookup */}
+                                <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                                  <Label className="text-sm font-semibold mb-2 block">Assign Door Code</Label>
+                                  <CardholderLookup
+                                    onSelect={(ch) => handleCardholderSelect(item.resourceRequestId, ch)}
+                                    selected={cardholder}
+                                    eventName={eventGroup.eventName}
+                                    resourceName={item.resourceName}
+                                  />
+                                  {cardholder && (
+                                    <div className="mt-2 p-2 bg-green-50 border border-green-300 rounded">
+                                      <p className="text-sm">
+                                        <span className="font-semibold">{cardholder.name}</span>
+                                        <span className="text-slate-600"> • Door Code: </span>
+                                        <span className="font-mono font-bold text-green-700 text-lg">{cardholder.pin}#</span>
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      sendToPCO(item.resourceRequestId, eventGroup, item);
+                                    }}
+                                    disabled={!cardholder?.pin || isSending}
+                                    variant="outline"
+                                    className="flex-1 border-blue-300 hover:bg-blue-50"
+                                    size="sm"
+                                  >
+                                    {isSending ? (
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <Send className="w-4 h-4 mr-2" />
+                                    )}
+                                    Send to PCO
+                                  </Button>
+                                  
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      approve(item.resourceRequestId, eventGroup, item);
+                                    }}
+                                    disabled={approvingId === item.resourceRequestId}
+                                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                                    size="sm"
+                                  >
+                                    {approvingId === item.resourceRequestId ? (
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                    )}
+                                    Approve
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </CardContent>
                   </Card>
                 </motion.div>
