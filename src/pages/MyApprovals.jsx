@@ -242,13 +242,11 @@ export default function MyApprovals() {
 
   const handleApprovalClick = useCallback((item, eventGroup) => {
     setSelectedApproval({
-      request_id: item.resourceRequestId,
-      event_id: item.eventId || eventGroup.eventId,
-      event_name: eventGroup.eventName,
-      event_starts_at: eventGroup.eventStartsAt,
-      event_ends_at: eventGroup.eventEndsAt,
-      resource_name: item.resourceName,
-      quantity: item.quantity
+      ...item,
+      eventName: eventGroup.eventName,
+      eventStartsAt: eventGroup.eventStartsAt,
+      eventEndsAt: eventGroup.eventEndsAt,
+      eventId: eventGroup.eventId
     });
     setShowDetailModal(true);
   }, []);
