@@ -11,6 +11,8 @@ import CardholderLookup from "./CardholderLookup";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ApprovalDetailModal({ approval, isOpen, onClose, onApprovalSuccess }) {
+  const onApprove = onApprovalSuccess;
+  const onDeny = onApprovalSuccess;
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState(null);
   const [approving, setApproving] = useState(false);
@@ -33,37 +35,23 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
     setLoading(true);
     setError(null);
     
-    try {
-      // Fetch full request details including questions/answers
-      const response = await base44.functions.invoke('getApprovalDetails', {
-        request_id: approval.resourceRequestId
-      });
-      
-      if (response.data?.ok) {
-        setDetails(response.data);
-      } else {
-        // Fallback to approval object data
-        setDetails({
-          ok: true,
-          questions: [],
-          answers: {},
-          event: {
-            name: approval.eventName,
-            starts_at: approval.eventStartsAt,
-            ends_at: approval.eventEndsAt
-          },
-          resource: {
-            name: approval.resourceName,
-            quantity: approval.quantity
-          }
-        });
+    // Details are now in the approval object from the new API
+    setDetails({
+      ok: true,
+      questions: [],
+      answers: {},
+      event: {
+        name: approval.event_name,
+        starts_at: approval.event_starts_at,
+        ends_at: approval.event_ends_at
+      },
+      resource: {
+        name: approval.resource_name,
+        quantity: approval.quantity
       }
-    } catch (error) {
-      console.error('Error loading approval details:', error);
-      setError('Failed to load approval details');
-    } finally {
-      setLoading(false);
-    }
+    });
+    
+    setLoading(false);
   };
 
   const sendToPlanningCenter = async () => {
@@ -75,13 +63,13 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
     setSendingToPCO(true);
     try {
       const badgeCode = `${selectedCardholder.pin}#`;
-      const accessTime = approval.eventStartsAt && approval.eventEndsAt
-        ? `${format(new Date(approval.eventStartsAt), 'h:mm a')} - ${format(new Date(approval.eventEndsAt), 'h:mm a')}`
+      const accessTime = approval.event_starts_at && approval.event_ends_at
+        ? `${format(new Date(approval.event_starts_at), 'h:mm a')} - ${format(new Date(approval.event_ends_at), 'h:mm a')}`
         : '';
       
       const response = await base44.functions.invoke('writePCONote', {
-        request_id: approval.resourceRequestId,
-        event_id: approval.eventId,
+        request_id: approval.request_id,
+        event_id: approval.event_id,
         badge_code: badgeCode,
         access_time: accessTime
       });
@@ -103,24 +91,22 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
   const handleApprove = async () => {
     setApproving(true);
     try {
-      console.log('🔍 Approving from modal:', approval.resourceRequestId);
+      console.log('🔍 Approving from modal:', approval.request_id);
       
       // Build payload with door code info if selected
       const payload = {
-        request_id: approval.resourceRequestId,
+        request_id: approval.request_id,
         action: 'approve',
-        event_id: approval.eventId,
-        event_name: approval.eventName,
-        event_date: approval.eventStartsAt
+        event_id: approval.event_id,
+        event_name: approval.event_name,
+        event_date: approval.event_starts_at
       };
       
       // Include door code if a cardholder was selected
       if (selectedCardholder?.pin) {
         payload.door_code = `${selectedCardholder.pin}#`;
-        payload.cardholder_name = selectedCardholder.name;
-        payload.cardholder_member_id = selectedCardholder.member_id;
-        payload.access_time = approval.eventStartsAt && approval.eventEndsAt
-          ? `${format(new Date(approval.eventStartsAt), 'h:mm a')} - ${format(new Date(approval.eventEndsAt), 'h:mm a')}`
+        payload.access_time = approval.event_starts_at && approval.event_ends_at
+          ? `${format(new Date(approval.event_starts_at), 'h:mm a')} - ${format(new Date(approval.event_ends_at), 'h:mm a')}`
           : '';
       }
       
@@ -128,26 +114,8 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
 
       if (response.data?.ok) {
         toast.success('Request approved successfully!');
-        
-        // Save door code selection locally to LocalEventCode entity
-        if (selectedCardholder?.pin) {
-          try {
-            await base44.entities.LocalEventCode.create({
-              pco_event_id: approval.eventId,
-              event_name: approval.eventName,
-              event_date: approval.eventStartsAt,
-              resource_name: approval.resourceName,
-              door_code: selectedCardholder.pin,
-              cardholder_name: selectedCardholder.name,
-              member_id: selectedCardholder.member_id
-            });
-          } catch (e) {
-            console.error('Failed to save local event code:', e);
-          }
-        }
-        
         onClose();
-        if (onApprovalSuccess) await onApprovalSuccess();
+        if (onApprove) await onApprove(); // Trigger refresh in parent
       } else {
         toast.error(response.data?.error || 'Failed to approve');
       }
@@ -162,17 +130,17 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
   const handleDeny = async () => {
     setDenying(true);
     try {
-      console.log('🔍 Denying from modal:', approval.resourceRequestId);
+      console.log('🔍 Denying from modal:', approval.request_id);
       
       const response = await base44.functions.invoke('approveResourceRequest', {
-        request_id: approval.resourceRequestId,
+        request_id: approval.request_id,
         action: 'deny'
       });
 
       if (response.data?.ok) {
         toast.success('Request denied successfully!');
         onClose();
-        if (onApprovalSuccess) await onApprovalSuccess();
+        if (onDeny) await onDeny(); // Trigger refresh in parent
       } else {
         toast.error(response.data?.error || 'Failed to deny');
       }
@@ -189,7 +157,7 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
   const pcoUrl = 'https://calendar.planningcenteronline.com/approvals';
 
   return (
-    <Dialog open={isOpen && !!approval} onOpenChange={onClose}>
+    <Dialog open={!!approval} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
@@ -235,16 +203,16 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
               <div>
                 <Label className="text-xs text-slate-500">Event Date</Label>
                 <p className="font-medium">
-                  {approval.eventStartsAt 
-                    ? format(new Date(approval.eventStartsAt), 'EEEE, MMM d, yyyy')
+                  {approval.event_starts_at 
+                    ? format(new Date(approval.event_starts_at), 'EEEE, MMM d, yyyy')
                     : 'N/A'}
                 </p>
               </div>
               <div>
                 <Label className="text-xs text-slate-500">Time</Label>
                 <p className="font-medium">
-                  {approval.eventStartsAt && approval.eventEndsAt
-                    ? `${format(new Date(approval.eventStartsAt), 'h:mm a')} - ${format(new Date(approval.eventEndsAt), 'h:mm a')}`
+                  {approval.event_starts_at && approval.event_ends_at
+                    ? `${format(new Date(approval.event_starts_at), 'h:mm a')} - ${format(new Date(approval.event_ends_at), 'h:mm a')}`
                     : 'N/A'}
                 </p>
               </div>
@@ -253,7 +221,7 @@ export default function ApprovalDetailModal({ approval, isOpen, onClose, onAppro
             {/* Resource Info */}
             <div className="p-4 bg-slate-50 rounded-lg">
               <Label className="text-xs text-slate-500">Resource Requested</Label>
-              <p className="font-semibold text-lg">{approval.resourceName}</p>
+              <p className="font-semibold text-lg">{approval.resource_name}</p>
               {approval.quantity && approval.quantity > 1 && (
                 <p className="text-sm text-slate-600">Quantity: {approval.quantity}</p>
               )}

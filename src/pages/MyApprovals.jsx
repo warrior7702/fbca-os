@@ -12,17 +12,14 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
-  MapPin,
-  ChevronDown,
-  Send
+  MapPin
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-import CardholderLookup from "../components/approvals/CardholderLookup";
-import { Label } from "@/components/ui/label";
+import ApprovalDetailModal from "../components/approvals/ApprovalDetailModal";
 
 // Removed external webhook URL - using backend function instead
 
@@ -98,10 +95,8 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [expandedApproval, setExpandedApproval] = useState(null);
-  const [approvalDetails, setApprovalDetails] = useState({});
-  const [selectedCardholders, setSelectedCardholders] = useState({});
-  const [sendingToPCO, setSendingToPCO] = useState({});
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedApproval, setSelectedApproval] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -181,7 +176,7 @@ export default function MyApprovals() {
     }));
   }, [user?.email]);
 
-  const refresh = useCallback(async ({ showToast = false, force = false } = {}) => {
+  const refresh = useCallback(async ({ showToast = false } = {}) => {
     setSyncing(true);
     try {
       const me = await base44.auth.me();
@@ -192,18 +187,6 @@ export default function MyApprovals() {
         setGroupedApprovals([]);
         setUserGroups([]);
         return;
-      }
-
-      // Sync from PCO to ensure we have latest data
-      if (force || showToast) {
-        const syncResponse = await base44.functions.invoke("syncMyApprovals", { 
-          force,
-          windowDays: 90 // Get 90 days forward
-        });
-        
-        if (!syncResponse?.data?.success) {
-          console.warn("Sync warning:", syncResponse?.data?.error);
-        }
       }
 
       const groups = await getUserGroups(me.email);
@@ -257,125 +240,24 @@ export default function MyApprovals() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh, syncing]);
 
-  const loadApprovalDetails = useCallback(async (requestId, resourceId) => {
-    if (approvalDetails[requestId]) return; // Already loaded
-    
-    try {
-      const response = await base44.functions.invoke('getApprovalDetails', { 
-        request_id: requestId,
-        resource_id: resourceId 
-      });
-      if (response.data?.ok) {
-        setApprovalDetails(prev => ({ ...prev, [requestId]: response.data }));
-      }
-    } catch (error) {
-      console.error('Error loading approval details:', error);
-      // Set empty details to avoid repeated attempts
-      setApprovalDetails(prev => ({ ...prev, [requestId]: { questions: [], answers: {} } }));
-    }
-  }, [approvalDetails]);
-
-  const toggleExpanded = useCallback((requestId, resourceId) => {
-    if (expandedApproval === requestId) {
-      setExpandedApproval(null);
-    } else {
-      setExpandedApproval(requestId);
-      loadApprovalDetails(requestId, resourceId);
-    }
-  }, [expandedApproval, loadApprovalDetails]);
-
-  const handleCardholderSelect = useCallback((requestId, cardholder) => {
-    setSelectedCardholders(prev => ({ ...prev, [requestId]: cardholder }));
+  const handleApprovalClick = useCallback((item, eventGroup) => {
+    setSelectedApproval({
+      request_id: item.resourceRequestId,
+      event_id: item.eventId || eventGroup.eventId,
+      event_name: eventGroup.eventName,
+      event_starts_at: eventGroup.eventStartsAt,
+      event_ends_at: eventGroup.eventEndsAt,
+      resource_name: item.resourceName,
+      quantity: item.quantity
+    });
+    setShowDetailModal(true);
   }, []);
 
-  const sendToPCO = useCallback(async (requestId, eventGroup, item) => {
-    const cardholder = selectedCardholders[requestId];
-    if (!cardholder?.pin) {
-      toast.error('Please select a cardholder first');
-      return;
-    }
-
-    setSendingToPCO(prev => ({ ...prev, [requestId]: true }));
-    try {
-      const badgeCode = `${cardholder.pin}#`;
-      const accessTime = eventGroup.eventStartsAt && eventGroup.eventEndsAt
-        ? `${format(new Date(eventGroup.eventStartsAt), 'h:mm a')} - ${format(new Date(eventGroup.eventEndsAt), 'h:mm a')}`
-        : '';
-      
-      const response = await base44.functions.invoke('writePCONote', {
-        request_id: requestId,
-        event_id: eventGroup.eventId,
-        badge_code: badgeCode,
-        access_time: accessTime
-      });
-
-      if (response.data?.ok) {
-        toast.success('Door code sent to Planning Center!');
-      } else {
-        toast.error('Failed to send to Planning Center');
-      }
-    } catch (error) {
-      console.error('Error sending to PCO:', error);
-      toast.error('Failed to send to Planning Center');
-    } finally {
-      setSendingToPCO(prev => ({ ...prev, [requestId]: false }));
-    }
-  }, [selectedCardholders]);
-
-  const approve = useCallback(async (requestId, eventGroup, item) => {
-    setApprovingId(requestId);
-    try {
-      const cardholder = selectedCardholders[requestId];
-      const payload = {
-        request_id: requestId,
-        action: 'approve',
-        event_id: eventGroup.eventId,
-        event_name: eventGroup.eventName,
-        event_date: eventGroup.eventStartsAt
-      };
-      
-      if (cardholder?.pin) {
-        payload.door_code = `${cardholder.pin}#`;
-        payload.cardholder_name = cardholder.name;
-        payload.cardholder_member_id = cardholder.member_id;
-        payload.access_time = eventGroup.eventStartsAt && eventGroup.eventEndsAt
-          ? `${format(new Date(eventGroup.eventStartsAt), 'h:mm a')} - ${format(new Date(eventGroup.eventEndsAt), 'h:mm a')}`
-          : '';
-      }
-
-      const response = await base44.functions.invoke('approveResourceRequest', payload);
-
-      if (response.data?.ok) {
-        toast.success('Request approved successfully!');
-        
-        // Save locally
-        if (cardholder?.pin) {
-          try {
-            await base44.entities.LocalEventCode.create({
-              pco_event_id: eventGroup.eventId,
-              event_name: eventGroup.eventName,
-              event_date: eventGroup.eventStartsAt,
-              resource_name: item.resourceName,
-              door_code: cardholder.pin,
-              cardholder_name: cardholder.name,
-              member_id: cardholder.member_id
-            });
-          } catch (e) {
-            console.error('Failed to save local event code:', e);
-          }
-        }
-
-        refresh({ showToast: false });
-      } else {
-        toast.error(response.data?.error || 'Failed to approve');
-      }
-    } catch (error) {
-      console.error('Approve error:', error);
-      toast.error('Failed to approve request');
-    } finally {
-      setApprovingId(null);
-    }
-  }, [selectedCardholders, refresh]);
+  const handleApprovalSuccess = useCallback(() => {
+    setShowDetailModal(false);
+    setSelectedApproval(null);
+    refresh({ showToast: true });
+  }, [refresh]);
 
   if (loading) {
     return (
@@ -513,125 +395,42 @@ export default function MyApprovals() {
                     </CardHeader>
 
                     <CardContent className="space-y-3">
-                      {eventGroup.items.map((item, idx) => {
-                        const isExpanded = expandedApproval === item.resourceRequestId;
-                        const details = approvalDetails[item.resourceRequestId];
-                        const cardholder = selectedCardholders[item.resourceRequestId];
-                        const isSending = sendingToPCO[item.resourceRequestId];
-                        
-                        return (
-                          <div
-                            key={item.resourceRequestId}
-                            className="bg-white/60 rounded-lg border border-slate-200 overflow-hidden"
-                          >
-                            <div 
-                              className="p-3 cursor-pointer hover:bg-slate-50"
-                              onClick={() => toggleExpanded(item.resourceRequestId, item.resourceId)}
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center gap-2 flex-1">
-                                  <MapPin className="w-4 h-4 text-slate-600" />
-                                  <span className="font-medium text-slate-900">{item.resourceName}</span>
-                                  {details?.questions?.length > 0 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {details.questions.length} Questions
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge className="bg-slate-100 text-slate-700" variant="outline">
-                                    Qty: {item.quantity ?? 1}
-                                  </Badge>
-                                  <ChevronDown 
-                                    className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                  />
-                                </div>
-                              </div>
+                      {eventGroup.items.map(item => (
+                        <div
+                          key={item.resourceRequestId}
+                          className="p-3 bg-white/60 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-slate-600" />
+                              <span className="font-medium text-slate-900">{item.resourceName}</span>
+                              {item.type === "room" && <span className="text-xs">🏢</span>}
+                              {item.type === "resource" && <span className="text-xs">📦</span>}
                             </div>
-
-                            {isExpanded && (
-                              <div className="px-3 pb-3 space-y-3 border-t border-slate-200 pt-3 bg-white">
-                                {/* Questions and Answers */}
-                                {details?.questions?.length > 0 && (
-                                  <div className="space-y-2">
-                                    {details.questions.map((question) => {
-                                      const answer = details.answers?.[question.id];
-                                      if (!answer) return null;
-                                      
-                                      return (
-                                        <div key={question.id} className="p-2 bg-slate-50 rounded border border-slate-200">
-                                          <p className="text-xs font-semibold text-slate-500 mb-1">
-                                            {question.question}
-                                          </p>
-                                          <p className="text-sm text-slate-900">{answer}</p>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {/* Cardholder Lookup */}
-                                <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                                  <Label className="text-sm font-semibold mb-2 block">Assign Door Code</Label>
-                                  <CardholderLookup
-                                    onSelect={(ch) => handleCardholderSelect(item.resourceRequestId, ch)}
-                                    selected={cardholder}
-                                    eventName={eventGroup.eventName}
-                                    resourceName={item.resourceName}
-                                  />
-                                  {cardholder && (
-                                    <div className="mt-2 p-2 bg-green-50 border border-green-300 rounded">
-                                      <p className="text-sm">
-                                        <span className="font-semibold">{cardholder.name}</span>
-                                        <span className="text-slate-600"> • Door Code: </span>
-                                        <span className="font-mono font-bold text-green-700 text-lg">{cardholder.pin}#</span>
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      sendToPCO(item.resourceRequestId, eventGroup, item);
-                                    }}
-                                    disabled={!cardholder?.pin || isSending}
-                                    variant="outline"
-                                    className="flex-1 border-blue-300 hover:bg-blue-50"
-                                    size="sm"
-                                  >
-                                    {isSending ? (
-                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    ) : (
-                                      <Send className="w-4 h-4 mr-2" />
-                                    )}
-                                    Send to PCO
-                                  </Button>
-                                  
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      approve(item.resourceRequestId, eventGroup, item);
-                                    }}
-                                    disabled={approvingId === item.resourceRequestId}
-                                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                                    size="sm"
-                                  >
-                                    {approvingId === item.resourceRequestId ? (
-                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    ) : (
-                                      <CheckCircle className="w-4 h-4 mr-2" />
-                                    )}
-                                    Approve
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
+                            <Badge className="bg-slate-100 text-slate-700" variant="outline">
+                              Qty: {item.quantity ?? 1}
+                            </Badge>
                           </div>
-                        );
-                      })}
+
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              onClick={() => handleApprovalClick(item, eventGroup)}
+                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                              size="sm"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -654,6 +453,16 @@ export default function MyApprovals() {
             resource_name: item.resourceName
           }))
         )}
+      />
+
+      <ApprovalDetailModal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedApproval(null);
+        }}
+        approval={selectedApproval}
+        onApprovalSuccess={handleApprovalSuccess}
       />
     </div>
   );
