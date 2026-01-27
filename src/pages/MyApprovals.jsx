@@ -300,7 +300,7 @@ export default function MyApprovals() {
                       }`}
                       onClick={() => setSelectedGroup(selectedGroup === g ? null : g)}
                     >
-                      {g} {groupCounts[g] > 0 && `(${groupCounts[g]})`}
+                      {g} ({groupCounts[g] || 0})
                     </Badge>
                   ))}
                   {selectedGroup && (
