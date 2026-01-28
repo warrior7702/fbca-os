@@ -13,17 +13,33 @@ Deno.serve(async (req) => {
     // Fetch the ticket
     const ticket = await base44.asServiceRole.entities.Ticket.get(ticket_id);
     
-    if (!ticket || !ticket.assigned_department) {
+    if (!ticket) {
       return Response.json({ 
         success: false, 
-        error: 'Ticket not found or no assigned department' 
+        error: 'Ticket not found' 
       }, { status: 404 });
+    }
+
+    // Map category to department if assigned_department is not set
+    const categoryToDept = {
+      'technology': 'IT',
+      'cleaning': 'Facilities',
+      'maintenance': 'Facilities'
+    };
+    
+    const department = ticket.assigned_department || categoryToDept[ticket.category];
+    
+    if (!department) {
+      return Response.json({ 
+        success: false, 
+        error: 'No department could be determined from ticket' 
+      }, { status: 400 });
     }
 
     // Get all workers in this department
     const roleAssignments = await base44.asServiceRole.entities.TicketRoleAssignment.filter({
       ticket_role: 'worker',
-      department: ticket.assigned_department
+      department: department
     });
 
     const workerEmails = roleAssignments.map(r => r.user_email);
@@ -98,7 +114,7 @@ Deno.serve(async (req) => {
       success: true,
       ticket_id: ticket.id,
       ticket_number: ticket.ticket_number,
-      department: ticket.assigned_department,
+      department: department,
       workers_notified: workerEmails.length,
       notifications_created: notificationsCreated,
       teams_messages_sent: teamsMessagesSent,
