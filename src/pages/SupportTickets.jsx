@@ -145,16 +145,16 @@ export default function SupportTickets() {
 
       // Fetch tickets based on role with optimized queries
       if (adminStatus) {
-        // Admins see all support tickets (exclude archived to reduce data load)
-        const allTickets = await base44.entities.Ticket.list('-created_date');
+        // Admins: Fetch only non-archived support tickets (limit to recent 200)
+        const allTickets = await base44.entities.Ticket.list('-created_date', 200);
         ticketsData = allTickets.filter(t => 
           t.category && 
           ['technology', 'cleaning', 'maintenance'].includes(t.category) && 
           t.status !== 'archived'
         );
       } else if (workerStatus) {
-        // Workers: Fetch all, filter client-side (unavoidable without complex queries)
-        const allTickets = await base44.entities.Ticket.list('-created_date');
+        // Workers: Fetch recent tickets only (limit to 200)
+        const allTickets = await base44.entities.Ticket.list('-created_date', 200);
         
         // Map category to department
         const getDepartment = (category) => {
@@ -185,7 +185,7 @@ export default function SupportTickets() {
           t.status !== 'archived'
         );
       } else {
-        // Regular users: fetch only their tickets
+        // Regular users: fetch only their tickets (already optimized)
         const userTickets = await base44.entities.Ticket.filter({
           requester_email: currentUser.email
         });
