@@ -93,6 +93,7 @@ export default function MyApprovals() {
   const [lastSync, setLastSync] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -161,6 +162,8 @@ export default function MyApprovals() {
 
       console.log('📦 approvals from PCO:', approvals);
       console.log('🔍 Total approvals:', approvals.length);
+      console.log('🔧 Debug info:', api.debug);
+      setDebugInfo(api.debug || null);
       
       const grouped = groupByEvent(approvals);
       setGroupedApprovals(grouped);
@@ -386,7 +389,41 @@ export default function MyApprovals() {
         </div>
       </div>
 
-      <FullApprovalCalendarModal
+      {/* Debug Panel - Remove after troubleshooting */}
+        {debugInfo && (
+          <Card className="border-2 border-yellow-400 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="text-yellow-800">Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-2">
+              <div><strong>Your Groups:</strong> {debugInfo.userGroups?.join(", ") || "None"}</div>
+              <div><strong>Your Group IDs:</strong> {debugInfo.userGroupIds?.join(", ") || "None"}</div>
+              <div><strong>All Groups in PCO:</strong></div>
+              <ul className="ml-4 text-xs">
+                {debugInfo.allGroupsFromPCO?.map(g => (
+                  <li key={g.id}>{g.name} (ID: {g.id})</li>
+                ))}
+              </ul>
+              <div><strong>Resources Mapped to Groups:</strong> {debugInfo.resourceToGroupCount}</div>
+              <div><strong>Total Pending Requests in PCO:</strong> {debugInfo.totalPendingInPCO}</div>
+              {debugInfo.samplePendingRequests?.length > 0 && (
+                <>
+                  <div><strong>Sample Pending Requests:</strong></div>
+                  <ul className="ml-4 text-xs">
+                    {debugInfo.samplePendingRequests.map(r => (
+                      <li key={r.id}>
+                        Request {r.id}: Resource {r.resourceId} →
+                        {r.mappedGroup ? ` Group "${r.mappedGroup.groupName}" (${r.mappedGroup.groupId})` : " NO GROUP MAPPING"}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <FullApprovalCalendarModal
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
         approvals={groupedApprovals.flatMap(ev =>
