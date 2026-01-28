@@ -449,17 +449,32 @@ export default function TicketDetail() {
   const handleAssignment = async (staffEmail) => {
     try {
       const staffMember = staffMembers.find(s => s.email === staffEmail);
+      const isUnassigning = staffEmail === "unassigned";
+      
+      // Add assignment comment to activity feed
+      const assignmentComment = {
+        author_email: user.email,
+        author_name: user.full_name || user.email,
+        content: isUnassigning ? 'Unassigned ticket' : `Assigned ticket to ${staffMember?.full_name || staffEmail}`,
+        is_internal: true,
+        timestamp: new Date().toISOString()
+      };
+      
+      const updatedComments = [...(ticket.comments || []), assignmentComment];
+      
       await base44.entities.Ticket.update(ticketId, {
-        assigned_to: staffEmail,
-        assigned_to_name: staffMember?.full_name || staffEmail,
+        assigned_to: isUnassigning ? null : staffEmail,
+        assigned_to_name: isUnassigning ? null : (staffMember?.full_name || staffEmail),
+        comments: updatedComments,
         last_activity_at: new Date().toISOString()
       });
       setTicket({ 
         ...ticket, 
-        assigned_to: staffEmail,
-        assigned_to_name: staffMember?.full_name || staffEmail
+        assigned_to: isUnassigning ? null : staffEmail,
+        assigned_to_name: isUnassigning ? null : (staffMember?.full_name || staffEmail),
+        comments: updatedComments
       });
-      toast.success(`Assigned to ${staffMember?.full_name || staffEmail}`);
+      toast.success(isUnassigning ? 'Ticket unassigned' : `Assigned to ${staffMember?.full_name || staffEmail}`);
 
       // Send notification to assigned person
       try {
@@ -525,10 +540,27 @@ export default function TicketDetail() {
       });
       
       if (response.data.success) {
+        // Add claim comment to activity feed
+        const claimComment = {
+          author_email: user.email,
+          author_name: user.full_name || user.email,
+          content: `Claimed ticket`,
+          is_internal: true,
+          timestamp: new Date().toISOString()
+        };
+        
+        const updatedComments = [...(ticket.comments || []), claimComment];
+        
+        // Update ticket with new comments
+        await base44.entities.Ticket.update(ticketId, {
+          comments: updatedComments
+        });
+        
         setTicket({
           ...ticket,
           assigned_to: response.data.assigned_to,
-          assigned_to_name: response.data.assigned_to_name
+          assigned_to_name: response.data.assigned_to_name,
+          comments: updatedComments
         });
         toast.success('Ticket claimed');
       }
@@ -548,10 +580,27 @@ export default function TicketDetail() {
       });
       
       if (response.data.success) {
+        // Add unassignment comment to activity feed
+        const unassignComment = {
+          author_email: user.email,
+          author_name: user.full_name || user.email,
+          content: `Unassigned ticket`,
+          is_internal: true,
+          timestamp: new Date().toISOString()
+        };
+        
+        const updatedComments = [...(ticket.comments || []), unassignComment];
+        
+        // Update ticket with new comments
+        await base44.entities.Ticket.update(ticketId, {
+          comments: updatedComments
+        });
+        
         setTicket({
           ...ticket,
           assigned_to: null,
-          assigned_to_name: null
+          assigned_to_name: null,
+          comments: updatedComments
         });
         toast.success('Ticket unassigned');
       }
