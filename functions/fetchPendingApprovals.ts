@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Total pending approvals for user: ${allApprovals.length}`);
 
-    // Build debug info to help diagnose issues
+    // Build debug info to help diagnose issues (v2)
     const debug = {
       userGroups,
       userGroupIds: Array.from(userGroupIds),
