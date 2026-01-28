@@ -52,8 +52,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ticketUrl = `${Deno.env.get('BASE44_APP_URL')}/TicketDetail?id=${ticket.id}`;
-    const message = `🎫 New ${ticket.priority || 'medium'} priority ticket created\n\n*${ticket.ticket_number}: ${ticket.subject}*\n\nClick to view/claim: ${ticketUrl}`;
+    const baseUrl = Deno.env.get('BASE44_APP_URL');
+    const ticketUrl = `${baseUrl}/TicketDetail?id=${ticket.id}`;
+    const claimUrl = `${baseUrl}/ClaimTicket?id=${ticket.id}`;
+    
+    const message = `🎫 New ${ticket.priority || 'medium'} priority ticket created\n\n*${ticket.ticket_number}: ${ticket.subject}*\n\n[View Ticket](${ticketUrl}) | [Claim & Assign to Me](${claimUrl})`;
 
     let teamsMessagesSent = 0;
     let notificationsCreated = 0;
