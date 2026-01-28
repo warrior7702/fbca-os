@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       openStatuses.includes(ticket.status)
     );
 
-    // Return only the specified fields
+    // Return only the specified fields including id for clickable links
     const response = {
       success: true,
       requester_email: requesterEmail,
