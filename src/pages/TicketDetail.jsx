@@ -93,6 +93,8 @@ export default function TicketDetail() {
   const [loadingRelatedOpen, setLoadingRelatedOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
+  const [showResolveDialog, setShowResolveDialog] = useState(false);
+  const [closingComment, setClosingComment] = useState("");
 
   const commentsEndRef = useRef(null);
 
@@ -346,7 +348,7 @@ export default function TicketDetail() {
     }
   };
 
-  const handleStatusChange = async (newStatus) => {
+  const handleStatusChange = async (newStatus, closingCommentText = "") => {
     setUpdatingStatus(true);
     try {
       console.log('🎫 Current ticket object:', ticket);
@@ -368,6 +370,18 @@ export default function TicketDetail() {
         updateData.resolved_at = new Date().toISOString();
         const resolutionTime = (new Date() - new Date(ticket.created_date)) / 1000 / 60;
         updateData.time_to_resolution = Math.round(resolutionTime);
+        
+        // Add closing comment if provided
+        if (closingCommentText.trim()) {
+          const closingCommentObj = {
+            author_email: user.email,
+            author_name: user.full_name || user.email,
+            content: closingCommentText.trim(),
+            is_internal: false,
+            timestamp: new Date().toISOString()
+          };
+          updateData.comments = [...(ticket.comments || []), closingCommentObj];
+        }
       }
 
       if (newStatus === 'archived') {
@@ -889,8 +903,7 @@ Provide your analysis in this exact JSON format:
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('Mark Resolved clicked');
-                        handleStatusChange('resolved');
+                        setShowResolveDialog(true);
                       }}
                       disabled={updatingStatus}
                       size="sm"
@@ -1948,6 +1961,59 @@ Provide your analysis in this exact JSON format:
           </div>
         </div>
       </div>
+
+      {/* Resolve with Comment Dialog */}
+      <AlertDialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resolve Ticket</AlertDialogTitle>
+            <AlertDialogDescription>
+              Add an optional closing comment before marking this ticket as resolved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Textarea
+              value={closingComment}
+              onChange={(e) => setClosingComment(e.target.value)}
+              placeholder="Closing comment (optional)"
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={updatingStatus}
+              onClick={() => {
+                setClosingComment("");
+                setShowResolveDialog(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                handleStatusChange('resolved', closingComment);
+                setClosingComment("");
+                setShowResolveDialog(false);
+              }}
+              disabled={updatingStatus}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {updatingStatus ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Resolving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Resolve Ticket
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
