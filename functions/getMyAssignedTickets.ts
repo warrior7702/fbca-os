@@ -61,11 +61,20 @@ Deno.serve(async (req) => {
     // Unassigned in user's departments
     let unassignedTickets = [];
     if (include_unassigned && userDepartments.length) {
-      unassignedTickets = filteredTickets.filter(ticket =>
-        !ticket.assigned_to &&
-        !ticket.assigned_to_2 &&
-        userDepartments.includes(ticket.assigned_department)
-      );
+      // Map category to department
+      const categoryToDept = {
+        'technology': 'IT',
+        'cleaning': 'Facilities',
+        'maintenance': 'Facilities'
+      };
+      
+      unassignedTickets = filteredTickets.filter(ticket => {
+        if (ticket.assigned_to || ticket.assigned_to_2) return false;
+        
+        // Check assigned_department if set, otherwise map from category
+        const ticketDept = ticket.assigned_department || categoryToDept[ticket.category];
+        return ticketDept && userDepartments.includes(ticketDept);
+      });
     }
 
     // Merge + de-dupe
