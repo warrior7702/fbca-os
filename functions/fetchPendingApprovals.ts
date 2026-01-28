@@ -182,11 +182,29 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Total pending approvals for user: ${allApprovals.length}`);
 
+    // Build debug info to help diagnose issues
+    const debug = {
+      userGroups,
+      userGroupIds: Array.from(userGroupIds),
+      allGroupsFromPCO: (allGroupsData.data || []).map((g: any) => ({ id: g.id, name: g.attributes?.name })),
+      resourceToGroupCount: Object.keys(resourceToGroup).length,
+      totalPendingInPCO: requestsData.data?.length || 0,
+      // Show first few pending requests for debugging
+      samplePendingRequests: (requestsData.data || []).slice(0, 5).map((r: any) => ({
+        id: r.id,
+        resourceId: r.relationships?.resource?.data?.id,
+        eventId: r.relationships?.event?.data?.id,
+        status: r.attributes?.approval_status,
+        mappedGroup: resourceToGroup[r.relationships?.resource?.data?.id] || null
+      }))
+    };
+
     return Response.json({
       success: true,
       totalEvents: Object.keys(eventsMap).length,
       totalApprovals: allApprovals.length,
-      approvals: allApprovals
+      approvals: allApprovals,
+      debug
     });
 
   } catch (error) {
