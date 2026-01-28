@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
         priority: ticket.priority,
         category: ticket.category,
         assigned_department: ticket.assigned_department,
+        assigned_to: ticket.assigned_to,
+        assigned_to_name: ticket.assigned_to_name,
         created_date: ticket.created_date,
         due_date: ticket.due_date
       }))
