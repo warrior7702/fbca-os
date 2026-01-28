@@ -34,11 +34,18 @@ Deno.serve(async (req) => {
     const listResp = await base44.asServiceRole.entities.Ticket.list('-created_date');
     const allTickets = Array.isArray(listResp) ? listResp : (listResp?.data || []);
 
-    // Get user's departments (safe)
-    const rolesResponse = await base44.asServiceRole.functions.invoke('getUsersWithTicketRoles');
-    const allUsers = rolesResponse?.data?.allUsers || [];
-    const userData = allUsers.find(u => u.user_email === assignedEmail) || null;
-    const userDepartments = userData?.departments || [];
+    // Get user's departments from TicketRoleAssignment entity
+    let userDepartments = [];
+    try {
+      const roleAssignments = await base44.asServiceRole.entities.TicketRoleAssignment.filter({
+        user_email: assignedEmail
+      });
+      if (roleAssignments.length > 0 && roleAssignments[0].department) {
+        userDepartments = [roleAssignments[0].department];
+      }
+    } catch (error) {
+      console.error('Error fetching user departments:', error);
+    }
 
     // Base filter
     let filteredTickets = allTickets.filter(ticket =>
