@@ -73,10 +73,13 @@ Deno.serve(async (req) => {
     
     // Send Teams message via Microsoft Graph API
     try {
+      console.log('🔵 Starting Teams notification...');
       // Get Microsoft Graph access token
       const clientId = Deno.env.get('MS_CLIENT_ID') || Deno.env.get('MICROSOFT_CLIENT_ID');
       const clientSecret = Deno.env.get('MS_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET');
       const tenantId = Deno.env.get('MS_TENANT_ID') || Deno.env.get('MICROSOFT_APP_TENANT_ID');
+      
+      console.log('🔑 Getting Graph token for tenant:', tenantId?.substring(0, 8) + '...');
       
       const tokenResponse = await fetch(
         `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
@@ -92,80 +95,105 @@ Deno.serve(async (req) => {
         }
       );
       
-      if (tokenResponse.ok) {
-        const { access_token } = await tokenResponse.json();
-        
-        // Send Teams chat message
-        const chatMessage = {
-          body: {
-            contentType: 'text',
-            content: message
-          }
-        };
-        
-        const sendResponse = await fetch(
-          `https://graph.microsoft.com/v1.0/users/${ticket.assigned_to}/chats`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${access_token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              chatType: 'oneOnOne',
-              members: [
-                {
-                  '@odata.type': '#microsoft.graph.aadUserConversationMember',
-                  roles: ['owner'],
-                  'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ticket.assigned_to}')`
-                }
-              ]
-            })
-          }
-        );
-        
-        if (sendResponse.ok) {
-          const chat = await sendResponse.json();
-          
-          // Send message to the chat
-          await fetch(
-            `https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${access_token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(chatMessage)
-            }
-          );
-          
-          teamsMessageSent = 1;
-        }
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error('❌ Token request failed:', tokenResponse.status, errorText);
+        throw new Error(`Token request failed: ${tokenResponse.status}`);
       }
+      
+      const { access_token } = await tokenResponse.json();
+      console.log('✅ Got Graph token');
+      
+      // Send Teams chat message
+      const chatMessage = {
+        body: {
+          contentType: 'text',
+          content: message
+        }
+      };
+      
+      console.log('💬 Creating chat with:', ticket.assigned_to);
+      
+      const sendResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${ticket.assigned_to}/chats`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            chatType: 'oneOnOne',
+            members: [
+              {
+                '@odata.type': '#microsoft.graph.aadUserConversationMember',
+                roles: ['owner'],
+                'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ticket.assigned_to}')`
+              }
+            ]
+          })
+        }
+      );
+      
+      if (!sendResponse.ok) {
+        const errorText = await sendResponse.text();
+        console.error('❌ Create chat failed:', sendResponse.status, errorText);
+        throw new Error(`Create chat failed: ${sendResponse.status}`);
+      }
+      
+      const chat = await sendResponse.json();
+      console.log('✅ Chat created:', chat.id);
+      
+      // Send message to the chat
+      const msgResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(chatMessage)
+        }
+      );
+      
+      if (!msgResponse.ok) {
+        const errorText = await msgResponse.text();
+        console.error('❌ Send message failed:', msgResponse.status, errorText);
+        throw new Error(`Send message failed: ${msgResponse.status}`);
+      }
+      
+      console.log('✅ Teams message sent');
+      teamsMessageSent = 1;
     } catch (teamsError) {
-      console.error('Teams message failed:', teamsError);
+      console.error('❌ Teams message failed:', teamsError.message);
     }
     
     // Check notification preferences and send email if opted in
     try {
+      console.log('📧 Checking email preferences...');
       const prefs = await base44.asServiceRole.entities.NotificationPreference.filter({
         user_email: ticket.assigned_to
       });
       
       const userPref = prefs[0];
+      console.log('Preference:', userPref ? `ticket_comment_email=${userPref.ticket_comment_email}` : 'No prefs (default=true)');
       
       // Send email if preference is enabled (default is true)
       if (!userPref || userPref.ticket_comment_email !== false) {
+        console.log('✉️ Sending email to:', ticket.assigned_to);
         await base44.asServiceRole.integrations.Core.SendEmail({
           to: ticket.assigned_to,
           subject: `New comment on ticket ${ticket.ticket_number}`,
           body: `${message}\n\nView ticket: ${Deno.env.get('BASE44_APP_URL')}/SupportTickets?id=${ticket_id}`
         });
+        console.log('✅ Email sent');
         emailsSent = 1;
+      } else {
+        console.log('⏭️ Email skipped (user opted out)');
       }
     } catch (emailError) {
-      console.error('Email notification failed:', emailError);
+      console.error('❌ Email notification failed:', emailError.message);
     }
     
     return Response.json({
