@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     
     // Send in-app notification
     try {
-      await base44.asServiceRole.functions.invoke('createNotification', {
+      await base44.asServiceRole.entities.Notification.create({
         user_email: ticket.assigned_to,
         type: 'ticket_comment',
         title: `New comment on ${ticket.ticket_number}`,
@@ -64,10 +64,11 @@ Deno.serve(async (req) => {
         related_ticket_id: ticket_id,
         related_ticket_number: ticket.ticket_number,
         action_url: `/SupportTickets?id=${ticket_id}`,
-        send_email: false // Email handled separately below
+        read: false
       });
+      console.log('In-app notification created successfully');
     } catch (notifyError) {
-      console.warn('In-app notification failed:', notifyError);
+      console.error('In-app notification failed:', notifyError);
     }
     
     // Send Teams message via Microsoft Graph API
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
         }
       }
     } catch (teamsError) {
-      console.warn('Teams message failed:', teamsError);
+      console.error('Teams message failed:', teamsError);
     }
     
     // Check notification preferences and send email if opted in
@@ -164,7 +165,7 @@ Deno.serve(async (req) => {
         emailsSent = 1;
       }
     } catch (emailError) {
-      console.warn('Email notification failed:', emailError);
+      console.error('Email notification failed:', emailError);
     }
     
     return Response.json({
