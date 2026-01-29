@@ -70,13 +70,78 @@ Deno.serve(async (req) => {
       console.warn('In-app notification failed:', notifyError);
     }
     
-    // Send Teams message via SparkBot
+    // Send Teams message via Microsoft Graph API
     try {
-      await base44.asServiceRole.functions.invoke('sendTeamsMessage', {
-        user_email: ticket.assigned_to,
-        message: message
-      });
-      teamsMessageSent = 1;
+      // Get Microsoft Graph access token
+      const clientId = Deno.env.get('MS_CLIENT_ID') || Deno.env.get('MICROSOFT_CLIENT_ID');
+      const clientSecret = Deno.env.get('MS_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET');
+      const tenantId = Deno.env.get('MS_TENANT_ID') || Deno.env.get('MICROSOFT_APP_TENANT_ID');
+      
+      const tokenResponse = await fetch(
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: clientId,
+            client_secret: clientSecret,
+            scope: 'https://graph.microsoft.com/.default'
+          })
+        }
+      );
+      
+      if (tokenResponse.ok) {
+        const { access_token } = await tokenResponse.json();
+        
+        // Send Teams chat message
+        const chatMessage = {
+          body: {
+            contentType: 'text',
+            content: message
+          }
+        };
+        
+        const sendResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/users/${ticket.assigned_to}/chats`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              chatType: 'oneOnOne',
+              members: [
+                {
+                  '@odata.type': '#microsoft.graph.aadUserConversationMember',
+                  roles: ['owner'],
+                  'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ticket.assigned_to}')`
+                }
+              ]
+            })
+          }
+        );
+        
+        if (sendResponse.ok) {
+          const chat = await sendResponse.json();
+          
+          // Send message to the chat
+          await fetch(
+            `https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(chatMessage)
+            }
+          );
+          
+          teamsMessageSent = 1;
+        }
+      }
     } catch (teamsError) {
       console.warn('Teams message failed:', teamsError);
     }
