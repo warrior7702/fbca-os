@@ -45,10 +45,21 @@ Deno.serve(async (req) => {
         })
       }
     );
+    
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Token fetch failed:', errorText);
+      return Response.json({ 
+        success: false, 
+        error: `Failed to get bot token: ${tokenResponse.status}`,
+        details: errorText
+      }, { status: 500 });
+    }
+    
     const { access_token } = await tokenResponse.json();
     
     // Send proactive message
-    await fetch(`${ticket.teams_service_url}/v3/conversations/${ticket.teams_conversation_id}/activities`, {
+    const teamsResponse = await fetch(`${ticket.teams_service_url}/v3/conversations/${ticket.teams_conversation_id}/activities`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${access_token}`,
@@ -60,7 +71,17 @@ Deno.serve(async (req) => {
       })
     });
     
-    return Response.json({ success: true });
+    if (!teamsResponse.ok) {
+      const errorText = await teamsResponse.text();
+      console.error('Teams message send failed:', errorText);
+      return Response.json({ 
+        success: false, 
+        error: `Failed to send Teams message: ${teamsResponse.status}`,
+        details: errorText
+      }, { status: 500 });
+    }
+    
+    return Response.json({ success: true, message_sent: message });
   } catch (error) {
     console.error('Error sending Teams update:', error);
     return Response.json({ error: error.message }, { status: 500 });
