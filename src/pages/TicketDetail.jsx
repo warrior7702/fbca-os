@@ -95,6 +95,9 @@ export default function TicketDetail() {
   const [unassigning, setUnassigning] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [closingComment, setClosingComment] = useState("");
+  const [showStatusCommentDialog, setShowStatusCommentDialog] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [statusComment, setStatusComment] = useState("");
 
   const commentsEndRef = useRef(null);
 
@@ -347,7 +350,7 @@ export default function TicketDetail() {
     }
   };
 
-  const handleStatusChange = async (newStatus, closingCommentText = "") => {
+  const handleStatusChange = async (newStatus, closingCommentText = "", statusCommentText = "") => {
     setUpdatingStatus(true);
     try {
       console.log('🎫 Current ticket object:', ticket);
@@ -383,6 +386,18 @@ export default function TicketDetail() {
         }
       }
 
+      // Add status comment for awaiting_information or awaiting_parts
+      if ((newStatus === 'awaiting_information' || newStatus === 'awaiting_parts') && statusCommentText.trim()) {
+        const statusCommentObj = {
+          author_email: user.email,
+          author_name: user.full_name || user.email,
+          content: statusCommentText.trim(),
+          is_internal: false,
+          timestamp: new Date().toISOString()
+        };
+        updateData.comments = [...(ticket.comments || []), statusCommentObj];
+      }
+
       if (newStatus === 'archived') {
         updateData.archived_at = new Date().toISOString();
       }
@@ -399,6 +414,24 @@ export default function TicketDetail() {
       }
       
       toast.success(`Ticket ${newStatus}!`);
+
+      // Send Teams notification with comment for specific statuses
+      if (ticket.teams_conversation_id && (newStatus === 'awaiting_information' || newStatus === 'awaiting_parts')) {
+        try {
+          const statusLabel = newStatus === 'awaiting_information' ? 'AWAITING INFORMATION' : 'AWAITING PARTS';
+          const customMessage = statusCommentText.trim() 
+            ? `⚠️ **Ticket ${ticket.ticket_number} Status Update**\n\nStatus: **${statusLabel}**\n\n${statusCommentText.trim()}`
+            : null;
+          
+          await base44.functions.invoke('sendTeamsTicketUpdate', {
+            ticket_id: ticketId,
+            message_type: 'status_change',
+            custom_message: customMessage
+          });
+        } catch (teamsError) {
+          console.warn('Teams notification failed:', teamsError);
+        }
+      }
 
       // Send notification to requester about status change
       const statusMessages = {
@@ -1490,7 +1523,14 @@ Provide your analysis in this exact JSON format:
                       value={ticket.status} 
                       onValueChange={(newStatus) => {
                         console.log('Status change triggered:', newStatus);
-                        handleStatusChange(newStatus);
+                        // Show dialog for awaiting_information or awaiting_parts
+                        if (newStatus === 'awaiting_information' || newStatus === 'awaiting_parts') {
+                          setPendingStatus(newStatus);
+                          setStatusComment("");
+                          setShowStatusCommentDialog(true);
+                        } else {
+                          handleStatusChange(newStatus);
+                        }
                       }}
                       disabled={updatingStatus}
                     >
@@ -2008,6 +2048,62 @@ Provide your analysis in this exact JSON format:
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Resolve Ticket
                 </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Comment Dialog */}
+      <AlertDialog open={showStatusCommentDialog} onOpenChange={setShowStatusCommentDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingStatus === 'awaiting_information' ? 'Awaiting Information' : 'Awaiting Parts'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Please add a comment explaining what information is needed or what parts are being ordered.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Textarea
+              value={statusComment}
+              onChange={(e) => setStatusComment(e.target.value)}
+              placeholder={pendingStatus === 'awaiting_information' 
+                ? "What information do you need from the requester?" 
+                : "What parts are needed and estimated arrival time?"}
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={updatingStatus}
+              onClick={() => {
+                setStatusComment("");
+                setPendingStatus(null);
+                setShowStatusCommentDialog(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                handleStatusChange(pendingStatus, "", statusComment);
+                setStatusComment("");
+                setPendingStatus(null);
+                setShowStatusCommentDialog(false);
+              }}
+              disabled={updatingStatus || !statusComment.trim()}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {updatingStatus ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Status'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

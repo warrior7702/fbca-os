@@ -62,6 +62,7 @@ import BrandAssets from './pages/BrandAssets';
 import Buildings from './pages/Buildings';
 import Calendar from './pages/Calendar';
 import CampaignRunning from './pages/CampaignRunning';
+import ClaimTicket from './pages/ClaimTicket';
 import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
 import CreateTicket from './pages/CreateTicket';
 import CronStatus from './pages/CronStatus';
@@ -110,6 +111,7 @@ import TestCardholders from './pages/TestCardholders';
 import TestMysterySync from './pages/TestMysterySync';
 import TestTranscription from './pages/TestTranscription';
 import TicketAnalytics from './pages/TicketAnalytics';
+import TicketDetail from './pages/TicketDetail';
 import TicketReporting from './pages/TicketReporting';
 import TicketRoleVerification from './pages/TicketRoleVerification';
 import Ticketing from './pages/Ticketing';
@@ -117,8 +119,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import ClaimTicket from './pages/ClaimTicket';
-import TicketDetail from './pages/TicketDetail';
 import __Layout from './Layout.jsx';
 
 
@@ -138,6 +138,7 @@ export const PAGES = {
     "Buildings": Buildings,
     "Calendar": Calendar,
     "CampaignRunning": CampaignRunning,
+    "ClaimTicket": ClaimTicket,
     "CommunicationsRequestForm": CommunicationsRequestForm,
     "CreateTicket": CreateTicket,
     "CronStatus": CronStatus,
@@ -186,6 +187,7 @@ export const PAGES = {
     "TestMysterySync": TestMysterySync,
     "TestTranscription": TestTranscription,
     "TicketAnalytics": TicketAnalytics,
+    "TicketDetail": TicketDetail,
     "TicketReporting": TicketReporting,
     "TicketRoleVerification": TicketRoleVerification,
     "Ticketing": Ticketing,
@@ -193,8 +195,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "ClaimTicket": ClaimTicket,
-    "TicketDetail": TicketDetail,
 }
 
 export const pagesConfig = {
