@@ -82,11 +82,13 @@ Deno.serve(async (req) => {
         // Use the existing sendTeamsTicketUpdate function which uses Bot Framework
         const teamsResult = await base44.asServiceRole.functions.invoke('sendTeamsTicketUpdate', {
           ticket_id: ticket_id,
-          message_type: 'comment_added'
+          message_type: 'comment_added',
+                      assigned_to: ticket.assigned_to
         });
 
         if (teamsResult?.success) {
           console.log('✅ Teams message sent via Bot Framework');
+              console.log('📊 Teams notification details:', { ticket_id: ticket.id, assigned_to: ticket.assigned_to, has_teams_context: !!ticket.teams_conversation_id });
           teamsMessageSent = 1;
         } else {
           console.error('❌ Teams message failed:', teamsResult?.error || 'Unknown error');
