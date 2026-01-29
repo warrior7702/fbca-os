@@ -62,9 +62,15 @@ Deno.serve(async (req) => {
     }
 
     const { access_token } = JSON.parse(tokenResponseBody);
-    
+
+    // Log the exact URL and conversation ID
+    const teamsUrl = `${ticket.teams_service_url}/v3/conversations/${ticket.teams_conversation_id}/activities`;
+    console.log('Teams POST URL:', teamsUrl);
+    console.log('Conversation ID:', ticket.teams_conversation_id);
+    console.log('Service URL:', ticket.teams_service_url);
+
     // Send proactive message
-    const teamsResponse = await fetch(`${ticket.teams_service_url}/v3/conversations/${ticket.teams_conversation_id}/activities`, {
+    const teamsResponse = await fetch(teamsUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${access_token}`,
