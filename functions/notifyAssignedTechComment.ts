@@ -107,7 +107,9 @@ Deno.serve(async (req) => {
       const { access_token } = await tokenResponse.json();
       console.log('✅ Got Graph token');
       
-      // Send Teams chat message
+      // Send Teams chat message directly to user
+      console.log('💬 Sending chat message to:', ticket.assigned_to);
+      
       const chatMessage = {
         body: {
           contentType: 'text',
@@ -115,10 +117,8 @@ Deno.serve(async (req) => {
         }
       };
       
-      console.log('💬 Creating chat with:', ticket.assigned_to);
-      
-      const sendResponse = await fetch(
-        `https://graph.microsoft.com/v1.0/users/${ticket.assigned_to}/chats`,
+      const msgResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/chats`,
         {
           method: 'POST',
           headers: {
@@ -133,30 +133,9 @@ Deno.serve(async (req) => {
                 roles: ['owner'],
                 'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ticket.assigned_to}')`
               }
-            ]
+            ],
+            ...chatMessage
           })
-        }
-      );
-      
-      if (!sendResponse.ok) {
-        const errorText = await sendResponse.text();
-        console.error('❌ Create chat failed:', sendResponse.status, errorText);
-        throw new Error(`Create chat failed: ${sendResponse.status}`);
-      }
-      
-      const chat = await sendResponse.json();
-      console.log('✅ Chat created:', chat.id);
-      
-      // Send message to the chat
-      const msgResponse = await fetch(
-        `https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(chatMessage)
         }
       );
       
