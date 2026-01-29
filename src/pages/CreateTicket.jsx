@@ -1080,6 +1080,7 @@ export default function CreateTicket() {
                             setShowBuildingDropdown(true);
                           }}
                           onFocus={() => setShowBuildingDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowBuildingDropdown(false), 200)}
                           placeholder="Search buildings..."
                           className="pr-8"
                         />
@@ -1138,6 +1139,7 @@ export default function CreateTicket() {
                             setShowRoomDropdown(true);
                           }}
                           onFocus={() => setShowRoomDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowRoomDropdown(false), 200)}
                           placeholder="Search rooms..."
                           className="pr-8"
                         />
