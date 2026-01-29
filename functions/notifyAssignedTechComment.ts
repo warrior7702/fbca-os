@@ -79,6 +79,9 @@ Deno.serve(async (req) => {
       const clientSecret = Deno.env.get('MS_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET');
       const tenantId = Deno.env.get('MS_TENANT_ID') || Deno.env.get('MICROSOFT_APP_TENANT_ID');
       
+      console.log('🔍 MS_TENANT_ID:', Deno.env.get('MS_TENANT_ID')?.substring(0, 20));
+      console.log('🔍 MICROSOFT_APP_TENANT_ID:', Deno.env.get('MICROSOFT_APP_TENANT_ID')?.substring(0, 20));
+      console.log('🔍 Final tenantId:', tenantId?.substring(0, 20));
       console.log('🔑 Getting Graph token for tenant:', tenantId?.substring(0, 8) + '...');
       
       const tokenResponse = await fetch(
