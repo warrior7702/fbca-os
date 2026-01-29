@@ -32,6 +32,8 @@ Deno.serve(async (req) => {
     const botAppId = Deno.env.get('TEAMS_BOT_APP_ID');
     const botAppSecret = Deno.env.get('TEAMS_BOT_APP_SECRET');
     
+    console.log('Requesting token with App ID:', botAppId?.substring(0, 8) + '...');
+
     const tokenResponse = await fetch(
       'https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token',
       {
@@ -45,18 +47,21 @@ Deno.serve(async (req) => {
         })
       }
     );
-    
+
+    const tokenResponseBody = await tokenResponse.text();
+    console.log('Token response status:', tokenResponse.status);
+    console.log('Token response body:', tokenResponseBody);
+
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error('Token fetch failed:', errorText);
+      console.error('Token fetch failed:', tokenResponseBody);
       return Response.json({ 
         success: false, 
         error: `Failed to get bot token: ${tokenResponse.status}`,
-        details: errorText
+        details: tokenResponseBody
       }, { status: 500 });
     }
-    
-    const { access_token } = await tokenResponse.json();
+
+    const { access_token } = JSON.parse(tokenResponseBody);
     
     // Send proactive message
     const teamsResponse = await fetch(`${ticket.teams_service_url}/v3/conversations/${ticket.teams_conversation_id}/activities`, {
