@@ -359,21 +359,11 @@ export default function TicketDetail() {
         setUpdatingStatus(false);
         return;
       }
-
-      // Create status change activity comment
-      const statusChangeComment = {
-        author_email: user.email,
-        author_name: user.full_name || user.email,
-        content: `Status changed from "${ticket.status}" to "${newStatus}"`,
-        is_internal: true,
-        timestamp: new Date().toISOString()
-      };
       
       const updateData = {
         status: newStatus,
         last_activity_at: new Date().toISOString(),
-        scope: ticket.scope, // Required field
-        comments: [...(ticket.comments || []), statusChangeComment]
+        scope: ticket.scope // Required field
       };
 
       if (newStatus === 'resolved') {
@@ -390,7 +380,7 @@ export default function TicketDetail() {
             is_internal: false,
             timestamp: new Date().toISOString()
           };
-          updateData.comments = [...updateData.comments, closingCommentObj];
+          updateData.comments = [...(ticket.comments || []), closingCommentObj];
         }
       }
 
@@ -401,19 +391,6 @@ export default function TicketDetail() {
       console.log('🔄 Updating ticket status to:', newStatus, 'for ticket:', ticketId);
       const result = await base44.entities.Ticket.update(ticketId, updateData);
       console.log('✅ Ticket status updated successfully:', result);
-      
-      // Send Teams message about status change
-      if (ticket.teams_conversation_id && ticket.teams_service_url) {
-        try {
-          const statusMessage = `**Status Update:** Ticket ${ticket.ticket_number} changed to "${newStatus.replace('_', ' ')}"${closingCommentText.trim() ? `\n\n${closingCommentText.trim()}` : ''}`;
-          await base44.functions.invoke('sendTeamsMessage', {
-            ticket_id: ticketId,
-            message: statusMessage
-          });
-        } catch (teamsError) {
-          console.warn('Teams notification failed:', teamsError);
-        }
-      }
       
       // Re-fetch to ensure we have latest data
       const refreshedTickets = await base44.entities.Ticket.filter({ id: ticketId });
