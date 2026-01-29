@@ -110,7 +110,6 @@ import TestCardholders from './pages/TestCardholders';
 import TestMysterySync from './pages/TestMysterySync';
 import TestTranscription from './pages/TestTranscription';
 import TicketAnalytics from './pages/TicketAnalytics';
-import TicketDetail from './pages/TicketDetail';
 import TicketReporting from './pages/TicketReporting';
 import TicketRoleVerification from './pages/TicketRoleVerification';
 import Ticketing from './pages/Ticketing';
@@ -119,6 +118,7 @@ import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
 import ClaimTicket from './pages/ClaimTicket';
+import TicketDetail from './pages/TicketDetail';
 import __Layout from './Layout.jsx';
 
 
@@ -186,7 +186,6 @@ export const PAGES = {
     "TestMysterySync": TestMysterySync,
     "TestTranscription": TestTranscription,
     "TicketAnalytics": TicketAnalytics,
-    "TicketDetail": TicketDetail,
     "TicketReporting": TicketReporting,
     "TicketRoleVerification": TicketRoleVerification,
     "Ticketing": Ticketing,
@@ -195,6 +194,7 @@ export const PAGES = {
     "WorkflowHub": WorkflowHub,
     "index": index,
     "ClaimTicket": ClaimTicket,
+    "TicketDetail": TicketDetail,
 }
 
 export const pagesConfig = {
