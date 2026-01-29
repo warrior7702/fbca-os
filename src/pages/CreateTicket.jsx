@@ -60,6 +60,7 @@ export default function CreateTicket() {
     display: null
   });
   const [urlAssetId, setUrlAssetId] = useState(null);
+  const [urlAssetCategory, setUrlAssetCategory] = useState(null);
 
   const [ticket, setTicket] = useState({
     requester_name: "",
@@ -186,6 +187,7 @@ export default function CreateTicket() {
     const assetId = params.get('asset_id');
     const assetNameParam = params.get('asset_name');
     const assetCategoryParam = params.get('asset_category');
+    setUrlAssetCategory(assetCategoryParam);
 
     let contextDisplay = null;
     let contextType = null;
@@ -771,7 +773,7 @@ export default function CreateTicket() {
       const assetHint = selectedAssetEntity || (finalAssetId ? {
         id: finalAssetId,
         name: finalAssetName,
-        category: assetCategoryParam || null
+        category: urlAssetCategory || null
       } : null);
 
       // Determine assigned department and reason
