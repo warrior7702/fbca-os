@@ -62,10 +62,17 @@ Deno.serve(async (req) => {
       "actions": [
         {
           "type": "Action.Submit",
-          "title": "Reply",
+          "title": "Reply?",
           "data": {
             "action": "ticket_reply",
             "ticket_id": ticket.id
+          }
+        },
+        {
+          "type": "Action.Submit",
+          "title": "Not Now",
+          "data": {
+            "action": "dismiss"
           }
         }
       ]
