@@ -71,82 +71,27 @@ Deno.serve(async (req) => {
       console.error('In-app notification failed:', notifyError);
     }
     
-    // Send Teams message via Microsoft Graph API
+    // Send Teams message via Bot Framework (sparkbot)
     try {
-      console.log('🔵 Starting Teams notification...');
-      // Get Microsoft Graph access token
-      const clientId = Deno.env.get('MS_CLIENT_ID') || Deno.env.get('MICROSOFT_CLIENT_ID');
-      const clientSecret = Deno.env.get('MS_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET');
-      const tenantId = Deno.env.get('MS_TENANT_ID') || Deno.env.get('MICROSOFT_APP_TENANT_ID');
-      
-      console.log('🔍 MS_TENANT_ID:', Deno.env.get('MS_TENANT_ID')?.substring(0, 20));
-      console.log('🔍 MICROSOFT_APP_TENANT_ID:', Deno.env.get('MICROSOFT_APP_TENANT_ID')?.substring(0, 20));
-      console.log('🔍 Final tenantId:', tenantId?.substring(0, 20));
-      console.log('🔑 Getting Graph token for tenant:', tenantId?.substring(0, 8) + '...');
-      
-      const tokenResponse = await fetch(
-        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: clientId,
-            client_secret: clientSecret,
-            scope: 'https://graph.microsoft.com/.default'
-          })
+      console.log('🔵 Starting Teams notification via Bot Framework...');
+
+      // Check if ticket has Teams conversation context
+      if (!ticket.teams_conversation_id || !ticket.teams_service_url) {
+        console.log('⏭️ No Teams conversation linked to this ticket, skipping Teams notification');
+      } else {
+        // Use the existing sendTeamsTicketUpdate function which uses Bot Framework
+        const teamsResult = await base44.asServiceRole.functions.invoke('sendTeamsTicketUpdate', {
+          ticket_id: ticket_id,
+          message_type: 'comment_added'
+        });
+
+        if (teamsResult?.success) {
+          console.log('✅ Teams message sent via Bot Framework');
+          teamsMessageSent = 1;
+        } else {
+          console.error('❌ Teams message failed:', teamsResult?.error || 'Unknown error');
         }
-      );
-      
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        console.error('❌ Token request failed:', tokenResponse.status, errorText);
-        throw new Error(`Token request failed: ${tokenResponse.status}`);
       }
-      
-      const { access_token } = await tokenResponse.json();
-      console.log('✅ Got Graph token');
-      
-      // Send Teams chat message directly to user
-      console.log('💬 Sending chat message to:', ticket.assigned_to);
-      
-      const chatMessage = {
-        body: {
-          contentType: 'text',
-          content: message
-        }
-      };
-      
-      const msgResponse = await fetch(
-        `https://graph.microsoft.com/v1.0/chats`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            chatType: 'oneOnOne',
-            members: [
-              {
-                '@odata.type': '#microsoft.graph.aadUserConversationMember',
-                roles: ['owner'],
-                'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ticket.assigned_to}')`
-              }
-            ],
-            ...chatMessage
-          })
-        }
-      );
-      
-      if (!msgResponse.ok) {
-        const errorText = await msgResponse.text();
-        console.error('❌ Send message failed:', msgResponse.status, errorText);
-        throw new Error(`Send message failed: ${msgResponse.status}`);
-      }
-      
-      console.log('✅ Teams message sent');
-      teamsMessageSent = 1;
     } catch (teamsError) {
       console.error('❌ Teams message failed:', teamsError.message);
     }
