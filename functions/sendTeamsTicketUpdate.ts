@@ -31,11 +31,13 @@ Deno.serve(async (req) => {
     // Get bot token
     const botAppId = Deno.env.get('TEAMS_BOT_APP_ID');
     const botAppSecret = Deno.env.get('TEAMS_BOT_APP_SECRET');
-    
+    const tenantId = Deno.env.get('MICROSOFT_APP_TENANT_ID');
+
     console.log('Requesting token with App ID:', botAppId?.substring(0, 8) + '...');
+    console.log('Using tenant ID:', tenantId);
 
     const tokenResponse = await fetch(
-      'https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token',
+      `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
