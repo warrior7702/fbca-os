@@ -15,18 +15,61 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Build message based on type
-    let message = custom_message;
-    
+    // Build Adaptive Card based on type
+    let cardTitle = custom_message;
+    let cardBody = '';
+
     if (!custom_message) {
-      const statusMessages = {
-        'status_change': `🔔 **Ticket ${ticket.ticket_number} Status Update**\n\nStatus: **${ticket.status.replace('_', ' ').toUpperCase()}**`,
-        'comment_added': `💬 **New Comment on ${ticket.ticket_number}**\n\n${ticket.comments?.[ticket.comments.length - 1]?.content || ''}`,
-        'resolved': `✅ **Ticket ${ticket.ticket_number} Resolved**\n\n**Issue:** ${ticket.subject}\n\n**Resolution:** ${ticket.comments?.reverse().find(c => c.content?.toLowerCase().includes('resolution') || c.content?.toLowerCase().includes('resolved'))?.content || 'Issue has been fixed.'}\n\nIf you need further help, reply here or create a new ticket.`
-      };
-      
-      message = statusMessages[message_type] || `Update on ticket ${ticket.ticket_number}`;
+      if (message_type === 'status_change') {
+        cardTitle = `🔔 Ticket ${ticket.ticket_number} Status Update`;
+        cardBody = `Status: **${ticket.status.replace('_', ' ').toUpperCase()}**`;
+      } else if (message_type === 'comment_added') {
+        cardTitle = `💬 New Comment on ${ticket.ticket_number}`;
+        cardBody = ticket.comments?.[ticket.comments.length - 1]?.content || '';
+      } else if (message_type === 'resolved') {
+        cardTitle = `✅ Ticket ${ticket.ticket_number} Resolved`;
+        cardBody = `**Issue:** ${ticket.subject}\n\n**Resolution:** ${ticket.comments?.reverse().find(c => c.content?.toLowerCase().includes('resolution') || c.content?.toLowerCase().includes('resolved'))?.content || 'Issue has been fixed.'}\n\nIf you need further help, reply here or create a new ticket.`;
+      } else {
+        cardTitle = `Update on ticket ${ticket.ticket_number}`;
+        cardBody = '';
+      }
     }
+
+    // Build Adaptive Card
+    const adaptiveCard = {
+      "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        {
+          "type": "TextBlock",
+          "text": cardTitle,
+          "weight": "Bolder",
+          "size": "Medium"
+        },
+        ...(cardBody ? [{
+          "type": "TextBlock",
+          "text": cardBody,
+          "wrap": true
+        }] : []),
+        {
+          "type": "Input.Text",
+          "id": "replyText",
+          "isMultiline": true,
+          "placeholder": "Reply to this ticket..."
+        }
+      ],
+      "actions": [
+        {
+          "type": "Action.Submit",
+          "title": "Reply",
+          "data": {
+            "action": "ticket_reply",
+            "ticket_id": ticket.id
+          }
+        }
+      ]
+    };
     
     // Get bot token
     const botAppId = Deno.env.get('TEAMS_BOT_APP_ID');
@@ -77,7 +120,12 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         type: 'message',
-        text: message
+        attachments: [
+          {
+            contentType: 'application/vnd.microsoft.card.adaptive',
+            content: adaptiveCard
+          }
+        ]
       })
     });
     
@@ -91,7 +139,7 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
     
-    return Response.json({ success: true, message_sent: message });
+    return Response.json({ success: true, card_sent: true });
   } catch (error) {
     console.error('Error sending Teams update:', error);
     return Response.json({ error: error.message }, { status: 500 });
