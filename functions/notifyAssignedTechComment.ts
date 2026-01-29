@@ -38,6 +38,16 @@ Deno.serve(async (req) => {
       });
     }
     
+    // Only notify if comment is from requester
+    if (latestComment.author_email !== ticket.requester_email) {
+      return Response.json({ 
+        success: true, 
+        message: 'Comment not from requester, skipping notification',
+        teams_message_sent: 0,
+        emails_sent: 0
+      });
+    }
+    
     // Build notification message
     const message = `💬 **New comment on ${ticket.ticket_number}**\n\n**From:** ${latestComment.author_name || latestComment.author_email}\n\n${latestComment.content}`;
     
