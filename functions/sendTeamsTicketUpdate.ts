@@ -135,14 +135,32 @@ Deno.serve(async (req) => {
         ]
       })
     });
-    
+
     if (!teamsResponse.ok) {
       const errorText = await teamsResponse.text();
       console.error('Teams message send failed:', errorText);
+      console.error('Status:', teamsResponse.status);
+      console.error('Post URL:', postUrl);
+
+      // If 403/404, the conversation is likely stale - clear it from ticket
+      if (teamsResponse.status === 403 || teamsResponse.status === 404) {
+        console.warn('⚠️ Conversation appears stale (403/404), clearing Teams context from ticket');
+        try {
+          await base44.asServiceRole.entities.Ticket.update(ticket_id, {
+            teams_conversation_id: null,
+            teams_service_url: null
+          });
+          console.log('✅ Cleared stale Teams conversation from ticket');
+        } catch (clearError) {
+          console.error('Failed to clear Teams context:', clearError);
+        }
+      }
+
       return Response.json({ 
         success: false, 
         error: `Failed to send Teams message: ${teamsResponse.status}`,
-        details: errorText
+        details: errorText,
+        conversation_cleared: teamsResponse.status === 403 || teamsResponse.status === 404
       }, { status: 500 });
     }
     
