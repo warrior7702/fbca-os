@@ -29,10 +29,7 @@ Deno.serve(async (req) => {
     let mode = 'app_credentials'; // Default mode assumes app credentials
     let lastError: string | null = null;
 
-    /*
-     * Prefer using the user's own PCO token and the group membership endpoint.
-     * This avoids fetching every group in the org and reduces the number of API calls.
-     */
+    // Prefer using the user's own PCO token and the group membership endpoint.
     if (user?.pco_access_token) {
       mode = 'user_token';
       try {
