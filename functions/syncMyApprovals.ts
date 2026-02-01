@@ -121,40 +121,37 @@ Deno.serve(async (req) => {
 
         console.log('📋 I am in', myGroupIds.size, 'approval groups');
 
-        // Get pending requests
-        const requestsResponse = await fetch(
-            'https://api.planningcenteronline.com/calendar/v2/event_resource_requests?where[approval_status]=P&order=-created_at&per_page=100&include=event,resource',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-
-        console.log('📡 Requests API response status:', requestsResponse.status);
-
-        if (!requestsResponse.ok) {
-            const errorText = await requestsResponse.text();
-            console.error('❌ Failed to fetch pending requests:', errorText);
-            throw new Error('Failed to fetch pending requests');
-        }
-
-        const requestsData = await requestsResponse.json();
-        console.log('📦 Raw requests data:', JSON.stringify(requestsData, null, 2));
-        
-        // Build maps
+        // Get pending requests from MY approval groups
+        const allRequests = [];
         const eventMap = {};
         const resourceMap = {};
         
-        if (requestsData.included) {
-            A(requestsData.included).forEach(item => {
-                if (item.type === 'Event') {
-                    eventMap[item.id] = item;
-                } else if (item.type === 'Resource') {
-                    resourceMap[item.id] = item;
+        for (const groupId of myGroupIds) {
+            const requestsResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/event_resource_requests?where[approval_status]=P&per_page=100&include=event,resource`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (requestsResponse.ok) {
+                const requestsData = await requestsResponse.json();
+                allRequests.push(...A(requestsData.data));
+                
+                // Build maps
+                if (requestsData.included) {
+                    A(requestsData.included).forEach(item => {
+                        if (item.type === 'Event') {
+                            eventMap[item.id] = item;
+                        } else if (item.type === 'Resource') {
+                            resourceMap[item.id] = item;
+                        }
+                    });
                 }
-            });
+                
+                console.log('📥 Group', myGroupNames[groupId], ':', A(requestsData.data).length, 'pending requests');
+            }
         }
 
-        console.log('📥 Fetched', A(requestsData.data).length, 'total pending requests');
-        console.log('🗺️ Resource mapping:', Object.keys(resourceToGroupMap).length, 'resources mapped');
-        console.log('👥 My groups:', Array.from(myGroupIds));
+        console.log('📥 Total fetched:', allRequests.length, 'pending requests from my groups');
 
         // Filter to my groups only
         const myApprovals = [];
