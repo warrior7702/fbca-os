@@ -59,23 +59,7 @@ Deno.serve(async (req) => {
 
         console.log('🔄 Starting sync for:', currentUser.email);
 
-        // Get my PCO person ID
-        const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        if (!meResponse.ok) {
-            const errorText = await meResponse.text();
-            console.error('❌ Failed to get PCO user:', meResponse.status, errorText);
-            throw new Error('Failed to get PCO user');
-        }
-
-        const meData = await meResponse.json();
-        const myPcoPersonId = meData.data?.id;
-
-        console.log('👤 My PCO Person ID:', myPcoPersonId);
-
-        // Get approval groups I'm in
+        // Get all approval groups and map resources
         const groupsResponse = await fetch(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -87,43 +71,45 @@ Deno.serve(async (req) => {
         const myGroupIds = new Set();
         const myGroupNames = {};
         const resourceToGroupMap = {};
-        
+
+        // Map all resources to groups and collect groups with pending requests
         for (const group of A(groupsData.data)) {
-            // Check if I'm in this group
-            const membersResponse = await fetch(
-                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+            const groupId = group.id;
+            const groupName = group.attributes?.name;
+
+            // Map resources to this group
+            const resourcesResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/resources?per_page=100`,
                 { headers: { 'Authorization': `Bearer ${accessToken}` } }
             );
-            
-            if (membersResponse.ok) {
-                const membersData = await membersResponse.json();
-                const isMember = A(membersData.data).some(person => person.id === myPcoPersonId);
-                
-                if (isMember) {
-                    myGroupIds.add(group.id);
-                    myGroupNames[group.id] = group.attributes?.name;
-                    console.log('✅ Member of group:', group.attributes?.name);
 
-                    // Map resources to groups ONLY for groups I'm in
-                    const resourcesResponse = await fetch(
-                        `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
-                        { headers: { 'Authorization': `Bearer ${accessToken}` } }
-                    );
+            if (resourcesResponse.ok) {
+                const resourcesData = await resourcesResponse.json();
+                for (const resource of A(resourcesData.data)) {
+                    resourceToGroupMap[resource.id] = {
+                        groupId: groupId,
+                        groupName: groupName
+                    };
+                }
+            }
 
-                    if (resourcesResponse.ok) {
-                        const resourcesData = await resourcesResponse.json();
-                        for (const resource of A(resourcesData.data)) {
-                            resourceToGroupMap[resource.id] = {
-                                groupId: group.id,
-                                groupName: group.attributes?.name
-                            };
-                        }
-                    }
+            // Check if this group has pending requests
+            const requestsResponse = await fetch(
+                `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/event_resource_requests?where[approval_status]=P&per_page=1`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+
+            if (requestsResponse.ok) {
+                const requestsData = await requestsResponse.json();
+                if (A(requestsData.data).length > 0) {
+                    myGroupIds.add(groupId);
+                    myGroupNames[groupId] = groupName;
+                    console.log('✅ Group with pending requests:', groupName);
                 }
             }
         }
 
-        console.log('📋 I am in', myGroupIds.size, 'approval groups');
+        console.log('📋 Found', myGroupIds.size, 'groups with pending approvals');
 
         // Get pending requests from MY approval groups
         const allRequests = [];
