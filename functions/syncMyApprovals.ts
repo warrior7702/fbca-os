@@ -153,39 +153,21 @@ Deno.serve(async (req) => {
 
         console.log('📥 Total fetched:', allRequests.length, 'pending requests from my groups');
 
-        // Filter to my groups only
+        // Filter to recent requests only
         const myApprovals = [];
         const lookbackDays = 90;
         const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
         
-        for (const request of A(requestsData.data)) {
-            console.log('🔍 Checking request:', request.id);
-            
+        for (const request of allRequests) {
             // Must be pending
-            if (request.attributes?.approval_status !== 'P') {
-                console.log('  ❌ Not pending:', request.attributes?.approval_status);
-                continue;
-            }
+            if (request.attributes?.approval_status !== 'P') continue;
             
             // Must be recent
             const createdAt = new Date(request.attributes?.created_at).getTime();
-            if (createdAt < cutoff) {
-                console.log('  ❌ Too old:', request.attributes?.created_at);
-                continue;
-            }
+            if (createdAt < cutoff) continue;
             
             const resourceId = request.relationships?.resource?.data?.id;
             const groupInfo = resourceToGroupMap[resourceId];
-            
-            console.log('  📌 Resource ID:', resourceId, 'Group:', groupInfo?.groupName);
-            
-            // Must be in my groups
-            if (!groupInfo || !myGroupIds.has(groupInfo.groupId)) {
-                console.log('  ❌ Not in my groups');
-                continue;
-            }
-            
-            console.log('  ✅ MATCH!');
             
             const eventId = request.relationships?.event?.data?.id;
             const event = eventMap[eventId];
