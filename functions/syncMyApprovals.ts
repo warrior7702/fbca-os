@@ -134,6 +134,13 @@ Deno.serve(async (req) => {
 
             if (requestsResponse.ok) {
                 const requestsData = await requestsResponse.json();
+                console.log(`📥 Group ${myGroupNames[groupId]} (${groupId}): ${A(requestsData.data).length} pending requests`);
+                
+                // Log the request IDs and dates
+                A(requestsData.data).forEach(req => {
+                    console.log(`  - Request ${req.id}: created ${req.attributes?.created_at}, status ${req.attributes?.approval_status}`);
+                });
+                
                 allRequests.push(...A(requestsData.data));
                 
                 // Build maps
@@ -146,8 +153,8 @@ Deno.serve(async (req) => {
                         }
                     });
                 }
-                
-                console.log('📥 Group', myGroupNames[groupId], ':', A(requestsData.data).length, 'pending requests');
+            } else {
+                console.error(`❌ Failed to fetch requests for group ${groupId}:`, requestsResponse.status);
             }
         }
 
