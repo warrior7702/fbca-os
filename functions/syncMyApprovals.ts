@@ -127,9 +127,16 @@ Deno.serve(async (req) => {
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
 
-        if (!requestsResponse.ok) throw new Error('Failed to fetch pending requests');
+        console.log('📡 Requests API response status:', requestsResponse.status);
+
+        if (!requestsResponse.ok) {
+            const errorText = await requestsResponse.text();
+            console.error('❌ Failed to fetch pending requests:', errorText);
+            throw new Error('Failed to fetch pending requests');
+        }
 
         const requestsData = await requestsResponse.json();
+        console.log('📦 Raw requests data:', JSON.stringify(requestsData, null, 2));
         
         // Build maps
         const eventMap = {};
