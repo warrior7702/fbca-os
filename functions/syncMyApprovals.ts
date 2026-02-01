@@ -60,12 +60,16 @@ Deno.serve(async (req) => {
         console.log('🔄 Starting sync for:', currentUser.email);
 
         // Get my PCO person ID
-        const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+        const meResponse = await fetch('https://api.planningcenteronline.com/people/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (!meResponse.ok) throw new Error('Failed to get PCO user');
-        
+        if (!meResponse.ok) {
+            const errorText = await meResponse.text();
+            console.error('❌ Failed to get PCO user:', meResponse.status, errorText);
+            throw new Error('Failed to get PCO user');
+        }
+
         const meData = await meResponse.json();
         const myPcoPersonId = meData.data?.id;
 
