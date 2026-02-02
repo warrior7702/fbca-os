@@ -241,8 +241,7 @@ export default function MyApprovals() {
 
     setApprovingId(resourceRequestId);
     try {
-      console.log('📤 Sending to approvePCOResourceRequest:', { resourceRequestId, action: "approve" });
-      const resp = await base44.functions.invoke("approvePCOResourceRequest", { 
+      const resp = await base44.functions.invoke("approveResourceRequest", { 
         resourceRequestId, 
         action: "approve" 
       });
