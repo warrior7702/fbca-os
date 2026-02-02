@@ -101,7 +101,18 @@ export default function MyApprovals() {
   const [codeSearching, setCodeSearching] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [sentCodes, setSentCodes] = useState({});
+  const [sentCodes, setSentCodes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('myApprovalssentCodes') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  // Persist sentCodes to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('myApprovalssentCodes', JSON.stringify(sentCodes));
+  }, [sentCodes]);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
