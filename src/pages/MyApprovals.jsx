@@ -503,11 +503,16 @@ export default function MyApprovals() {
                           )}
 
                           {item.resourceName === "Building Access" && (
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Key className="w-4 h-4 text-blue-600" />
-                                <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
-                              </div>
+                           <div className="mt-3 space-y-2">
+                             <div className="flex items-center gap-2">
+                               <Key className="w-4 h-4 text-blue-600" />
+                               <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
+                               {sentCodes[item.resourceRequestId] && (
+                                 <Badge className="bg-green-100 text-green-800 text-xs">
+                                   ✓ Sent: {sentCodes[item.resourceRequestId]}#
+                                 </Badge>
+                               )}
+                             </div>
                               <Input
                                 placeholder="Search by name or 6-digit code..."
                                 value={codeSearches[item.resourceRequestId] || ''}
