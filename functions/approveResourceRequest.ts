@@ -69,10 +69,25 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const errorBody = await response.text();
       console.log('❌ PCO error response:', errorBody);
+      
+      // Parse PCO error for better messaging
+      let errorDetail = errorBody;
+      try {
+        const errorJson = JSON.parse(errorBody);
+        if (errorJson.errors?.[0]?.detail) {
+          errorDetail = errorJson.errors[0].detail;
+        }
+      } catch {}
+      
+      const userMessage = response.status === 403 
+        ? 'You do not have permission to approve this request in Planning Center. Verify you are in the correct approval group.'
+        : `PCO API error: ${response.status}`;
+      
       return Response.json(
         {
-          error: `PCO API error: ${response.status}`,
-          detail: errorBody
+          error: userMessage,
+          detail: errorDetail,
+          status: response.status
         },
         { status: response.status }
       );
