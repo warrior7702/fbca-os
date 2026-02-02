@@ -195,9 +195,7 @@ export default function MyApprovals() {
         const totalPending = grouped.reduce((sum, ev) => sum + (ev.items?.length || 0), 0);
         toast.success(`Found ${totalPending} pending approval${totalPending !== 1 ? "s" : ""}`);
       }
-
-
-    } catch (e) {
+      } catch (e) {
       console.error(e);
       toast.error(`Failed to load approvals: ${e.message}`);
     } finally {
