@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
     const approvalStatus = action === 'deny' ? 'R' : 'A';
     console.log('📊 Mapped action to approval_status:', approvalStatus);
 
-    // Send PATCH request to PCO resource_bookings endpoint
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_bookings/${resourceRequestId}`;
+    // Send PATCH request to PCO event_resource_requests endpoint
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests/${resourceRequestId}`;
     console.log('📤 Sending PATCH to PCO:', pcoUrl);
     
     const response = await fetch(pcoUrl, {
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         data: {
-          type: 'ResourceBooking',
+          type: 'EventResourceRequest',
           id: resourceRequestId.toString(),
           attributes: {
             approval_status: approvalStatus
