@@ -242,19 +242,22 @@ Deno.serve(async (req) => {
             try {
                 await delay(150);
                 const answersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}?include=resource_answers`,
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_answers`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
                 
                 if (answersResponse.ok) {
                     const answersData = await answersResponse.json();
-                    const includedAnswers = A(answersData.included).filter(item => item.type === 'ResourceAnswer');
                     
-                    answers = includedAnswers.map(a => ({
+                    answers = A(answersData.data).map(a => ({
                         question: a?.attributes?.question || '',
                         answer: a?.attributes?.response || '',
                         answer_type: a?.attributes?.response_type || 'text'
                     }));
+                    
+                    console.log(`📝 Request ${request.id}: ${answers.length} answers`);
+                } else {
+                    console.log(`⚠️ Request ${request.id}: answers API returned ${answersResponse.status}`);
                 }
             } catch (err) {
                 console.log(`Could not fetch answers for request ${request.id}:`, err.message);
