@@ -115,6 +115,8 @@ Deno.serve(async (req) => {
                     const preview = `${newComment.author_name}: ${newComment.content}`.trim();
                     const message = preview.length > 140 ? `${preview.substring(0, 140)}...` : preview;
                     const actionUrl = `/support-tickets?id=${ticket.id}`;
+                    const proactiveUrl = Deno.env.get('SPARKBOT_PROACTIVE_URL') || '';
+                    const proactiveSecret = Deno.env.get('SPARKBOT_PROACTIVE_SECRET') || '';
 
                     for (const email of assignees) {
                         await base44.asServiceRole.functions.invoke('createNotification', {
@@ -127,6 +129,33 @@ Deno.serve(async (req) => {
                             action_url: actionUrl,
                             send_email: false
                         });
+
+                        if (proactiveUrl && proactiveSecret) {
+                            try {
+                                const users = await base44.asServiceRole.entities.User.filter({ email });
+                                const user = users?.[0];
+                                const refRaw = user?.teams_dm_conversation_reference || null;
+                                if (!refRaw) continue;
+
+                                const conversationReference =
+                                    typeof refRaw === 'string' ? JSON.parse(refRaw) : refRaw;
+
+                                await fetch(proactiveUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${proactiveSecret}`
+                                    },
+                                    body: JSON.stringify({
+                                        conversationReference,
+                                        message: `💬 ${message}`,
+                                        title: `New comment on ${ticket.ticket_number}`
+                                    })
+                                });
+                            } catch (dmError) {
+                                console.warn(`Failed to send Teams DM to ${email}:`, dmError);
+                            }
+                        }
                     }
                 }
             }
