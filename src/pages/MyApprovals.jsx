@@ -246,6 +246,8 @@ export default function MyApprovals() {
       
       if (!resp?.data?.success) {
         const errorMsg = resp?.data?.error || "Unknown approval error";
+        const errorDetails = resp?.data?.details;
+        console.error('❌ Approval failed:', errorMsg, errorDetails);
         throw new Error(errorMsg);
       }
 

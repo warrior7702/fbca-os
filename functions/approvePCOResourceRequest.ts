@@ -47,10 +47,20 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('❌ PCO API error:', response.status, errorText);
+      
+      let errorMessage = 'PCO API error';
+      if (response.status === 403) {
+        errorMessage = 'Permission denied - you may not have access to approve this resource';
+      } else if (response.status === 401) {
+        errorMessage = 'PCO authentication failed - try reconnecting in Settings';
+      }
+      
       return Response.json({ 
         success: false, 
-        error: 'PCO API error',
-        details: errorText 
+        error: errorMessage,
+        details: errorText,
+        status: response.status
       }, { status: response.status });
     }
 
