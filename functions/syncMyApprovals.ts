@@ -250,9 +250,9 @@ Deno.serve(async (req) => {
                     const answersData = await answersResponse.json();
                     
                     answers = A(answersData.data).map(a => ({
-                        question: a?.attributes?.question || '',
-                        answer: a?.attributes?.value || '',
-                        answer_type: a?.attributes?.kind || 'text'
+                        question: a?.attributes?.question?.question || '',
+                        answer: a?.attributes?.answer || '',
+                        answer_type: a?.attributes?.question?.kind || 'text'
                     }));
                     
                     console.log(`📝 Request ${request.id}: ${answers.length} answers`);
