@@ -101,7 +101,6 @@ export default function MyApprovals() {
   const [codeSearching, setCodeSearching] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [codeSentRequests, setCodeSentRequests] = useState({});
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -206,13 +205,6 @@ export default function MyApprovals() {
   }, [fetchApprovalsFromPCO, getUserGroups]);
 
   useEffect(() => {
-    // Load sent codes from localStorage
-    const savedSentCodes = localStorage.getItem('doorCodesSent');
-    if (savedSentCodes) {
-      try {
-        setCodeSentRequests(JSON.parse(savedSentCodes));
-      } catch {}
-    }
     refresh({ showToast: false });
   }, [refresh]);
 
@@ -330,13 +322,6 @@ export default function MyApprovals() {
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
-      
-      // Save to localStorage
-      setCodeSentRequests(prev => {
-        const updated = { ...prev, [requestId]: true };
-        localStorage.setItem('doorCodesSent', JSON.stringify(updated));
-        return updated;
-      });
     } catch (error) {
       console.error('Failed to send door code:', error);
       toast.error('Failed to send door code to Planning Center');
@@ -501,27 +486,17 @@ export default function MyApprovals() {
                           )}
 
                           {item.resourceName === "Building Access" && (
-                           <div className="mt-3 space-y-2">
-                             <div className="flex items-center gap-2">
-                               <Key className="w-4 h-4 text-blue-600" />
-                               <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
-                             </div>
-                             <div className="relative">
-                               <Input
-                                 placeholder="Search by name or 6-digit code..."
-                                 value={codeSearches[item.resourceRequestId] || ''}
-                                 onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
-                                 className="text-sm pr-10"
-                               />
-                               {codeSentRequests[item.resourceRequestId] && (
-                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
-                                   <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded text-green-700">
-                                     <CheckCircle className="w-4 h-4" />
-                                     <span className="text-xs font-medium">Sent</span>
-                                   </div>
-                                 </div>
-                               )}
-                             </div>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Key className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
+                              </div>
+                              <Input
+                                placeholder="Search by name or 6-digit code..."
+                                value={codeSearches[item.resourceRequestId] || ''}
+                                onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
+                                className="text-sm"
+                              />
                               {codeSearching[item.resourceRequestId] && (
                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                   <Loader2 className="w-3 h-3 animate-spin" />
