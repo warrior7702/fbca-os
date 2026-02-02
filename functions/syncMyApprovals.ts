@@ -237,6 +237,27 @@ Deno.serve(async (req) => {
                 continue;
             }
             
+            // Fetch request answers
+            let answers = [];
+            try {
+                await delay(150);
+                const answersResponse = await fetch(
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_questions`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                );
+                
+                if (answersResponse.ok) {
+                    const answersData = await answersResponse.json();
+                    answers = A(answersData.data).map(a => ({
+                        question: a?.attributes?.question || '',
+                        answer: a?.attributes?.response || '',
+                        answer_type: a?.attributes?.response_type || 'text'
+                    }));
+                }
+            } catch (err) {
+                console.log(`Could not fetch answers for request ${request.id}:`, err.message);
+            }
+            
             myApprovals.push({
                 user_email: currentUser.email,
                 request_id: request.id,
@@ -250,7 +271,8 @@ Deno.serve(async (req) => {
                 quantity: request.attributes?.quantity || 1,
                 approval_status: 'P',
                 pco_created_at: request.attributes?.created_at,
-                pco_updated_at: request.attributes?.updated_at
+                pco_updated_at: request.attributes?.updated_at,
+                answers: answers
             });
         }
 
