@@ -501,17 +501,27 @@ export default function MyApprovals() {
                           )}
 
                           {item.resourceName === "Building Access" && (
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Key className="w-4 h-4 text-blue-600" />
-                                <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
-                              </div>
-                              <Input
-                                placeholder="Search by name or 6-digit code..."
-                                value={codeSearches[item.resourceRequestId] || ''}
-                                onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
-                                className="text-sm"
-                              />
+                           <div className="mt-3 space-y-2">
+                             <div className="flex items-center gap-2">
+                               <Key className="w-4 h-4 text-blue-600" />
+                               <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
+                             </div>
+                             <div className="relative">
+                               <Input
+                                 placeholder="Search by name or 6-digit code..."
+                                 value={codeSearches[item.resourceRequestId] || ''}
+                                 onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
+                                 className="text-sm pr-10"
+                               />
+                               {codeSentRequests[item.resourceRequestId] && (
+                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                                   <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded text-green-700">
+                                     <CheckCircle className="w-4 h-4" />
+                                     <span className="text-xs font-medium">Sent</span>
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
                               {codeSearching[item.resourceRequestId] && (
                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                   <Loader2 className="w-3 h-3 animate-spin" />
