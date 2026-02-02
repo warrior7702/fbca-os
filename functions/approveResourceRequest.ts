@@ -39,6 +39,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Verify token by calling PCO /me endpoint
+    console.log('🔍 Verifying PCO token...');
+    const meResponse = await fetch(
+      'https://api.planningcenteronline.com/calendar/v2/me',
+      {
+        headers: {
+          'Authorization': `Bearer ${userRecord.pco_access_token}`
+        }
+      }
+    );
+    const meData = await meResponse.json();
+    console.log('📋 PCO /me response:', JSON.stringify(meData));
+    
+    if (!meResponse.ok) {
+      console.log('❌ Token verification failed');
+      return Response.json(
+        {
+          error: 'Planning Center token is invalid or expired. Please reconnect.',
+          detail: meData
+        },
+        { status: 403 }
+      );
+    }
+
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
     console.log('📊 Mapped action to approval_status:', approvalStatus);
