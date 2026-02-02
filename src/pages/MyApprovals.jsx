@@ -551,7 +551,15 @@ export default function MyApprovals() {
                                   ))}
                                 </div>
                               )}
-                              {selectedCardholders[item.resourceRequestId] && (
+                              {sentCodes[item.resourceRequestId] ? (
+                                <Button
+                                  disabled
+                                  className="w-full bg-green-600 text-white"
+                                  size="sm"
+                                >
+                                  ✓ Code {sentCodes[item.resourceRequestId]}# Already Sent
+                                </Button>
+                              ) : selectedCardholders[item.resourceRequestId] && (
                                 <Button
                                   onClick={() => sendCodeToPCO(selectedCardholders[item.resourceRequestId], eventGroup.eventId, item.resourceRequestId)}
                                   disabled={sendingCode === item.resourceRequestId}
