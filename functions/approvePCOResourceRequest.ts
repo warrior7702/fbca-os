@@ -60,20 +60,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'resourceRequestId required' }, { status: 400 });
     }
 
-    // Verify who this token belongs to
-    const meResponse = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-    
-    if (meResponse.ok) {
-      const meData = await meResponse.json();
-      console.log(`✅ Approving as PCO user: ${meData.data?.attributes?.name} (ID: ${meData.data?.id})`);
-    }
-
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
 
-    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId}`);
+    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId} for user ${currentUser.email}`);
 
     // Approve/Deny the resource request via PCO API
     const response = await fetch(
