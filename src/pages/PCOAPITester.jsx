@@ -2385,6 +2385,34 @@ export default function PCOAPITester() {
                   </Alert>
                 </div>
 
+                {/* Inspect Specific Request Section */}
+                <div className="border-t pt-4 space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-cyan-600" />
+                    Inspect Specific Resource Request
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter resource request ID (e.g., 32652275)"
+                      value={eventId}
+                      onChange={(e) => setEventId(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={testLookupRequest} 
+                      disabled={testLoading}
+                      className="bg-cyan-600 hover:bg-cyan-700"
+                    >
+                      {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Inspect'}
+                    </Button>
+                  </div>
+                  <Alert className="bg-cyan-50 border-cyan-200">
+                    <AlertDescription className="text-sm">
+                      <strong>Debug request:</strong> Inspects the PCO resource request object to see what user IDs are embedded in it (created_by, modified_by, etc).
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
                 {/* User ID Lookup Section */}
                 <div className="border-t pt-4 space-y-2">
                   <Label className="flex items-center gap-2">
