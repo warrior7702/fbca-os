@@ -370,6 +370,18 @@ export default function MyApprovals() {
                             </Badge>
                           </div>
 
+                          {/* Request Answers */}
+                          {item.answers && item.answers.length > 0 && (
+                            <div className="mt-2 space-y-1.5 text-sm">
+                              {item.answers.map((answer, idx) => (
+                                <div key={idx} className="flex flex-col">
+                                  <span className="text-slate-600 text-xs">{answer.question}</span>
+                                  <span className="text-slate-900 font-medium">{answer.answer}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="flex gap-2 mt-3">
                             <Button
                               onClick={() => approve(item.resourceRequestId)}
