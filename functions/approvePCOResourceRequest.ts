@@ -1,19 +1,60 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+async function refreshTokenIfNeeded(base44, user) {
+  const expiresAt = new Date(user.pco_token_expires_at);
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+  if (expiresAt > fiveMinutesFromNow) {
+    return user.pco_access_token;
+  }
+
+  console.log('🔄 Refreshing PCO token...');
+  const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: user.pco_refresh_token,
+      client_id: Deno.env.get('PCO_CLIENT_ID'),
+      client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+    })
+  });
+
+  if (!tokenResponse.ok) throw new Error('Token refresh failed');
+
+  const tokens = await tokenResponse.json();
+  const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+  await base44.asServiceRole.entities.User.update(user.id, {
+    pco_access_token: tokens.access_token,
+    pco_refresh_token: tokens.refresh_token,
+    pco_token_expires_at: newExpiresAt
+  });
+
+  return tokens.access_token;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const currentUser = await base44.auth.me();
 
-    if (!user) {
+    if (!currentUser) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!user.pco_access_token) {
+    // Get full user record with tokens
+    const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
+    const user = users[0];
+
+    if (!user || !user.pco_access_token) {
       return Response.json({ error: 'PCO not connected' }, { status: 400 });
     }
 
     const { resourceRequestId, action = 'approve' } = await req.json();
+    
+    // Refresh token if needed
+    const accessToken = await refreshTokenIfNeeded(base44, user);
 
     if (!resourceRequestId) {
       return Response.json({ error: 'resourceRequestId required' }, { status: 400 });
@@ -30,7 +71,7 @@ Deno.serve(async (req) => {
       {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${user.pco_access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
