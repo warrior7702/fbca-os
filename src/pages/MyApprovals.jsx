@@ -467,13 +467,21 @@ export default function MyApprovals() {
 
                           {/* Request Answers */}
                           {item.answers && item.answers.length > 0 && (
-                            <div className="mt-2 space-y-1.5 text-sm">
-                              {item.answers.map((answer, idx) => (
-                                <div key={idx} className="flex flex-col">
-                                  <span className="text-slate-600 text-xs">{answer.question}</span>
-                                  <span className="text-slate-900 font-medium">{answer.answer}</span>
-                                </div>
-                              ))}
+                            <div className="mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                              <p className="text-xs font-semibold text-blue-900 mb-2">Request Details</p>
+                              <div className="space-y-2">
+                                {item.answers.map((answer, idx) => {
+                                  const answerDisplay = Array.isArray(answer.answer) 
+                                    ? answer.answer.join(", ")
+                                    : answer.answer;
+                                  return (
+                                    <div key={idx} className="flex flex-col">
+                                      <span className="text-slate-600 text-xs font-medium">{answer.question}</span>
+                                      <span className="text-slate-900 text-sm">{answerDisplay}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
 
