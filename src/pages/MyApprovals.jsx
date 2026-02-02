@@ -492,12 +492,25 @@ export default function MyApprovals() {
                                 <Key className="w-4 h-4 text-blue-600" />
                                 <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
                               </div>
-                              <Input
-                                placeholder="Search by name or 6-digit code..."
-                                value={codeSearches[item.resourceRequestId] || ''}
-                                onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
-                                className="text-sm"
-                              />
+                              <div className="flex gap-2 items-center">
+                                <Input
+                                  placeholder="Search by name or 6-digit code..."
+                                  value={codeSearches[item.resourceRequestId] || ''}
+                                  onChange={(e) => {
+                                    setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }));
+                                    if (e.target.value) {
+                                      setSentCodes(prev => ({ ...prev, [item.resourceRequestId]: false }));
+                                    }
+                                  }}
+                                  className="text-sm flex-1"
+                                />
+                                {sentCodes[item.resourceRequestId] && (
+                                  <div className="flex items-center gap-1 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-green-700 text-xs font-medium whitespace-nowrap">
+                                    <CheckCircle className="w-4 h-4" />
+                                    Sent
+                                  </div>
+                                )}
+                              </div>
                               {codeSearching[item.resourceRequestId] && (
                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                   <Loader2 className="w-3 h-3 animate-spin" />
