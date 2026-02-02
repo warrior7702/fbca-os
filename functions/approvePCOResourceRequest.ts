@@ -13,13 +13,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'PCO not connected' }, { status: 400 });
     }
 
-    const { resourceRequestId } = await req.json();
+    const { resourceRequestId, action = 'approve' } = await req.json();
 
     if (!resourceRequestId) {
       return Response.json({ error: 'resourceRequestId required' }, { status: 400 });
     }
 
-    // Approve the resource request via PCO API
+    // Map action to PCO approval_status
+    const approvalStatus = action === 'deny' ? 'R' : 'A';
+
+    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId}`);
+
+    // Approve/Deny the resource request via PCO API
     const response = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${resourceRequestId}`,
       {
@@ -33,7 +38,7 @@ Deno.serve(async (req) => {
             type: 'EventResourceRequest',
             id: resourceRequestId,
             attributes: {
-              status: 'A'
+              approval_status: approvalStatus
             }
           }
         })
