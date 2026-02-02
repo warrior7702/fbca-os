@@ -49,7 +49,8 @@ Deno.serve(async (req) => {
     const user = await base44.asServiceRole.entities.User.get(currentUser.id);
 
     console.log(`📝 Fetched user record: ${user.email} (ID: ${user.id})`);
-    console.log(`🔑 PCO token exists: ${!!user.pco_access_token}`);
+    console.log(`🔑 PCO user_id stored: ${user.pco_user_id}`);
+    console.log(`🔑 PCO token last 10 chars: ${user.pco_access_token?.slice(-10)}`);
 
     if (!user || !user.pco_access_token) {
       return Response.json({ error: 'PCO not connected' }, { status: 400 });
@@ -59,6 +60,16 @@ Deno.serve(async (req) => {
     
     // Refresh token if needed
     const accessToken = await refreshTokenIfNeeded(base44, user);
+    console.log(`🔐 Using token (last 10): ${accessToken.slice(-10)}`);
+
+    // Verify token ownership
+    const meCheck = await fetch('https://api.planningcenteronline.com/calendar/v2/me', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (meCheck.ok) {
+      const meData = await meCheck.json();
+      console.log(`✅ Token belongs to: ${meData.data?.attributes?.name} (PCO ID: ${meData.data?.id})`);
+    }
 
     if (!resourceRequestId) {
       return Response.json({ error: 'resourceRequestId required' }, { status: 400 });
@@ -67,7 +78,7 @@ Deno.serve(async (req) => {
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
 
-    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId} for user ${currentUser.email}`);
+    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId}`);
 
     // Approve/Deny the resource request via PCO API
     const response = await fetch(
