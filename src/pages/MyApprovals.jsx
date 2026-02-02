@@ -212,6 +212,13 @@ export default function MyApprovals() {
     refresh({ showToast: false });
   }, [refresh]);
 
+  // Re-fetch approvals when user reconnects PCO
+  useEffect(() => {
+    if (user?.pco_access_token) {
+      refresh({ showToast: false });
+    }
+  }, [user?.pco_access_token, refresh]);
+
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible" && !syncing) {
