@@ -43,9 +43,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get full user record with tokens
-    const users = await base44.asServiceRole.entities.User.filter({ email: currentUser.email });
-    const user = users[0];
+    console.log(`🔍 Current user: ${currentUser.email} (ID: ${currentUser.id})`);
+
+    // Get full user record with tokens - use ID not email to avoid duplicates
+    const user = await base44.asServiceRole.entities.User.get(currentUser.id);
+
+    console.log(`📝 Fetched user record: ${user.email} (ID: ${user.id})`);
+    console.log(`🔑 PCO token exists: ${!!user.pco_access_token}`);
 
     if (!user || !user.pco_access_token) {
       return Response.json({ error: 'PCO not connected' }, { status: 400 });
