@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
-import CardholderLookup from "../components/approvals/CardholderLookup";
+import { Input } from "@/components/ui/input";
 
 // Removed external webhook URL - using backend function instead
 
@@ -96,7 +96,10 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
-  const [lookupOpenForRequest, setLookupOpenForRequest] = useState(null);
+  const [codeSearches, setCodeSearches] = useState({});
+  const [codeResults, setCodeResults] = useState({});
+  const [codeSearching, setCodeSearching] = useState({});
+  const [sendingCode, setSendingCode] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -238,11 +241,42 @@ export default function MyApprovals() {
     }
   }, []);
 
-  const handleCardholderSelect = useCallback(async (cardholder, eventId) => {
+  const searchCardholders = useCallback(async (requestId, query) => {
+    if (query.length < 2) {
+      setCodeResults(prev => ({ ...prev, [requestId]: [] }));
+      return;
+    }
+
+    setCodeSearching(prev => ({ ...prev, [requestId]: true }));
+    try {
+      const response = await base44.functions.invoke('cardholdersSearch', {
+        q: query,
+        limit: 5
+      });
+
+      if (response.data.ok) {
+        setCodeResults(prev => ({ ...prev, [requestId]: response.data.results || [] }));
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setCodeSearching(prev => ({ ...prev, [requestId]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    Object.entries(codeSearches).forEach(([requestId, query]) => {
+      const timer = setTimeout(() => searchCardholders(requestId, query), 300);
+      return () => clearTimeout(timer);
+    });
+  }, [codeSearches, searchCardholders]);
+
+  const sendCodeToPCO = useCallback(async (cardholder, eventId, requestId) => {
+    setSendingCode(requestId);
     try {
       const answers = groupedApprovals
         .flatMap(ev => ev.items)
-        .find(item => item.eventId === eventId)?.answers || [];
+        .find(item => item.resourceRequestId === requestId)?.answers || [];
       
       const accessTimeAnswer = answers.find(a => 
         a.question.toLowerCase().includes('time') && 
@@ -256,10 +290,13 @@ export default function MyApprovals() {
       });
       
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
-      setLookupOpenForRequest(null);
+      setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
+      setCodeResults(prev => ({ ...prev, [requestId]: [] }));
     } catch (error) {
       console.error('Failed to send door code:', error);
       toast.error('Failed to send door code to Planning Center');
+    } finally {
+      setSendingCode(null);
     }
   }, [groupedApprovals]);
 
@@ -411,15 +448,47 @@ export default function MyApprovals() {
                           )}
 
                           {item.resourceName === "Building Access" && (
-                            <Button
-                              onClick={() => setLookupOpenForRequest(item.resourceRequestId)}
-                              variant="outline"
-                              size="sm"
-                              className="w-full mt-3"
-                            >
-                              <Key className="w-4 h-4 mr-2" />
-                              Send Door Code to PCO
-                            </Button>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Key className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
+                              </div>
+                              <Input
+                                placeholder="Search by name or 6-digit code..."
+                                value={codeSearches[item.resourceRequestId] || ''}
+                                onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
+                                className="text-sm"
+                              />
+                              {codeSearching[item.resourceRequestId] && (
+                                <div className="flex items-center gap-2 text-sm text-slate-500">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  Searching...
+                                </div>
+                              )}
+                              {codeResults[item.resourceRequestId]?.length > 0 && (
+                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                  {codeResults[item.resourceRequestId].map(cardholder => (
+                                    <button
+                                      key={cardholder.id}
+                                      onClick={() => sendCodeToPCO(cardholder, eventGroup.eventId, item.resourceRequestId)}
+                                      disabled={sendingCode === item.resourceRequestId}
+                                      className="w-full flex items-center gap-2 p-2 hover:bg-blue-50 rounded border border-slate-200 hover:border-blue-300 transition-colors text-left disabled:opacity-50"
+                                    >
+                                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-white text-xs font-bold">{cardholder.name[0]}</span>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-slate-900 text-sm">{cardholder.name}</p>
+                                        <p className="text-xs text-slate-600 font-mono">{cardholder.pin}#</p>
+                                      </div>
+                                      {sendingCode === item.resourceRequestId && (
+                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           <div className="flex gap-2 mt-3">
@@ -504,18 +573,6 @@ export default function MyApprovals() {
         )}
         />
 
-        <CardholderLookup
-        isOpen={!!lookupOpenForRequest}
-        onClose={() => setLookupOpenForRequest(null)}
-        onSelect={(cardholder) => {
-          const item = groupedApprovals
-            .flatMap(ev => ev.items)
-            .find(i => i.resourceRequestId === lookupOpenForRequest);
-          if (item) {
-            handleCardholderSelect(cardholder, item.eventId);
-          }
-        }}
-        />
-        </div>
+      </div>
         );
         }
