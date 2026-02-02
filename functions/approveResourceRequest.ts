@@ -1,5 +1,44 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+const refreshTokenIfNeeded = async (base44, user) => {
+  const expiresAt = new Date(user.pco_token_expires_at);
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+  if (expiresAt > fiveMinutesFromNow) {
+    return user.pco_access_token;
+  }
+
+  console.log('🔄 Token expiring soon, refreshing...');
+  const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: user.pco_refresh_token,
+      client_id: Deno.env.get('PCO_CLIENT_ID'),
+      client_secret: Deno.env.get('PCO_CLIENT_SECRET')
+    })
+  });
+
+  if (!tokenResponse.ok) {
+    const err = await tokenResponse.text();
+    console.error('Token refresh failed:', err);
+    throw new Error('Token refresh failed');
+  }
+
+  const tokens = await tokenResponse.json();
+  const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+
+  await base44.asServiceRole.entities.User.update(user.id, {
+    pco_access_token: tokens.access_token,
+    pco_refresh_token: tokens.refresh_token,
+    pco_token_expires_at: newExpiresAt
+  });
+
+  console.log('✅ Token refreshed successfully');
+  return tokens.access_token;
+};
+
 Deno.serve(async (req) => {
   try {
     console.log('🔍 approveResourceRequest started');
@@ -39,13 +78,17 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Refresh token if needed
+    const accessToken = await refreshTokenIfNeeded(base44, userRecord);
+    console.log('✅ Token ready (fresh or valid)');
+
     // Verify token by calling PCO /me endpoint
     console.log('🔍 Verifying PCO token...');
     const meResponse = await fetch(
       'https://api.planningcenteronline.com/calendar/v2/me',
       {
         headers: {
-          'Authorization': `Bearer ${userRecord.pco_access_token}`
+          'Authorization': `Bearer ${accessToken}`
         }
       }
     );
