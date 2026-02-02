@@ -78,9 +78,11 @@ Deno.serve(async (req) => {
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
 
-    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId}`);
+    console.log(`${action === 'deny' ? 'Denying' : 'Approving'} resource request ${resourceRequestId} as PCO user ${user.pco_user_id}`);
 
     // Approve/Deny the resource request via PCO API
+    // Note: The approval is performed as the authenticated user (determined by the Bearer token)
+    // PCO will record this approval as being done by user ID: ${user.pco_user_id}
     const response = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${resourceRequestId}`,
       {
