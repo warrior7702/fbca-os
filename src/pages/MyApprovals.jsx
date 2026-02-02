@@ -99,6 +99,7 @@ export default function MyApprovals() {
   const [codeSearches, setCodeSearches] = useState({});
   const [codeResults, setCodeResults] = useState({});
   const [codeSearching, setCodeSearching] = useState({});
+  const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
 
   const pendingCount = useMemo(
@@ -292,6 +293,7 @@ export default function MyApprovals() {
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
+      setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
     } catch (error) {
       console.error('Failed to send door code:', error);
       toast.error('Failed to send door code to Planning Center');
@@ -470,9 +472,12 @@ export default function MyApprovals() {
                                   {codeResults[item.resourceRequestId].map(cardholder => (
                                     <button
                                       key={cardholder.id}
-                                      onClick={() => sendCodeToPCO(cardholder, eventGroup.eventId, item.resourceRequestId)}
-                                      disabled={sendingCode === item.resourceRequestId}
-                                      className="w-full flex items-center gap-2 p-2 hover:bg-blue-50 rounded border border-slate-200 hover:border-blue-300 transition-colors text-left disabled:opacity-50"
+                                      onClick={() => setSelectedCardholders(prev => ({ ...prev, [item.resourceRequestId]: cardholder }))}
+                                      className={`w-full flex items-center gap-2 p-2 hover:bg-blue-50 rounded border transition-colors text-left ${
+                                        selectedCardholders[item.resourceRequestId]?.id === cardholder.id
+                                          ? 'border-blue-500 bg-blue-50'
+                                          : 'border-slate-200 hover:border-blue-300'
+                                      }`}
                                     >
                                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
                                         <span className="text-white text-xs font-bold">{cardholder.name[0]}</span>
@@ -481,12 +486,32 @@ export default function MyApprovals() {
                                         <p className="font-medium text-slate-900 text-sm">{cardholder.name}</p>
                                         <p className="text-xs text-slate-600 font-mono">{cardholder.pin}#</p>
                                       </div>
-                                      {sendingCode === item.resourceRequestId && (
-                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                      {selectedCardholders[item.resourceRequestId]?.id === cardholder.id && (
+                                        <CheckCircle className="w-4 h-4 text-blue-600" />
                                       )}
                                     </button>
                                   ))}
                                 </div>
+                              )}
+                              {selectedCardholders[item.resourceRequestId] && (
+                                <Button
+                                  onClick={() => sendCodeToPCO(selectedCardholders[item.resourceRequestId], eventGroup.eventId, item.resourceRequestId)}
+                                  disabled={sendingCode === item.resourceRequestId}
+                                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                  size="sm"
+                                >
+                                  {sendingCode === item.resourceRequestId ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Key className="w-4 h-4 mr-2" />
+                                      Send {selectedCardholders[item.resourceRequestId].pin}# to PCO
+                                    </>
+                                  )}
+                                </Button>
                               )}
                             </div>
                           )}
