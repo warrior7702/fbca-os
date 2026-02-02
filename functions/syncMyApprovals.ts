@@ -237,12 +237,12 @@ Deno.serve(async (req) => {
                 continue;
             }
             
-            // Fetch request answers using resource_questions endpoint
+            // Fetch request answers
             let answers = [];
             try {
                 await delay(150);
                 const answersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_questions`,
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/answers`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
                 
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
                     
                     answers = A(answersData.data).map(a => ({
                         question: a?.attributes?.question || '',
-                        answer: a?.attributes?.response || '',
+                        answer: a?.attributes?.value || '',
                         answer_type: a?.attributes?.kind || 'text'
                     }));
                     
