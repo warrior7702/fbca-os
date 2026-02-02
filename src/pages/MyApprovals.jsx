@@ -546,7 +546,7 @@ export default function MyApprovals() {
 
                           <div className="flex gap-2 mt-3">
                             <Button
-                              onClick={() => approve(item.resourceRequestId, eventGroup.eventId)}
+                              onClick={() => approve(item.resourceRequestId, eventGroup.eventId, item.resourceId)}
                               disabled={approvingId === item.resourceRequestId}
                               className="bg-green-600 hover:bg-green-700 text-white flex-1"
                               size="sm"
