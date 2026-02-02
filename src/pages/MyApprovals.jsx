@@ -225,17 +225,17 @@ export default function MyApprovals() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refresh, syncing]);
 
-  const approve = useCallback(async (resourceRequestId, eventId) => {
-    console.log('🔍 Approve called with resourceRequestId:', resourceRequestId, 'eventId:', eventId);
+  const approve = useCallback(async (resourceRequestId, eventId, resourceId) => {
+    console.log('🔍 Approve called with resourceRequestId:', resourceRequestId, 'eventId:', eventId, 'resourceId:', resourceId);
     
     if (!user?.pco_access_token) {
       toast.error("Please connect Planning Center in Settings");
       return;
     }
 
-    if (!resourceRequestId || !eventId) {
-      toast.error("Missing resource request ID or event ID");
-      console.error('❌ resourceRequestId or eventId is undefined');
+    if (!resourceRequestId || !eventId || !resourceId) {
+      toast.error("Missing resource request ID, event ID, or resource ID");
+      console.error('❌ Missing IDs:', { resourceRequestId, eventId, resourceId });
       return;
     }
 
@@ -244,6 +244,7 @@ export default function MyApprovals() {
       const resp = await base44.functions.invoke("approveResourceRequest", { 
         resourceRequestId, 
         eventId,
+        resourceId,
         action: "approve" 
       });
       
