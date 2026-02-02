@@ -242,13 +242,15 @@ Deno.serve(async (req) => {
             try {
                 await delay(150);
                 const answersResponse = await fetch(
-                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}/resource_questions`,
+                    `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${request.id}?include=resource_answers`,
                     { headers: { 'Authorization': `Bearer ${accessToken}` } }
                 );
                 
                 if (answersResponse.ok) {
                     const answersData = await answersResponse.json();
-                    answers = A(answersData.data).map(a => ({
+                    const includedAnswers = A(answersData.included).filter(item => item.type === 'ResourceAnswer');
+                    
+                    answers = includedAnswers.map(a => ({
                         question: a?.attributes?.question || '',
                         answer: a?.attributes?.response || '',
                         answer_type: a?.attributes?.response_type || 'text'
