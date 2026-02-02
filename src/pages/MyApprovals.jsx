@@ -101,18 +101,6 @@ export default function MyApprovals() {
   const [codeSearching, setCodeSearching] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [sentCodes, setSentCodes] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('myApprovalssentCodes') || '{}');
-    } catch {
-      return {};
-    }
-  });
-
-  // Persist sentCodes to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('myApprovalssentCodes', JSON.stringify(sentCodes));
-  }, [sentCodes]);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -331,7 +319,6 @@ export default function MyApprovals() {
       });
       
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
-      setSentCodes(prev => ({ ...prev, [requestId]: true }));
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
@@ -504,25 +491,12 @@ export default function MyApprovals() {
                                 <Key className="w-4 h-4 text-blue-600" />
                                 <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
                               </div>
-                              <div className="flex gap-2 items-center">
-                                <Input
-                                  placeholder="Search by name or 6-digit code..."
-                                  value={codeSearches[item.resourceRequestId] || ''}
-                                  onChange={(e) => {
-                                    setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }));
-                                    if (e.target.value) {
-                                      setSentCodes(prev => ({ ...prev, [item.resourceRequestId]: false }));
-                                    }
-                                  }}
-                                  className="text-sm flex-1"
-                                />
-                                {sentCodes[item.resourceRequestId] && (
-                                  <div className="flex items-center gap-1 px-3 py-1.5 bg-green-50 border border-green-200 rounded text-green-700 text-xs font-medium whitespace-nowrap">
-                                    <CheckCircle className="w-4 h-4" />
-                                    Sent
-                                  </div>
-                                )}
-                              </div>
+                              <Input
+                                placeholder="Search by name or 6-digit code..."
+                                value={codeSearches[item.resourceRequestId] || ''}
+                                onChange={(e) => setCodeSearches(prev => ({ ...prev, [item.resourceRequestId]: e.target.value }))}
+                                className="text-sm"
+                              />
                               {codeSearching[item.resourceRequestId] && (
                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                   <Loader2 className="w-3 h-3 animate-spin" />
