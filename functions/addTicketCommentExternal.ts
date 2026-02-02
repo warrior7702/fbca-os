@@ -95,6 +95,60 @@ Deno.serve(async (req) => {
             status: ['resolved', 'archived'].includes(ticket.status) ? 'open' : ticket.status
         });
 
+        // Notify department workers when the requester adds a comment
+        try {
+            const requesterEmail = (ticket.requester_email || '').toLowerCase();
+            const authorEmail = (author_email || ticket.requester_email || '').toLowerCase();
+            const isRequester = requesterEmail && authorEmail && requesterEmail === authorEmail;
+
+            if (isRequester) {
+                const rolesResponse = await base44.asServiceRole.functions.invoke('getUsersWithTicketRoles');
+                if (!rolesResponse?.data?.success) {
+                    throw new Error('getUsersWithTicketRoles failed');
+                }
+
+                const getDepartment = (category: string | null | undefined) => {
+                    const deptMap: Record<string, string> = {
+                        'technology': 'IT',
+                        'cleaning': 'Facilities',
+                        'maintenance': 'Facilities'
+                    };
+                    return category ? (deptMap[category] || null) : null;
+                };
+
+                const department = getDepartment(ticket.category);
+                if (department) {
+                    const departmentWorkers = rolesResponse.data.allUsers.filter((user: any) =>
+                        user.ticket_role === 'worker' &&
+                        user.departments &&
+                        user.departments.includes(department) &&
+                        (user.user_email || '').toLowerCase() !== authorEmail
+                    );
+
+                    if (departmentWorkers.length > 0) {
+                        const preview = `${newComment.author_name}: ${newComment.content}`.trim();
+                        const message = preview.length > 140 ? `${preview.substring(0, 140)}...` : preview;
+                        const actionUrl = `/support-tickets?id=${ticket.id}`;
+
+                        for (const worker of departmentWorkers) {
+                            await base44.asServiceRole.functions.invoke('createNotification', {
+                                user_email: worker.user_email,
+                                type: 'ticket_comment',
+                                title: `Comment on ${ticket.ticket_number}`,
+                                message,
+                                related_ticket_id: ticket.id,
+                                related_ticket_number: ticket.ticket_number,
+                                action_url: actionUrl,
+                                send_email: false
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (notifyError) {
+            console.warn('Failed to notify department workers:', notifyError);
+        }
+
         return Response.json({ 
             success: true, 
             ticket_number: ticket.ticket_number,
