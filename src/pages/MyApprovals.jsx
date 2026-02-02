@@ -320,6 +320,7 @@ export default function MyApprovals() {
       });
       
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
+      setSentCodes(prev => ({ ...prev, [requestId]: true }));
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
