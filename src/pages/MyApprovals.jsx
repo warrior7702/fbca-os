@@ -330,6 +330,12 @@ export default function MyApprovals() {
       });
       
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
+      
+      // Save to sent codes memory
+      const updated = { ...sentCodes, [requestId]: cardholder.pin };
+      setSentCodes(updated);
+      localStorage.setItem('sent_door_codes', JSON.stringify(updated));
+      
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
@@ -339,7 +345,7 @@ export default function MyApprovals() {
     } finally {
       setSendingCode(null);
     }
-  }, [groupedApprovals]);
+  }, [groupedApprovals, sentCodes]);
 
   if (loading) {
     return (
