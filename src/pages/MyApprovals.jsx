@@ -196,27 +196,7 @@ export default function MyApprovals() {
         toast.success(`Found ${totalPending} pending approval${totalPending !== 1 ? "s" : ""}`);
       }
 
-      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
-      const approvals = Array.isArray(api.approvals) ? api.approvals : [];
 
-      console.log('📦 approvals from PCO:', approvals);
-      console.log('🔍 Total approvals:', approvals.length);
-      console.log('🔑 First approval resourceRequestId:', approvals[0]?.resourceRequestId);
-      console.log('🔧 Debug info:', api.debug);
-      setDebugInfo(api.debug || null);
-      
-      const grouped = groupByEvent(approvals);
-      setGroupedApprovals(grouped);
-      setLastSync(new Date());
-
-      if (showToast) {
-        const totalPending = grouped.reduce((sum, ev) => sum + (ev.items?.length || 0), 0);
-        if (totalPending === 0) {
-          toast.info(`No pending approvals for: ${groups.join(", ")}`);
-        } else {
-          toast.success(`Found ${totalPending} pending approval${totalPending !== 1 ? "s" : ""}`);
-        }
-      }
     } catch (e) {
       console.error(e);
       toast.error(`Failed to load approvals: ${e.message}`);
