@@ -486,7 +486,7 @@ export default function MyApprovals() {
                           </div>
 
                           {/* Request Answers */}
-                          {item.answers && item.answers.length > 0 && (
+                          {item.answers && item.answers.length > 0 ? (
                             <div className="mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
                               <p className="text-xs font-semibold text-blue-900 mb-2">Request Details</p>
                               <div className="space-y-2">
@@ -502,6 +502,10 @@ export default function MyApprovals() {
                                   );
                                 })}
                               </div>
+                            </div>
+                          ) : (
+                            <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                              <p className="text-xs text-yellow-700">No request details available</p>
                             </div>
                           )}
 
