@@ -143,6 +143,7 @@ Deno.serve(async (req) => {
           error: patchData.errors?.[0]?.detail || 'No error detail',
           user_id_in_error: patchData.errors?.[0]?.meta?.description || 'No user ID in error'
         },
+        resources_by_group: resourcesByGroup,
         request_details: requestData.data || null
       }
     });
