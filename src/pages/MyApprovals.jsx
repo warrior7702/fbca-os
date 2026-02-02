@@ -101,17 +101,6 @@ export default function MyApprovals() {
   const [codeSearching, setCodeSearching] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
-  const [sentCodes, setSentCodes] = useState({});
-
-  // Load sent codes from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('sent_door_codes');
-    if (saved) {
-      try {
-        setSentCodes(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -146,21 +135,18 @@ export default function MyApprovals() {
     }
     
     // Transform from new format to expected format
-    const approvals = (response.data.pending_approvals || []).map(a => {
-      console.log('📝 Transforming approval:', a.request_id, 'answers:', a.answers);
-      return {
-        resourceRequestId: a.request_id,
-        eventId: a.event_id,
-        eventName: a.event_name,
-        eventStartsAt: a.event_starts_at,
-        eventEndsAt: a.event_ends_at,
-        resourceId: a.resource_id,
-        resourceName: a.resource_name,
-        quantity: a.quantity,
-        approvalGroupName: a.approval_group_name,
-        answers: a.answers || []
-      };
-    });
+    const approvals = (response.data.pending_approvals || []).map(a => ({
+      resourceRequestId: a.request_id,
+      eventId: a.event_id,
+      eventName: a.event_name,
+      eventStartsAt: a.event_starts_at,
+      eventEndsAt: a.event_ends_at,
+      resourceId: a.resource_id,
+      resourceName: a.resource_name,
+      quantity: a.quantity,
+      approvalGroupName: a.approval_group_name,
+      answers: a.answers || []
+    }));
     
     return {
       approvals,
@@ -333,12 +319,6 @@ export default function MyApprovals() {
       });
       
       toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
-      
-      // Save to sent codes memory
-      const updated = { ...sentCodes, [requestId]: cardholder.pin };
-      setSentCodes(updated);
-      localStorage.setItem('sent_door_codes', JSON.stringify(updated));
-      
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
@@ -348,7 +328,7 @@ export default function MyApprovals() {
     } finally {
       setSendingCode(null);
     }
-  }, [groupedApprovals, sentCodes]);
+  }, [groupedApprovals]);
 
   if (loading) {
     return (
@@ -506,16 +486,11 @@ export default function MyApprovals() {
                           )}
 
                           {item.resourceName === "Building Access" && (
-                           <div className="mt-3 space-y-2">
-                             <div className="flex items-center gap-2">
-                               <Key className="w-4 h-4 text-blue-600" />
-                               <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
-                               {sentCodes[item.resourceRequestId] && (
-                                 <Badge className="bg-green-100 text-green-800 text-xs">
-                                   ✓ Sent: {sentCodes[item.resourceRequestId]}#
-                                 </Badge>
-                               )}
-                             </div>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Key className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm font-medium text-slate-700">Send Door Code to PCO</span>
+                              </div>
                               <Input
                                 placeholder="Search by name or 6-digit code..."
                                 value={codeSearches[item.resourceRequestId] || ''}
@@ -554,15 +529,7 @@ export default function MyApprovals() {
                                   ))}
                                 </div>
                               )}
-                              {sentCodes[item.resourceRequestId] ? (
-                                <Button
-                                  disabled
-                                  className="w-full bg-green-600 text-white"
-                                  size="sm"
-                                >
-                                  ✓ Code {sentCodes[item.resourceRequestId]}# Already Sent
-                                </Button>
-                              ) : selectedCardholders[item.resourceRequestId] && (
+                              {selectedCardholders[item.resourceRequestId] && (
                                 <Button
                                   onClick={() => sendCodeToPCO(selectedCardholders[item.resourceRequestId], eventGroup.eventId, item.resourceRequestId)}
                                   disabled={sendingCode === item.resourceRequestId}
