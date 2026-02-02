@@ -135,9 +135,11 @@ Deno.serve(async (req) => {
         const allRequests = [];
 
         for (const groupId of myGroupIds) {
-            const requestsResponse = await fetch(
+            await delay(200); // Delay between group fetches
+
+            const requestsResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/event_resource_requests?where[approval_status]=P&per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                { 'Authorization': `Bearer ${accessToken}` }
             );
 
             if (requestsResponse.ok) {
