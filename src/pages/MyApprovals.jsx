@@ -206,6 +206,13 @@ export default function MyApprovals() {
   }, [fetchApprovalsFromPCO, getUserGroups]);
 
   useEffect(() => {
+    // Load sent codes from localStorage
+    const savedSentCodes = localStorage.getItem('doorCodesSent');
+    if (savedSentCodes) {
+      try {
+        setCodeSentRequests(JSON.parse(savedSentCodes));
+      } catch {}
+    }
     refresh({ showToast: false });
   }, [refresh]);
 
