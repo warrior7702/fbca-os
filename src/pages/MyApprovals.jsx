@@ -171,11 +171,29 @@ export default function MyApprovals() {
       console.log("✅ userGroups from getUserGroups:", groups);
       setUserGroups(groups);
 
-      if (!groups || groups.length === 0) {
+      // Still fetch approvals even if getUserGroups returns empty—the sync function determines actual groups
+      const api = await fetchApprovalsFromPCO({ windowDays: 180 });
+      const approvals = Array.isArray(api.approvals) ? api.approvals : [];
+
+      console.log('📦 approvals from PCO:', approvals);
+      console.log('🔍 Total approvals:', approvals.length);
+      
+      if (approvals.length === 0) {
         setGroupedApprovals([]);
         setLastSync(new Date());
-        if (showToast) toast.info("You are not assigned to any approval groups.");
+        if (showToast) toast.info("No pending approvals at the moment.");
+        setSyncing(false);
+        setLoading(false);
         return;
+      }
+
+      const grouped = groupByEvent(approvals);
+      setGroupedApprovals(grouped);
+      setLastSync(new Date());
+
+      if (showToast) {
+        const totalPending = grouped.reduce((sum, ev) => sum + (ev.items?.length || 0), 0);
+        toast.success(`Found ${totalPending} pending approval${totalPending !== 1 ? "s" : ""}`);
       }
 
       const api = await fetchApprovalsFromPCO({ windowDays: 180 });
