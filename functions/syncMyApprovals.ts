@@ -2,6 +2,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
 
 const A = (x) => Array.isArray(x) ? x : [];
 
+// Rate limit helper
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function refreshTokenIfNeeded(base44, user) {
     const expiresAt = new Date(user.pco_token_expires_at);
     const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
@@ -33,6 +36,19 @@ async function refreshTokenIfNeeded(base44, user) {
     });
 
     return tokens.access_token;
+}
+
+async function fetchWithRetry(url, headers, maxRetries = 2) {
+    for (let i = 0; i <= maxRetries; i++) {
+        const response = await fetch(url, { headers });
+        if (response.ok) return response;
+        if (response.status === 429 && i < maxRetries) {
+            console.log(`⏳ Rate limited, waiting 2s...`);
+            await delay(2000);
+            continue;
+        }
+        return response;
+    }
 }
 
 Deno.serve(async (req) => {
