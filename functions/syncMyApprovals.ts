@@ -76,9 +76,9 @@ Deno.serve(async (req) => {
         console.log('🔄 Starting sync for:', currentUser.email);
 
         // Get all approval groups and map resources
-        const groupsResponse = await fetch(
+        const groupsResponse = await fetchWithRetry(
             'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
-            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            { 'Authorization': `Bearer ${accessToken}` }
         );
 
         if (!groupsResponse.ok) throw new Error('Failed to fetch approval groups');
@@ -93,10 +93,12 @@ Deno.serve(async (req) => {
             const groupId = group.id;
             const groupName = group.attributes?.name;
 
+            await delay(100); // Small delay between requests
+
             // Map resources to this group
-            const resourcesResponse = await fetch(
+            const resourcesResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/resources?per_page=100`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                { 'Authorization': `Bearer ${accessToken}` }
             );
 
             if (resourcesResponse.ok) {
@@ -109,10 +111,12 @@ Deno.serve(async (req) => {
                 }
             }
 
+            await delay(100);
+
             // Check if this group has pending requests
-            const requestsResponse = await fetch(
+            const requestsResponse = await fetchWithRetry(
                 `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${groupId}/event_resource_requests?where[approval_status]=P&per_page=1`,
-                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                { 'Authorization': `Bearer ${accessToken}` }
             );
 
             if (requestsResponse.ok) {
