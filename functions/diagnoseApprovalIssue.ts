@@ -93,8 +93,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 5: Check the specific request details
-    console.log('📦 Step 5: Fetching request details...');
+    // Step 5: Map resources to approval groups
+    console.log('📦 Step 5: Mapping resources to your approval groups...');
+    const resourcesByGroup = {};
+    for (const group of myGroups) {
+      const resourcesResponse = await fetch(
+        `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+        { headers: { 'Authorization': `Bearer ${userRecord.pco_access_token}` } }
+      );
+      
+      if (resourcesResponse.ok) {
+        const resourcesData = await resourcesResponse.json();
+        resourcesByGroup[group.name] = (resourcesData.data || []).map(r => ({
+          id: r.id,
+          name: r.attributes?.name
+        }));
+        console.log(`✅ ${group.name} has ${resourcesData.data.length} resources`);
+      }
+    }
+
+    // Step 6: Check the specific request details
+    console.log('📦 Step 6: Fetching request details...');
     const requestResponse = await fetch(
       `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests/${resourceRequestId}?include=resource`,
       { headers: { 'Authorization': `Bearer ${userRecord.pco_access_token}` } }
