@@ -185,39 +185,22 @@ Deno.serve(async (req) => {
         console.log('🗓️ Fetching future event instances from', startDate.toISOString(), 'to', endDate.toISOString());
         
         const eventInstanceMap = {};
-        let instanceNextUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&per_page=100&order=starts_at`;
-        let instancePageCount = 0;
         
-        while (instanceNextUrl && instancePageCount < 20) { // Limit to 20 pages = 2000 instances
-            await delay(200);
+        // Build map directly from eventMap (which came from included data in requests)
+        for (const eventId in eventMap) {
+            const event = eventMap[eventId];
+            const startsAt = event.attributes?.starts_at;
             
-            const instancesResponse = await fetch(instanceNextUrl, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            
-            if (!instancesResponse.ok) {
-                console.error('Failed to fetch instance page', instancePageCount);
-                break;
+            // Only include future events
+            if (startsAt && new Date(startsAt) > new Date()) {
+                eventInstanceMap[eventId] = {
+                    starts_at: startsAt,
+                    ends_at: event.attributes?.ends_at
+                };
             }
-            
-            const instancesData = await instancesResponse.json();
-            
-            for (const instance of A(instancesData.data)) {
-                const eventId = instance.relationships?.event?.data?.id;
-                if (eventId && !eventInstanceMap[eventId]) {
-                    // Store the first (earliest) future instance for each event
-                    eventInstanceMap[eventId] = {
-                        starts_at: instance.attributes?.starts_at,
-                        ends_at: instance.attributes?.ends_at
-                    };
-                }
-            }
-            
-            instanceNextUrl = instancesData.links?.next || null;
-            instancePageCount++;
         }
         
-        console.log('✅ Cached', Object.keys(eventInstanceMap).length, 'future event instances');
+        console.log('✅ Built event map with', Object.keys(eventInstanceMap).length, 'future events from requests data');
 
         // Now build final approvals list using cached data
         const myApprovals = [];
