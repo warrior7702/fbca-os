@@ -121,15 +121,28 @@ export default function MyApprovals() {
   }, []);
 
   const fetchApprovalsFromPCO = useCallback(async ({ windowDays = 180 }) => {
-    const response = await base44.functions.invoke("fetchPendingApprovals", { windowDays });
+    const response = await base44.functions.invoke("syncMyApprovals", { windowDays });
     
     if (!response?.data?.success) {
       throw new Error(response?.data?.error || "Failed to fetch approvals");
     }
     
+    // Transform from new format to expected format
+    const approvals = (response.data.pending_approvals || []).map(a => ({
+      resourceRequestId: a.request_id,
+      eventId: a.event_id,
+      eventName: a.event_name,
+      eventStartsAt: a.event_starts_at,
+      eventEndsAt: a.event_ends_at,
+      resourceId: a.resource_id,
+      resourceName: a.resource_name,
+      quantity: a.quantity,
+      approvalGroupName: a.approval_group_name
+    }));
+    
     return {
-      approvals: response.data.approvals || [],
-      totalEvents: response.data.totalEvents || 0
+      approvals,
+      totalEvents: response.data.count || 0
     };
   }, []);
 
