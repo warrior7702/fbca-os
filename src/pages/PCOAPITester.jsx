@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -432,6 +431,52 @@ export default function PCOAPITester() {
   };
 
   // NEW: Lookup specific PCO user by ID
+  const testLookupRequest = async () => {
+    if (!eventId) {
+      toast.error('Please enter a request ID');
+      return;
+    }
+    
+    setTestLoading(true);
+    setResult(null);
+    try {
+      console.log('🔍 Looking up resource request:', eventId);
+      
+      // Get token
+      const tokenResponse = await base44.functions.invoke('getPCOToken');
+      if (!tokenResponse.data.ok) {
+        throw new Error('Failed to get PCO token');
+      }
+      
+      const token = tokenResponse.data.access_token;
+      
+      // We need to search all events for this request... or use the raw API
+      // For now, fetch the request directly - PCO allows direct request lookups
+      // Try multiple ways to find it
+      const results = [];
+      
+      // Method 1: Try fetching as if we know the event ID (from diagnostic)
+      console.log('📞 Trying to fetch request 32652275 (if you know event ID, pass it)...');
+      
+      // For now, return helpful info
+      setResult({
+        ok: false,
+        status: 400,
+        error: 'To look up a specific request, you need the event ID. Use diagnostic above to find it.'
+      });
+      toast.info('Use the diagnostic tools above to find the event ID for this request');
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setResult({
+        ok: false,
+        error: error.message
+      });
+      toast.error('Failed to lookup request: ' + error.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const testLookupUser = async () => {
     if (!lookupUserId) {
       toast.error('Please enter a user ID');
