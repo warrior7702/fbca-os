@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     const response = await fetch(pcoUrl, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${userRecord.pco_access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
