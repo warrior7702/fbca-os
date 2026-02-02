@@ -12,13 +12,15 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
-  MapPin
+  MapPin,
+  Key
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import ApprovalCalendar from "../components/approvals/ApprovalCalendar";
 import ConnectionWarning from "../components/shared/ConnectionWarning";
+import CardholderLookup from "../components/approvals/CardholderLookup";
 
 // Removed external webhook URL - using backend function instead
 
@@ -94,6 +96,7 @@ export default function MyApprovals() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
+  const [lookupOpenForRequest, setLookupOpenForRequest] = useState(null);
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
@@ -234,6 +237,31 @@ export default function MyApprovals() {
       setApprovingId(null);
     }
   }, []);
+
+  const handleCardholderSelect = useCallback(async (cardholder, eventId) => {
+    try {
+      const answers = groupedApprovals
+        .flatMap(ev => ev.items)
+        .find(item => item.eventId === eventId)?.answers || [];
+      
+      const accessTimeAnswer = answers.find(a => 
+        a.question.toLowerCase().includes('time') && 
+        a.question.toLowerCase().includes('access')
+      );
+      
+      await base44.functions.invoke("writePCONote", {
+        event_id: eventId,
+        badge_code: cardholder.pin,
+        access_time: accessTimeAnswer?.answer || ''
+      });
+      
+      toast.success(`Door code ${cardholder.pin}# sent to Planning Center!`);
+      setLookupOpenForRequest(null);
+    } catch (error) {
+      console.error('Failed to send door code:', error);
+      toast.error('Failed to send door code to Planning Center');
+    }
+  }, [groupedApprovals]);
 
   if (loading) {
     return (
@@ -382,6 +410,18 @@ export default function MyApprovals() {
                             </div>
                           )}
 
+                          {item.resourceName === "Building Access" && (
+                            <Button
+                              onClick={() => setLookupOpenForRequest(item.resourceRequestId)}
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-3"
+                            >
+                              <Key className="w-4 h-4 mr-2" />
+                              Send Door Code to PCO
+                            </Button>
+                          )}
+
                           <div className="flex gap-2 mt-3">
                             <Button
                               onClick={() => approve(item.resourceRequestId)}
@@ -462,7 +502,20 @@ export default function MyApprovals() {
             resource_name: item.resourceName
           }))
         )}
-      />
-    </div>
-  );
-}
+        />
+
+        <CardholderLookup
+        isOpen={!!lookupOpenForRequest}
+        onClose={() => setLookupOpenForRequest(null)}
+        onSelect={(cardholder) => {
+          const item = groupedApprovals
+            .flatMap(ev => ev.items)
+            .find(i => i.resourceRequestId === lookupOpenForRequest);
+          if (item) {
+            handleCardholderSelect(cardholder, item.eventId);
+          }
+        }}
+        />
+        </div>
+        );
+        }
