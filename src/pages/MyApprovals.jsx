@@ -183,6 +183,7 @@ export default function MyApprovals() {
 
       console.log('📦 approvals from PCO:', approvals);
       console.log('🔍 Total approvals:', approvals.length);
+      console.log('🔑 First approval resourceRequestId:', approvals[0]?.resourceRequestId);
       console.log('🔧 Debug info:', api.debug);
       setDebugInfo(api.debug || null);
       
@@ -222,13 +223,22 @@ export default function MyApprovals() {
   }, [refresh, syncing]);
 
   const approve = useCallback(async (resourceRequestId) => {
+    console.log('🔍 Approve called with resourceRequestId:', resourceRequestId);
+    
     if (!user?.pco_access_token) {
       toast.error("Please connect Planning Center in Settings");
       return;
     }
 
+    if (!resourceRequestId) {
+      toast.error("Missing resource request ID");
+      console.error('❌ resourceRequestId is undefined');
+      return;
+    }
+
     setApprovingId(resourceRequestId);
     try {
+      console.log('📤 Sending to approvePCOResourceRequest:', { resourceRequestId, action: "approve" });
       const resp = await base44.functions.invoke("approvePCOResourceRequest", { 
         resourceRequestId, 
         action: "approve" 
