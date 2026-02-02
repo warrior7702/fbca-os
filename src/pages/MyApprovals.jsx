@@ -222,10 +222,22 @@ export default function MyApprovals() {
   }, [refresh, syncing]);
 
   const approve = useCallback(async (resourceRequestId) => {
+    if (!user?.pco_access_token) {
+      toast.error("Please connect Planning Center in Settings");
+      return;
+    }
+
     setApprovingId(resourceRequestId);
     try {
-      const resp = await base44.functions.invoke("approvePCOResourceRequest", { resourceRequestId });
-      if (!resp?.data?.success) throw new Error(resp?.data?.error || "Unknown approval error");
+      const resp = await base44.functions.invoke("approvePCOResourceRequest", { 
+        resourceRequestId, 
+        action: "approve" 
+      });
+      
+      if (!resp?.data?.success) {
+        const errorMsg = resp?.data?.error || "Unknown approval error";
+        throw new Error(errorMsg);
+      }
 
       // Optimistic remove
       setGroupedApprovals(prev =>
@@ -233,14 +245,14 @@ export default function MyApprovals() {
           .map(ev => ({ ...ev, items: ev.items.filter(i => i.resourceRequestId !== resourceRequestId) }))
           .filter(ev => ev.items.length > 0)
       );
-      toast.success("Approved successfully!");
+      toast.success("Approved successfully in Planning Center!");
     } catch (e) {
       console.error(e);
       toast.error(`Failed to approve: ${e.message}`);
     } finally {
       setApprovingId(null);
     }
-  }, []);
+  }, [user]);
 
   const searchCardholders = useCallback(async (requestId, query) => {
     if (query.length < 2) {
