@@ -183,10 +183,12 @@ Deno.serve(async (req) => {
             let eventStartsAt = null;
             let eventEndsAt = null;
 
+            await delay(150);
+
             try {
-                const eventResponse = await fetch(
+                const eventResponse = await fetchWithRetry(
                     `https://api.planningcenteronline.com/calendar/v2/events/${eventId}`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    { 'Authorization': `Bearer ${accessToken}` }
                 );
 
                 if (eventResponse.ok) {
@@ -197,11 +199,13 @@ Deno.serve(async (req) => {
                 console.error(`Error fetching event ${eventId}:`, err.message);
             }
 
+            await delay(150);
+
             // Fetch event instance for dates
             try {
-                const instancesResponse = await fetch(
+                const instancesResponse = await fetchWithRetry(
                     `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_instances?filter=future&per_page=1&order=starts_at`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    { 'Authorization': `Bearer ${accessToken}` }
                 );
 
                 if (instancesResponse.ok) {
@@ -215,12 +219,14 @@ Deno.serve(async (req) => {
                 console.error(`Error fetching event instance ${eventId}:`, err.message);
             }
 
+            await delay(150);
+
             // Fetch resource details
             let resourceName = 'Unknown Resource';
             try {
-                const resourceResponse = await fetch(
+                const resourceResponse = await fetchWithRetry(
                     `https://api.planningcenteronline.com/calendar/v2/resources/${resourceId}`,
-                    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+                    { 'Authorization': `Bearer ${accessToken}` }
                 );
 
                 if (resourceResponse.ok) {
