@@ -63,12 +63,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get event_id and resource_id from request body (needed for resource_bookings endpoint)
+    const { eventId, resourceId } = body;
+    console.log('📋 eventId:', eventId, 'resourceId:', resourceId);
+
+    if (!eventId || !resourceId) {
+      console.log('❌ Missing eventId or resourceId');
+      return Response.json(
+        { error: 'Missing eventId or resourceId' },
+        { status: 400 }
+      );
+    }
+
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
     console.log('📊 Mapped action to approval_status:', approvalStatus);
 
-    // Send PATCH request to PCO
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${resourceRequestId}`;
+    // Send PATCH request to PCO resource_bookings endpoint
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_bookings/${resourceRequestId}`;
     console.log('📤 Sending PATCH to PCO:', pcoUrl);
     
     const response = await fetch(pcoUrl, {
@@ -79,7 +91,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         data: {
-          type: 'EventResourceRequest',
+          type: 'ResourceBooking',
           id: resourceRequestId.toString(),
           attributes: {
             approval_status: approvalStatus
