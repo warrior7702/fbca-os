@@ -330,6 +330,13 @@ export default function MyApprovals() {
       setCodeSearches(prev => ({ ...prev, [requestId]: '' }));
       setCodeResults(prev => ({ ...prev, [requestId]: [] }));
       setSelectedCardholders(prev => ({ ...prev, [requestId]: null }));
+      
+      // Save to localStorage
+      setCodeSentRequests(prev => {
+        const updated = { ...prev, [requestId]: true };
+        localStorage.setItem('doorCodesSent', JSON.stringify(updated));
+        return updated;
+      });
     } catch (error) {
       console.error('Failed to send door code:', error);
       toast.error('Failed to send door code to Planning Center');
