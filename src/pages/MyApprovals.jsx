@@ -137,7 +137,8 @@ export default function MyApprovals() {
       resourceId: a.resource_id,
       resourceName: a.resource_name,
       quantity: a.quantity,
-      approvalGroupName: a.approval_group_name
+      approvalGroupName: a.approval_group_name,
+      answers: a.answers || []
     }));
     
     return {
