@@ -101,6 +101,7 @@ export default function MyApprovals() {
   const [codeSearching, setCodeSearching] = useState({});
   const [selectedCardholders, setSelectedCardholders] = useState({});
   const [sendingCode, setSendingCode] = useState(null);
+  const [codeSentRequests, setCodeSentRequests] = useState({});
 
   const pendingCount = useMemo(
     () => (groupedApprovals || []).reduce((sum, ev) => sum + (ev.items?.length || 0), 0),
