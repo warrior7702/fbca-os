@@ -146,18 +146,21 @@ export default function MyApprovals() {
     }
     
     // Transform from new format to expected format
-    const approvals = (response.data.pending_approvals || []).map(a => ({
-      resourceRequestId: a.request_id,
-      eventId: a.event_id,
-      eventName: a.event_name,
-      eventStartsAt: a.event_starts_at,
-      eventEndsAt: a.event_ends_at,
-      resourceId: a.resource_id,
-      resourceName: a.resource_name,
-      quantity: a.quantity,
-      approvalGroupName: a.approval_group_name,
-      answers: a.answers || []
-    }));
+    const approvals = (response.data.pending_approvals || []).map(a => {
+      console.log('📝 Transforming approval:', a.request_id, 'answers:', a.answers);
+      return {
+        resourceRequestId: a.request_id,
+        eventId: a.event_id,
+        eventName: a.event_name,
+        eventStartsAt: a.event_starts_at,
+        eventEndsAt: a.event_ends_at,
+        resourceId: a.resource_id,
+        resourceName: a.resource_name,
+        quantity: a.quantity,
+        approvalGroupName: a.approval_group_name,
+        answers: a.answers || []
+      };
+    });
     
     return {
       approvals,
