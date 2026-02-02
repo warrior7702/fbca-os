@@ -47,18 +47,56 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Notify assigned staff
-      if (ticket.assigned_to) {
-        await base44.asServiceRole.functions.invoke('createNotification', {
-          user_email: ticket.assigned_to,
-          type: 'ticket_comment',
-          title: `New comment on ${ticket.ticket_number}`,
-          message: `${ticket.requester_name}: ${userMessage.substring(0, 100)}`,
-          related_ticket_id: ticket.id,
-          related_ticket_number: ticket.ticket_number,
-          action_url: `/ticketdetail?id=${ticket.id}`,
-          send_email: true
-        });
+      // Notify assigned staff (in-app + optional Teams DM)
+      const assignees = [ticket.assigned_to, ticket.assigned_to_2]
+        .filter(Boolean)
+        .map((email) => String(email).toLowerCase())
+        .filter((email, idx, arr) => arr.indexOf(email) === idx);
+
+      if (assignees.length > 0) {
+        const preview = `${ticket.requester_name}: ${userMessage.substring(0, 100)}`;
+        const proactiveUrl = Deno.env.get('SPARKBOT_PROACTIVE_URL') || '';
+        const proactiveSecret = Deno.env.get('SPARKBOT_PROACTIVE_SECRET') || '';
+
+        for (const email of assignees) {
+          await base44.asServiceRole.functions.invoke('createNotification', {
+            user_email: email,
+            type: 'ticket_comment',
+            title: `New comment on ${ticket.ticket_number}`,
+            message: preview,
+            related_ticket_id: ticket.id,
+            related_ticket_number: ticket.ticket_number,
+            action_url: `/ticketdetail?id=${ticket.id}`,
+            send_email: true
+          });
+
+          if (proactiveUrl && proactiveSecret) {
+            try {
+              const users = await base44.asServiceRole.entities.User.filter({ email });
+              const user = users?.[0];
+              const refRaw = user?.teams_dm_conversation_reference || null;
+              if (!refRaw) continue;
+
+              const conversationReference =
+                typeof refRaw === 'string' ? JSON.parse(refRaw) : refRaw;
+
+              await fetch(proactiveUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${proactiveSecret}`
+                },
+                body: JSON.stringify({
+                  conversationReference,
+                  message: `💬 ${preview}`,
+                  title: `New comment on ${ticket.ticket_number}`
+                })
+              });
+            } catch (dmError) {
+              console.error(`Failed to send Teams DM to ${email}:`, dmError);
+            }
+          }
+        }
       }
       
       return Response.json({ 
