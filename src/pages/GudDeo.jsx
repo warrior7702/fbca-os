@@ -87,24 +87,24 @@ export default function GudDeo() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Hours */}
-          <Card>
+          <Card className="bg-white/90 border-0 shadow-md">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-600" />
+              <CardTitle className="flex items-center gap-2 text-[#6B4E3D]">
+                <Clock className="w-5 h-5 text-[#8B6F47]" />
                 Hours of Operation
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {hours.map((schedule) => (
-                <div key={schedule.day} className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
-                  <span className="font-medium text-slate-900">{schedule.day}</span>
+                <div key={schedule.day} className="flex items-center justify-between p-3 rounded-lg bg-[#D4BCB0]/20">
+                  <span className="font-medium text-[#6B4E3D]">{schedule.day}</span>
                   <div className="flex items-center gap-2">
                     {schedule.open && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                         Open
                       </Badge>
                     )}
-                    <span className={schedule.open ? "text-slate-900" : "text-slate-500"}>
+                    <span className={schedule.open ? "text-[#6B4E3D]" : "text-[#6B4E3D]/60"}>
                       {schedule.hours}
                     </span>
                   </div>
