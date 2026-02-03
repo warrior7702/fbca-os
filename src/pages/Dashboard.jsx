@@ -76,6 +76,7 @@ const systemApps = [
     name: "Gud Deo",
     path: "GudDeo",
     icon: Battery,
+    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png",
     color: "text-yellow-500",
     action: null
   },
