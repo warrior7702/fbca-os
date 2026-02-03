@@ -66,17 +66,17 @@ export default function GudDeo() {
         </Card>
 
         {/* Order Online Button */}
-        <Card className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg">
+        <Card className="bg-gradient-to-r from-[#C09F80] to-[#A6826B] text-white border-0 shadow-lg">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-bold mb-2">Order Online!</h3>
-                <p className="text-white/90">Pick up in the café or grab & go!</p>
+                <p className="text-white/95">Pick up in the café or grab & go!</p>
               </div>
               <Button
-                onClick={() => window.open("https://www.guddeocafe.com/#JTOMJHKPPJCR7XCYJD4BDOMI", "_blank")}
+                onClick={() => window.open("https://www.guddeocafe.com/s/order", "_blank")}
                 size="lg"
-                className="bg-white text-orange-600 hover:bg-orange-50 font-semibold px-8"
+                className="bg-white text-[#6B4E3D] hover:bg-gray-50 font-semibold px-8"
               >
                 <ExternalLink className="w-5 h-5 mr-2" />
                 Order Now
