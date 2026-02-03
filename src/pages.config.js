@@ -71,6 +71,7 @@ import DepartmentTest from './pages/DepartmentTest';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import Documents from './pages/Documents';
 import EmailTemplateEditor from './pages/EmailTemplateEditor';
+import EventHub from './pages/EventHub';
 import EventOpsDetail from './pages/EventOpsDetail';
 import FBCANexts from './pages/FBCANexts';
 import FloorPlanManager from './pages/FloorPlanManager';
@@ -148,6 +149,7 @@ export const PAGES = {
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
     "Documents": Documents,
     "EmailTemplateEditor": EmailTemplateEditor,
+    "EventHub": EventHub,
     "EventOpsDetail": EventOpsDetail,
     "FBCANexts": FBCANexts,
     "FloorPlanManager": FloorPlanManager,
