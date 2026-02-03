@@ -120,10 +120,10 @@ const systemApps = [
   },
   {
     name: "Gud Deo",
-    path: null,
+    path: "GudDeo",
     icon: Battery,
     color: "text-yellow-500",
-    action: () => toast.info('Gud Deo - Coming Soon!')
+    action: null
   },
   {
     name: "Printshot",
