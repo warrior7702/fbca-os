@@ -1,6 +1,4 @@
-iSparkles
-m
-port React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -79,19 +77,17 @@ const apps = [
     color: "text-violet-500"
   },
   {
-       {
-      name: "Event Hub",
-      path: "EventHub",
-      icon: Ticket,
-      color: "text-rose-500"
-    },
-    {
-      name: "Church Calendar",
-      path: "Calendar",
-      icon: CalendarIcon,
-      color: "text-blue-600"
-    },
-
+    name: "Event Hub",
+    path: "EventHub",
+    icon: Ticket,
+    color: "text-rose-500"
+  },
+  {
+    name: "Church Calendar",
+    path: "Calendar",
+    icon: CalendarIcon,
+    color: "text-blue-600"
+  },
   {
     name: "SharePoint",
     path: "SharePoint",
