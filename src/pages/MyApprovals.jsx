@@ -241,14 +241,17 @@ export default function MyApprovals() {
 
     setApprovingId(resourceRequestId);
     try {
+      // Call the backend function with canonical parameter names expected by approveResourceRequest
       const resp = await base44.functions.invoke("approveResourceRequest", { 
-        resourceRequestId, 
-        eventId,
-        resourceId,
+        request_id: resourceRequestId, 
+        event_id: eventId,
+        resource_id: resourceId,
         action: "approve" 
       });
       
-      if (!resp?.data?.success) {
+      // New implementation returns an `ok` flag instead of `success`
+      const ok = resp?.data?.ok ?? resp?.data?.success;
+      if (!ok) {
         const errorMsg = resp?.data?.error || "Unknown approval error";
         const errorDetails = resp?.data?.details;
         console.error('❌ Approval failed:', errorMsg, errorDetails);
