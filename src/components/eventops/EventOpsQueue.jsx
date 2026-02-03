@@ -80,6 +80,9 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
 
   const getFilteredEvents = () => {
     if (showFilter === "all") return events;
+    if (showFilter === "booked") {
+      return events;
+    }
     if (showFilter === "room_setup") {
       return events.filter(e => e.needs_room_setup);
     }
