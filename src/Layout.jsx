@@ -434,13 +434,13 @@ export default function Layout({ children, currentPageName }) {
               <Link to={createPageUrl('GudDeo')}>
                 <motion.div
                   whileHover={{ scale: 1.1 }}
-                  className="w-10 h-10 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="Gud Deo"
                 >
                   <img 
                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/78b5d3cf5_image.png"
                     alt="Gud Deo"
-                    className="w-full h-full object-contain"
+                    className="w-5 h-5 object-contain"
                   />
                 </motion.div>
               </Link>
