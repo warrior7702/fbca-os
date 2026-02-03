@@ -53,28 +53,41 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     console.log('📦 Request body:', body);
-    const { resourceRequestId, action = 'approve' } = body;
-    console.log('📋 resourceRequestId:', resourceRequestId, 'action:', action);
 
-    // Validate required field
-    if (!resourceRequestId) {
-      console.log('❌ Missing resourceRequestId');
+    // Support both legacy and new parameter names
+    let resourceRequestId = undefined;
+    let eventId = undefined;
+    let resourceId = undefined;
+    let action = 'approve';
+
+    if (typeof body === 'object' && body !== null) {
+      resourceRequestId = String(body.resourceRequestId ?? body.request_id ?? '').trim();
+      eventId = String(body.eventId ?? body.event_id ?? '').trim();
+      resourceId = String(body.resourceId ?? body.resource_id ?? '').trim();
+      action = String(body.action ?? 'approve').trim().toLowerCase();
+    }
+
+    console.log('📋 Parsed resourceRequestId:', resourceRequestId, 'eventId:', eventId, 'resourceId:', resourceId, 'action:', action);
+
+    // Validate required fields
+    if (!resourceRequestId || !['approve','deny'].includes(action)) {
+      console.log('❌ Missing resourceRequestId or invalid action');
       return Response.json(
-        { error: 'Missing resourceRequestId' },
+        { error: 'resourceRequestId (or request_id) and action=approve|deny required' },
         { status: 400 }
       );
     }
 
-    // Get user's PCO token
+    // Fetch user record with pco tokens
     console.log('🔐 Fetching user record from Base44...');
     const userRecord = await base44.asServiceRole.entities.User.get(user.id);
     console.log('✅ User record fetched, has pco_access_token:', !!userRecord?.pco_access_token);
-    
+
     if (!userRecord?.pco_access_token) {
       console.log('❌ No PCO access token found');
       return Response.json(
         { error: 'Please reconnect Planning Center in Settings' },
-        { status: 403 }
+        { status: 401 }
       );
     }
 
@@ -94,7 +107,7 @@ Deno.serve(async (req) => {
     );
     const meData = await meResponse.json();
     console.log('📋 PCO /me response:', JSON.stringify(meData));
-    
+
     if (!meResponse.ok) {
       console.log('❌ Token verification failed');
       return Response.json(
@@ -106,26 +119,105 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get event_id and resource_id from request body (needed for resource_bookings endpoint)
-    const { eventId, resourceId } = body;
-    console.log('📋 eventId:', eventId, 'resourceId:', resourceId);
+    const pcoUserId = meData.data?.id;
 
+    // If eventId or resourceId missing, fetch details from PCO to obtain them
     if (!eventId || !resourceId) {
-      console.log('❌ Missing eventId or resourceId');
+      try {
+        console.log('📦 Missing eventId or resourceId, fetching request details from PCO...');
+        const detailsRes = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${resourceRequestId}?include=resource,event`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        const detailsData = await detailsRes.json();
+        eventId = eventId || detailsData.data?.relationships?.event?.data?.id;
+        resourceId = resourceId || detailsData.data?.relationships?.resource?.data?.id;
+        console.log('📝 Fetched eventId:', eventId, 'resourceId:', resourceId);
+      } catch (e) {
+        console.log('⚠️ Failed to fetch request details:', e);
+      }
+    }
+
+    // Validate again after attempt
+    if (!eventId || !resourceId) {
+      console.log('❌ Still missing eventId or resourceId');
       return Response.json(
-        { error: 'Missing eventId or resourceId' },
+        { error: 'eventId and resourceId are required to approve or deny this request' },
         { status: 400 }
       );
+    }
+
+    // Check if user has permission via approval groups
+    try {
+      console.log('📦 Checking approval groups and resource permissions...');
+      // Get all resource approval groups
+      const groupsRes = await fetch(
+        'https://api.planningcenteronline.com/calendar/v2/resource_approval_groups?per_page=100',
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      const groupsData = await groupsRes.json();
+      const myGroupIds = [];
+      const groupResourceMap = {};
+
+      for (const group of groupsData.data || []) {
+        // Fetch group members
+        const membersRes = await fetch(
+          `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/people?per_page=100`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (membersRes.ok) {
+          const membersData = await membersRes.json();
+          const isMember = (membersData.data || []).some((person) => person.id === pcoUserId);
+          if (isMember) {
+            myGroupIds.push(group.id);
+            console.log('✅ Member of group:', group.attributes?.name, '(', group.id, ')');
+            // Fetch resources for this group
+            const resourcesRes = await fetch(
+              `https://api.planningcenteronline.com/calendar/v2/resource_approval_groups/${group.id}/resources?per_page=100`,
+              { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            if (resourcesRes.ok) {
+              const resourcesData = await resourcesRes.json();
+              groupResourceMap[group.id] = (resourcesData.data || []).map((r) => r.id);
+              console.log('  ↳ Manages', groupResourceMap[group.id].length, 'resources');
+            }
+          }
+        }
+      }
+
+      // Determine if any of the user's groups manage this resource
+      let hasPermission = false;
+      for (const groupId of myGroupIds) {
+        const resources = groupResourceMap[groupId] || [];
+        if (resources.includes(resourceId)) {
+          hasPermission = true;
+          console.log('✅ Group', groupId, 'manages this resource');
+          break;
+        }
+      }
+
+      if (!hasPermission) {
+        console.log('❌ User does not have permission to approve this resource');
+        return Response.json(
+          {
+            error: 'You do not have permission to approve this request. Verify you belong to the correct approval group.',
+            status: 403
+          },
+          { status: 403 }
+        );
+      }
+    } catch (e) {
+      console.log('⚠️ Error while checking approval groups:', e);
     }
 
     // Map action to PCO approval_status
     const approvalStatus = action === 'deny' ? 'R' : 'A';
     console.log('📊 Mapped action to approval_status:', approvalStatus);
 
-    // Send PATCH request to PCO event_resource_requests endpoint
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests/${resourceRequestId}`;
+    // Construct PATCH URL (use the non-nested endpoint for event resource requests)
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests/${resourceRequestId}`;
     console.log('📤 Sending PATCH to PCO:', pcoUrl);
-    
+
     const response = await fetch(pcoUrl, {
       method: 'PATCH',
       headers: {
@@ -148,8 +240,6 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const errorBody = await response.text();
       console.log('❌ PCO error response:', errorBody);
-      
-      // Parse PCO error for better messaging
       let errorDetail = errorBody;
       try {
         const errorJson = JSON.parse(errorBody);
@@ -157,19 +247,10 @@ Deno.serve(async (req) => {
           errorDetail = errorJson.errors[0].detail;
         }
       } catch {}
-      
-      const userMessage = response.status === 403 
+      const userMessage = response.status === 403
         ? 'You do not have permission to approve this request in Planning Center. Verify you are in the correct approval group.'
         : `PCO API error: ${response.status}`;
-      
-      return Response.json(
-        {
-          error: userMessage,
-          detail: errorDetail,
-          status: response.status
-        },
-        { status: response.status }
-      );
+      return Response.json({ error: userMessage, detail: errorDetail, status: response.status }, { status: response.status });
     }
 
     console.log('✅ Success!');
