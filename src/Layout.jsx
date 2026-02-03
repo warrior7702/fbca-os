@@ -25,8 +25,7 @@ import {
   Menu,
   X,
   Printer,
-  Church,
-  Coffee
+  Church
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -78,6 +77,12 @@ const apps = [
     color: "text-violet-500"
   },
   {
+    name: "Event Hub",
+    path: "EventHub",
+    icon: Ticket,
+    color: "text-rose-500"
+  },
+  {
     name: "Church Calendar",
     path: "Calendar",
     icon: CalendarIcon,
@@ -123,7 +128,6 @@ const systemApps = [
     name: "Gud Deo",
     path: "GudDeo",
     icon: Battery,
-    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png",
     color: "text-yellow-500",
     action: null
   },
@@ -432,15 +436,14 @@ export default function Layout({ children, currentPageName }) {
                   <Play className="w-4 h-4 text-white/80" />
                 </motion.div>
               </Link>
-              <Link to={createPageUrl('GudDeo')}>
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Gud Deo"
-                >
-                  <Coffee className="w-4 h-4 text-white/80" />
-                </motion.div>
-              </Link>
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => toast.info('Gud Deo - Coming Soon!')}
+                title="Gud Deo"
+              >
+                <Battery className="w-4 h-4 text-white/80" />
+              </motion.div>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
@@ -459,7 +462,7 @@ export default function Layout({ children, currentPageName }) {
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer group"
+                className="relative w-8 h-8 flex items center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer group"
               >
                 <Sparkles className={`w-4 h-4 ${hasConnectionAlert ? 'text-yellow-300' : 'text-yellow-600'}`} />
                 {hasConnectionAlert && (
