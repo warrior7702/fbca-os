@@ -436,7 +436,7 @@ export default function Dashboard() {
                   >
                     <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
                       {app.customIcon ? (
-                        <img src={app.customIcon} alt={app.name} className="w-6 h-6" />
+                        <img src={app.customIcon} alt={app.name} className="w-6 h-6 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
                       ) : (
                         <app.icon className="w-5 h-5 text-white" />
                       )}
