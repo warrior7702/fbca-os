@@ -49,14 +49,14 @@ export default function GudDeo() {
         </motion.div>
 
         {/* Mission Statement */}
-        <Card className="border-2 border-orange-200 bg-orange-50">
+        <Card className="border-0 bg-white/90 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              <Heart className="w-8 h-8 text-orange-600 flex-shrink-0 mt-1" />
+              <Heart className="w-8 h-8 text-[#8B6F47] flex-shrink-0 mt-1" />
               <div>
-                <h3 className="font-semibold text-lg text-slate-900 mb-2">Our Mission</h3>
-                <p className="text-slate-700">
-                  Bring hope, open doors, and turn dreams into realities that change a life and a world. 
+                <h3 className="font-semibold text-xl text-[#6B4E3D] mb-3">Sierra Leone Orphan Sponsorship</h3>
+                <p className="text-[#6B4E3D] leading-relaxed">
+                  Bring hope, open doors, and turn dreams into realities that change a life and a world, one child at a time, one cup at a time. 
                   Every premium beverage and food item purchased provides essential support for an orphan in Sierra Leone. 
                   It costs just <strong>$1.23 a day</strong> to provide food, clothing, hygiene products, medical care, education, and a Bible for each child.
                 </p>
