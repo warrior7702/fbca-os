@@ -77,6 +77,12 @@ const apps = [
     color: "text-violet-500"
   },
   {
+    name: "Event Hub",
+    path: "EventHub",
+    icon: Ticket,
+    color: "text-rose-500"
+  },
+  {
     name: "Church Calendar",
     path: "Calendar",
     icon: CalendarIcon,
