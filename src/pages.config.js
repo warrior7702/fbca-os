@@ -75,6 +75,7 @@ import EventOpsDetail from './pages/EventOpsDetail';
 import FBCANexts from './pages/FBCANexts';
 import FloorPlanManager from './pages/FloorPlanManager';
 import FoodService from './pages/FoodService';
+import GudDeo from './pages/GudDeo';
 import Home from './pages/Home';
 import ImportCardholders from './pages/ImportCardholders';
 import ImportClickUpTickets from './pages/ImportClickUpTickets';
@@ -119,7 +120,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import GudDeo from './pages/GudDeo';
 import __Layout from './Layout.jsx';
 
 
@@ -152,6 +152,7 @@ export const PAGES = {
     "FBCANexts": FBCANexts,
     "FloorPlanManager": FloorPlanManager,
     "FoodService": FoodService,
+    "GudDeo": GudDeo,
     "Home": Home,
     "ImportCardholders": ImportCardholders,
     "ImportClickUpTickets": ImportClickUpTickets,
@@ -196,7 +197,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "GudDeo": GudDeo,
 }
 
 export const pagesConfig = {
