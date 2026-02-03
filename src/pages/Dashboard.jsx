@@ -76,7 +76,7 @@ const systemApps = [
     name: "Gud Deo",
     path: "GudDeo",
     icon: Battery,
-    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png",
+    customIcon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/78b5d3cf5_image.png",
     color: "text-yellow-500",
     action: null
   },
@@ -436,7 +436,7 @@ export default function Dashboard() {
                   >
                     <div className={`w-10 h-10 bg-gradient-to-br ${app.color.replace('text-', 'from-')} to-slate-300 rounded-lg flex items-center justify-center`}>
                       {app.customIcon ? (
-                        <img src={app.customIcon} alt={app.name} className="w-5 h-5 object-contain" style={{ filter: 'invert(1) brightness(1.2) grayscale(100%)' }} />
+                        <img src={app.customIcon} alt={app.name} className="w-6 h-6 object-contain" />
                       ) : (
                         <app.icon className="w-5 h-5 text-white" />
                       )}

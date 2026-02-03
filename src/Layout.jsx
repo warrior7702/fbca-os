@@ -438,10 +438,9 @@ export default function Layout({ children, currentPageName }) {
                   title="Gud Deo"
                 >
                   <img 
-                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png"
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/78b5d3cf5_image.png"
                     alt="Gud Deo"
-                    className="w-4 h-4 object-contain"
-                    style={{ filter: 'invert(1) brightness(1.2) grayscale(100%)' }}
+                    className="w-5 h-5 object-contain"
                   />
                 </motion.div>
               </Link>
