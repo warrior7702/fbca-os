@@ -210,29 +210,21 @@ Deno.serve(async (req) => {
       console.log('⚠️ Error while checking approval groups:', e);
     }
 
-    // Try PATCH with approval_status on nested endpoint under event
-    const approvalStatus = action === 'deny' ? 'R' : 'A';
-    console.log('📊 Setting approval_status to:', approvalStatus);
+    // Try POST to nested action endpoint under event
+    const actionPath = action === 'deny' ? 'deny' : 'approve';
+    console.log('📊 Using action:', actionPath);
 
-    // Use nested endpoint: /events/{eventId}/event_resource_requests/{id}
-    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests/${resourceRequestId}`;
-    console.log('📤 Sending PATCH to PCO (nested under event):', pcoUrl);
+    // Try: /events/{eventId}/event_resource_requests/{id}/approve
+    const pcoUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests/${resourceRequestId}/${actionPath}`;
+    console.log('📤 Sending POST to PCO (nested action endpoint):', pcoUrl);
 
     const response = await fetch(pcoUrl, {
-      method: 'PATCH',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        data: {
-          type: 'EventResourceRequest',
-          id: resourceRequestId.toString(),
-          attributes: {
-            approval_status: approvalStatus
-          }
-        }
-      })
+      body: JSON.stringify({})
     });
 
     console.log('📬 PCO response status:', response.status);
