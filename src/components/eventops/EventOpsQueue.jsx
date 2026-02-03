@@ -15,6 +15,7 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
   const [showFilter, setShowFilter] = useState("all");
   const [dayRangeFilter, setDayRangeFilter] = useState("next_14_days");
   const [rooms, setRooms] = useState([]);
+  const [eventsWithSetup, setEventsWithSetup] = useState(new Set());
 
   useEffect(() => {
     loadEvents();
