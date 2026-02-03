@@ -147,16 +147,16 @@ export default function GudDeo() {
         </div>
 
         {/* Menu Preview */}
-        <Card>
+        <Card className="bg-white/90 border-0 shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between text-[#6B4E3D]">
               <span className="flex items-center gap-2">
-                <Utensils className="w-5 h-5 text-amber-600" />
+                <Utensils className="w-5 h-5 text-[#8B6F47]" />
                 Menu Highlights
               </span>
               <Button
-                onClick={() => window.open("https://www.fbca.org/gud-deo-cafe/", "_blank")}
-                variant="outline"
+                onClick={() => window.open("https://www.guddeocafe.com/s/order", "_blank")}
+                className="bg-[#8B6F47] hover:bg-[#6B4E3D] text-white"
                 size="sm"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -167,15 +167,15 @@ export default function GudDeo() {
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
               {menuItems.map((section) => (
-                <div key={section.category} className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                <div key={section.category} className="p-4 rounded-lg bg-white border-2 border-[#D4BCB0]">
                   <div className="flex items-center gap-2 mb-3">
-                    <section.icon className="w-5 h-5 text-amber-600" />
-                    <h4 className="font-semibold text-slate-900">{section.category}</h4>
+                    <section.icon className="w-5 h-5 text-[#8B6F47]" />
+                    <h4 className="font-semibold text-[#6B4E3D]">{section.category}</h4>
                   </div>
                   <ul className="space-y-2">
                     {section.items.map((item) => (
-                      <li key={item} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="text-amber-500 mt-1">•</span>
+                      <li key={item} className="text-sm text-[#6B4E3D]/80 flex items-start gap-2">
+                        <span className="text-[#8B6F47] mt-1">•</span>
                         <span>{item}</span>
                       </li>
                     ))}
