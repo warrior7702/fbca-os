@@ -130,16 +130,16 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
               </SelectContent>
             </Select>
             <Select value={showFilter} onValueChange={setShowFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="room_setup">Room Setup</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="alerts">Alerts Only</SelectItem>
-              </SelectContent>
-            </Select>
+               <SelectTrigger className="w-40">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="all">All Booked</SelectItem>
+                 <SelectItem value="room_setup">With Setup</SelectItem>
+                 <SelectItem value="maintenance">Maintenance</SelectItem>
+                 <SelectItem value="alerts">Alerts Only</SelectItem>
+               </SelectContent>
+             </Select>
           </div>
         </div>
       </CardHeader>
