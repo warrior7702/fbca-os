@@ -66,6 +66,16 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
         });
       }
       
+      // Determine which events have Room Setup approvals from PCO
+      const setupEventIds = new Set();
+      const approvals = await base44.entities.PCO_EventApprovalRequest.list();
+      for (const approval of approvals) {
+        if (approval.approval_group === 'Room Setups') {
+          setupEventIds.add(approval.pco_event_id);
+        }
+      }
+      setEventsWithSetup(setupEventIds);
+      
       setEvents(filtered);
       
       // Load rooms for display
