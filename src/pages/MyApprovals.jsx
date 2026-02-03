@@ -258,12 +258,26 @@ export default function MyApprovals() {
         throw new Error(errorMsg);
       }
 
-      // Optimistic remove
+      // Optimistic remove from UI
       setGroupedApprovals(prev =>
         prev
           .map(ev => ({ ...ev, items: ev.items.filter(i => i.resourceRequestId !== resourceRequestId) }))
           .filter(ev => ev.items.length > 0)
       );
+      
+      // Delete from database
+      try {
+        const dbApprovals = await base44.entities.PendingApproval.filter({ 
+          user_email: user.email,
+          request_id: resourceRequestId 
+        });
+        for (const approval of dbApprovals) {
+          await base44.entities.PendingApproval.delete(approval.id);
+        }
+      } catch (e) {
+        console.log('Note: Could not delete approval from DB:', e);
+      }
+      
       toast.success("Approved successfully in Planning Center!");
     } catch (e) {
       console.error(e);
