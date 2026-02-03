@@ -440,7 +440,7 @@ export default function Layout({ children, currentPageName }) {
                   <img 
                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/78b5d3cf5_image.png"
                     alt="Gud Deo"
-                    className="w-5 h-5 object-contain"
+                    className="w-6 h-6 object-contain"
                   />
                 </motion.div>
               </Link>
