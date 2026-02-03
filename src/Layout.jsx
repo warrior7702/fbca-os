@@ -437,7 +437,11 @@ export default function Layout({ children, currentPageName }) {
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="Gud Deo"
                 >
-                  <Battery className="w-4 h-4 text-white/80" />
+                  <img 
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png"
+                    alt="Gud Deo"
+                    className="w-5 h-5 object-contain brightness-90"
+                  />
                 </motion.div>
               </Link>
               <motion.div
