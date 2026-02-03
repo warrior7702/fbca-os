@@ -23,21 +23,27 @@ export default function GudDeo() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 p-6">
+    <div className="min-h-screen bg-[#D4BCB0] p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
+        {/* Header with Logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
+          className="text-center space-y-6 py-4"
         >
-          <div className="flex items-center justify-center gap-3">
-            <div className="p-3 rounded-xl shadow-lg bg-gradient-to-br from-amber-500 to-orange-500">
-              <Coffee className="w-8 h-8 text-white" />
+          <div className="flex flex-col items-center gap-3">
+            <div className="text-6xl font-bold tracking-wider text-[#6B4E3D]" style={{ fontFamily: 'Georgia, serif' }}>
+              GUD DEO
             </div>
-            <h1 className="text-4xl font-bold text-slate-900">Gud Deo Café</h1>
+            <div className="flex flex-col items-center">
+              <Coffee className="w-10 h-10 text-[#8B6F47]" />
+              <div className="flex gap-2 mt-1">
+                <div className="w-20 h-1 bg-[#8B6F47] transform -rotate-12 origin-right"></div>
+                <div className="w-20 h-1 bg-[#8B6F47] transform rotate-12 origin-left"></div>
+              </div>
+            </div>
           </div>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          <p className="text-lg text-[#6B4E3D] max-w-2xl mx-auto font-medium">
             One cup at a time, one child at a time. Every purchase supports orphans in Sierra Leone.
           </p>
         </motion.div>
