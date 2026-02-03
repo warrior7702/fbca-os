@@ -440,7 +440,8 @@ export default function Layout({ children, currentPageName }) {
                   <img 
                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/07dd00e30_ChatGPTImageFeb3202612_05_14AM.png"
                     alt="Gud Deo"
-                    className="w-4 h-4 object-contain brightness-0 invert opacity-80"
+                    className="w-4 h-4 object-contain"
+                    style={{ filter: 'invert(1) brightness(1.2) grayscale(100%)' }}
                   />
                 </motion.div>
               </Link>
