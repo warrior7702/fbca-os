@@ -31,17 +31,12 @@ export default function GudDeo() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-6 py-4"
         >
-          <div className="flex flex-col items-center gap-3">
-            <div className="text-6xl font-bold tracking-wider text-[#6B4E3D]" style={{ fontFamily: 'Georgia, serif' }}>
-              GUD DEO
-            </div>
-            <div className="flex flex-col items-center">
-              <Coffee className="w-10 h-10 text-[#8B6F47]" />
-              <div className="flex gap-2 mt-1">
-                <div className="w-20 h-1 bg-[#8B6F47] transform -rotate-12 origin-right"></div>
-                <div className="w-20 h-1 bg-[#8B6F47] transform rotate-12 origin-left"></div>
-              </div>
-            </div>
+          <div className="flex flex-col items-center gap-4">
+            <img 
+              src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68fb9a0b2d7d369a37662cca/ec5827d15_GoodDayCoffee_SecondaryBrand.png"
+              alt="Gud Deo Logo"
+              className="w-48 h-48 object-contain"
+            />
           </div>
           <p className="text-lg text-[#6B4E3D] max-w-2xl mx-auto font-medium">
             One cup at a time, one child at a time. Every purchase supports orphans in Sierra Leone.
