@@ -114,31 +114,30 @@ export default function GudDeo() {
           </Card>
 
           {/* Location */}
-          <Card>
+          <Card className="bg-white/90 border-0 shadow-md">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-amber-600" />
+              <CardTitle className="flex items-center gap-2 text-[#6B4E3D]">
+                <MapPin className="w-5 h-5 text-[#8B6F47]" />
                 Location & Contact
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <p className="font-medium text-slate-900">Gud Deo Café</p>
-                <p className="text-slate-600">101 UTA Blvd</p>
-                <p className="text-slate-600">Arlington, Texas 76010</p>
+                <p className="font-medium text-[#6B4E3D]">Gud Deo Café</p>
+                <p className="text-[#6B4E3D]/80">101 UTA Blvd</p>
+                <p className="text-[#6B4E3D]/80">Arlington, Texas 76010</p>
               </div>
               <div className="space-y-2">
-                <p className="text-slate-600">
+                <p className="text-[#6B4E3D]/80">
                   <strong>Phone:</strong> (817) 277-6353
                 </p>
-                <p className="text-slate-600">
+                <p className="text-[#6B4E3D]/80">
                   <strong>Email:</strong> goodday@fbca.org
                 </p>
               </div>
               <Button
                 onClick={() => window.open("https://www.google.com/maps/dir/?api=1&destination=101+UTA+Blvd+Arlington+TX+76010", "_blank")}
-                variant="outline"
-                className="w-full"
+                className="w-full bg-[#8B6F47] hover:bg-[#6B4E3D] text-white"
               >
                 <MapPin className="w-4 h-4 mr-2" />
                 Get Directions
