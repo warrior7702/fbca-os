@@ -23,7 +23,7 @@ export default function GudDeo() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#D4BCB0] p-6">
+    <div className="min-h-screen bg-[#D4BCB0] p-6 pb-24">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header with Logo */}
         <motion.div
