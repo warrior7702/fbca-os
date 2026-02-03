@@ -68,28 +68,74 @@ export default function EventHub() {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">Event Hub</h1>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="queue">Ops Queue</TabsTrigger>
-          <TabsTrigger value="heatmap">Room Heat Map</TabsTrigger>
-          <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
-        </TabsList>
-        <TabsContent value="queue">
-          <EventOpsQueue
-            key={refreshKey}
-            onEventClick={handleEventClick}
-            roomFilter={roomFilter}
-            dateFilter={dateFilter}
-          />
-        </TabsContent>
-        <TabsContent value="heatmap">
-          <RoomHeatMap onCellClick={handleCellClick} />
-        </TabsContent>
-        <TabsContent value="timeline">
-          <RoomTimelineTab />
-        </TabsContent>
-      </Tabs>
+      <div>
+        <h1 className="text-2xl font-bold">Event Hub</h1>
+        <p className="text-gray-600">
+          Manage room setups, cleaning, and event operations across all departments.
+        </p>
+        {(roomFilter || dateFilter) && (
+          <div className="flex items-center gap-2 mt-2">
+            {roomFilter && (
+              <span className="flex items-center bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-sm">
+                Room: {roomFilter}
+                <button
+                  onClick={() => setRoomFilter(null)}
+                  className="ml-1 focus:outline-none"
+                  aria-label="Clear room filter"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {dateFilter && (
+              <span className="flex items-center bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-sm">
+                Date: {dateFilter}
+                <button
+                  onClick={() => setDateFilter(null)}
+                  className="ml-1 focus:outline-none"
+                  aria-label="Clear date filter"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {roomFilter && dateFilter && (
+              <button
+                onClick={() => {
+                  setRoomFilter(null);
+                  setDateFilter(null);
+                }}
+                className="text-sm text-blue-500 underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="bg-white rounded-md shadow-sm p-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList>
+            <TabsTrigger value="queue">Ops Queue</TabsTrigger>
+            <TabsTrigger value="heatmap">Room Heat Map</TabsTrigger>
+            <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
+          </TabsList>
+          <TabsContent value="queue">
+            <EventOpsQueue
+              key={refreshKey}
+              onEventClick={handleEventClick}
+              roomFilter={roomFilter}
+              dateFilter={dateFilter}
+            />
+          </TabsContent>
+          <TabsContent value="heatmap">
+            <RoomHeatMap onCellClick={handleCellClick} />
+          </TabsContent>
+          <TabsContent value="timeline">
+            <RoomTimelineTab />
+          </TabsContent>
+        </Tabs>
+      </div>
       <EventOpsDetailDrawer
         event={selectedEvent}
         isOpen={drawerOpen}
