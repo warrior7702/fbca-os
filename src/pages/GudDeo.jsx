@@ -187,18 +187,18 @@ export default function GudDeo() {
         </Card>
 
         {/* Support Info */}
-        <Card className="border-2 border-amber-300">
+        <Card className="border-0 bg-white/90 shadow-md">
           <CardContent className="p-6">
             <div className="text-center space-y-3">
-              <h3 className="text-xl font-semibold text-slate-900">Every Purchase Makes a Difference</h3>
-              <p className="text-slate-600">
+              <h3 className="text-xl font-semibold text-[#6B4E3D]">Every Purchase Makes a Difference</h3>
+              <p className="text-[#6B4E3D]/80">
                 Your support through Gud Deo Café directly impacts the lives of orphans in Sierra Leone, 
                 providing them with hope, care, and a brighter future.
               </p>
               <div className="pt-2">
                 <Button
                   onClick={() => window.open("https://www.fbca.org/gud-deo-cafe/", "_blank")}
-                  className="bg-amber-600 hover:bg-amber-700"
+                  className="bg-[#8B6F47] hover:bg-[#6B4E3D] text-white"
                 >
                   Learn More About Our Mission
                 </Button>
