@@ -569,28 +569,14 @@ export default function MyApprovals() {
                             </div>
                           )}
 
-                          <div className="flex gap-2 mt-3">
-                            <Button
-                              onClick={() => approve(item.resourceRequestId, eventGroup.eventId, item.resourceId)}
-                              disabled={approvingId === item.resourceRequestId}
-                              className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                              size="sm"
-                            >
-                              {approvingId === item.resourceRequestId ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                              )}
-                              Approve
-                            </Button>
-                            <Button
-                              onClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={() => window.open("https://calendar.planningcenteronline.com/approvals", "_blank")}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white"
+                            size="sm"
+                          >
+                            Go to PCO
+                            <ExternalLink className="w-4 h-4 ml-2" />
+                          </Button>
                         </div>
                       ))}
                     </CardContent>
