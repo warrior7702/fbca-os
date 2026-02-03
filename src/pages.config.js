@@ -1,4 +1,5 @@
-/**
+/Dashboard
+**
  * pages.config.js - Page routing configuration
  * 
  * This file is AUTO-GENERATED. Do not add imports or modify PAGES manually.
