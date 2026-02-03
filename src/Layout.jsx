@@ -430,14 +430,15 @@ export default function Layout({ children, currentPageName }) {
                   <Play className="w-4 h-4 text-white/80" />
                 </motion.div>
               </Link>
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
-                onClick={() => toast.info('Gud Deo - Coming Soon!')}
-                title="Gud Deo"
-              >
-                <Battery className="w-4 h-4 text-white/80" />
-              </motion.div>
+              <Link to={createPageUrl('GudDeo')}>
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Gud Deo"
+                >
+                  <Battery className="w-4 h-4 text-white/80" />
+                </motion.div>
+              </Link>
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors cursor-pointer"
