@@ -95,7 +95,7 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
       return events;
     }
     if (showFilter === "room_setup") {
-      return events.filter(e => e.needs_room_setup);
+      return events.filter(e => eventsWithSetup.has(e.pco_event_id));
     }
     if (showFilter === "maintenance") {
       return events.filter(e => e.needs_maintenance);
