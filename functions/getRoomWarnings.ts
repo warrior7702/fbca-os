@@ -200,16 +200,21 @@ Deno.serve(async (req) => {
       ? await getNextEventsBatch(base44, bookableRoomIds)
       : {};
 
+    // Cache all acknowledgments upfront
+    const allAcknowledgments = await base44.asServiceRole.entities.CleaningAcknowledgment.list();
+    const acksByRoom = Object.fromEntries(
+      rooms.map(r => [r.id, allAcknowledgments.filter(a => a.room_id === r.id)])
+    );
+
     // Compute warnings for all rooms with batching to avoid rate limits
     const warnings = [];
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 10;
     
     for (let i = 0; i < rooms.length; i += BATCH_SIZE) {
       const batch = rooms.slice(i, i + BATCH_SIZE);
       
-      const batchWarnings = await Promise.all(
-        batch.map(async (room) => {
-          const warning = await computeCleaningWarnings(base44, room, nextEventMap);
+      const batchWarnings = batch.map((room) => {
+        const warning = computeCleaningWarningsSync(room, nextEventMap, acksByRoom[room.id] || []);
           
           if (warning) {
             // Filter by temperature if specified
