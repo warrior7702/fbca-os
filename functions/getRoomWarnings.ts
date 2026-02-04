@@ -91,10 +91,12 @@ Deno.serve(async (req) => {
 
     // Get all rooms
     let rooms = await base44.asServiceRole.entities.Room.list();
+    console.log(`[DEBUG] Total rooms: ${rooms.length}`);
 
     // Filter by building if specified
     if (building) {
       rooms = rooms.filter(r => r.building_name === building || r.building === building);
+      console.log(`[DEBUG] Rooms in building "${building}": ${rooms.length}`);
     }
 
     // Batch fetch all events for all rooms
