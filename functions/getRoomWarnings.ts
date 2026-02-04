@@ -199,6 +199,11 @@ Deno.serve(async (req) => {
           } else if (temperature === 'HOT') {
             warningText = `Behind cleaning schedule (${room.cleaning_schedule})`;
           }
+          
+          // For non-bookable rooms, check for next event anyway (some rooms may have events)
+          if (!eventTime && nextEventMap[room.id]) {
+            eventTime = nextEventMap[room.id].start_time.toISOString();
+          }
         }
         
         if (!warningText) return null;
