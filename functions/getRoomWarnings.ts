@@ -179,27 +179,44 @@ Deno.serve(async (req) => {
       rooms = rooms.filter(r => r.building_name === building || r.building === building);
     }
 
-    // Compute warnings for all rooms
+    // Compute warnings for all rooms with batching to avoid rate limits
     const warnings = [];
-    for (const room of rooms) {
-      const warning = await computeCleaningWarnings(base44, room);
+    const BATCH_SIZE = 10;
+    
+    for (let i = 0; i < rooms.length; i += BATCH_SIZE) {
+      const batch = rooms.slice(i, i + BATCH_SIZE);
       
-      if (warning) {
-        // Filter by temperature if specified
-        if (temperatureFilter && warning.temperature !== temperatureFilter) {
-          continue;
-        }
-        
-        warnings.push({
-          room_id: room.id,
-          room_name: room.room_name,
-          room_number: room.room_number,
-          building: room.building_name || room.building,
-          floor: room.floor_name || room.floor,
-          warning_text: warning.text,
-          temperature: warning.temperature,
-          event_time: warning.event_time
-        });
+      const batchWarnings = await Promise.all(
+        batch.map(async (room) => {
+          const warning = await computeCleaningWarnings(base44, room);
+          
+          if (warning) {
+            // Filter by temperature if specified
+            if (temperatureFilter && warning.temperature !== temperatureFilter) {
+              return null;
+            }
+            
+            return {
+              room_id: room.id,
+              room_name: room.room_name,
+              room_number: room.room_number,
+              building: room.building_name || room.building,
+              floor: room.floor_name || room.floor,
+              warning_text: warning.text,
+              temperature: warning.temperature,
+              event_time: warning.event_time
+            };
+          }
+          
+          return null;
+        })
+      );
+      
+      warnings.push(...batchWarnings.filter(w => w !== null));
+      
+      // Small delay between batches to avoid rate limit
+      if (i + BATCH_SIZE < rooms.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
