@@ -11,6 +11,13 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
 
   if (!warning) return null;
 
+  // Ensure warning has required structure
+  const warningData = {
+    text: warning.text || warning.warning_text || 'Room needs cleaning',
+    temperature: warning.temperature || 'WARM',
+    event_time: warning.event_time
+  };
+
   const handleMarkClean = async () => {
     if (!confirm(`Mark ${room.room_name || room.room_number} as clean?\n\nThis will update last_cleaned_at and clear the warning immediately.`)) {
       return;
@@ -68,24 +75,24 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
 
   return (
     <>
-      <div className={`rounded-lg border-2 p-4 mb-4 ${getTemperatureColor(warning.temperature)}`}>
+      <div className={`rounded-lg border-2 p-4 mb-4 ${getTemperatureColor(warningData.temperature)}`}>
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 mt-0.5">
-            {getTemperatureIcon(warning.temperature)}
+            {getTemperatureIcon(warningData.temperature)}
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-semibold text-slate-900">Room Needs Cleaning</h4>
               <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                warning.temperature === 'HOT' ? 'bg-red-100 text-red-800' :
-                warning.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
+                warningData.temperature === 'HOT' ? 'bg-red-100 text-red-800' :
+                warningData.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
                 'bg-green-100 text-green-800'
               }`}>
-                {getTemperatureText(warning.temperature)}
+                {getTemperatureText(warningData.temperature)}
               </span>
             </div>
-            <p className="text-sm text-slate-700">{warning.text}</p>
+            <p className="text-sm text-slate-700">{warningData.text}</p>
           </div>
 
           <div className="flex flex-col gap-2 flex-shrink-0">
@@ -119,7 +126,7 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
         open={showAckModal}
         onOpenChange={setShowAckModal}
         room={room}
-        warning={warning}
+        warning={warningData}
         onAcknowledged={onRefresh}
       />
     </>
