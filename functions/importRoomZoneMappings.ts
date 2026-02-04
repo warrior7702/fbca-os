@@ -19,54 +19,51 @@ Deno.serve(async (req) => {
     const notFound = [];
     const errors = [];
 
-    // Process in batches to avoid rate limits
-    const BATCH_SIZE = 10;
-    const DELAY_MS = 1000; // 1 second delay between batches
+    // Process sequentially with delays to avoid rate limits
+    const DELAY_MS = 100; // 100ms delay between each room
 
-    for (let i = 0; i < mappings.length; i += BATCH_SIZE) {
-      const batch = mappings.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < mappings.length; i++) {
+      const mapping = mappings[i];
       
-      await Promise.all(batch.map(async (mapping) => {
-        try {
-          // Find room by akita_room_id
-          const rooms = await base44.asServiceRole.entities.Room.filter({
-            akita_room_id: mapping.Akita_Room_ID
-          });
+      try {
+        // Find room by akita_room_id
+        const rooms = await base44.asServiceRole.entities.Room.filter({
+          akita_room_id: mapping.Akita_Room_ID
+        });
 
-          if (rooms.length === 0) {
-            notFound.push({
-              akita_room_id: mapping.Akita_Room_ID,
-              room_number: mapping.Room_Number,
-              room_name: mapping.Room_Name
-            });
-            return;
-          }
-
-          const room = rooms[0];
-
-          // Update room with zone assignment
-          await base44.asServiceRole.entities.Room.update(room.id, {
-            zone_id: mapping.Zone_ID,
-            cleaning_schedule: mapping.Cleaning_Schedule
-          });
-
-          updated.push({
-            room_id: room.id,
-            room_number: mapping.Room_Number,
-            zone_id: mapping.Zone_ID,
-            schedule: mapping.Cleaning_Schedule
-          });
-
-        } catch (error) {
-          errors.push({
+        if (rooms.length === 0) {
+          notFound.push({
             akita_room_id: mapping.Akita_Room_ID,
-            error: error.message
+            room_number: mapping.Room_Number,
+            room_name: mapping.Room_Name
           });
+          continue;
         }
-      }));
 
-      // Delay between batches to avoid rate limits
-      if (i + BATCH_SIZE < mappings.length) {
+        const room = rooms[0];
+
+        // Update room with zone assignment
+        await base44.asServiceRole.entities.Room.update(room.id, {
+          zone_id: mapping.Zone_ID,
+          cleaning_schedule: mapping.Cleaning_Schedule
+        });
+
+        updated.push({
+          room_id: room.id,
+          room_number: mapping.Room_Number,
+          zone_id: mapping.Zone_ID,
+          schedule: mapping.Cleaning_Schedule
+        });
+
+      } catch (error) {
+        errors.push({
+          akita_room_id: mapping.Akita_Room_ID,
+          error: error.message
+        });
+      }
+
+      // Delay between each update to avoid rate limits
+      if (i < mappings.length - 1) {
         await new Promise(resolve => setTimeout(resolve, DELAY_MS));
       }
     }
