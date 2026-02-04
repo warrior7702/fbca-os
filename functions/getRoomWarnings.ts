@@ -120,58 +120,7 @@ async function getNextEventsBatch(base44, roomIds) {
   return roomEventMap;
 }
 
-// Compute cleaning warnings (without events - events fetched in batch)
-async function computeCleaningWarnings(base44, room, nextEventMap) {
-  const temperature = getRoomTemperature(room);
-  
-  if (temperature === 'COOL') return null;
-  
-  const latestAck = await base44.asServiceRole.entities.CleaningAcknowledgment.filter({
-    room_id: room.id,
-    auto_cleared: false
-  });
-  
-  const lastCleanedDate = room.last_cleaned_at ? new Date(room.last_cleaned_at) : new Date(0);
-  const activeAck = latestAck.find(ack => {
-    const ackDate = new Date(ack.acknowledged_at);
-    return ackDate > lastCleanedDate;
-  });
-  
-  if (activeAck) return null;
-  
-  let warningText = null;
-  let eventTime = null;
-  
-  if (room.is_bookable) {
-    const nextEvent = nextEventMap[room.id];
-    if (!nextEvent) return null;
-    
-    const hoursUntilEvent = (nextEvent.start_time - new Date()) / (1000 * 60 * 60);
-    
-    if (hoursUntilEvent <= 24 && temperature !== 'COOL') {
-      warningText = `Needs cleaned before ${nextEvent.name} on ${formatDate(nextEvent.start_time)}`;
-      eventTime = nextEvent.start_time.toISOString();
-    }
-  } else {
-    if (room.cleaning_schedule === 'not_cleaned') return null;
-    
-    if (!room.cleaning_schedule || room.cleaning_schedule === 'unknown') {
-      if (isBeforeServiceDay(new Date()) && temperature === 'HOT') {
-        warningText = "Needs cleaned before Wednesday night and Sunday morning services";
-      }
-    } else if (temperature === 'HOT') {
-      warningText = `Behind cleaning schedule (${room.cleaning_schedule})`;
-    }
-  }
-  
-  if (!warningText) return null;
-  
-  return {
-    text: warningText,
-    temperature: temperature,
-    event_time: eventTime
-  };
-}
+
 
 Deno.serve(async (req) => {
   try {
