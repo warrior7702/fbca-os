@@ -4,6 +4,7 @@ import EventOpsQueue from "@/components/eventops/EventOpsQueue";
 import RoomHeatMap from "@/components/eventops/RoomHeatMap";
 import RoomTimelineTab from "@/components/eventops/RoomTimelineTab";
 import EventOpsDetailDrawer from "@/components/eventops/EventOpsDetailDrawer";
+import CleaningDashboard from "@/components/cleaning/CleaningDashboard";
 
 /**
  * Event Hub module page.
