@@ -66,8 +66,7 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
   const getTemperatureColor = (temp) => {
     switch(temp) {
       case 'ALERT': return 'bg-red-50 border-red-200';
-      case 'WARM': return 'bg-orange-50 border-orange-200';
-      case 'COOL': return 'bg-green-50 border-green-200';
+      case 'NOTICE': return 'bg-yellow-50 border-yellow-200';
       default: return 'bg-slate-50 border-slate-200';
     }
   };
@@ -75,17 +74,15 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
   const getTemperatureIcon = (temp) => {
     switch(temp) {
       case 'ALERT': return <Flame className="w-5 h-5 text-red-500" />;
-      case 'WARM': return <ThermometerSun className="w-5 h-5 text-orange-500" />;
-      case 'COOL': return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'NOTICE': return <ThermometerSun className="w-5 h-5 text-yellow-500" />;
       default: return null;
     }
   };
 
   const getTemperatureText = (temp) => {
     switch(temp) {
-      case 'ALERT': return 'ALERT';
-      case 'WARM': return 'SOON';
-      case 'COOL': return 'ON SCHEDULE';
+      case 'ALERT': return 'URGENT';
+      case 'NOTICE': return 'UPCOMING';
       default: return '';
     }
   };
