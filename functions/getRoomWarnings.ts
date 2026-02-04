@@ -1,7 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-
-
 // Determine alert level based on time until event
 function getAlertLevel(hoursUntilEvent) {
   if (hoursUntilEvent <= 6) return 'ALERT';
@@ -9,66 +7,40 @@ function getAlertLevel(hoursUntilEvent) {
   return null;
 }
 
-// Format date helper
-function formatDate(date) {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
-// Add hours to date
-function addHours(date, hours) {
-  const d = new Date(date);
-  d.setHours(d.getHours() + hours);
-  return d;
-}
-
-// Get next event for bookable rooms
-async function getNextEventsBatch(base44, roomIds) {
-  const now = new Date();
+// Get all PCO bookable rooms with their upcoming events
+async function getPCOEventsByRoom(base44) {
   const roomEventMap = {};
-  
-  // Initialize all rooms to null
-  roomIds.forEach(id => {
-    roomEventMap[id] = null;
-  });
-  
-  if (roomIds.length === 0) return roomEventMap;
+  const now = new Date();
   
   try {
-    // Fetch upcoming event rooms in batches
-    const eventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list('-start_time', 500);
-    console.log(`[DEBUG] Fetched ${eventRooms.length} event rooms total`);
+    // Fetch all PCO resource requests (they contain room + event info)
+    const requests = await base44.asServiceRole.entities.PCO_Request.list('-created_at', 500);
+    console.log(`[DEBUG] Fetched ${requests.length} PCO requests`);
     
-    // Filter for upcoming events in next 24 hours
-    const upcomingEventRooms = eventRooms.filter(er => {
-      if (!er.start_time || !roomIds.includes(er.room_id)) return false;
-      const startTime = new Date(er.start_time);
+    // Group by room_id and get first upcoming event per room
+    requests.forEach(req => {
+      if (!req.room_id || !req.event_starts_at) return;
+      
+      const startTime = new Date(req.event_starts_at);
       const hoursAhead = (startTime - now) / (1000 * 60 * 60);
-      return hoursAhead >= 0 && hoursAhead <= 24;
-    });
-    
-    console.log(`[DEBUG] Found ${upcomingEventRooms.length} rooms with events in next 24 hours`);
-    
-    // Get first upcoming event for each room
-    const processed = new Set();
-    upcomingEventRooms.forEach(er => {
-      if (!processed.has(er.room_id) && er.event_name && er.start_time) {
-        roomEventMap[er.room_id] = {
-          name: er.event_name,
-          start_time: new Date(er.start_time)
+      
+      // Only consider events in next 24 hours
+      if (hoursAhead < 0 || hoursAhead > 24) return;
+      
+      // Keep first event for each room
+      if (!roomEventMap[req.room_id] || startTime < new Date(roomEventMap[req.room_id].start_time)) {
+        roomEventMap[req.room_id] = {
+          name: req.event_name || 'Event',
+          start_time: startTime.toISOString(),
+          pco_room_id: req.room_id
         };
-        processed.add(er.room_id);
       }
     });
     
+    console.log(`[DEBUG] Found ${Object.keys(roomEventMap).length} rooms with events in next 24 hours`);
+    
   } catch (e) {
-    console.error('Failed to fetch events:', e.message);
+    console.error('Failed to fetch events from PCO:', e.message);
   }
   
   return roomEventMap;
