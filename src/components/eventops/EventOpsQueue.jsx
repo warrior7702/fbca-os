@@ -15,7 +15,6 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
   const [showFilter, setShowFilter] = useState("all");
   const [dayRangeFilter, setDayRangeFilter] = useState("next_14_days");
   const [rooms, setRooms] = useState([]);
-  const [eventsWithSetup, setEventsWithSetup] = useState(new Set());
 
   useEffect(() => {
     loadEvents();
@@ -66,16 +65,6 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
         });
       }
       
-      // Determine which events have Room Setup approvals from PCO
-      const setupEventIds = new Set();
-      const approvals = await base44.entities.PCO_EventApprovalRequest.list();
-      for (const approval of approvals) {
-        if (approval.approval_group === 'Room Setups') {
-          setupEventIds.add(approval.pco_event_id);
-        }
-      }
-      setEventsWithSetup(setupEventIds);
-      
       setEvents(filtered);
       
       // Load rooms for display
@@ -91,11 +80,8 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
 
   const getFilteredEvents = () => {
     if (showFilter === "all") return events;
-    if (showFilter === "booked") {
-      return events;
-    }
     if (showFilter === "room_setup") {
-      return events.filter(e => eventsWithSetup.has(e.pco_event_id));
+      return events.filter(e => e.needs_room_setup);
     }
     if (showFilter === "maintenance") {
       return events.filter(e => e.needs_maintenance);
@@ -141,16 +127,16 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
               </SelectContent>
             </Select>
             <Select value={showFilter} onValueChange={setShowFilter}>
-               <SelectTrigger className="w-40">
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="all">All Booked</SelectItem>
-                 <SelectItem value="room_setup">With Setup</SelectItem>
-                 <SelectItem value="maintenance">Maintenance</SelectItem>
-                 <SelectItem value="alerts">Alerts Only</SelectItem>
-               </SelectContent>
-             </Select>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="room_setup">Room Setup</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="alerts">Alerts Only</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
