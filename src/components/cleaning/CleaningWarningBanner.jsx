@@ -114,15 +114,9 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-700">{warningData.text}</p>
-              {warningData.event_time && (
+              {warningData.event_name && warningData.event_time && (
                 <p className="text-xs text-slate-500 mt-1">
-                  Next event: {new Date(warningData.event_time).toLocaleString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: '2-digit',
-                    meridiem: 'short'
-                  })}
+                  {warningData.event_name} {getCountdown(warningData.event_time)}
                 </p>
               )}
             </div>
