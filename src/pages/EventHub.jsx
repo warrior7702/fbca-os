@@ -136,6 +136,9 @@ export default function EventHub() {
           <TabsContent value="timeline">
             <RoomTimelineTab />
           </TabsContent>
+          <TabsContent value="cleaning">
+            <CleaningDashboard />
+          </TabsContent>
         </Tabs>
       </div>
       <EventOpsDetailDrawer
