@@ -87,6 +87,31 @@ export default function CleaningZoneImport() {
     }
   };
 
+  const handleAutoAssign = async () => {
+    setLoading(true);
+    try {
+      const { data } = await base44.functions.invoke('autoAssignCleaningSchedules', {});
+      
+      toast.success(`Auto-assigned ${data.total_processed} rooms`);
+      
+      // Show breakdown
+      if (data.assignments) {
+        const breakdown = Object.entries(data.assignments)
+          .map(([schedule, count]) => `${schedule}: ${count}`)
+          .join(', ');
+        toast.info(breakdown);
+      }
+
+      // Refresh diagnostics
+      runDiagnostic();
+    } catch (error) {
+      console.error('Auto-assign error:', error);
+      toast.error('Failed to auto-assign: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
