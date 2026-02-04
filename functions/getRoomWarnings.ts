@@ -1,20 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Helper: Get last Monday from a given date
-function getLastMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
 
-// Helper: Check if date is before a service day (Tues or Sat)
-function isBeforeServiceDay(date) {
-  const day = date.getDay();
-  return day === 2 || day === 6;
-}
 
 // Determine alert level based on time until event
 function getAlertLevel(hoursUntilEvent) {
