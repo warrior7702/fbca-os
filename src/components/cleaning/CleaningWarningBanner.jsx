@@ -15,7 +15,24 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
   const warningData = {
     text: warning.text || warning.warning_text || 'Room needs cleaning',
     temperature: warning.temperature || 'WARM',
-    event_time: warning.event_time
+    event_time: warning.event_time,
+    event_name: warning.event_name
+  };
+
+  // Calculate countdown
+  const getCountdown = (eventTime) => {
+    if (!eventTime) return null;
+    const now = new Date();
+    const eventDate = new Date(eventTime);
+    const ms = eventDate - now;
+    if (ms < 0) return 'Soon';
+    
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `in ${days} day${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `in ${hours} hour${hours > 1 ? 's' : ''}`;
+    return 'Soon';
   };
 
   const handleMarkClean = async () => {
