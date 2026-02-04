@@ -75,48 +75,52 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
 
   return (
     <>
-      <div className={`rounded-lg border-2 p-4 mb-4 ${getTemperatureColor(warningData.temperature)}`}>
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 mt-0.5">
-            {getTemperatureIcon(warningData.temperature)}
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-semibold text-slate-900">Room Needs Cleaning</h4>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                warningData.temperature === 'HOT' ? 'bg-red-100 text-red-800' :
-                warningData.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
-                'bg-green-100 text-green-800'
-              }`}>
-                {getTemperatureText(warningData.temperature)}
-              </span>
+      <div className={`rounded-lg border-2 p-3 sm:p-4 mb-4 ${getTemperatureColor(warningData.temperature)}`}>
+        <div className="flex flex-col gap-3">
+          {/* Header */}
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              {getTemperatureIcon(warningData.temperature)}
             </div>
-            <p className="text-sm text-slate-700">{warningData.text}</p>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h4 className="font-semibold text-sm sm:text-base text-slate-900">Room Needs Cleaning</h4>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                  warningData.temperature === 'HOT' ? 'bg-red-100 text-red-800' :
+                  warningData.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {getTemperatureText(warningData.temperature)}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-700">{warningData.text}</p>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2 flex-shrink-0">
+          {/* Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200/50">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setShowAckModal(true)}
-              className="whitespace-nowrap"
+              className="flex-1 sm:flex-none text-xs sm:text-sm"
             >
-              <Calendar className="w-4 h-4 mr-1" />
-              Set Cleaning Plan
+              <Calendar className="w-3 h-3 mr-1" />
+              Set Plan
             </Button>
             <Button
               size="sm"
               onClick={handleMarkClean}
               disabled={markingClean}
-              className="bg-green-600 hover:bg-green-700 whitespace-nowrap"
+              className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
             >
               {markingClean ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
               ) : (
-                <CheckCircle className="w-4 h-4 mr-1" />
+                <CheckCircle className="w-3 h-3 mr-1" />
               )}
-              Mark as Clean
+              Mark Clean
             </Button>
           </div>
         </div>

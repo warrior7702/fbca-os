@@ -153,42 +153,42 @@ export default function CleaningDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-red-700">🔥 URGENT</p>
-                  <p className="text-3xl font-bold text-red-900 mt-1">{hotRooms.length}</p>
-                  <p className="text-xs text-red-600 mt-1">Event &lt; 24 hrs or behind schedule</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-red-700">🔥 URGENT</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-1">{hotRooms.length}</p>
+                  <p className="text-xs text-red-600 mt-1 line-clamp-2">Event &lt; 24h</p>
                 </div>
-                <Flame className="w-12 h-12 text-red-400 opacity-50" />
+                <Flame className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 opacity-50 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">🟡 ATTENTION</p>
-                  <p className="text-3xl font-bold text-orange-900 mt-1">{warmRooms.length}</p>
-                  <p className="text-xs text-orange-600 mt-1">Needs attention soon</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-orange-700">🟡 ATTENTION</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-1">{warmRooms.length}</p>
+                  <p className="text-xs text-orange-600 mt-1 line-clamp-2">Soon</p>
                 </div>
-                <ThermometerSun className="w-12 h-12 text-orange-400 opacity-50" />
+                <ThermometerSun className="w-10 h-10 sm:w-12 sm:h-12 text-orange-400 opacity-50 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">✅ ON SCHEDULE</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">{coolRooms.length}</p>
-                  <p className="text-xs text-green-600 mt-1">No warnings</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-green-700">✅ SCHEDULE</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-1">{coolRooms.length}</p>
+                  <p className="text-xs text-green-600 mt-1 line-clamp-2">Ok</p>
                 </div>
-                <CheckCircle2 className="w-12 h-12 text-green-400 opacity-50" />
+                <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-400 opacity-50 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -255,50 +255,54 @@ export default function CleaningDashboard() {
           <div className="grid grid-cols-1 gap-4">
             {warnings.map((warning) => (
               <Card key={warning.room_id} className={`border-2 ${getTemperatureColor(warning.temperature)}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 mt-1">
-                      {getTemperatureIcon(warning.temperature)}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-slate-900">
-                          {warning.room_name || warning.room_number}
-                        </h3>
-                        <Badge variant="outline" className={`text-xs ${
-                          warning.temperature === 'HOT' ? 'bg-red-100 text-red-800 border-red-300' :
-                          warning.temperature === 'WARM' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                          'bg-green-100 text-green-800 border-green-300'
-                        }`}>
-                          {warning.temperature}
-                        </Badge>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col gap-3">
+                    {/* Header */}
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getTemperatureIcon(warning.temperature)}
                       </div>
 
-                      <p className="text-sm text-slate-700 mb-2">{warning.warning_text}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-sm sm:text-base text-slate-900">
+                            {warning.room_name || warning.room_number}
+                          </h3>
+                          <Badge variant="outline" className={`text-xs ${
+                            warning.temperature === 'HOT' ? 'bg-red-100 text-red-800 border-red-300' :
+                            warning.temperature === 'WARM' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                            'bg-green-100 text-green-800 border-green-300'
+                          }`}>
+                            {warning.temperature}
+                          </Badge>
+                        </div>
 
-                      <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                        {warning.building && (
-                          <span className="flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {warning.building}
-                          </span>
-                        )}
-                        {warning.floor && (
-                          <span>• {warning.floor}</span>
-                        )}
-                        {warning.room_number && (
-                          <span>• Room {warning.room_number}</span>
-                        )}
+                        <p className="text-xs sm:text-sm text-slate-700 mb-2">{warning.warning_text}</p>
+
+                        <div className="flex flex-wrap gap-1 sm:gap-2 text-xs text-slate-600">
+                          {warning.building && (
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-3 h-3" />
+                              {warning.building}
+                            </span>
+                          )}
+                          {warning.floor && (
+                            <span>• {warning.floor}</span>
+                          )}
+                          {warning.room_number && (
+                            <span>• Rm {warning.room_number}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 flex-shrink-0">
+                    {/* Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200/50">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleAcknowledge(warning)}
-                        className="whitespace-nowrap"
+                        className="flex-1 sm:flex-none text-xs sm:text-sm"
                       >
                         <Calendar className="w-3 h-3 mr-1" />
                         Set Plan
@@ -307,7 +311,7 @@ export default function CleaningDashboard() {
                         size="sm"
                         onClick={() => handleMarkClean(warning.room_id, warning.room_name || warning.room_number)}
                         disabled={markingClean === warning.room_id}
-                        className="bg-green-600 hover:bg-green-700 whitespace-nowrap"
+                        className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
                       >
                         {markingClean === warning.room_id ? (
                           <Loader2 className="w-3 h-3 mr-1 animate-spin" />
