@@ -117,15 +117,21 @@ Deno.serve(async (req) => {
       ? await getNextEventsBatch(base44, bookableRoomIds)
       : {};
 
-    // Cache all acknowledgments upfront
-    const allAcknowledgments = await base44.asServiceRole.entities.CleaningAcknowledgment.list();
+    // Cache all acknowledgments upfront - with retry
+    let allAcknowledgments = [];
+    try {
+      allAcknowledgments = await base44.asServiceRole.entities.CleaningAcknowledgment.list();
+    } catch (e) {
+      console.warn('Failed to fetch acknowledgments:', e.message);
+    }
+    
     const acksByRoom = Object.fromEntries(
       rooms.map(r => [r.id, allAcknowledgments.filter(a => a.room_id === r.id)])
     );
 
     // Compute warnings for all rooms with batching to avoid rate limits
     const warnings = [];
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 20;
     
     for (let i = 0; i < rooms.length; i += BATCH_SIZE) {
       const batch = rooms.slice(i, i + BATCH_SIZE);
