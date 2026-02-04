@@ -30,10 +30,16 @@ Deno.serve(async (req) => {
       zonesByCategory[cat] = (zonesByCategory[cat] || 0) + 1;
     }
 
+    // Count rooms with schedules
+    const roomsWithSchedule = allRoomsForCount.filter(r => r.cleaning_schedule && r.cleaning_schedule !== 'unknown').length;
+    const roomsWithoutSchedule = allRoomsForCount.length - roomsWithSchedule;
+
     return Response.json({
       success: true,
       total_rooms: allRoomsForCount.length,
       total_zones: zones.length,
+      rooms_with_schedule: roomsWithSchedule,
+      rooms_without_schedule: roomsWithoutSchedule,
       sample_rooms: allRooms.map(r => ({
         id: r.id,
         akita_room_id: r.akita_room_id,
