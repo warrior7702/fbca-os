@@ -143,20 +143,33 @@ export default function CleaningZoneImport() {
           </CardContent>
         </Card>
 
-        {/* Diagnostics Button */}
+        {/* Diagnostics & Auto-Assign */}
         <Card>
           <CardHeader>
-            <CardTitle>Database Diagnostics</CardTitle>
+            <CardTitle>Step 3: Auto-Assign Remaining Rooms</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button onClick={runDiagnostic} disabled={loading}>
-              {loading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4 mr-2" />
-              )}
-              Run Diagnostic Check
-            </Button>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Automatically assign cleaning schedules to unassigned rooms based on room name keywords
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={runDiagnostic} disabled={loading} variant="outline">
+                {loading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                )}
+                Run Diagnostic Check
+              </Button>
+              <Button onClick={handleAutoAssign} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                )}
+                Auto-Assign Unassigned Rooms
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
