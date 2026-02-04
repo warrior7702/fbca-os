@@ -388,6 +388,24 @@ export default function CleaningZoneImport() {
                 </div>
               </div>
 
+              {diagnostic.rooms_without_schedule_list && diagnostic.rooms_without_schedule_list.length > 0 && (
+                <details className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                  <summary className="cursor-pointer font-medium text-sm text-amber-900">
+                    Rooms Without Schedules ({diagnostic.rooms_without_schedule_list.length})
+                  </summary>
+                  <div className="mt-2 space-y-1 text-xs max-h-96 overflow-y-auto">
+                    {diagnostic.rooms_without_schedule_list.map((room, idx) => (
+                      <div key={idx} className="text-amber-800 border-b border-amber-200 pb-1">
+                        <strong>{room.room_number}</strong> - {room.room_name} 
+                        {room.building && ` | ${room.building}`}
+                        {room.floor && ` - ${room.floor}`}
+                        <div className="text-xs text-amber-600">Akita ID: {room.akita_room_id}</div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
               <details className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <summary className="cursor-pointer font-medium text-sm">
                   Sample Room Data (first 10)
