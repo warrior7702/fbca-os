@@ -161,13 +161,12 @@ export default function CleaningZoneImport() {
                 type="file"
                 accept=".csv"
                 onChange={handleMappingsImport}
-                disabled={loading || !zonesResult}
+                disabled={loading}
                 className="hidden"
               />
               <Button 
-                disabled={loading || !zonesResult} 
+                disabled={loading} 
                 className="cursor-pointer"
-                variant={!zonesResult ? "outline" : "default"}
                 asChild
               >
                 <span>
@@ -180,15 +179,6 @@ export default function CleaningZoneImport() {
                 </span>
               </Button>
             </label>
-
-            {!zonesResult && (
-              <Alert>
-                <AlertCircle className="w-4 h-4" />
-                <AlertDescription>
-                  Please import zones first (Step 1)
-                </AlertDescription>
-              </Alert>
-            )}
 
             {mappingsResult && (
               <div className="space-y-2">
