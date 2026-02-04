@@ -121,6 +121,7 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
+import CleaningZoneImport from './pages/CleaningZoneImport';
 import __Layout from './Layout.jsx';
 
 
@@ -199,6 +200,7 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
+    "CleaningZoneImport": CleaningZoneImport,
 }
 
 export const pagesConfig = {
