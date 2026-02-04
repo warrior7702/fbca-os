@@ -5,13 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Clock, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import CleaningWarningBanner from "@/components/cleaning/CleaningWarningBanner";
 
 export default function RoomTimelineTab() {
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [eventRooms, setEventRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [warning, setWarning] = useState(null);
 
   useEffect(() => {
     loadRooms();
