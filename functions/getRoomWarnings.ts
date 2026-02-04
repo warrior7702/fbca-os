@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
 
     // Compute warnings for all rooms with batching to avoid rate limits
     const warnings = [];
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 5;
     
     for (let i = 0; i < rooms.length; i += BATCH_SIZE) {
       const batch = rooms.slice(i, i + BATCH_SIZE);
@@ -214,9 +214,9 @@ Deno.serve(async (req) => {
       
       warnings.push(...batchWarnings.filter(w => w !== null));
       
-      // Small delay between batches to avoid rate limit
+      // Delay between batches to avoid rate limit
       if (i + BATCH_SIZE < rooms.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
     }
 
