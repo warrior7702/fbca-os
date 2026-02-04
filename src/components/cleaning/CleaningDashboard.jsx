@@ -84,8 +84,8 @@ export default function CleaningDashboard() {
     }
   };
 
-  const hotCount = warnings.filter(w => w.temperature === 'HOT').length;
-  const warmCount = warnings.filter(w => w.temperature === 'WARM').length;
+  const alertCount = warnings.filter(w => w.temperature === 'ALERT').length;
+  const noticeCount = warnings.filter(w => w.temperature === 'NOTICE').length;
 
   if (loading && warnings.length === 0) {
     return (
