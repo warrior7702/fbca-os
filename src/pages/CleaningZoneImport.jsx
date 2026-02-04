@@ -10,6 +10,7 @@ export default function CleaningZoneImport() {
   const [loading, setLoading] = useState(false);
   const [zonesResult, setZonesResult] = useState(null);
   const [mappingsResult, setMappingsResult] = useState(null);
+  const [diagnostic, setDiagnostic] = useState(null);
 
   const parseCSV = (text) => {
     const lines = text.trim().split('\n');
@@ -66,11 +67,23 @@ export default function CleaningZoneImport() {
       if (data.not_found_count > 0) {
         toast.warning(`${data.not_found_count} rooms not found in database`);
       }
+
+      // Run diagnostic after import
+      runDiagnostic();
     } catch (error) {
       console.error('Mappings import error:', error);
       toast.error('Failed to import mappings: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runDiagnostic = async () => {
+    try {
+      const { data } = await base44.functions.invoke('diagnosticRoomData', {});
+      setDiagnostic(data);
+    } catch (error) {
+      console.error('Diagnostic error:', error);
     }
   };
 
@@ -218,10 +231,95 @@ export default function CleaningZoneImport() {
                     </div>
                   </details>
                 )}
+
+                {mappingsResult.errors && mappingsResult.errors.length > 0 && (
+                  <details className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <summary className="cursor-pointer font-medium text-sm text-red-900">
+                      View Errors ({mappingsResult.errors.length})
+                    </summary>
+                    <div className="mt-2 space-y-1 text-xs">
+                      {mappingsResult.errors.slice(0, 10).map((err, idx) => (
+                        <div key={idx} className="text-red-800">
+                          {err.akita_room_id}: {err.error}
+                        </div>
+                      ))}
+                      {mappingsResult.errors.length > 10 && (
+                        <div className="text-red-600 italic">
+                          ... and {mappingsResult.errors.length - 10} more
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Diagnostics */}
+        {diagnostic && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Diagnostics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-slate-50 p-3 rounded">
+                  <div className="font-semibold text-slate-900">Total Rooms</div>
+                  <div className="text-2xl font-bold text-slate-700">
+                    {diagnostic.total_rooms}
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded">
+                  <div className="font-semibold text-slate-900">Total Zones</div>
+                  <div className="text-2xl font-bold text-slate-700">
+                    {diagnostic.total_zones}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Rooms by Cleaning Schedule</h4>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(diagnostic.rooms_by_schedule).map(([schedule, count]) => (
+                    <div key={schedule} className="flex justify-between">
+                      <span className="text-slate-600">{schedule}</span>
+                      <span className="font-semibold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Zones by Category</h4>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(diagnostic.zones_by_category).map(([category, count]) => (
+                    <div key={category} className="flex justify-between">
+                      <span className="text-slate-600">{category}</span>
+                      <span className="font-semibold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <details className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <summary className="cursor-pointer font-medium text-sm">
+                  Sample Room Data (first 10)
+                </summary>
+                <div className="mt-2 space-y-2 text-xs">
+                  {diagnostic.sample_rooms.map((room, idx) => (
+                    <div key={idx} className="border-b border-slate-200 pb-2">
+                      <div><strong>Room:</strong> {room.room_number} - {room.room_name}</div>
+                      <div><strong>Akita ID:</strong> {room.akita_room_id || 'MISSING'}</div>
+                      <div><strong>Zone:</strong> {room.zone_id || 'unassigned'}</div>
+                      <div><strong>Schedule:</strong> {room.cleaning_schedule || 'unassigned'}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Verification */}
         {mappingsResult && (
