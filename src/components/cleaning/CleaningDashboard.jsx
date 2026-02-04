@@ -163,8 +163,8 @@ export default function CleaningDashboard() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Urgent (HOT)</p>
-                    <p className="text-2xl font-bold text-red-600">{hotCount}</p>
+                    <p className="text-sm text-slate-600">Urgent (&lt;6hrs)</p>
+                    <p className="text-2xl font-bold text-red-600">{alertCount}</p>
                   </div>
                   <AlertTriangle className="w-8 h-8 text-red-500" />
                 </div>
@@ -174,10 +174,10 @@ export default function CleaningDashboard() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600">Soon (WARM)</p>
-                    <p className="text-2xl font-bold text-orange-600">{warmCount}</p>
+                    <p className="text-sm text-slate-600">Upcoming (6-24hrs)</p>
+                    <p className="text-2xl font-bold text-yellow-600">{noticeCount}</p>
                   </div>
-                  <AlertTriangle className="w-8 h-8 text-orange-500" />
+                  <AlertTriangle className="w-8 h-8 text-yellow-500" />
                 </div>
               </CardContent>
             </Card>
