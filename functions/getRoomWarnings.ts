@@ -7,22 +7,29 @@ function getAlertLevel(hoursUntilEvent) {
   return null;
 }
 
-// Get upcoming events directly from PCO API
+// Get upcoming events from PCO API
 async function getPCOEventsByRoom(base44) {
   const roomEventMap = {};
   const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   
   try {
-    // Get PCO token
-    const pcoToken = Deno.env.get('PCO_ACCESS_TOKEN');
+    // Get PCO access token using SDK
+    let pcoToken;
+    try {
+      const tokenResponse = await base44.functions.invoke('getPCOToken', {});
+      pcoToken = tokenResponse.data?.access_token;
+    } catch (e) {
+      console.error('Failed to get PCO token:', e.message);
+      return roomEventMap;
+    }
+    
     if (!pcoToken) {
-      console.error('PCO_ACCESS_TOKEN not set');
+      console.error('No valid PCO token available');
       return roomEventMap;
     }
 
-    // Query PCO API for events in next 24 hours with their resource requests
-    const url = `https://api.planningcenteronline.com/services/v2/events?filter=future&order=-starts_at&per_page=100&include=resource_requests`;
+    // Query PCO API for events in next 24 hours
+    const url = `https://api.planningcenteronline.com/services/v2/events?filter=future&order=-starts_at&per_page=100`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${pcoToken}` }
     });
@@ -36,34 +43,40 @@ async function getPCOEventsByRoom(base44) {
     const events = data.data || [];
     console.log(`[DEBUG] Fetched ${events.length} events from PCO API`);
     
-    // For each event, look for room resource requests
-    events.forEach(event => {
+    // For each event, fetch its room bookings
+    for (const event of events) {
       const startsAt = new Date(event.attributes.starts_at);
       const hoursAhead = (startsAt - now) / (1000 * 60 * 60);
       
       // Only consider events in next 24 hours
-      if (hoursAhead < 0 || hoursAhead > 24) return;
+      if (hoursAhead < 0 || hoursAhead > 24) continue;
       
-      // Extract room requests from included data
-      const eventId = event.id;
-      const resourceRequests = data.included?.filter(item => 
-        item.type === 'ResourceRequest' && 
-        item.relationships?.requestable?.data?.type === 'Room'
-      ) || [];
-      
-      resourceRequests.forEach(req => {
-        const roomId = req.relationships?.requestable?.data?.id;
-        if (roomId) {
-          if (!roomEventMap[roomId] || startsAt < new Date(roomEventMap[roomId].start_time)) {
-            roomEventMap[roomId] = {
-              name: event.attributes.name,
-              start_time: startsAt.toISOString(),
-              pco_room_id: roomId
-            };
-          }
+      try {
+        // Get room bookings for this event
+        const roomsUrl = `https://api.planningcenteronline.com/services/v2/events/${event.id}/event_instances/0/event_times/0/room_setups`;
+        const roomsResponse = await fetch(roomsUrl, {
+          headers: { 'Authorization': `Bearer ${pcoToken}` }
+        });
+        
+        if (roomsResponse.ok) {
+          const roomsData = await roomsResponse.json();
+          const rooms = roomsData.data || [];
+          
+          rooms.forEach(room => {
+            const roomId = room.relationships?.room?.data?.id;
+            if (roomId) {
+              roomEventMap[roomId] = {
+                name: event.attributes.name,
+                start_time: startsAt.toISOString(),
+                pco_room_id: roomId
+              };
+            }
+          });
         }
-      });
-    });
+      } catch (e) {
+        console.warn(`Failed to get rooms for event ${event.id}:`, e.message);
+      }
+    }
     
     console.log(`[DEBUG] Found ${Object.keys(roomEventMap).length} rooms with events in next 24 hours`);
     
