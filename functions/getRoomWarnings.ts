@@ -16,40 +16,11 @@ function isBeforeServiceDay(date) {
   return day === 2 || day === 6;
 }
 
-// Calculate room temperature
-function getRoomTemperature(room) {
-  const schedule = room.cleaning_schedule;
-  const lastCleaned = room.last_cleaned_at;
-  const now = new Date();
-  
-  if (!lastCleaned) return 'ALERT';
-  
-  const lastCleanedDate = new Date(lastCleaned);
-  const hoursSinceClean = (now - lastCleanedDate) / (1000 * 60 * 60);
-  
-  switch(schedule) {
-    case 'daily':
-      if (hoursSinceClean > 24) return 'ALERT';
-      if (hoursSinceClean > 18) return 'WARM';
-      return 'COOL';
-      
-    case 'mon_wed_full_clean':
-      const lastMonday = getLastMonday(now);
-      if (lastCleanedDate < lastMonday) return 'ALERT';
-      if (hoursSinceClean / 24 > 2) return 'WARM';
-      return 'COOL';
-      
-    case 'vip':
-      if (hoursSinceClean > 72) return 'ALERT';
-      if (hoursSinceClean > 48) return 'WARM';
-      return 'COOL';
-      
-    case 'not_cleaned':
-      return 'COOL';
-      
-    default:
-      return isBeforeServiceDay(now) ? 'ALERT' : 'COOL';
-  }
+// Determine alert level based on time until event
+function getAlertLevel(hoursUntilEvent) {
+  if (hoursUntilEvent <= 6) return 'ALERT';
+  if (hoursUntilEvent <= 24) return 'WARM';
+  return 'COOL';
 }
 
 // Format date helper
@@ -155,7 +126,7 @@ Deno.serve(async (req) => {
       rooms.map(r => [r.id, allAcknowledgments.filter(a => a.room_id === r.id)])
     );
 
-    // Compute warnings for all rooms with batching to avoid rate limits
+    // Compute warnings - only for bookable rooms with upcoming events
     const warnings = [];
     const BATCH_SIZE = 20;
     
@@ -163,10 +134,19 @@ Deno.serve(async (req) => {
       const batch = rooms.slice(i, i + BATCH_SIZE);
       
       const batchWarnings = batch.map((room) => {
-        const temperature = getRoomTemperature(room);
+        // Only show warnings for bookable rooms with events
+        if (!room.is_bookable) return null;
         
-        if (temperature === 'COOL') return null;
+        const nextEvent = nextEventMap[room.id];
+        if (!nextEvent) return null;
         
+        const now = new Date();
+        const hoursUntilEvent = (nextEvent.start_time - now) / (1000 * 60 * 60);
+        
+        // Only show if event is within 48 hours
+        if (hoursUntilEvent > 48) return null;
+        
+        // Check for active acknowledgment
         const acksForRoom = acksByRoom[room.id] || [];
         const lastCleanedDate = room.last_cleaned_at ? new Date(room.last_cleaned_at) : new Date(0);
         const activeAck = acksForRoom.find(ack => {
@@ -176,44 +156,12 @@ Deno.serve(async (req) => {
         
         if (activeAck) return null;
         
-        let warningText = null;
-        let eventTime = null;
-        
-        if (room.is_bookable) {
-          const nextEvent = nextEventMap[room.id];
-          if (!nextEvent) return null;
-          
-          const hoursUntilEvent = (nextEvent.start_time - new Date()) / (1000 * 60 * 60);
-          
-          if (hoursUntilEvent <= 24 && temperature !== 'COOL') {
-            warningText = `Needs cleaned before ${nextEvent.name} on ${formatDate(nextEvent.start_time)}`;
-            eventTime = nextEvent.start_time.toISOString();
-          }
-        } else {
-          if (room.cleaning_schedule === 'not_cleaned') return null;
-          
-          if (!room.cleaning_schedule || room.cleaning_schedule === 'unknown') {
-            if (isBeforeServiceDay(new Date()) && temperature === 'HOT') {
-              warningText = "Needs cleaned before Wednesday night and Sunday morning services";
-            }
-          } else if (temperature === 'HOT') {
-            warningText = `Behind cleaning schedule (${room.cleaning_schedule})`;
-          }
-          
-          // For non-bookable rooms, check for next event anyway (some rooms may have events)
-          if (!eventTime && nextEventMap[room.id]) {
-            eventTime = nextEventMap[room.id].start_time.toISOString();
-          }
-        }
-        
-        if (!warningText) return null;
+        const temperature = getAlertLevel(hoursUntilEvent);
         
         // Filter by temperature if specified
         if (temperatureFilter && temperature !== temperatureFilter) {
           return null;
         }
-        
-        const nextEvent = nextEventMap[room.id];
         
         return {
           room_id: room.id,
@@ -221,10 +169,10 @@ Deno.serve(async (req) => {
           room_number: room.room_number,
           building: room.building_name || room.building,
           floor: room.floor_name || room.floor,
-          warning_text: warningText,
+          warning_text: `Needs cleaned before ${nextEvent.name}`,
           temperature: temperature,
-          event_time: eventTime,
-          event_name: nextEvent?.name,
+          event_time: nextEvent.start_time.toISOString(),
+          event_name: nextEvent.name,
           room: {
             id: room.id,
             room_name: room.room_name,
