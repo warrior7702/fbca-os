@@ -129,8 +129,8 @@ Deno.serve(async (req) => {
         const now = new Date();
         const hoursUntilEvent = (nextEvent.start_time - now) / (1000 * 60 * 60);
         
-        // Only show if event is within 48 hours
-        if (hoursUntilEvent > 48) return null;
+        // Only show if event is within 24 hours
+        if (hoursUntilEvent > 24) return null;
         
         // Check for active acknowledgment
         const acksForRoom = acksByRoom[room.id] || [];
