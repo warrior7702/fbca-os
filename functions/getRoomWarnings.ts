@@ -5,8 +5,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 // Determine alert level based on time until event
 function getAlertLevel(hoursUntilEvent) {
   if (hoursUntilEvent <= 6) return 'ALERT';
-  if (hoursUntilEvent <= 24) return 'WARM';
-  return 'COOL';
+  if (hoursUntilEvent <= 24) return 'NOTICE';
+  return null;
 }
 
 // Format date helper
