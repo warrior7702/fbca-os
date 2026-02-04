@@ -270,7 +270,7 @@ export default function CleaningZoneImport() {
               <CardTitle>Database Diagnostics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="bg-slate-50 p-3 rounded">
                   <div className="font-semibold text-slate-900">Total Rooms</div>
                   <div className="text-2xl font-bold text-slate-700">
@@ -281,6 +281,18 @@ export default function CleaningZoneImport() {
                   <div className="font-semibold text-slate-900">Total Zones</div>
                   <div className="text-2xl font-bold text-slate-700">
                     {diagnostic.total_zones}
+                  </div>
+                </div>
+                <div className="bg-green-50 p-3 rounded">
+                  <div className="font-semibold text-green-900">With Schedule</div>
+                  <div className="text-2xl font-bold text-green-700">
+                    {diagnostic.rooms_with_schedule}
+                  </div>
+                </div>
+                <div className="bg-amber-50 p-3 rounded">
+                  <div className="font-semibold text-amber-900">Without Schedule</div>
+                  <div className="text-2xl font-bold text-amber-700">
+                    {diagnostic.rooms_without_schedule}
                   </div>
                 </div>
               </div>
