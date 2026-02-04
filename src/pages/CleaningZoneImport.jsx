@@ -143,6 +143,23 @@ export default function CleaningZoneImport() {
           </CardContent>
         </Card>
 
+        {/* Diagnostics Button */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Database Diagnostics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={runDiagnostic} disabled={loading}>
+              {loading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              Run Diagnostic Check
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Step 2: Import Room Mappings */}
         <Card>
           <CardHeader>
