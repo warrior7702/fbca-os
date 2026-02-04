@@ -137,10 +137,10 @@ Deno.serve(async (req) => {
       rooms = rooms.filter(r => r.building_name === building || r.building === building);
     }
 
-    // Batch fetch all events upfront
-    const bookableRoomIds = rooms.filter(r => r.is_bookable).map(r => r.id);
-    const nextEventMap = bookableRoomIds.length > 0 
-      ? await getNextEventsBatch(base44, bookableRoomIds)
+    // Batch fetch all events for all rooms
+    const allRoomIds = rooms.map(r => r.id);
+    const nextEventMap = allRoomIds.length > 0 
+      ? await getNextEventsBatch(base44, allRoomIds)
       : {};
 
     // Cache all acknowledgments upfront - with retry
