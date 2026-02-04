@@ -29,18 +29,18 @@ function getRoomTemperature(room) {
   
   switch(schedule) {
     case 'daily':
-      if (hoursSinceClean > 24) return 'HOT';
+      if (hoursSinceClean > 24) return 'ALERT';
       if (hoursSinceClean > 18) return 'WARM';
       return 'COOL';
       
     case 'mon_wed_full_clean':
       const lastMonday = getLastMonday(now);
-      if (lastCleanedDate < lastMonday) return 'HOT';
+      if (lastCleanedDate < lastMonday) return 'ALERT';
       if (hoursSinceClean / 24 > 2) return 'WARM';
       return 'COOL';
       
     case 'vip':
-      if (hoursSinceClean > 72) return 'HOT';
+      if (hoursSinceClean > 72) return 'ALERT';
       if (hoursSinceClean > 48) return 'WARM';
       return 'COOL';
       
@@ -48,7 +48,7 @@ function getRoomTemperature(room) {
       return 'COOL';
       
     default:
-      return isBeforeServiceDay(now) ? 'HOT' : 'COOL';
+      return isBeforeServiceDay(now) ? 'ALERT' : 'COOL';
   }
 }
 
