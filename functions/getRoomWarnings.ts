@@ -22,7 +22,7 @@ function getRoomTemperature(room) {
   const lastCleaned = room.last_cleaned_at;
   const now = new Date();
   
-  if (!lastCleaned) return 'HOT';
+  if (!lastCleaned) return 'ALERT';
   
   const lastCleanedDate = new Date(lastCleaned);
   const hoursSinceClean = (now - lastCleanedDate) / (1000 * 60 * 60);
