@@ -214,35 +214,73 @@ Deno.serve(async (req) => {
       const batch = rooms.slice(i, i + BATCH_SIZE);
       
       const batchWarnings = batch.map((room) => {
-        const warning = computeCleaningWarningsSync(room, nextEventMap, acksByRoom[room.id] || []);
+        const temperature = getRoomTemperature(room);
+        
+        if (temperature === 'COOL') return null;
+        
+        const acksForRoom = acksByRoom[room.id] || [];
+        const lastCleanedDate = room.last_cleaned_at ? new Date(room.last_cleaned_at) : new Date(0);
+        const activeAck = acksForRoom.find(ack => {
+          const ackDate = new Date(ack.acknowledged_at);
+          return ackDate > lastCleanedDate && !ack.auto_cleared;
+        });
+        
+        if (activeAck) return null;
+        
+        let warningText = null;
+        let eventTime = null;
+        
+        if (room.is_bookable) {
+          const nextEvent = nextEventMap[room.id];
+          if (!nextEvent) return null;
           
-          if (warning) {
-            // Filter by temperature if specified
-            if (temperatureFilter && warning.temperature !== temperatureFilter) {
-              return null;
-            }
-            
-            return {
-              room_id: room.id,
-              room_name: room.room_name,
-              room_number: room.room_number,
-              building: room.building_name || room.building,
-              floor: room.floor_name || room.floor,
-              warning_text: warning.text,
-              temperature: warning.temperature,
-              event_time: warning.event_time
-            };
+          const hoursUntilEvent = (nextEvent.start_time - new Date()) / (1000 * 60 * 60);
+          
+          if (hoursUntilEvent <= 24 && temperature !== 'COOL') {
+            warningText = `Needs cleaned before ${nextEvent.name} on ${formatDate(nextEvent.start_time)}`;
+            eventTime = nextEvent.start_time.toISOString();
           }
+        } else {
+          if (room.cleaning_schedule === 'not_cleaned') return null;
           
+          if (!room.cleaning_schedule || room.cleaning_schedule === 'unknown') {
+            if (isBeforeServiceDay(new Date()) && temperature === 'HOT') {
+              warningText = "Needs cleaned before Wednesday night and Sunday morning services";
+            }
+          } else if (temperature === 'HOT') {
+            warningText = `Behind cleaning schedule (${room.cleaning_schedule})`;
+          }
+        }
+        
+        if (!warningText) return null;
+        
+        // Filter by temperature if specified
+        if (temperatureFilter && temperature !== temperatureFilter) {
           return null;
-        })
-      );
+        }
+        
+        return {
+          room_id: room.id,
+          room_name: room.room_name,
+          room_number: room.room_number,
+          building: room.building_name || room.building,
+          floor: room.floor_name || room.floor,
+          warning_text: warningText,
+          temperature: temperature,
+          event_time: eventTime,
+          room: {
+            id: room.id,
+            room_name: room.room_name,
+            room_number: room.room_number
+          }
+        };
+      });
       
       warnings.push(...batchWarnings.filter(w => w !== null));
       
       // Delay between batches to avoid rate limit
       if (i + BATCH_SIZE < rooms.length) {
-        await new Promise(resolve => setTimeout(resolve, 250));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
