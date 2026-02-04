@@ -104,8 +104,8 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
                 </h4>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                   warningData.temperature === 'ALERT' ? 'bg-red-100 text-red-800' :
-                  warningData.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
-                  'bg-green-100 text-green-800'
+                  warningData.temperature === 'NOTICE' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-slate-100 text-slate-800'
                 }`}>
                   {getTemperatureText(warningData.temperature)}
                 </span>
