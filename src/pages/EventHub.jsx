@@ -120,6 +120,7 @@ export default function EventHub() {
             <TabsTrigger value="queue">Ops Queue</TabsTrigger>
             <TabsTrigger value="heatmap">Room Heat Map</TabsTrigger>
             <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
+            <TabsTrigger value="cleaning">Cleaning</TabsTrigger>
           </TabsList>
           <TabsContent value="queue">
             <EventOpsQueue
