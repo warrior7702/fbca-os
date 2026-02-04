@@ -22,6 +22,7 @@ export default function RoomTimelineTab() {
 
   useEffect(() => {
     if (selectedRoomId) {
+      loadRoomDetails();
       loadTimeline();
     }
   }, [selectedRoomId]);
@@ -34,6 +35,32 @@ export default function RoomTimelineTab() {
       console.error('Error loading rooms:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRoomDetails = async () => {
+    try {
+      const room = await base44.entities.Room.filter({ pco_resource_id: selectedRoomId });
+      if (room.length > 0) {
+        setSelectedRoom(room[0]);
+        loadWarning(room[0]);
+      }
+    } catch (error) {
+      console.error('Error loading room details:', error);
+    }
+  };
+
+  const loadWarning = async (room) => {
+    try {
+      const result = await base44.functions.invoke('computeCleaningWarnings', { room_id: room.id });
+      if (result.data && result.data.warnings && result.data.warnings.length > 0) {
+        setWarning(result.data.warnings[0]);
+      } else {
+        setWarning(null);
+      }
+    } catch (error) {
+      console.error('Error loading warning:', error);
+      setWarning(null);
     }
   };
 
