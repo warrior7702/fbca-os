@@ -17,6 +17,7 @@ import {
   X,
   AlertCircle
 } from "lucide-react";
+import CleaningWarningBanner from "@/components/cleaning/CleaningWarningBanner";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,8 @@ export default function AkitaFetch() {
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [roomWarning, setRoomWarning] = useState(null);
+  const [loadingWarning, setLoadingWarning] = useState(false);
   const [showPins, setShowPins] = useState(true);
   const [showRoomLabels, setShowRoomLabels] = useState(false);
   const [showOnlyWithTickets, setShowOnlyWithTickets] = useState(false);
@@ -109,9 +112,42 @@ export default function AkitaFetch() {
     setSelectedRoom(null);
   };
 
-  const handleRoomClick = (room) => {
+  const handleRoomClick = async (room) => {
     setSelectedRoom(room);
     setSelectedAsset(null);
+    await loadRoomWarning(room.id);
+  };
+
+  const loadRoomWarning = async (roomId) => {
+    setLoadingWarning(true);
+    try {
+      const result = await base44.functions.invoke('computeCleaningWarnings', {
+        room_id: roomId
+      });
+
+      if (result.data.warning) {
+        setRoomWarning(result.data.warning);
+      } else {
+        setRoomWarning(null);
+      }
+    } catch (error) {
+      console.error('Error loading room warning:', error);
+      setRoomWarning(null);
+    } finally {
+      setLoadingWarning(false);
+    }
+  };
+
+  const refreshRoomData = async () => {
+    if (selectedRoom) {
+      await loadRoomWarning(selectedRoom.id);
+      const updatedRooms = await base44.entities.Room.list();
+      setRooms(updatedRooms);
+      const updatedRoom = updatedRooms.find(r => r.id === selectedRoom.id);
+      if (updatedRoom) {
+        setSelectedRoom(updatedRoom);
+      }
+    }
   };
 
   // Get floors for selected building
@@ -932,6 +968,21 @@ export default function AkitaFetch() {
           {/* Room Details Panel */}
           {selectedRoom && (
             <div className="border-t bg-slate-50 max-h-96 overflow-y-auto">
+              {/* Cleaning Warning Banner */}
+              {loadingWarning ? (
+                <div className="p-4 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                </div>
+              ) : roomWarning && (
+                <div className="p-4">
+                  <CleaningWarningBanner
+                    room={selectedRoom}
+                    warning={roomWarning}
+                    onRefresh={refreshRoomData}
+                  />
+                </div>
+              )}
+
               {/* Room Header */}
               <div className="p-4 bg-white border-b">
                 <div className="flex items-start justify-between mb-2">
