@@ -84,7 +84,7 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
   const getTemperatureText = (temp) => {
     switch(temp) {
       case 'HOT': return 'URGENT';
-      case 'WARM': return 'SOON';
+      case 'WARM': return 'NOTICE';
       case 'COOL': return 'ON SCHEDULE';
       default: return '';
     }
