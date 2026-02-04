@@ -16,40 +16,11 @@ function isBeforeServiceDay(date) {
   return day === 2 || day === 6;
 }
 
-// Calculate room temperature
-function getRoomTemperature(room) {
-  const schedule = room.cleaning_schedule;
-  const lastCleaned = room.last_cleaned_at;
-  const now = new Date();
-  
-  if (!lastCleaned) return 'ALERT';
-  
-  const lastCleanedDate = new Date(lastCleaned);
-  const hoursSinceClean = (now - lastCleanedDate) / (1000 * 60 * 60);
-  
-  switch(schedule) {
-    case 'daily':
-      if (hoursSinceClean > 24) return 'ALERT';
-      if (hoursSinceClean > 18) return 'WARM';
-      return 'COOL';
-      
-    case 'mon_wed_full_clean':
-      const lastMonday = getLastMonday(now);
-      if (lastCleanedDate < lastMonday) return 'ALERT';
-      if (hoursSinceClean / 24 > 2) return 'WARM';
-      return 'COOL';
-      
-    case 'vip':
-      if (hoursSinceClean > 72) return 'ALERT';
-      if (hoursSinceClean > 48) return 'WARM';
-      return 'COOL';
-      
-    case 'not_cleaned':
-      return 'COOL';
-      
-    default:
-      return isBeforeServiceDay(now) ? 'ALERT' : 'COOL';
-  }
+// Determine alert level based on time until event
+function getAlertLevel(hoursUntilEvent) {
+  if (hoursUntilEvent <= 6) return 'ALERT';
+  if (hoursUntilEvent <= 24) return 'WARM';
+  return 'COOL';
 }
 
 // Format date helper
