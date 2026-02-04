@@ -124,6 +124,14 @@ export default function RoomTimelineTab() {
 
       {selectedRoomId && (
         <>
+          {selectedRoom && warning && (
+            <CleaningWarningBanner 
+              room={selectedRoom} 
+              warning={warning}
+              onRefresh={() => loadWarning(selectedRoom)}
+            />
+          )}
+          
           {loadingTimeline ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
