@@ -71,7 +71,7 @@ function addHours(date, hours) {
   return d;
 }
 
-// Get next event for bookable rooms (minimal query)
+// Get next event for bookable rooms
 async function getNextEventsBatch(base44, roomIds) {
   const now = new Date();
   const roomEventMap = {};
@@ -83,8 +83,40 @@ async function getNextEventsBatch(base44, roomIds) {
   
   if (roomIds.length === 0) return roomEventMap;
   
-  // Skip event fetching - just return empty map to avoid rate limits
-  // The cleaning dashboard works without events
+  try {
+    // Fetch event rooms for bookable rooms
+    const eventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list();
+    
+    // Filter for upcoming events
+    const upcomingEventRooms = eventRooms.filter(er => {
+      if (!er.start_time) return false;
+      const startTime = new Date(er.start_time);
+      const daysAhead = (startTime - now) / (1000 * 60 * 60 * 24);
+      return daysAhead >= 0 && daysAhead <= 3; // Next 3 days
+    });
+    
+    // Group by room and get next event per room
+    const roomEventsByRoom = {};
+    upcomingEventRooms.forEach(er => {
+      if (!roomEventsByRoom[er.room_id] || new Date(er.start_time) < new Date(roomEventsByRoom[er.room_id].start_time)) {
+        roomEventsByRoom[er.room_id] = {
+          name: er.event_name,
+          start_time: new Date(er.start_time)
+        };
+      }
+    });
+    
+    // Map to output format
+    roomIds.forEach(roomId => {
+      if (roomEventsByRoom[roomId]) {
+        roomEventMap[roomId] = roomEventsByRoom[roomId];
+      }
+    });
+    
+  } catch (e) {
+    console.warn('Failed to fetch events:', e.message);
+  }
+  
   return roomEventMap;
 }
 
