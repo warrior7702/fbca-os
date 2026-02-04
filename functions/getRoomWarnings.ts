@@ -43,14 +43,17 @@ async function getNextEventsBatch(base44, roomIds) {
   try {
     // Fetch upcoming event rooms in batches
     const eventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list('-start_time', 500);
+    console.log(`[DEBUG] Fetched ${eventRooms.length} event rooms total`);
     
-    // Filter for upcoming events in next 3 days
+    // Filter for upcoming events in next 24 hours
     const upcomingEventRooms = eventRooms.filter(er => {
       if (!er.start_time || !roomIds.includes(er.room_id)) return false;
       const startTime = new Date(er.start_time);
-      const daysAhead = (startTime - now) / (1000 * 60 * 60 * 24);
-      return daysAhead >= 0 && daysAhead <= 3;
+      const hoursAhead = (startTime - now) / (1000 * 60 * 60);
+      return hoursAhead >= 0 && hoursAhead <= 24;
     });
+    
+    console.log(`[DEBUG] Found ${upcomingEventRooms.length} rooms with events in next 24 hours`);
     
     // Get first upcoming event for each room
     const processed = new Set();
@@ -65,7 +68,7 @@ async function getNextEventsBatch(base44, roomIds) {
     });
     
   } catch (e) {
-    console.warn('Failed to fetch events:', e.message);
+    console.error('Failed to fetch events:', e.message);
   }
   
   return roomEventMap;
