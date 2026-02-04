@@ -34,12 +34,25 @@ Deno.serve(async (req) => {
     const roomsWithSchedule = allRoomsForCount.filter(r => r.cleaning_schedule && r.cleaning_schedule !== 'unknown').length;
     const roomsWithoutSchedule = allRoomsForCount.length - roomsWithSchedule;
 
+    // Get list of rooms without schedules
+    const roomsWithoutScheduleList = allRoomsForCount
+      .filter(r => !r.cleaning_schedule || r.cleaning_schedule === 'unknown')
+      .map(r => ({
+        id: r.id,
+        akita_room_id: r.akita_room_id,
+        room_number: r.room_number,
+        room_name: r.room_name,
+        building: r.building_name,
+        floor: r.floor_name
+      }));
+
     return Response.json({
       success: true,
       total_rooms: allRoomsForCount.length,
       total_zones: zones.length,
       rooms_with_schedule: roomsWithSchedule,
       rooms_without_schedule: roomsWithoutSchedule,
+      rooms_without_schedule_list: roomsWithoutScheduleList,
       sample_rooms: allRooms.map(r => ({
         id: r.id,
         akita_room_id: r.akita_room_id,
