@@ -71,11 +71,27 @@ Deno.serve(async (req) => {
       console.log(`[DEBUG] Rooms in building "${building}": ${rooms.length}`);
     }
 
-    // Batch fetch all events for all rooms
-    const allRoomIds = rooms.map(r => r.id);
-    const nextEventMap = allRoomIds.length > 0 
-      ? await getNextEventsBatch(base44, allRoomIds)
-      : {};
+    // Fetch events from PCO_Request (which has room + event links)
+    const pcoEventsByRoom = await getPCOEventsByRoom(base44);
+    
+    // Map PCO room IDs to Campus Hub room IDs
+    const roomMap = {};
+    rooms.forEach(room => {
+      if (room.pco_resource_id) {
+        roomMap[room.pco_resource_id] = room;
+      }
+    });
+    console.log(`[DEBUG] Built room map for ${Object.keys(roomMap).length} rooms`);
+    
+    // Map events to Campus Hub rooms
+    const nextEventMap = {};
+    Object.entries(pcoEventsByRoom).forEach(([pcoRoomId, event]) => {
+      const room = roomMap[pcoRoomId];
+      if (room) {
+        nextEventMap[room.id] = event;
+      }
+    });
+    console.log(`[DEBUG] Mapped ${Object.keys(nextEventMap).length} events to Campus Hub rooms`);
 
     // Cache all acknowledgments upfront - with retry
     let allAcknowledgments = [];
