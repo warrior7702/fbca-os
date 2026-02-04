@@ -9,16 +9,14 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const pathParts = url.pathname.split('/');
-    const roomId = pathParts[pathParts.indexOf('acknowledgeRoomWarning') - 1] || pathParts[pathParts.length - 2];
-
     const body = await req.json();
-    const { user_id, user_name, notes } = body;
+    const { room_id, user_id, user_name, notes } = body;
 
-    if (!roomId) {
-      return Response.json({ error: 'room_id required in URL path' }, { status: 400 });
+    if (!room_id) {
+      return Response.json({ error: 'room_id required in request body' }, { status: 400 });
     }
+
+    const roomId = room_id;
 
     // Verify room exists
     const rooms = await base44.asServiceRole.entities.Room.filter({ id: roomId });
