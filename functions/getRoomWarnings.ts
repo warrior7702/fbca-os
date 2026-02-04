@@ -214,6 +214,8 @@ Deno.serve(async (req) => {
           return null;
         }
         
+        const nextEvent = nextEventMap[room.id];
+        
         return {
           room_id: room.id,
           room_name: room.room_name,
@@ -223,6 +225,7 @@ Deno.serve(async (req) => {
           warning_text: warningText,
           temperature: temperature,
           event_time: eventTime,
+          event_name: nextEvent?.name,
           room: {
             id: room.id,
             room_name: room.room_name,
