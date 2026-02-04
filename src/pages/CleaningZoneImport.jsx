@@ -297,6 +297,73 @@ export default function CleaningZoneImport() {
                 </div>
               </div>
 
+              {/* Last Import Results */}
+              {mappingsResult && (
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="font-semibold text-sm mb-2">Last Import Results</h4>
+                  <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                    <div className="bg-green-50 p-3 rounded">
+                      <div className="font-semibold text-green-900">Updated</div>
+                      <div className="text-2xl font-bold text-green-700">
+                        {mappingsResult.updated_count}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 p-3 rounded">
+                      <div className="font-semibold text-amber-900">Not Found</div>
+                      <div className="text-2xl font-bold text-amber-700">
+                        {mappingsResult.not_found_count}
+                      </div>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded">
+                      <div className="font-semibold text-red-900">Errors</div>
+                      <div className="text-2xl font-bold text-red-700">
+                        {mappingsResult.error_count}
+                      </div>
+                    </div>
+                  </div>
+
+                  {mappingsResult.not_found && mappingsResult.not_found.length > 0 && (
+                    <details className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+                      <summary className="cursor-pointer font-medium text-sm text-amber-900">
+                        View Not Found Rooms ({mappingsResult.not_found.length})
+                      </summary>
+                      <div className="mt-2 space-y-1 text-xs">
+                        {mappingsResult.not_found.slice(0, 10).map((room, idx) => (
+                          <div key={idx} className="text-amber-800">
+                            {room.room_number} - {room.room_name} (ID: {room.akita_room_id})
+                          </div>
+                        ))}
+                        {mappingsResult.not_found.length > 10 && (
+                          <div className="text-amber-600 italic">
+                            ... and {mappingsResult.not_found.length - 10} more
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )}
+
+                  {mappingsResult.errors && mappingsResult.errors.length > 0 && (
+                    <details className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <summary className="cursor-pointer font-medium text-sm text-red-900">
+                        View Errors ({mappingsResult.errors.length})
+                      </summary>
+                      <div className="mt-2 space-y-1 text-xs">
+                        {mappingsResult.errors.slice(0, 10).map((err, idx) => (
+                          <div key={idx} className="text-red-800">
+                            {err.akita_room_id}: {err.error}
+                          </div>
+                        ))}
+                        {mappingsResult.errors.length > 10 && (
+                          <div className="text-red-600 italic">
+                            ... and {mappingsResult.errors.length - 10} more
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
+
               <div>
                 <h4 className="font-semibold text-sm mb-2">Rooms by Cleaning Schedule</h4>
                 <div className="space-y-1 text-sm">
