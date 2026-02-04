@@ -85,7 +85,9 @@ export default function CleaningWarningBanner({ room, warning, onRefresh }) {
             
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h4 className="font-semibold text-sm sm:text-base text-slate-900">Room Needs Cleaning</h4>
+                <h4 className="font-semibold text-sm sm:text-base text-slate-900">
+                  {room?.room_name || 'Room'} {room?.room_number && `(${room.room_number})`}
+                </h4>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                   warningData.temperature === 'HOT' ? 'bg-red-100 text-red-800' :
                   warningData.temperature === 'WARM' ? 'bg-orange-100 text-orange-800' :
