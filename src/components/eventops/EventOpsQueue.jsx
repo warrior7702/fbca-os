@@ -131,7 +131,7 @@ export default function EventOpsQueue({ onEventClick, roomFilter, dateFilter }) 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">All Booked</SelectItem>
                 <SelectItem value="room_setup">Room Setup</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
                 <SelectItem value="alerts">Alerts Only</SelectItem>
