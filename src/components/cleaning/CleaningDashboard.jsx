@@ -126,13 +126,12 @@ export default function CleaningDashboard() {
             </label>
             <Select value={selectedTemperature} onValueChange={setSelectedTemperature}>
               <SelectTrigger>
-                <SelectValue placeholder="All temperatures..." />
+                <SelectValue placeholder="All priorities..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="HOT">🔴 Urgent (HOT)</SelectItem>
-                <SelectItem value="WARM">🟠 Soon (WARM)</SelectItem>
-                <SelectItem value="COOL">🟢 On Schedule (COOL)</SelectItem>
+                <SelectItem value="ALERT">🔴 Urgent (&lt;6hrs)</SelectItem>
+                <SelectItem value="NOTICE">🟡 Upcoming (6-24hrs)</SelectItem>
               </SelectContent>
             </Select>
           </div>
