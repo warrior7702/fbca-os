@@ -84,32 +84,26 @@ async function getNextEventsBatch(base44, roomIds) {
   if (roomIds.length === 0) return roomEventMap;
   
   try {
-    // Fetch event rooms for bookable rooms
-    const eventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list();
+    // Fetch upcoming event rooms in batches
+    const eventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list('-start_time', 500);
     
-    // Filter for upcoming events
+    // Filter for upcoming events in next 3 days
     const upcomingEventRooms = eventRooms.filter(er => {
-      if (!er.start_time) return false;
+      if (!er.start_time || !roomIds.includes(er.room_id)) return false;
       const startTime = new Date(er.start_time);
       const daysAhead = (startTime - now) / (1000 * 60 * 60 * 24);
-      return daysAhead >= 0 && daysAhead <= 3; // Next 3 days
+      return daysAhead >= 0 && daysAhead <= 3;
     });
     
-    // Group by room and get next event per room
-    const roomEventsByRoom = {};
+    // Get first upcoming event for each room
+    const processed = new Set();
     upcomingEventRooms.forEach(er => {
-      if (!roomEventsByRoom[er.room_id] || new Date(er.start_time) < new Date(roomEventsByRoom[er.room_id].start_time)) {
-        roomEventsByRoom[er.room_id] = {
+      if (!processed.has(er.room_id) && er.event_name && er.start_time) {
+        roomEventMap[er.room_id] = {
           name: er.event_name,
           start_time: new Date(er.start_time)
         };
-      }
-    });
-    
-    // Map to output format
-    roomIds.forEach(roomId => {
-      if (roomEventsByRoom[roomId]) {
-        roomEventMap[roomId] = roomEventsByRoom[roomId];
+        processed.add(er.room_id);
       }
     });
     
