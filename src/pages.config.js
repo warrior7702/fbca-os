@@ -63,6 +63,7 @@ import Buildings from './pages/Buildings';
 import Calendar from './pages/Calendar';
 import CampaignRunning from './pages/CampaignRunning';
 import ClaimTicket from './pages/ClaimTicket';
+import CleaningDashboard from './pages/CleaningDashboard';
 import CleaningZoneImport from './pages/CleaningZoneImport';
 import CommunicationsRequestForm from './pages/CommunicationsRequestForm';
 import CreateTicket from './pages/CreateTicket';
@@ -122,7 +123,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import CleaningDashboard from './pages/CleaningDashboard';
 import __Layout from './Layout.jsx';
 
 
@@ -143,6 +143,7 @@ export const PAGES = {
     "Calendar": Calendar,
     "CampaignRunning": CampaignRunning,
     "ClaimTicket": ClaimTicket,
+    "CleaningDashboard": CleaningDashboard,
     "CleaningZoneImport": CleaningZoneImport,
     "CommunicationsRequestForm": CommunicationsRequestForm,
     "CreateTicket": CreateTicket,
@@ -202,7 +203,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "CleaningDashboard": CleaningDashboard,
 }
 
 export const pagesConfig = {

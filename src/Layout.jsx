@@ -99,6 +99,12 @@ const apps = [
     path: "Documents",
     icon: Folder,
     color: "text-blue-500"
+  },
+  {
+    name: "Cleaning",
+    path: "CleaningDashboard",
+    icon: UtensilsCrossed,
+    color: "text-green-500"
   }
 ];
 
