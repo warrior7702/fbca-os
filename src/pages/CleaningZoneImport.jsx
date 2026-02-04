@@ -11,6 +11,7 @@ export default function CleaningZoneImport() {
   const [zonesResult, setZonesResult] = useState(null);
   const [mappingsResult, setMappingsResult] = useState(null);
   const [diagnostic, setDiagnostic] = useState(null);
+  const [verification, setVerification] = useState(null);
 
   const parseCSV = (text) => {
     const lines = text.trim().split('\n');
