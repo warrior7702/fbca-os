@@ -71,42 +71,57 @@ function addHours(date, hours) {
   return d;
 }
 
-// Get next event for a bookable room
-async function getNextEvent(base44, roomId) {
+// Get next event for bookable rooms (batch optimized)
+async function getNextEventsBatch(base44, roomIds) {
   const now = new Date();
+  const roomEventMap = {};
   
-  const events = await base44.asServiceRole.entities.PCO_EventRoom.filter({
-    room_id: roomId
+  // Initialize all rooms to null
+  roomIds.forEach(id => {
+    roomEventMap[id] = null;
   });
   
-  if (!events || events.length === 0) return null;
+  // Get all event rooms for these rooms
+  const allEventRooms = await base44.asServiceRole.entities.PCO_EventRoom.list();
+  const relevantEventRooms = allEventRooms.filter(er => roomIds.includes(er.room_id));
   
-  const futureEvents = [];
-  for (const eventRoom of events) {
-    const eventDetails = await base44.asServiceRole.entities.PCO_Event.filter({
-      id: eventRoom.event_id
-    });
+  if (relevantEventRooms.length === 0) return roomEventMap;
+  
+  // Get all referenced events
+  const eventIds = [...new Set(relevantEventRooms.map(er => er.event_id))];
+  const allEvents = await base44.asServiceRole.entities.PCO_Event.list();
+  const eventMap = Object.fromEntries(allEvents.map(e => [e.id, e]));
+  
+  // Process each room
+  for (const roomId of roomIds) {
+    const roomEventRooms = relevantEventRooms.filter(er => er.room_id === roomId);
+    const futureEvents = [];
     
-    if (eventDetails && eventDetails.length > 0) {
-      const event = eventDetails[0];
-      const startTime = new Date(event.starts_at);
-      if (startTime > now) {
-        futureEvents.push({
-          name: event.name,
-          start_time: startTime,
-          end_time: event.ends_at ? new Date(event.ends_at) : null
-        });
+    for (const eventRoom of roomEventRooms) {
+      const event = eventMap[eventRoom.event_id];
+      if (event) {
+        const startTime = new Date(event.starts_at);
+        if (startTime > now) {
+          futureEvents.push({
+            name: event.name,
+            start_time: startTime,
+            end_time: event.ends_at ? new Date(event.ends_at) : null
+          });
+        }
       }
+    }
+    
+    if (futureEvents.length > 0) {
+      futureEvents.sort((a, b) => a.start_time - b.start_time);
+      roomEventMap[roomId] = futureEvents[0];
     }
   }
   
-  if (futureEvents.length === 0) return null;
-  futureEvents.sort((a, b) => a.start_time - b.start_time);
-  return futureEvents[0];
+  return roomEventMap;
 }
 
-// Compute cleaning warnings
-async function computeCleaningWarnings(base44, room) {
+// Compute cleaning warnings (without events - events fetched in batch)
+async function computeCleaningWarnings(base44, room, nextEventMap) {
   const temperature = getRoomTemperature(room);
   
   if (temperature === 'COOL') return null;
@@ -128,7 +143,7 @@ async function computeCleaningWarnings(base44, room) {
   let eventTime = null;
   
   if (room.is_bookable) {
-    const nextEvent = await getNextEvent(base44, room.id);
+    const nextEvent = nextEventMap[room.id];
     if (!nextEvent) return null;
     
     const hoursUntilEvent = (nextEvent.start_time - new Date()) / (1000 * 60 * 60);
@@ -179,6 +194,12 @@ Deno.serve(async (req) => {
       rooms = rooms.filter(r => r.building_name === building || r.building === building);
     }
 
+    // Batch fetch all events upfront
+    const bookableRoomIds = rooms.filter(r => r.is_bookable).map(r => r.id);
+    const nextEventMap = bookableRoomIds.length > 0 
+      ? await getNextEventsBatch(base44, bookableRoomIds)
+      : {};
+
     // Compute warnings for all rooms with batching to avoid rate limits
     const warnings = [];
     const BATCH_SIZE = 5;
@@ -188,7 +209,7 @@ Deno.serve(async (req) => {
       
       const batchWarnings = await Promise.all(
         batch.map(async (room) => {
-          const warning = await computeCleaningWarnings(base44, room);
+          const warning = await computeCleaningWarnings(base44, room, nextEventMap);
           
           if (warning) {
             // Filter by temperature if specified
