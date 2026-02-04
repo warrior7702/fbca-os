@@ -478,36 +478,95 @@ export default function CleaningZoneImport() {
           </Card>
         )}
 
-        {/* Verification */}
-        {mappingsResult && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+        {/* Final Verification */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {verification?.completion_percentage === 100 ? (
                 <CheckCircle className="w-5 h-5 text-green-600" />
-                Phase 1 Complete
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600 mb-4">
-                Schema changes and data import completed. Ready for Phase 2.
-              </p>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-slate-50 p-3 rounded">
-                  <div className="font-semibold text-slate-900">Cleaning Zones</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {zonesResult.imported_count}
+              ) : (
+                <AlertCircle className="w-5 h-5 text-blue-600" />
+              )}
+              Phase 2 Verification
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Run final verification to confirm all rooms are properly assigned
+            </p>
+
+            <Button onClick={runVerification} disabled={loading}>
+              {loading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              Run Final Verification
+            </Button>
+
+            {verification && (
+              <div className="space-y-4 mt-4">
+                <Alert className={verification.completion_percentage >= 90 ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}>
+                  <CheckCircle className="w-4 h-4" />
+                  <AlertDescription>
+                    <div className="font-semibold mb-2">
+                      {verification.completion_percentage}% Complete ({verification.totals.assigned}/{verification.totals.total_rooms} rooms)
+                    </div>
+                    {verification.completion_percentage >= 90 ? (
+                      <div className="text-sm text-green-700">
+                        ✅ Phase 2 Complete - Ready for production
+                      </div>
+                    ) : (
+                      <div className="text-sm text-amber-700">
+                        ⚠ {verification.totals.unassigned} rooms still need assignment
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="bg-slate-50 p-3 rounded">
+                    <div className="font-semibold text-slate-900">Total Rooms</div>
+                    <div className="text-2xl font-bold text-slate-700">
+                      {verification.totals.total_rooms}
+                    </div>
+                  </div>
+                  <div className="bg-green-50 p-3 rounded">
+                    <div className="font-semibold text-green-900">Assigned</div>
+                    <div className="text-2xl font-bold text-green-700">
+                      {verification.totals.assigned}
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 p-3 rounded">
+                    <div className="font-semibold text-amber-900">Unassigned</div>
+                    <div className="text-2xl font-bold text-amber-700">
+                      {verification.totals.unassigned}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-slate-50 p-3 rounded">
-                  <div className="font-semibold text-slate-900">Rooms Updated</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {mappingsResult.updated_count}
+
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Distribution by Schedule</h4>
+                  <div className="space-y-1 text-sm">
+                    {Object.entries(verification.distribution).map(([schedule, count]) => (
+                      <div key={schedule} className="flex justify-between items-center p-2 bg-slate-50 rounded">
+                        <span className="text-slate-700 font-medium">{schedule}</span>
+                        <span className="font-bold text-slate-900">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded">
+                  <div className="font-semibold text-blue-900 mb-1">Total Zones</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {verification.total_zones}
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
