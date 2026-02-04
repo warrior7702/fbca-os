@@ -113,6 +113,20 @@ export default function CleaningZoneImport() {
     }
   };
 
+  const runVerification = async () => {
+    setLoading(true);
+    try {
+      const { data } = await base44.functions.invoke('verifyCleaningData', {});
+      setVerification(data);
+      toast.success(`Verification complete: ${data.completion_percentage}% assigned`);
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast.error('Failed to verify: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
