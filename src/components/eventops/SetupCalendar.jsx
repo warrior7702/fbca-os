@@ -104,6 +104,25 @@ export default function SetupCalendar() {
     return rooms;
   };
 
+  // Generate 14 days starting from today
+  const generateCalendarDays = () => {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const calendarDays = generateCalendarDays();
+
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
