@@ -302,12 +302,15 @@ Deno.serve(async (req) => {
     
     // Get rooms from database to map PCO resources to campus hub rooms
     const allRooms = await base44.asServiceRole.entities.Room.list();
+    console.log(`[DEBUG] Found ${allRooms.length} total rooms in database`);
+
     const roomMap = {};
     allRooms.forEach(room => {
       if (room.pco_resource_id) {
         roomMap[room.pco_resource_id] = room;
       }
     });
+    console.log(`[DEBUG] Room map has ${Object.keys(roomMap).length} PCO-mapped rooms`);
     
     // Group by building
     const buildingMap = {};
