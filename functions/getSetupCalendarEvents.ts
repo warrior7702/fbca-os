@@ -380,6 +380,8 @@ Deno.serve(async (req) => {
       ...building,
       rooms: Object.values(building.rooms)
     }));
+
+    console.log(`[DEBUG] Final buildings array has ${buildings.length} buildings`);
     
     // Calculate summary
     const summary = {
