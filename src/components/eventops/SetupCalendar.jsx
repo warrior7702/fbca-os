@@ -390,21 +390,30 @@ export default function SetupCalendar() {
                                                       conflict.event_id === event.event_id || 
                                                       conflict.event_name === event.event_name
                                                     );
+                                                    const style = isConflict 
+                                                      ? { 
+                                                          backgroundColor: '#f8d7da',
+                                                          borderLeft: '3px solid #dc3545',
+                                                          color: '#721c24'
+                                                        }
+                                                      : {
+                                                          backgroundColor: '#d4edda',
+                                                          borderLeft: '3px solid #28a745',
+                                                          color: '#155724'
+                                                        };
+                                                    
                                                     return (
                                                       <div 
                                                         key={idx}
-                                                        className={`text-xs rounded px-1.5 py-0.5 truncate border ${
-                                                          isConflict
-                                                            ? 'bg-red-100 border-red-300'
-                                                            : 'bg-green-100 border-green-300'
-                                                        }`}
+                                                        className="text-xs rounded px-1.5 py-0.5 truncate border"
+                                                        style={style}
                                                         title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
                                                       >
-                                                        {isConflict && <div className="text-red-700 font-semibold">⚠️ Conflict</div>}
-                                                        <div className={`font-medium truncate ${isConflict ? 'text-red-900' : 'text-green-900'}`}>
+                                                        {isConflict && <div className="font-semibold">⚠️ Conflict</div>}
+                                                        <div className="font-medium truncate">
                                                           {event.event_name}
                                                         </div>
-                                                        <div className={`text-[10px] ${isConflict ? 'text-red-700' : 'text-green-700'}`}>
+                                                        <div className="text-[10px]">
                                                           {format(new Date(event.start_time), 'h:mm a')}
                                                         </div>
                                                       </div>
