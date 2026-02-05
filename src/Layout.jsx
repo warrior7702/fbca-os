@@ -83,6 +83,12 @@ const apps = [
     color: "text-rose-500"
   },
   {
+    name: "Cleaning",
+    path: "CleaningDashboard",
+    icon: UtensilsCrossed,
+    color: "text-green-500"
+  },
+  {
     name: "Church Calendar",
     path: "Calendar",
     icon: CalendarIcon,
