@@ -15,9 +15,7 @@ export default function CleaningDashboard() {
   const [warnings, setWarnings] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [buildingFilter, setBuildingFilter] = useState("");
   const [temperatureFilter, setTemperatureFilter] = useState("all");
-  const [buildings, setBuildings] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedWarning, setSelectedWarning] = useState(null);
   const [showAckModal, setShowAckModal] = useState(false);
@@ -29,16 +27,12 @@ export default function CleaningDashboard() {
 
   useEffect(() => {
     loadWarnings();
-  }, [buildingFilter, temperatureFilter]);
+  }, [temperatureFilter]);
 
   const loadInitialData = async () => {
     try {
-      const [roomsData, buildingsData] = await Promise.all([
-        base44.entities.Room.list(),
-        base44.entities.Building.list()
-      ]);
+      const roomsData = await base44.entities.Room.list();
       setAllRooms(roomsData);
-      setBuildings(buildingsData);
     } catch (error) {
       console.error('Error loading initial data:', error);
       toast.error('Failed to load data');
@@ -48,18 +42,11 @@ export default function CleaningDashboard() {
   const loadWarnings = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (buildingFilter) params.set('building', buildingFilter);
-      if (temperatureFilter !== 'all') params.set('temperature', temperatureFilter.toUpperCase());
-
       const result = await base44.functions.invoke('getRoomWarnings', {});
       
       let warningsData = result.data.warnings || [];
       
-      // Apply filters
-      if (buildingFilter) {
-        warningsData = warningsData.filter(w => w.building === buildingFilter);
-      }
+      // Apply temperature filter
       if (temperatureFilter !== 'all') {
         warningsData = warningsData.filter(w => w.temperature === temperatureFilter.toUpperCase());
       }
@@ -112,22 +99,22 @@ export default function CleaningDashboard() {
     await loadWarnings();
   };
 
-  const hotRooms = warnings.filter(w => w.temperature === 'HOT');
-  const warmRooms = warnings.filter(w => w.temperature === 'WARM');
-  const coolRooms = allRooms.filter(r => !warnings.find(w => w.room_id === r.id));
+  const alertRooms = warnings.filter(w => w.temperature === 'ALERT');
+  const noticeRooms = warnings.filter(w => w.temperature === 'NOTICE');
+  const totalWarnings = warnings.length;
 
   const getTemperatureIcon = (temp) => {
     switch(temp) {
-      case 'HOT': return <Flame className="w-5 h-5 text-red-500" />;
-      case 'WARM': return <ThermometerSun className="w-5 h-5 text-orange-500" />;
+      case 'ALERT': return <Flame className="w-5 h-5 text-red-500" />;
+      case 'NOTICE': return <ThermometerSun className="w-5 h-5 text-orange-500" />;
       default: return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     }
   };
 
   const getTemperatureColor = (temp) => {
     switch(temp) {
-      case 'HOT': return 'bg-red-50 border-red-200';
-      case 'WARM': return 'bg-orange-50 border-orange-200';
+      case 'ALERT': return 'bg-red-50 border-red-200';
+      case 'NOTICE': return 'bg-orange-50 border-orange-200';
       default: return 'bg-green-50 border-green-200';
     }
   };
@@ -158,9 +145,9 @@ export default function CleaningDashboard() {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-red-700">🔥 URGENT</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-1">{hotRooms.length}</p>
-                  <p className="text-xs text-red-600 mt-1 line-clamp-2">Event &lt; 24h</p>
+                  <p className="text-xs sm:text-sm font-medium text-red-700">🔥 ALERT</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-1">{alertRooms.length}</p>
+                  <p className="text-xs text-red-600 mt-1 line-clamp-2">Event &lt; 6h</p>
                 </div>
                 <Flame className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 opacity-50 flex-shrink-0" />
               </div>
@@ -171,24 +158,24 @@ export default function CleaningDashboard() {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-orange-700">🟡 ATTENTION</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-1">{warmRooms.length}</p>
-                  <p className="text-xs text-orange-600 mt-1 line-clamp-2">Soon</p>
+                  <p className="text-xs sm:text-sm font-medium text-orange-700">🟡 NOTICE</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-1">{noticeRooms.length}</p>
+                  <p className="text-xs text-orange-600 mt-1 line-clamp-2">Event &lt; 24h</p>
                 </div>
                 <ThermometerSun className="w-10 h-10 sm:w-12 sm:h-12 text-orange-400 opacity-50 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-green-700">✅ SCHEDULE</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-1">{coolRooms.length}</p>
-                  <p className="text-xs text-green-600 mt-1 line-clamp-2">Ok</p>
+                  <p className="text-xs sm:text-sm font-medium text-blue-700">📊 TOTAL</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-1">{totalWarnings}</p>
+                  <p className="text-xs text-blue-600 mt-1 line-clamp-2">Rooms</p>
                 </div>
-                <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-400 opacity-50 flex-shrink-0" />
+                <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400 opacity-50 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -199,30 +186,14 @@ export default function CleaningDashboard() {
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
               <div className="flex-1 min-w-[200px]">
-                <Select value={buildingFilter} onValueChange={setBuildingFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Buildings" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={null}>All Buildings</SelectItem>
-                    {buildings.map(building => (
-                      <SelectItem key={building.id} value={building.name}>
-                        {building.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex-1 min-w-[200px]">
                 <Select value={temperatureFilter} onValueChange={setTemperatureFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Priorities" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Priorities</SelectItem>
-                    <SelectItem value="hot">🔥 Hot Only</SelectItem>
-                    <SelectItem value="warm">🟡 Warm Only</SelectItem>
+                    <SelectItem value="alert">🔥 Alert Only</SelectItem>
+                    <SelectItem value="notice">🟡 Notice Only</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -269,8 +240,8 @@ export default function CleaningDashboard() {
                             {warning.room_name || warning.room_number}
                           </h3>
                           <Badge variant="outline" className={`text-xs ${
-                            warning.temperature === 'HOT' ? 'bg-red-100 text-red-800 border-red-300' :
-                            warning.temperature === 'WARM' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                            warning.temperature === 'ALERT' ? 'bg-red-100 text-red-800 border-red-300' :
+                            warning.temperature === 'NOTICE' ? 'bg-orange-100 text-orange-800 border-orange-300' :
                             'bg-green-100 text-green-800 border-green-300'
                           }`}>
                             {warning.temperature}
