@@ -376,10 +376,17 @@ export default function SetupCalendar() {
                                           >
                                             {dayEvents.length > 0 ? (
                                               <div className="space-y-0.5 h-full">
+                                                {/* Show conflict indicator if any conflicts */}
+                                                {dayConflicts.length > 0 && (
+                                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+                                                    !
+                                                  </div>
+                                                )}
+                                                
                                                 {showCountBadge ? (
                                                   <div className="h-full flex items-center justify-center">
                                                     <div className={`text-lg font-bold rounded-full w-12 h-12 flex items-center justify-center border-2 ${
-                                                      hasConflict 
+                                                      dayConflicts.length > 0
                                                         ? 'bg-red-100 border-red-300 text-red-700'
                                                         : 'bg-green-100 border-green-300 text-green-700'
                                                     }`}>
@@ -388,10 +395,7 @@ export default function SetupCalendar() {
                                                   </div>
                                                 ) : (
                                                   dayEvents.map((event, idx) => {
-                                                    const isConflict = room.conflicts?.some(conflict => 
-                                                      conflict.event_id === event.event_id || 
-                                                      conflict.event_name === event.event_name
-                                                    );
+                                                    const isConflict = dayConflicts.some(ce => ce.event_id === event.event_id);
                                                     const style = isConflict 
                                                       ? { 
                                                           backgroundColor: '#f8d7da',
@@ -407,12 +411,14 @@ export default function SetupCalendar() {
                                                     return (
                                                       <div 
                                                         key={idx}
-                                                        className="text-xs rounded px-1.5 py-0.5 truncate border"
+                                                        className={`text-xs rounded px-1.5 py-0.5 truncate border ${
+                                                          isConflict ? 'animate-pulse' : ''
+                                                        }`}
                                                         style={style}
                                                         title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
                                                       >
-                                                        {isConflict && <div className="font-semibold">⚠️ Conflict</div>}
-                                                        <div className="font-medium truncate">
+                                                        {isConflict && <div className="font-semibold text-[11px]">⚠️ Conflict</div>}
+                                                        <div className="font-medium truncate text-[11px]">
                                                           {event.event_name}
                                                         </div>
                                                         <div className="text-[10px]">
