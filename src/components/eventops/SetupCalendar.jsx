@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare, Search, ChevronDown } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
 export default function SetupCalendar() {
@@ -49,6 +49,27 @@ export default function SetupCalendar() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Generate 14 days array
+  const getDaysArray = () => {
+    if (!data?.summary?.date_range?.start) return [];
+    const startDate = new Date(data.summary.date_range.start);
+    return Array.from({ length: 14 }, (_, i) => addDays(startDate, i));
+  };
+
+  // Check if a date is a weekend
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
+  };
+
+  // Get events for a specific room and day
+  const getEventsForRoomAndDay = (room, day) => {
+    return room.events.filter(event => {
+      const eventStart = new Date(event.start_time);
+      return isSameDay(eventStart, day);
+    });
   };
 
   const toggleBuilding = (buildingId) => {
