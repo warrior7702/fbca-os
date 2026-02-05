@@ -314,7 +314,9 @@ Deno.serve(async (req) => {
     
     // Group by building
     const buildingMap = {};
-    
+
+    console.log(`[DEBUG] Starting to group ${eventsWithSetup.length} events by building`);
+
     for (const event of eventsWithSetup) {
        for (const room of event.rooms) {
          const campusRoom = roomMap[room.pco_resource_id];
