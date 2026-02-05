@@ -34,6 +34,40 @@ async function refreshPCOTokenIfNeeded(base44, user) {
   return user.pco_access_token;
 }
 
+// Parse setup type from notes/requirements
+function parseSetupType(notes) {
+  if (!notes) return 'None';
+  
+  const lowerNotes = notes.toLowerCase();
+  
+  // Check for explicit "no setup" indicators
+  if (lowerNotes.includes('no setup') || 
+      lowerNotes.includes('none') ||
+      lowerNotes.includes('n/a')) {
+    return 'None';
+  }
+  
+  // Check for setup types
+  if (lowerNotes.includes('theater') || lowerNotes.includes('theatre')) {
+    return 'Theater';
+  }
+  if (lowerNotes.includes('banquet')) {
+    return 'Banquet';
+  }
+  if (lowerNotes.includes('classroom')) {
+    return 'Classroom';
+  }
+  if (lowerNotes.includes('conference')) {
+    return 'Conference';
+  }
+  if (lowerNotes.includes('reception')) {
+    return 'Reception';
+  }
+  
+  // If notes exist but don't match known patterns, assume standard setup needed
+  return 'Standard';
+}
+
 // Fetch PCO events for date range
 async function getPCOEvents(pcoToken, startDate, endDate) {
   const headers = { 'Authorization': `Bearer ${pcoToken}` };
@@ -80,21 +114,29 @@ async function getPCOEvents(pcoToken, startDate, endDate) {
       // Get event details
       const eventDetail = included.find(i => i.type === 'Event' && i.id === eventId);
       
-      // Map resources
+      // Map resources with setup requirements
       const rooms = [];
       for (const request of requests) {
         const resourceId = request.relationships?.resource?.data?.id;
         const resource = included.find(i => i.type === 'Resource' && i.id === resourceId);
         
-        if (resource) {
+        // Get setup notes/requirements from the request
+        const notes = request.attributes?.notes || '';
+        const setupType = parseSetupType(notes);
+        
+        // FILTER: Only include rooms with actual setup requirements
+        if (resource && setupType !== 'None' && setupType !== 'No Setup') {
           rooms.push({
             pco_resource_id: resourceId,
             resource_name: resource.attributes?.name || 'Unknown',
-            quantity: request.attributes?.quantity || 1
+            quantity: request.attributes?.quantity || 1,
+            setup_notes: notes,
+            setup_type: setupType
           });
         }
       }
       
+      // FILTER: Only include events with rooms that need setup
       if (rooms.length > 0) {
         events.push({
           pco_event_id: eventId,
@@ -116,9 +158,24 @@ async function getPCOEvents(pcoToken, startDate, endDate) {
 
 // Parse setup requirements from event
 function parseSetupRequirements(event) {
-  // Default setup/teardown times (in minutes)
-  const DEFAULT_SETUP = 60;
-  const DEFAULT_TEARDOWN = 60;
+  // Setup times based on type (in minutes)
+  const SETUP_TIMES = {
+    'Theater': 60,
+    'Banquet': 90,
+    'Classroom': 45,
+    'Conference': 30,
+    'Reception': 60,
+    'Standard': 60
+  };
+  
+  const TEARDOWN_TIMES = {
+    'Theater': 60,
+    'Banquet': 90,
+    'Classroom': 45,
+    'Conference': 30,
+    'Reception': 60,
+    'Standard': 60
+  };
   
   return {
     event_id: event.pco_event_id,
@@ -128,9 +185,9 @@ function parseSetupRequirements(event) {
     rooms: event.rooms.map(room => ({
       pco_resource_id: room.pco_resource_id,
       resource_name: room.resource_name,
-      setup_type: 'Standard', // TODO: Parse from PCO questions/answers
-      setup_time_minutes: DEFAULT_SETUP,
-      teardown_time_minutes: DEFAULT_TEARDOWN
+      setup_type: room.setup_type || 'Standard',
+      setup_time_minutes: SETUP_TIMES[room.setup_type] || 60,
+      teardown_time_minutes: TEARDOWN_TIMES[room.setup_type] || 60
     }))
   };
 }
