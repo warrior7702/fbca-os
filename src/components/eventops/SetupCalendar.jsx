@@ -272,16 +272,16 @@ export default function SetupCalendar() {
               >
                 <Card>
                   <CollapsibleTrigger className="w-full">
-                    <CardContent className="p-4 hover:bg-slate-50 transition-colors">
+                    <CardContent className="p-4 bg-slate-800 text-white hover:bg-slate-700 transition-colors rounded-t-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <ChevronDown 
-                            className={`w-5 h-5 text-slate-600 transition-transform ${
+                            className={`w-5 h-5 transition-transform ${
                               isExpanded ? 'rotate-0' : '-rotate-90'
                             }`}
                           />
-                          <Building2 className="w-5 h-5 text-blue-600" />
-                          <h3 className="text-lg font-semibold text-slate-900">
+                          <Building2 className="w-5 h-5" />
+                          <h3 className="text-lg font-semibold">
                             {building.building_name}
                           </h3>
                         </div>
