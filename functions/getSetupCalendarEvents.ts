@@ -36,9 +36,7 @@ async function refreshPCOTokenIfNeeded(base44, user) {
 
 // Parse setup type from notes/requirements
 function parseSetupType(notes) {
-  if (!notes) return 'None';
-  
-  const lowerNotes = notes.toLowerCase();
+  const lowerNotes = (notes || '').toLowerCase();
   
   // Check for explicit "no setup" indicators
   if (lowerNotes.includes('no setup') || 
@@ -64,7 +62,7 @@ function parseSetupType(notes) {
     return 'Reception';
   }
   
-  // If notes exist but don't match known patterns, assume standard setup needed
+  // Default: assume Standard setup needed for all bookable rooms
   return 'Standard';
 }
 
