@@ -357,6 +357,14 @@ export default function SetupCalendar() {
                                       {/* Event Cells for each Room */}
                                       {filteredRooms.map((room) => {
                                         const dayEvents = getEventsForRoomAndDay(room, day);
+                                        const hasConflict = dayEvents.some(event => 
+                                          room.conflicts?.some(conflict => 
+                                            conflict.event_id === event.event_id || 
+                                            conflict.event_name === event.event_name
+                                          )
+                                        );
+                                        const showCountBadge = dayEvents.length > 3;
+                                        
                                         return (
                                           <div 
                                             key={room.room_id}
@@ -365,21 +373,44 @@ export default function SetupCalendar() {
                                             }`}
                                           >
                                             {dayEvents.length > 0 ? (
-                                              <div className="space-y-0.5">
-                                                {dayEvents.map((event, idx) => (
-                                                  <div 
-                                                    key={idx}
-                                                    className="text-xs bg-blue-100 border border-blue-300 rounded px-1.5 py-0.5 truncate"
-                                                    title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
-                                                  >
-                                                    <div className="font-medium text-blue-900 truncate">
-                                                      {event.event_name}
-                                                    </div>
-                                                    <div className="text-blue-700 text-[10px]">
-                                                      {format(new Date(event.start_time), 'h:mm a')}
+                                              <div className="space-y-0.5 h-full">
+                                                {showCountBadge ? (
+                                                  <div className="h-full flex items-center justify-center">
+                                                    <div className={`text-lg font-bold rounded-full w-12 h-12 flex items-center justify-center border-2 ${
+                                                      hasConflict 
+                                                        ? 'bg-red-100 border-red-300 text-red-700'
+                                                        : 'bg-green-100 border-green-300 text-green-700'
+                                                    }`}>
+                                                      +{dayEvents.length}
                                                     </div>
                                                   </div>
-                                                ))}
+                                                ) : (
+                                                  dayEvents.map((event, idx) => {
+                                                    const isConflict = room.conflicts?.some(conflict => 
+                                                      conflict.event_id === event.event_id || 
+                                                      conflict.event_name === event.event_name
+                                                    );
+                                                    return (
+                                                      <div 
+                                                        key={idx}
+                                                        className={`text-xs rounded px-1.5 py-0.5 truncate border ${
+                                                          isConflict
+                                                            ? 'bg-red-100 border-red-300'
+                                                            : 'bg-green-100 border-green-300'
+                                                        }`}
+                                                        title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
+                                                      >
+                                                        {isConflict && <div className="text-red-700 font-semibold">⚠️ Conflict</div>}
+                                                        <div className={`font-medium truncate ${isConflict ? 'text-red-900' : 'text-green-900'}`}>
+                                                          {event.event_name}
+                                                        </div>
+                                                        <div className={`text-[10px] ${isConflict ? 'text-red-700' : 'text-green-700'}`}>
+                                                          {format(new Date(event.start_time), 'h:mm a')}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })
+                                                )}
                                               </div>
                                             ) : null}
                                           </div>
