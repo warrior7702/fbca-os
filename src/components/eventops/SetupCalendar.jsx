@@ -125,19 +125,7 @@ export default function SetupCalendar() {
     return rooms;
   };
 
-  // Generate 14 days starting from today
-  const generateCalendarDays = () => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push(date);
-    }
-    return days;
-  };
 
-  const calendarDays = generateCalendarDays();
 
   if (loading) {
     return (
@@ -338,136 +326,88 @@ export default function SetupCalendar() {
                             No rooms match the current filters
                           </p>
                         ) : (
-                          <div className="overflow-x-auto">
-                            <div className="min-w-max">
-                              {/* Calendar Header */}
-                              <div className="grid grid-cols-[200px_repeat(14,1fr)] gap-0 mb-2">
-                                {/* Room Name Column Header */}
-                                <div className="bg-slate-100 border border-slate-300 p-2 font-semibold text-sm text-slate-700">
-                                  Room
-                                </div>
-                                
-                                {/* Day Headers */}
-                                {calendarDays.map((day, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`border border-slate-300 p-2 text-center text-xs font-medium min-w-[80px] ${
-                                      isWeekend(day) ? 'bg-red-50' : 'bg-slate-50'
-                                    }`}
-                                  >
-                                    <div className="text-slate-700">
-                                      {format(day, 'EEE d')}
-                                    </div>
-                                  </div>
-                                ))}
+                          <div className="flex overflow-hidden">
+                            {/* Fixed Left Column - Room Names */}
+                            <div className="flex-shrink-0 w-48 border-r border-slate-300">
+                              {/* Header */}
+                              <div className="h-12 flex items-center px-3 border-b border-slate-300 bg-slate-100 font-semibold text-sm text-slate-700">
+                                Room
                               </div>
-
                               {/* Room Rows */}
                               {filteredRooms.map((room) => (
-                                <div key={room.room_id} className="grid grid-cols-[200px_repeat(14,1fr)] gap-0 mb-0">
-                                  {/* Room Name Cell */}
-                                  <div className="bg-slate-50 border border-slate-300 p-2 text-sm font-medium text-slate-900 flex items-center">
-                                    <div>
-                                      <div>{room.room_name}</div>
-                                      {room.room_number && (
-                                        <div className="text-xs text-slate-500">{room.room_number}</div>
-                                      )}
-                                    </div>
+                                <div 
+                                  key={room.room_id}
+                                  className="h-20 flex items-center px-3 border-b border-slate-300 bg-slate-50"
+                                >
+                                  <div className="text-sm">
+                                    <div className="font-medium text-slate-900">{room.room_name}</div>
+                                    {room.room_number && (
+                                      <div className="text-xs text-slate-500">{room.room_number}</div>
+                                    )}
                                   </div>
-
-                                  {/* Day Cells */}
-                                  {calendarDays.map((day, dayIdx) => {
-                                    const dayStart = new Date(day);
-                                    dayStart.setHours(0, 0, 0, 0);
-                                    const dayEnd = new Date(day);
-                                    dayEnd.setHours(23, 59, 59, 999);
-
-                                    // Find events for this room on this day
-                                    const eventsOnDay = room.events.filter(event => {
-                                      const eventStart = new Date(event.start_time);
-                                      return eventStart >= dayStart && eventStart <= dayEnd;
-                                    });
-
-                                    // Calculate total indicators (green + yellow dots)
-                                    const totalIndicators = eventsOnDay.reduce((count, event) => {
-                                      let indicators = 1; // green dot for main event
-                                      if (event.room_setup?.setup_time_minutes > 0) indicators++; // yellow dot for setup
-                                      if (event.room_setup?.teardown_time_minutes > 0) indicators++; // yellow dot for teardown
-                                      return count + indicators;
-                                    }, 0);
-
-                                    const maxDisplay = 4;
-                                    const hasOverflow = totalIndicators > maxDisplay;
-                                    const displayLimit = hasOverflow ? 3 : maxDisplay;
-
-                                    return (
-                                      <div
-                                        key={dayIdx}
-                                        className={`border border-slate-300 p-2 min-h-[60px] min-w-[80px] ${
-                                          isWeekend(day) ? 'bg-red-50/30' : 'bg-white'
-                                        }`}
-                                      >
-                                        {eventsOnDay.length > 0 && (
-                                          <div className="flex flex-wrap gap-1 items-start">
-                                            {(() => {
-                                              let displayedCount = 0;
-                                              const dots = [];
-                                              
-                                              for (const event of eventsOnDay) {
-                                                if (displayedCount >= displayLimit) break;
-                                                
-                                                // Yellow dot for setup
-                                                if (event.room_setup?.setup_time_minutes > 0 && displayedCount < displayLimit) {
-                                                  dots.push(
-                                                    <div
-                                                      key={`setup-${event.event_id || displayedCount}`}
-                                                      className="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600"
-                                                      title={`Setup: ${event.room_setup.setup_type || 'Standard'} (${event.room_setup.setup_time_minutes} min)`}
-                                                    />
-                                                  );
-                                                  displayedCount++;
-                                                }
-                                                
-                                                // Green dot for main event
-                                                if (displayedCount < displayLimit) {
-                                                  dots.push(
-                                                    <div
-                                                      key={`event-${event.event_id || displayedCount}`}
-                                                      className="w-3 h-3 rounded-full bg-green-500 border border-green-700"
-                                                      title={`${event.event_name} - ${format(new Date(event.start_time), 'h:mm a')}`}
-                                                    />
-                                                  );
-                                                  displayedCount++;
-                                                }
-                                                
-                                                // Yellow dot for teardown
-                                                if (event.room_setup?.teardown_time_minutes > 0 && displayedCount < displayLimit) {
-                                                  dots.push(
-                                                    <div
-                                                      key={`teardown-${event.event_id || displayedCount}`}
-                                                      className="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600"
-                                                      title={`Teardown (${event.room_setup.teardown_time_minutes} min)`}
-                                                    />
-                                                  );
-                                                  displayedCount++;
-                                                }
-                                              }
-                                              
-                                              return dots;
-                                            })()}
-                                            
-                                            {hasOverflow && (
-                                              <Badge className="text-[10px] h-4 px-1 bg-slate-700 hover:bg-slate-600">
-                                                +{totalIndicators - displayLimit}
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
                                 </div>
                               ))}
+                            </div>
+
+                            {/* Scrollable Days Columns */}
+                            <div className="flex-1 overflow-x-auto">
+                              <div className="flex min-w-max">
+                                {getDaysArray().map((day, dayIndex) => {
+                                  const isWeekendDay = isWeekend(day);
+                                  return (
+                                    <div 
+                                      key={dayIndex} 
+                                      className={`flex-shrink-0 w-32 ${
+                                        isWeekendDay ? 'bg-red-50' : 'bg-white'
+                                      }`}
+                                    >
+                                      {/* Day Header */}
+                                      <div className={`h-12 flex flex-col items-center justify-center border-b border-l border-slate-300 ${
+                                        isWeekendDay ? 'bg-red-100' : 'bg-slate-100'
+                                      }`}>
+                                        <div className="text-xs font-medium text-slate-600">
+                                          {format(day, 'EEE')}
+                                        </div>
+                                        <div className="text-sm font-semibold text-slate-900">
+                                          {format(day, 'd')}
+                                        </div>
+                                      </div>
+
+                                      {/* Event Cells for each Room */}
+                                      {filteredRooms.map((room) => {
+                                        const dayEvents = getEventsForRoomAndDay(room, day);
+                                        return (
+                                          <div 
+                                            key={room.room_id}
+                                            className={`h-20 border-b border-l border-slate-300 p-1 ${
+                                              isWeekendDay ? 'bg-red-50' : 'bg-white'
+                                            }`}
+                                          >
+                                            {dayEvents.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {dayEvents.map((event, idx) => (
+                                                  <div 
+                                                    key={idx}
+                                                    className="text-xs bg-blue-100 border border-blue-300 rounded px-1.5 py-0.5 truncate"
+                                                    title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
+                                                  >
+                                                    <div className="font-medium text-blue-900 truncate">
+                                                      {event.event_name}
+                                                    </div>
+                                                    <div className="text-blue-700 text-[10px]">
+                                                      {format(new Date(event.start_time), 'h:mm a')}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         )}
