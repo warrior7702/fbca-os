@@ -313,14 +313,14 @@ export default function SetupCalendar() {
                         ) : (
                           <div className="flex overflow-hidden">
                             {/* Fixed Left Column - Room Names */}
-                            <div className="flex-shrink-0 w-48 border-r border-slate-300">
-                              <div className="h-12 flex items-center px-3 border-b border-slate-300 bg-slate-100 font-semibold text-sm text-slate-700">
+                            <div className="flex-shrink-0 w-40 border-r border-slate-300">
+                              <div className="h-12 flex items-center px-3 border-b border-slate-300 bg-slate-800 text-white font-semibold text-sm sticky left-0 z-20">
                                 Room
                               </div>
                               {filteredRooms.map((room) => (
                                 <div 
                                   key={room.room_id}
-                                  className="h-20 flex items-center px-3 border-b border-slate-300 bg-slate-50"
+                                  className="h-20 flex items-center px-3 border-b border-slate-300 bg-slate-50 sticky left-0 z-10"
                                 >
                                   <div className="text-sm">
                                     <div className="font-medium text-slate-900">{room.room_name}</div>
@@ -334,7 +334,7 @@ export default function SetupCalendar() {
 
                             {/* Scrollable Days Columns */}
                             <div className="flex-1 overflow-x-auto">
-                              <div className="flex min-w-max">
+                              <div className="inline-flex min-w-max">
                                 {calendarDays.map((day, dayIndex) => {
                                   const isWeekendDay = isWeekend(day);
                                   return (
