@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight } from "lucide-react";
+import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -55,32 +55,55 @@ export default function SetupCalendar() {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        {/* Card 1: Total Events - Green */}
+        <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-slate-900">{data.summary.total_events}</div>
-            <p className="text-sm text-slate-600">Total Events</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-slate-900">{data.summary.active_rooms}</div>
-            <p className="text-sm text-slate-600">Active Rooms</p>
-          </CardContent>
-        </Card>
-        <Card className={data.summary.total_conflicts > 0 ? 'border-red-200 bg-red-50' : ''}>
-          <CardContent className="pt-6">
-            <div className={`text-2xl font-bold ${data.summary.total_conflicts > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-              {data.summary.total_conflicts}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-green-700">{data.summary.total_events}</div>
+                <p className="text-sm text-green-600">Total Events</p>
+              </div>
+              <CalendarDays className="w-8 h-8 text-green-400" />
             </div>
-            <p className="text-sm text-slate-600">Setup Conflicts</p>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Card 2: Setup Conflicts - Red */}
+        <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-6">
-            <div className="text-sm text-slate-900 font-medium">
-              {format(new Date(data.summary.date_range.start), 'MMM d')} - {format(new Date(data.summary.date_range.end), 'MMM d')}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-red-700">{data.summary.total_conflicts}</div>
+                <p className="text-sm text-red-600">Setup Conflicts</p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-red-400" />
             </div>
-            <p className="text-sm text-slate-600">Date Range</p>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Active Rooms - Blue */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-blue-700">{data.summary.active_rooms}</div>
+                <p className="text-sm text-blue-600">Active Rooms</p>
+              </div>
+              <Building2 className="w-8 h-8 text-blue-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Setup Tasks - Gray */}
+        <Card className="border-slate-200 bg-slate-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-slate-700">{data.summary.total_events * 2}</div>
+                <p className="text-sm text-slate-600">Setup Tasks</p>
+              </div>
+              <CheckSquare className="w-8 h-8 text-slate-400" />
+            </div>
           </CardContent>
         </Card>
       </div>
