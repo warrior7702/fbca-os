@@ -3,6 +3,9 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare, Search, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -21,21 +24,84 @@ export default function SetupCalendar() {
     loadSetupData();
   }, []);
 
+  useEffect(() => {
+    // Expand first building by default when data loads
+    if (data?.buildings?.length > 0 && Object.keys(expandedBuildings).length === 0) {
+      setExpandedBuildings({ [data.buildings[0].building_id]: true });
+    }
+  }, [data]);
+
   const loadSetupData = async () => {
     setLoading(true);
     try {
-      const result = await base44.functions.invoke('getSetupCalendarEvents', {});
-      setData(result.data);
+      const today = new Date();
+      const endDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
       
-      if (result.data.buildings.length > 0) {
-        setSelectedBuilding(result.data.buildings[0].building_id);
-      }
+      const result = await base44.functions.invoke('getSetupCalendarEvents', {
+        start_date: today.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0]
+      });
+      
+      setData(result.data);
     } catch (error) {
       console.error('Error loading setup calendar:', error);
       toast.error('Failed to load setup calendar');
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleBuilding = (buildingId) => {
+    setExpandedBuildings(prev => ({
+      ...prev,
+      [buildingId]: !prev[buildingId]
+    }));
+  };
+
+  const getFilteredBuildings = () => {
+    if (!data?.buildings) return [];
+    
+    return data.buildings.filter(building => {
+      // Building filter
+      if (buildingFilter !== 'all' && building.building_id !== buildingFilter) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const buildingMatch = building.building_name.toLowerCase().includes(query);
+        const roomMatch = building.rooms.some(room => 
+          room.room_name?.toLowerCase().includes(query) || 
+          room.room_number?.toLowerCase().includes(query)
+        );
+        if (!buildingMatch && !roomMatch) return false;
+      }
+      
+      return true;
+    });
+  };
+
+  const getFilteredRooms = (building) => {
+    let rooms = building.rooms;
+    
+    // Room filter
+    if (roomFilter === 'with_events') {
+      rooms = rooms.filter(room => room.events.length > 0);
+    } else if (roomFilter === 'with_conflicts') {
+      rooms = rooms.filter(room => room.conflicts.length > 0);
+    }
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      rooms = rooms.filter(room =>
+        room.room_name?.toLowerCase().includes(query) ||
+        room.room_number?.toLowerCase().includes(query)
+      );
+    }
+    
+    return rooms;
   };
 
   if (loading) {
@@ -53,8 +119,6 @@ export default function SetupCalendar() {
       </div>
     );
   }
-
-  const currentBuilding = data.buildings.find(b => b.building_id === selectedBuilding);
 
   return (
     <div className="space-y-6">
@@ -113,47 +177,151 @@ export default function SetupCalendar() {
         </Card>
       </div>
 
-      {/* Building Selector */}
-      {data.buildings.length > 1 && (
-        <div className="flex gap-2">
-          {data.buildings.map(building => (
-            <Button
-              key={building.building_id}
-              variant={selectedBuilding === building.building_id ? 'default' : 'outline'}
-              onClick={() => setSelectedBuilding(building.building_id)}
-            >
-              {building.building_name}
-              {building.conflict_count > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {building.conflict_count}
-                </Badge>
-              )}
-            </Button>
-          ))}
-        </div>
-      )}
+      {/* Controls Bar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4">
+            {/* Row 1: View Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700 mr-2">View:</span>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  onClick={() => setViewMode('grid')}
+                >
+                  2-Week Grid
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'strips' ? 'default' : 'outline'}
+                  onClick={() => setViewMode('strips')}
+                >
+                  Week Strips
+                </Button>
+              </div>
+            </div>
 
-      {/* Building Details */}
-      {currentBuilding && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">
-              {currentBuilding.building_name}
-            </h3>
-            <div className="flex gap-4 text-sm text-slate-600">
-              <span>{currentBuilding.room_count} rooms</span>
-              <span>{currentBuilding.event_count} events</span>
-              {currentBuilding.conflict_count > 0 && (
-                <span className="text-red-600 font-medium">
-                  {currentBuilding.conflict_count} conflicts
-                </span>
-              )}
+            {/* Row 2: Filters and Search */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="All Buildings" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Buildings</SelectItem>
+                  {data.buildings?.map((building) => (
+                    <SelectItem key={building.building_id} value={building.building_id}>
+                      {building.building_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={roomFilter} onValueChange={setRoomFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="All Rooms" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Rooms</SelectItem>
+                  <SelectItem value="with_events">With Events Only</SelectItem>
+                  <SelectItem value="with_conflicts">With Conflicts Only</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search rooms..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Rooms */}
-          <div className="space-y-4">
-            {currentBuilding.rooms.map(room => (
+      {/* Building Sections */}
+      {getFilteredBuildings().length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-slate-500">No buildings match the current filters</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {getFilteredBuildings().map((building) => {
+            const isExpanded = expandedBuildings[building.building_id];
+            const filteredRooms = getFilteredRooms(building);
+            
+            return (
+              <Collapsible
+                key={building.building_id}
+                open={isExpanded}
+                onOpenChange={() => toggleBuilding(building.building_id)}
+              >
+                <Card>
+                  <CollapsibleTrigger className="w-full">
+                    <CardContent className="p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <ChevronDown 
+                            className={`w-5 h-5 text-slate-600 transition-transform ${
+                              isExpanded ? 'rotate-0' : '-rotate-90'
+                            }`}
+                          />
+                          <Building2 className="w-5 h-5 text-blue-600" />
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            {building.building_name}
+                          </h3>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-slate-50">
+                            {filteredRooms.length} {filteredRooms.length === 1 ? 'Room' : 'Rooms'}
+                          </Badge>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {building.event_count} {building.event_count === 1 ? 'Event' : 'Events'}
+                          </Badge>
+                          {building.conflict_count > 0 && (
+                            <Badge variant="destructive">
+                              {building.conflict_count} {building.conflict_count === 1 ? 'Conflict' : 'Conflicts'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <CardContent className="pt-0 pb-4 px-4">
+                      <div className="border-t pt-4">
+                        {filteredRooms.length === 0 ? (
+                          <p className="text-sm text-slate-500 text-center py-4">
+                            No rooms match the current filters
+                          </p>
+                        ) : (
+                          <div className="text-sm text-slate-600">
+                            <p className="text-center py-8 text-slate-400">
+                              Calendar grid coming soon...
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
               <Card key={room.room_id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
