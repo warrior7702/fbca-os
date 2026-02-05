@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare, Search, ChevronDown } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2, AlertTriangle, CalendarDays, Building2, CheckSquare, Search, ChevronDown } from "lucide-react";
+import { format, addDays, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
 export default function SetupCalendar() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [selectedBuilding, setSelectedBuilding] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'strips'
+  const [viewMode, setViewMode] = useState('grid');
   const [buildingFilter, setBuildingFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +24,6 @@ export default function SetupCalendar() {
   }, []);
 
   useEffect(() => {
-    // Expand first building by default when data loads
     if (data?.buildings?.length > 0 && Object.keys(expandedBuildings).length === 0) {
       setExpandedBuildings({ [data.buildings[0].building_id]: true });
     }
@@ -51,6 +49,24 @@ export default function SetupCalendar() {
     }
   };
 
+  const getDaysArray = () => {
+    if (!data?.summary?.date_range?.start) return [];
+    const startDate = new Date(data.summary.date_range.start);
+    return Array.from({ length: 14 }, (_, i) => addDays(startDate, i));
+  };
+
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
+
+  const getEventsForRoomAndDay = (room, day) => {
+    return room.events.filter(event => {
+      const eventStart = new Date(event.start_time);
+      return isSameDay(eventStart, day);
+    });
+  };
+
   const toggleBuilding = (buildingId) => {
     setExpandedBuildings(prev => ({
       ...prev,
@@ -62,12 +78,10 @@ export default function SetupCalendar() {
     if (!data?.buildings) return [];
     
     return data.buildings.filter(building => {
-      // Building filter
       if (buildingFilter !== 'all' && building.building_id !== buildingFilter) {
         return false;
       }
       
-      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const buildingMatch = building.building_name.toLowerCase().includes(query);
@@ -85,14 +99,12 @@ export default function SetupCalendar() {
   const getFilteredRooms = (building) => {
     let rooms = building.rooms;
     
-    // Room filter
     if (roomFilter === 'with_events') {
       rooms = rooms.filter(room => room.events.length > 0);
     } else if (roomFilter === 'with_conflicts') {
       rooms = rooms.filter(room => room.conflicts.length > 0);
     }
     
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       rooms = rooms.filter(room =>
@@ -102,25 +114,6 @@ export default function SetupCalendar() {
     }
     
     return rooms;
-  };
-
-  // Generate 14 days starting from today
-  const generateCalendarDays = () => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push(date);
-    }
-    return days;
-  };
-
-  const calendarDays = generateCalendarDays();
-
-  const isWeekend = (date) => {
-    const day = date.getDay();
-    return day === 0 || day === 6; // Sunday or Saturday
   };
 
   if (loading) {
@@ -139,11 +132,12 @@ export default function SetupCalendar() {
     );
   }
 
+  const calendarDays = getDaysArray();
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Card 1: Total Events - Green */}
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -156,7 +150,6 @@ export default function SetupCalendar() {
           </CardContent>
         </Card>
 
-        {/* Card 2: Setup Conflicts - Red */}
         <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -169,7 +162,6 @@ export default function SetupCalendar() {
           </CardContent>
         </Card>
 
-        {/* Card 3: Active Rooms - Blue */}
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -182,7 +174,6 @@ export default function SetupCalendar() {
           </CardContent>
         </Card>
 
-        {/* Card 4: Setup Tasks - Gray */}
         <Card className="border-slate-200 bg-slate-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -200,7 +191,6 @@ export default function SetupCalendar() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-4">
-            {/* Row 1: View Toggle */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-slate-700 mr-2">View:</span>
               <div className="flex gap-1">
@@ -221,7 +211,6 @@ export default function SetupCalendar() {
               </div>
             </div>
 
-            {/* Row 2: Filters and Search */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Select value={buildingFilter} onValueChange={setBuildingFilter}>
                 <SelectTrigger className="w-full sm:w-48">
@@ -322,148 +311,83 @@ export default function SetupCalendar() {
                             No rooms match the current filters
                           </p>
                         ) : (
-                          <div className="relative border-2 border-slate-300 rounded-lg overflow-hidden">
-                            <div className="flex">
-                              {/* Fixed Left Column - Room Names */}
-                              <div className="flex-shrink-0 w-56 bg-slate-50 border-r-2 border-slate-300 z-10">
-                                {/* Header */}
-                                <div className="p-3 border-b-2 border-slate-300 font-semibold text-slate-700 bg-slate-100 sticky top-0">
-                                  Room
-                                </div>
-                                
-                                {/* Room Name Cells */}
-                                {filteredRooms.map((room) => (
-                                  <div
-                                    key={room.room_id}
-                                    className="p-3 border-b border-slate-200 min-h-[100px] flex flex-col justify-center bg-slate-50"
-                                  >
-                                    <div className="font-medium text-slate-900 text-sm">
-                                      {room.room_name} {room.room_number && <span className="text-slate-600">{room.room_number}</span>}
-                                    </div>
-                                    <div className="flex gap-1 mt-2 flex-wrap">
-                                      {room.events.length > 0 && (
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                          {room.events.length}
-                                        </Badge>
-                                      )}
-                                      {room.conflicts.length > 0 && (
-                                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex items-center gap-0.5">
-                                          <AlertTriangle className="w-2.5 h-2.5" />
-                                          {room.conflicts.length}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                          <div className="flex overflow-hidden">
+                            {/* Fixed Left Column - Room Names */}
+                            <div className="flex-shrink-0 w-48 border-r border-slate-300">
+                              <div className="h-12 flex items-center px-3 border-b border-slate-300 bg-slate-100 font-semibold text-sm text-slate-700">
+                                Room
                               </div>
-
-                              {/* Scrollable Days Section */}
-                              <div className="flex-1 overflow-x-auto">
-                                <div className="min-w-max">
-                                  {/* Days Header */}
-                                  <div className="flex border-b-2 border-slate-300 bg-slate-100 sticky top-0 z-5">
-                                    {calendarDays.map((date, i) => {
-                                      const dayName = format(date, 'EEE');
-                                      const dayNum = format(date, 'd');
-                                      const weekend = isWeekend(date);
-                                      
-                                      return (
-                                        <div
-                                          key={i}
-                                          className={`w-28 p-2 text-center border-r border-slate-200 ${
-                                            weekend ? 'bg-red-100' : 'bg-slate-50'
-                                          }`}
-                                        >
-                                          <div className="font-semibold text-slate-700">{dayName}</div>
-                                          <div className="text-xs text-slate-600">{dayNum}</div>
-                                        </div>
-                                      );
-                                    })}
+                              {filteredRooms.map((room) => (
+                                <div 
+                                  key={room.room_id}
+                                  className="h-20 flex items-center px-3 border-b border-slate-300 bg-slate-50"
+                                >
+                                  <div className="text-sm">
+                                    <div className="font-medium text-slate-900">{room.room_name}</div>
+                                    {room.room_number && (
+                                      <div className="text-xs text-slate-500">{room.room_number}</div>
+                                    )}
                                   </div>
-
-                                  {/* Room Rows with Day Cells */}
-                                  {filteredRooms.map((room) => {
-                                    // Create a Set of conflict event IDs for quick lookup
-                                    const conflictEventIds = new Set();
-                                    room.conflicts.forEach(conflict => {
-                                      conflictEventIds.add(conflict.event1.event_id);
-                                      conflictEventIds.add(conflict.event2.event_id);
-                                    });
-
-                                    return (
-                                      <div key={room.room_id} className="flex border-b border-slate-200">
-                                        {calendarDays.map((date, dayIdx) => {
-                                          const weekend = isWeekend(date);
-                                          
-                                          // Find events for this day
-                                          const dayStart = new Date(date);
-                                          dayStart.setHours(0, 0, 0, 0);
-                                          const dayEnd = new Date(date);
-                                          dayEnd.setHours(23, 59, 59, 999);
-                                          
-                                          const dayEvents = room.events.filter(event => {
-                                            const eventDate = new Date(event.start_time);
-                                            return eventDate >= dayStart && eventDate <= dayEnd;
-                                          });
-
-                                          return (
-                                            <div
-                                              key={dayIdx}
-                                              className={`w-28 p-1.5 border-r border-slate-200 min-h-[100px] ${
-                                                weekend ? 'bg-red-50/30' : 'bg-white'
-                                              }`}
-                                            >
-                                              <div className="flex flex-wrap gap-1.5 items-start content-start">
-                                                {dayEvents.slice(0, 4).map((event, idx) => {
-                                                  const hasConflict = conflictEventIds.has(event.event_id);
-                                                  
-                                                  return (
-                                                    <React.Fragment key={idx}>
-                                                      {/* Yellow dot for setup */}
-                                                      {event.room_setup && (
-                                                        <div 
-                                                          className="w-2.5 h-2.5 rounded-full bg-yellow-500 cursor-pointer hover:scale-125 transition-transform"
-                                                          title={`Setup: ${event.event_name} - ${event.room_setup.setup_time_minutes || 60} min`}
-                                                        />
-                                                      )}
-                                                      
-                                                      {/* Green dot for event (red if conflict) */}
-                                                      <div 
-                                                        className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:scale-125 transition-transform ${
-                                                          hasConflict ? 'bg-red-500' : 'bg-green-500'
-                                                        }`}
-                                                        title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}${event.room_setup ? `\nSetup: ${event.room_setup.setup_type}` : ''}`}
-                                                      />
-                                                      
-                                                      {/* Yellow dot for teardown */}
-                                                      {event.room_setup && (
-                                                        <div 
-                                                          className="w-2.5 h-2.5 rounded-full bg-yellow-500 cursor-pointer hover:scale-125 transition-transform"
-                                                          title={`Teardown: ${event.event_name}`}
-                                                        />
-                                                      )}
-                                                    </React.Fragment>
-                                                  );
-                                                })}
-                                                
-                                                {/* "+N" badge if more than 4 events */}
-                                                {dayEvents.length > 4 && (
-                                                  <Badge 
-                                                    variant="secondary" 
-                                                    className="text-[9px] px-1 py-0 h-4 leading-none"
-                                                    title={`${dayEvents.length - 4} more events`}
-                                                  >
-                                                    +{dayEvents.length - 4}
-                                                  </Badge>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    );
-                                  })}
                                 </div>
+                              ))}
+                            </div>
+
+                            {/* Scrollable Days Columns */}
+                            <div className="flex-1 overflow-x-auto">
+                              <div className="flex min-w-max">
+                                {calendarDays.map((day, dayIndex) => {
+                                  const isWeekendDay = isWeekend(day);
+                                  return (
+                                    <div 
+                                      key={dayIndex} 
+                                      className="flex-shrink-0 w-32"
+                                    >
+                                      {/* Day Header */}
+                                      <div className={`h-12 flex flex-col items-center justify-center border-b border-l border-slate-300 ${
+                                        isWeekendDay ? 'bg-red-100' : 'bg-slate-100'
+                                      }`}>
+                                        <div className="text-xs font-medium text-slate-600">
+                                          {format(day, 'EEE')}
+                                        </div>
+                                        <div className="text-sm font-semibold text-slate-900">
+                                          {format(day, 'd')}
+                                        </div>
+                                      </div>
+
+                                      {/* Event Cells for each Room */}
+                                      {filteredRooms.map((room) => {
+                                        const dayEvents = getEventsForRoomAndDay(room, day);
+                                        return (
+                                          <div 
+                                            key={room.room_id}
+                                            className={`h-20 border-b border-l border-slate-300 p-1 ${
+                                              isWeekendDay ? 'bg-red-50' : 'bg-white'
+                                            }`}
+                                          >
+                                            {dayEvents.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {dayEvents.map((event, idx) => (
+                                                  <div 
+                                                    key={idx}
+                                                    className="text-xs bg-blue-100 border border-blue-300 rounded px-1.5 py-0.5 truncate"
+                                                    title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}`}
+                                                  >
+                                                    <div className="font-medium text-blue-900 truncate">
+                                                      {event.event_name}
+                                                    </div>
+                                                    <div className="text-blue-700 text-[10px]">
+                                                      {format(new Date(event.start_time), 'h:mm a')}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
