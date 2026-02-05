@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare } from "lucide-react";
+import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight, CalendarDays, Building2, CheckSquare, Search, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -11,6 +11,11 @@ export default function SetupCalendar() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'strips'
+  const [buildingFilter, setBuildingFilter] = useState('all');
+  const [roomFilter, setRoomFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedBuildings, setExpandedBuildings] = useState({});
 
   useEffect(() => {
     loadSetupData();
