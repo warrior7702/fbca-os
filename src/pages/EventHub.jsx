@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import EventOpsQueue from "@/components/eventops/EventOpsQueue";
-import RoomHeatMap from "@/components/eventops/RoomHeatMap";
+import SetupCalendar from "@/components/eventops/SetupCalendar";
 import RoomTimelineTab from "@/components/eventops/RoomTimelineTab";
 import EventOpsDetailDrawer from "@/components/eventops/EventOpsDetailDrawer";
 import CleaningDashboard from "@/components/cleaning/CleaningDashboard";
@@ -118,7 +118,7 @@ export default function EventHub() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="queue">Ops Queue</TabsTrigger>
-            <TabsTrigger value="heatmap">Room Heat Map</TabsTrigger>
+            <TabsTrigger value="setup">Setup Calendar</TabsTrigger>
             <TabsTrigger value="timeline">Room Timeline</TabsTrigger>
             <TabsTrigger value="cleaning">Cleaning</TabsTrigger>
           </TabsList>
@@ -130,8 +130,8 @@ export default function EventHub() {
               dateFilter={dateFilter}
             />
           </TabsContent>
-          <TabsContent value="heatmap">
-            <RoomHeatMap onCellClick={handleCellClick} />
+          <TabsContent value="setup">
+            <SetupCalendar />
           </TabsContent>
           <TabsContent value="timeline">
             <RoomTimelineTab />
