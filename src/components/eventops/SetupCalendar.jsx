@@ -139,11 +139,6 @@ export default function SetupCalendar() {
 
   const calendarDays = generateCalendarDays();
 
-  const isWeekend = (date) => {
-    const day = date.getDay();
-    return day === 0 || day === 6; // Sunday or Saturday
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
