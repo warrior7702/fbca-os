@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
         if (!nextEvent) return null;
         
         const now = new Date();
-        const hoursUntilEvent = (nextEvent.start_time - now) / (1000 * 60 * 60);
+        const hoursUntilEvent = (new Date(nextEvent.start_time) - now) / (1000 * 60 * 60);
         
         // Only show if event is within 24 hours
         if (hoursUntilEvent > 24) return null;
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
           floor: room.floor_name || room.floor,
           warning_text: `Needs cleaned before ${nextEvent.name}`,
           temperature: temperature,
-          event_time: nextEvent.start_time.toISOString(),
+          event_time: nextEvent.start_time,
           event_name: nextEvent.name,
           room: {
             id: room.id,
