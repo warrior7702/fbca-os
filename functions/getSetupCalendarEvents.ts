@@ -115,13 +115,15 @@ async function getPCOEvents(pcoToken, startDate, endDate) {
       for (const request of requests) {
         const resourceId = request.relationships?.resource?.data?.id;
         const resource = included.find(i => i.type === 'Resource' && i.id === resourceId);
-        
+
+        if (!resource) continue;
+
         // Get setup notes/requirements from the request
         const notes = request.attributes?.notes || '';
         const setupType = parseSetupType(notes);
-        
-        // FILTER: Only include rooms with actual setup requirements
-        if (resource && setupType !== 'None' && setupType !== 'No Setup') {
+
+        // Include all bookable rooms, but track setup type from notes
+        if (setupType !== 'None') {
           rooms.push({
             pco_resource_id: resourceId,
             resource_name: resource.attributes?.name || 'Unknown',
