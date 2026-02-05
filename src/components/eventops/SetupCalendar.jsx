@@ -340,11 +340,13 @@ export default function SetupCalendar() {
                                   return (
                                     <div 
                                       key={dayIndex} 
-                                      className="flex-shrink-0 w-32"
+                                      className="flex-shrink-0 w-32 border-l border-slate-300"
                                     >
                                       {/* Day Header */}
-                                      <div className={`h-12 flex flex-col items-center justify-center border-b border-l border-slate-300 ${
-                                        isWeekendDay ? 'bg-pink-100' : 'bg-slate-100'
+                                      <div className={`h-12 flex flex-col items-center justify-center border-b ${
+                                        isWeekendDay 
+                                          ? 'bg-red-500 text-white' 
+                                          : 'bg-slate-100'
                                       }`}>
                                         <div className="text-xs font-medium text-slate-600">
                                           {format(day, 'EEE')}
