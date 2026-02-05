@@ -7,13 +7,14 @@ function getAlertLevel(hoursUntilEvent) {
   return null;
 }
 
-// Get upcoming events from PCO Calendar API with resource requests
+// Get upcoming events from PCO Calendar API
 async function getPCOEventsByRoom(base44, userEmail) {
   const roomEventMap = {};
   const now = new Date();
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   
   try {
-    // Get user's PCO token from User entity
+    // Get user's PCO token
     const users = await base44.asServiceRole.entities.User.filter({ email: userEmail });
     const user = users[0];
     
@@ -53,61 +54,75 @@ async function getPCOEventsByRoom(base44, userEmail) {
       }
     }
 
-    // Query PCO Calendar API for event resource requests (same endpoint approvals use)
-    const url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?per_page=100&include=event,resource`;
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${pcoToken}` }
-    });
+    const headers = { 'Authorization': `Bearer ${pcoToken}` };
+
+    // Fetch event instances (next 24 hours)
+    const instancesUrl = `https://api.planningcenteronline.com/calendar/v2/event_instances?filter=future&order=starts_at&per_page=100`;
+    const instancesResponse = await fetch(instancesUrl, { headers });
     
-    if (!response.ok) {
-      console.error(`[DEBUG] PCO API error: ${response.status} - ${await response.text()}`);
+    if (!instancesResponse.ok) {
+      console.error(`[DEBUG] PCO API error: ${instancesResponse.status}`);
       return roomEventMap;
     }
     
-    const data = await response.json();
-    const requests = data.data || [];
-    const included = data.included || [];
+    const instancesData = await instancesResponse.json();
+    const instances = instancesData.data || [];
     
-    console.log(`[DEBUG] Fetched ${requests.length} resource requests from PCO`);
-    console.log(`[DEBUG] Included ${included.length} related items`);
+    console.log(`[DEBUG] Fetched ${instances.length} event instances from PCO`);
     
-    // Build lookup maps
-    const eventsMap = {};
-    const resourcesMap = {};
-    
-    included.forEach(item => {
-      if (item.type === 'Event') {
-        eventsMap[item.id] = item;
-      } else if (item.type === 'Resource') {
-        resourcesMap[item.id] = item;
-      }
-    });
-    
-    // Process requests for events in next 24 hours
-    requests.forEach(request => {
-      const eventId = request.relationships?.event?.data?.id;
-      const resourceId = request.relationships?.resource?.data?.id;
-      
-      if (!eventId || !resourceId) return;
-      
-      const event = eventsMap[eventId];
-      if (!event) return;
-      
-      const startsAt = new Date(event.attributes.starts_at);
+    // Filter instances to next 24 hours and collect event IDs
+    const eventIds = new Set();
+    instances.forEach(instance => {
+      const startsAt = new Date(instance.attributes?.starts_at);
       const hoursAhead = (startsAt - now) / (1000 * 60 * 60);
       
-      if (hoursAhead < 0 || hoursAhead > 24) return;
-      
-      if (!roomEventMap[resourceId] || startsAt < new Date(roomEventMap[resourceId].start_time)) {
-        roomEventMap[resourceId] = {
-          name: event.attributes.name,
-          start_time: startsAt.toISOString(),
-          pco_room_id: resourceId
-        };
+      if (hoursAhead >= 0 && hoursAhead <= 24) {
+        const eventId = instance.relationships?.event?.data?.id;
+        if (eventId) eventIds.add(eventId);
       }
     });
     
-    console.log(`[DEBUG] Found ${Object.keys(roomEventMap).length} PCO resources with events in next 24 hours`);
+    console.log(`[DEBUG] Found ${eventIds.size} events in next 24 hours`);
+    
+    // Fetch resource requests for each event
+    for (const eventId of eventIds) {
+      try {
+        const requestsUrl = `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`;
+        const requestsResponse = await fetch(requestsUrl, { headers });
+        
+        if (!requestsResponse.ok) continue;
+        
+        const requestsData = await requestsResponse.json();
+        const requests = requestsData.data || [];
+        const included = requestsData.included || [];
+        
+        // Get event start time from the instance
+        const instance = instances.find(i => i.relationships?.event?.data?.id === eventId);
+        if (!instance) continue;
+        
+        const startsAt = new Date(instance.attributes.starts_at);
+        const eventName = instance.attributes?.name || 'Unknown Event';
+        
+        // Map resources
+        requests.forEach(request => {
+          const resourceId = request.relationships?.resource?.data?.id;
+          if (!resourceId) return;
+          
+          if (!roomEventMap[resourceId] || startsAt < new Date(roomEventMap[resourceId].start_time)) {
+            roomEventMap[resourceId] = {
+              name: eventName,
+              start_time: startsAt.toISOString(),
+              pco_room_id: resourceId
+            };
+          }
+        });
+        
+      } catch (e) {
+        console.error(`[DEBUG] Failed to fetch requests for event ${eventId}:`, e.message);
+      }
+    }
+    
+    console.log(`[DEBUG] Mapped ${Object.keys(roomEventMap).length} resources to events`);
     
   } catch (e) {
     console.error('[DEBUG] Failed to fetch events from PCO:', e.message);
