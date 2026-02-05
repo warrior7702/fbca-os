@@ -88,12 +88,10 @@ async function getPCOEvents(pcoToken, startDate, endDate) {
   const end = new Date(endDate);
   
   // Filter instances to date range
-  const filteredInstances = instances.filter(instance => {
-    const startsAt = new Date(instance.attributes?.starts_at);
-    return startsAt >= start && startsAt <= end;
-  });
-  
-  console.log(`[DEBUG] Found ${filteredInstances.length} instances in date range`);
+   const filteredInstances = instances.filter(instance => {
+     const startsAt = new Date(instance.attributes?.starts_at);
+     return startsAt >= start && startsAt <= end;
+   });
   
   // Fetch event details with resources
   for (const instance of filteredInstances) {
