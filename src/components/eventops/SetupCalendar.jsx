@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar, AlertTriangle, Building2, CheckCircle2, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import CalendarGrid from "./CalendarGrid";
 
 export default function SetupCalendar() {
   const [data, setData] = useState(null);
@@ -242,38 +243,8 @@ export default function SetupCalendar() {
 
                 {/* Building Content */}
                 {isExpanded && (
-                  <div className="bg-white p-6 border-t">
-                    {building.rooms && building.rooms.length > 0 ? (
-                      <div className="space-y-4">
-                        {building.rooms.map((room) => (
-                          <div
-                            key={room.room_id}
-                            className="p-4 bg-slate-50 rounded-lg border border-slate-200"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {room.room_name || `Room ${room.room_number}`}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {room.room_number && `Room #${room.room_number}`}
-                                </p>
-                              </div>
-                              <div className="text-xs text-slate-600">
-                                {room.events?.length || 0} events
-                              </div>
-                            </div>
-                            <div className="h-24 bg-white border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-400 text-sm">
-                              14-day grid will render here
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-slate-500 py-8">
-                        No rooms in this building
-                      </p>
-                    )}
+                  <div className="bg-white border-t">
+                    <CalendarGrid building={building} />
                   </div>
                 )}
               </div>
