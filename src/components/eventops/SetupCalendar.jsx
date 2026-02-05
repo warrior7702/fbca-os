@@ -413,37 +413,16 @@ export default function SetupCalendar() {
                                                 weekend ? 'bg-red-50/30' : 'bg-white'
                                               }`}
                                             >
-                                              <div className="space-y-1">
-                                                {dayEvents.map((event, idx) => {
-                                                  const hasConflict = conflictEventIds.has(event.event_id);
-                                                  
-                                                  return (
-                                                    <div
-                                                      key={idx}
-                                                      className={`relative text-xs p-1.5 rounded cursor-pointer transition-all ${
-                                                        hasConflict
-                                                          ? 'bg-red-100 border border-red-300 hover:bg-red-200'
-                                                          : 'bg-blue-100 border border-blue-300 hover:bg-blue-200'
-                                                      }`}
-                                                      title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}\nSetup: ${event.room_setup.setup_type}`}
-                                                    >
-                                                      {hasConflict && (
-                                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-white" title="Setup Conflict" />
-                                                      )}
-                                                      <div className={`font-medium truncate text-[11px] ${
-                                                        hasConflict ? 'text-red-900' : 'text-blue-900'
-                                                      }`}>
-                                                        {event.event_name}
-                                                      </div>
-                                                      <div className={`text-[10px] ${
-                                                        hasConflict ? 'text-red-700' : 'text-blue-700'
-                                                      }`}>
-                                                        {format(new Date(event.start_time), 'h:mm a')}
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
+                                              {dayEvents.length > 0 && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex-shrink-0" />
+                                                  {dayEvents.length > 1 && (
+                                                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 py-0">
+                                                      +{dayEvents.length - 1}
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
                                           );
                                         })}
