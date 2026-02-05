@@ -53,55 +53,58 @@ async function getPCOEventsByRoom(base44, userEmail) {
       }
     }
 
-    // Query PCO Calendar API for events with resource requests
-    const url = `https://api.planningcenteronline.com/calendar/v2/events?order=starts_at&per_page=100&include=resource_requests`;
+    // Query PCO Calendar API for event resource requests (same endpoint approvals use)
+    const url = `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?per_page=100&include=event,resource`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${pcoToken}` }
     });
     
     if (!response.ok) {
-      console.error(`[DEBUG] PCO API error: ${response.status}`);
+      console.error(`[DEBUG] PCO API error: ${response.status} - ${await response.text()}`);
       return roomEventMap;
     }
     
     const data = await response.json();
-    const events = data.data || [];
+    const requests = data.data || [];
     const included = data.included || [];
     
-    console.log(`[DEBUG] Fetched ${events.length} events from PCO Calendar API`);
+    console.log(`[DEBUG] Fetched ${requests.length} resource requests from PCO`);
     console.log(`[DEBUG] Included ${included.length} related items`);
     
-    // Build map of resource requests by event
-    const requestsByEvent = {};
+    // Build lookup maps
+    const eventsMap = {};
+    const resourcesMap = {};
+    
     included.forEach(item => {
-      if (item.type === 'ResourceRequest') {
-        const eventId = item.relationships?.event?.data?.id;
-        const resourceId = item.relationships?.resource?.data?.id;
-        
-        if (eventId && resourceId) {
-          if (!requestsByEvent[eventId]) requestsByEvent[eventId] = [];
-          requestsByEvent[eventId].push(resourceId);
-        }
+      if (item.type === 'Event') {
+        eventsMap[item.id] = item;
+      } else if (item.type === 'Resource') {
+        resourcesMap[item.id] = item;
       }
     });
     
-    // Process events in next 24 hours
-    events.forEach(event => {
+    // Process requests for events in next 24 hours
+    requests.forEach(request => {
+      const eventId = request.relationships?.event?.data?.id;
+      const resourceId = request.relationships?.resource?.data?.id;
+      
+      if (!eventId || !resourceId) return;
+      
+      const event = eventsMap[eventId];
+      if (!event) return;
+      
       const startsAt = new Date(event.attributes.starts_at);
       const hoursAhead = (startsAt - now) / (1000 * 60 * 60);
       
       if (hoursAhead < 0 || hoursAhead > 24) return;
       
-      const resourceIds = requestsByEvent[event.id] || [];
-      resourceIds.forEach(resourceId => {
-        if (!roomEventMap[resourceId] || startsAt < new Date(roomEventMap[resourceId].start_time)) {
-          roomEventMap[resourceId] = {
-            name: event.attributes.name,
-            start_time: startsAt.toISOString(),
-            pco_room_id: resourceId
-          };
-        }
-      });
+      if (!roomEventMap[resourceId] || startsAt < new Date(roomEventMap[resourceId].start_time)) {
+        roomEventMap[resourceId] = {
+          name: event.attributes.name,
+          start_time: startsAt.toISOString(),
+          pco_room_id: resourceId
+        };
+      }
     });
     
     console.log(`[DEBUG] Found ${Object.keys(roomEventMap).length} PCO resources with events in next 24 hours`);
