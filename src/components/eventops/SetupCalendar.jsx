@@ -393,28 +393,79 @@ export default function SetupCalendar() {
                                       return eventStart >= dayStart && eventStart <= dayEnd;
                                     });
 
+                                    // Calculate total indicators (green + yellow dots)
+                                    const totalIndicators = eventsOnDay.reduce((count, event) => {
+                                      let indicators = 1; // green dot for main event
+                                      if (event.room_setup?.setup_time_minutes > 0) indicators++; // yellow dot for setup
+                                      if (event.room_setup?.teardown_time_minutes > 0) indicators++; // yellow dot for teardown
+                                      return count + indicators;
+                                    }, 0);
+
+                                    const maxDisplay = 4;
+                                    const hasOverflow = totalIndicators > maxDisplay;
+                                    const displayLimit = hasOverflow ? 3 : maxDisplay;
+
                                     return (
                                       <div
                                         key={dayIdx}
-                                        className={`border border-slate-300 p-1 min-h-[60px] min-w-[80px] ${
+                                        className={`border border-slate-300 p-2 min-h-[60px] min-w-[80px] ${
                                           isWeekend(day) ? 'bg-red-50/30' : 'bg-white'
                                         }`}
                                       >
                                         {eventsOnDay.length > 0 && (
-                                          <div className="space-y-1">
-                                            {eventsOnDay.map((event, eventIdx) => (
-                                              <div
-                                                key={eventIdx}
-                                                className="bg-blue-100 border border-blue-300 rounded px-1 py-0.5 text-xs"
-                                              >
-                                                <div className="font-medium text-blue-900 truncate" title={event.event_name}>
-                                                  {event.event_name}
-                                                </div>
-                                                <div className="text-blue-700 text-[10px]">
-                                                  {format(new Date(event.start_time), 'h:mm a')}
-                                                </div>
-                                              </div>
-                                            ))}
+                                          <div className="flex flex-wrap gap-1 items-start">
+                                            {(() => {
+                                              let displayedCount = 0;
+                                              const dots = [];
+                                              
+                                              for (const event of eventsOnDay) {
+                                                if (displayedCount >= displayLimit) break;
+                                                
+                                                // Yellow dot for setup
+                                                if (event.room_setup?.setup_time_minutes > 0 && displayedCount < displayLimit) {
+                                                  dots.push(
+                                                    <div
+                                                      key={`setup-${event.event_id || displayedCount}`}
+                                                      className="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600"
+                                                      title={`Setup: ${event.room_setup.setup_type || 'Standard'} (${event.room_setup.setup_time_minutes} min)`}
+                                                    />
+                                                  );
+                                                  displayedCount++;
+                                                }
+                                                
+                                                // Green dot for main event
+                                                if (displayedCount < displayLimit) {
+                                                  dots.push(
+                                                    <div
+                                                      key={`event-${event.event_id || displayedCount}`}
+                                                      className="w-3 h-3 rounded-full bg-green-500 border border-green-700"
+                                                      title={`${event.event_name} - ${format(new Date(event.start_time), 'h:mm a')}`}
+                                                    />
+                                                  );
+                                                  displayedCount++;
+                                                }
+                                                
+                                                // Yellow dot for teardown
+                                                if (event.room_setup?.teardown_time_minutes > 0 && displayedCount < displayLimit) {
+                                                  dots.push(
+                                                    <div
+                                                      key={`teardown-${event.event_id || displayedCount}`}
+                                                      className="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600"
+                                                      title={`Teardown (${event.room_setup.teardown_time_minutes} min)`}
+                                                    />
+                                                  );
+                                                  displayedCount++;
+                                                }
+                                              }
+                                              
+                                              return dots;
+                                            })()}
+                                            
+                                            {hasOverflow && (
+                                              <Badge className="text-[10px] h-4 px-1 bg-slate-700 hover:bg-slate-600">
+                                                +{totalIndicators - displayLimit}
+                                              </Badge>
+                                            )}
                                           </div>
                                         )}
                                       </div>
