@@ -104,6 +104,25 @@ export default function SetupCalendar() {
     return rooms;
   };
 
+  // Generate 14 days starting from today
+  const generateCalendarDays = () => {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const calendarDays = generateCalendarDays();
+
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -304,140 +323,84 @@ export default function SetupCalendar() {
                           </p>
                         ) : (
                           <div className="overflow-x-auto">
-                            {/* Calendar Grid */}
-                            <div className="min-w-[1400px]">
-                              {/* Header Row */}
-                              <div className="grid grid-cols-[200px_repeat(14,1fr)] border-b-2 border-slate-300 bg-slate-50">
-                                <div className="p-3 font-semibold text-slate-700 border-r-2 border-slate-300">
+                            <div className="min-w-max">
+                              {/* Calendar Header */}
+                              <div className="grid grid-cols-[200px_repeat(14,1fr)] gap-0 mb-2">
+                                {/* Room Name Column Header */}
+                                <div className="bg-slate-100 border border-slate-300 p-2 font-semibold text-sm text-slate-700">
                                   Room
                                 </div>
-                                {(() => {
-                                  const days = [];
-                                  const startDate = new Date(data.summary.date_range.start);
-                                  for (let i = 0; i < 14; i++) {
-                                    const date = new Date(startDate);
-                                    date.setDate(startDate.getDate() + i);
-                                    const dayName = format(date, 'EEE');
-                                    const dayNum = format(date, 'd');
-                                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                    days.push(
-                                      <div
-                                        key={i}
-                                        className={`p-2 text-center border-r border-slate-200 ${
-                                          isWeekend ? 'bg-red-50' : ''
-                                        }`}
-                                      >
-                                        <div className="font-semibold text-slate-700">{dayName}</div>
-                                        <div className="text-xs text-slate-600">{dayNum}</div>
-                                      </div>
-                                    );
-                                  }
-                                  return days;
-                                })()}
+                                
+                                {/* Day Headers */}
+                                {calendarDays.map((day, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`border border-slate-300 p-2 text-center text-xs font-medium min-w-[80px] ${
+                                      isWeekend(day) ? 'bg-red-50' : 'bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="text-slate-700">
+                                      {format(day, 'EEE d')}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
 
                               {/* Room Rows */}
-                              {filteredRooms.map((room) => {
-                                const startDate = new Date(data.summary.date_range.start);
-                                
-                                return (
-                                  <div key={room.room_id} className="grid grid-cols-[200px_repeat(14,1fr)] border-b border-slate-200">
-                                    {/* Room Name */}
-                                    <div className="p-3 border-r-2 border-slate-300 bg-slate-50">
-                                      <div className="font-medium text-slate-900 text-sm">
-                                        {room.room_name}
-                                      </div>
+                              {filteredRooms.map((room) => (
+                                <div key={room.room_id} className="grid grid-cols-[200px_repeat(14,1fr)] gap-0 mb-0">
+                                  {/* Room Name Cell */}
+                                  <div className="bg-slate-50 border border-slate-300 p-2 text-sm font-medium text-slate-900 flex items-center">
+                                    <div>
+                                      <div>{room.room_name}</div>
                                       {room.room_number && (
-                                        <div className="text-xs text-slate-600">
-                                          {room.room_number}
-                                        </div>
+                                        <div className="text-xs text-slate-500">{room.room_number}</div>
                                       )}
-                                      <div className="flex gap-1 mt-2">
-                                        {room.events.length > 0 && (
-                                          <Badge variant="outline" className="text-xs">
-                                            {room.events.length}
-                                          </Badge>
-                                        )}
-                                        {room.conflicts.length > 0 && (
-                                          <Badge variant="destructive" className="text-xs">
-                                            <AlertTriangle className="w-2 h-2 mr-1" />
-                                            {room.conflicts.length}
-                                          </Badge>
+                                    </div>
+                                  </div>
+
+                                  {/* Day Cells */}
+                                  {calendarDays.map((day, dayIdx) => {
+                                    const dayStart = new Date(day);
+                                    dayStart.setHours(0, 0, 0, 0);
+                                    const dayEnd = new Date(day);
+                                    dayEnd.setHours(23, 59, 59, 999);
+
+                                    // Find events for this room on this day
+                                    const eventsOnDay = room.events.filter(event => {
+                                      const eventStart = new Date(event.start_time);
+                                      return eventStart >= dayStart && eventStart <= dayEnd;
+                                    });
+
+                                    return (
+                                      <div
+                                        key={dayIdx}
+                                        className={`border border-slate-300 p-1 min-h-[60px] min-w-[80px] ${
+                                          isWeekend(day) ? 'bg-red-50/30' : 'bg-white'
+                                        }`}
+                                      >
+                                        {eventsOnDay.length > 0 && (
+                                          <div className="space-y-1">
+                                            {eventsOnDay.map((event, eventIdx) => (
+                                              <div
+                                                key={eventIdx}
+                                                className="bg-blue-100 border border-blue-300 rounded px-1 py-0.5 text-xs"
+                                              >
+                                                <div className="font-medium text-blue-900 truncate" title={event.event_name}>
+                                                  {event.event_name}
+                                                </div>
+                                                <div className="text-blue-700 text-[10px]">
+                                                  {format(new Date(event.start_time), 'h:mm a')}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         )}
                                       </div>
-                                    </div>
-
-                                    {/* Day Columns */}
-                                    {(() => {
-                                      const dayCells = [];
-                                      for (let i = 0; i < 14; i++) {
-                                        const date = new Date(startDate);
-                                        date.setDate(startDate.getDate() + i);
-                                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                        
-                                        // Find events for this day
-                                        const dayEvents = room.events.filter(event => {
-                                          const eventDate = new Date(event.start_time);
-                                          return eventDate.toDateString() === date.toDateString();
-                                        });
-
-                                        // Find conflicts for this day
-                                        const dayConflicts = room.conflicts.filter(conflict => {
-                                          const conflictDate = new Date(conflict.event1.start_time);
-                                          return conflictDate.toDateString() === date.toDateString();
-                                        });
-
-                                        dayCells.push(
-                                          <div
-                                            key={i}
-                                            className={`p-1 border-r border-slate-200 min-h-[80px] ${
-                                              isWeekend ? 'bg-red-50/50' : 'bg-white'
-                                            }`}
-                                          >
-                                            <div className="space-y-1">
-                                              {dayEvents.map((event, idx) => {
-                                                const hasConflict = dayConflicts.some(c => 
-                                                  c.event1.event_id === event.event_id || 
-                                                  c.event2.event_id === event.event_id
-                                                );
-                                                
-                                                return (
-                                                  <div
-                                                    key={idx}
-                                                    className={`text-xs p-1.5 rounded ${
-                                                      hasConflict 
-                                                        ? 'bg-red-100 border border-red-300' 
-                                                        : 'bg-blue-100 border border-blue-300'
-                                                    }`}
-                                                  >
-                                                    <div className={`font-medium truncate ${
-                                                      hasConflict ? 'text-red-900' : 'text-blue-900'
-                                                    }`}>
-                                                      {event.event_name}
-                                                    </div>
-                                                    <div className={`text-xs ${
-                                                      hasConflict ? 'text-red-700' : 'text-blue-700'
-                                                    }`}>
-                                                      {format(new Date(event.start_time), 'h:mm a')}
-                                                    </div>
-                                                    {hasConflict && (
-                                                      <div className="flex items-center gap-1 mt-0.5 text-red-600">
-                                                        <AlertTriangle className="w-2 h-2" />
-                                                        <span className="text-[10px]">Conflict</span>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-                                      return dayCells;
-                                    })()}
-                                  </div>
-                                );
-                              })}
+                                    );
+                                  })}
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
