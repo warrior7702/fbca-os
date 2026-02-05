@@ -8,19 +8,49 @@ function getAlertLevel(hoursUntilEvent) {
 }
 
 // Get upcoming events from PCO Calendar API with resource requests
-async function getPCOEventsByRoom(base44) {
+async function getPCOEventsByRoom(base44, userEmail) {
   const roomEventMap = {};
   const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   
   try {
-    // Get PCO access token
-    const tokenResponse = await base44.asServiceRole.functions.invoke('getPCOToken', {});
-    const pcoToken = tokenResponse.data?.access_token;
+    // Get user's PCO token from User entity
+    const users = await base44.asServiceRole.entities.User.filter({ email: userEmail });
+    const user = users[0];
     
-    if (!pcoToken) {
-      console.error('[DEBUG] No PCO token available');
+    if (!user?.pco_access_token) {
+      console.error('[DEBUG] No PCO token for user:', userEmail);
       return roomEventMap;
+    }
+    
+    // Check if token needs refresh
+    const expiresAt = new Date(user.pco_token_expires_at);
+    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+    let pcoToken = user.pco_access_token;
+    
+    if (expiresAt <= fiveMinutesFromNow && user.pco_refresh_token) {
+      console.log('[DEBUG] Refreshing PCO token...');
+      const tokenResponse = await fetch('https://api.planningcenteronline.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: user.pco_refresh_token,
+          client_id: Deno.env.get('PCO_CLIENT_ID') || '',
+          client_secret: Deno.env.get('PCO_CLIENT_SECRET') || ''
+        })
+      });
+      
+      if (tokenResponse.ok) {
+        const tokens = await tokenResponse.json();
+        pcoToken = tokens.access_token;
+        const newExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+        await base44.asServiceRole.entities.User.update(user.id, {
+          pco_access_token: tokens.access_token,
+          pco_refresh_token: tokens.refresh_token,
+          pco_token_expires_at: newExpiresAt
+        });
+        console.log('[DEBUG] PCO token refreshed');
+      }
     }
 
     // Query PCO Calendar API for events with resource requests
@@ -108,8 +138,8 @@ Deno.serve(async (req) => {
       console.log(`[DEBUG] Rooms in building "${building}": ${rooms.length}`);
     }
 
-    // Fetch events from PCO_Request (which has room + event links)
-    const pcoEventsByRoom = await getPCOEventsByRoom(base44);
+    // Fetch events from PCO using authenticated user's token
+    const pcoEventsByRoom = await getPCOEventsByRoom(base44, user.email);
     
     // Map PCO room IDs to Campus Hub room IDs
     const roomMap = {};
