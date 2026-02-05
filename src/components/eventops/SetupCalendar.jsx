@@ -359,7 +359,7 @@ export default function SetupCalendar() {
                                       {/* Event Cells for each Room */}
                                       {filteredRooms.map((room) => {
                                         const dayEvents = getEventsForRoomAndDay(room, day);
-                                        const hasConflict = dayEvents.some(event => 
+                                        const dayConflicts = dayEvents.filter(event => 
                                           room.conflicts?.some(conflict => 
                                             conflict.event_id === event.event_id || 
                                             conflict.event_name === event.event_name
@@ -370,7 +370,7 @@ export default function SetupCalendar() {
                                         return (
                                           <div 
                                             key={room.room_id}
-                                            className={`h-20 border-b border-l border-slate-300 p-1 ${
+                                            className={`h-20 border-b p-1 relative ${
                                               isWeekendDay ? 'bg-pink-50' : 'bg-white'
                                             }`}
                                           >
