@@ -316,9 +316,12 @@ Deno.serve(async (req) => {
     const buildingMap = {};
     
     for (const event of eventsWithSetup) {
-      for (const room of event.rooms) {
-        const campusRoom = roomMap[room.pco_resource_id];
-        if (!campusRoom) continue;
+       for (const room of event.rooms) {
+         const campusRoom = roomMap[room.pco_resource_id];
+         if (!campusRoom) {
+           console.log(`[DEBUG] No campus room found for PCO resource ${room.pco_resource_id} (${room.resource_name})`);
+           continue;
+         }
         
         const buildingId = campusRoom.building_id || 'unknown';
         const buildingName = campusRoom.building_name || campusRoom.building || 'Unknown Building';
