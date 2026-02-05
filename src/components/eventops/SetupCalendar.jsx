@@ -1,39 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Calendar, AlertTriangle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, AlertTriangle, Calendar, Clock, ArrowRight } from "lucide-react";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function SetupCalendar() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [expandedRooms, setExpandedRooms] = useState({});
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
 
   useEffect(() => {
-    loadCalendarData();
+    loadSetupData();
   }, []);
 
-  const loadCalendarData = async () => {
+  const loadSetupData = async () => {
     setLoading(true);
     try {
       const result = await base44.functions.invoke('getSetupCalendarEvents', {});
       setData(result.data);
+      
+      if (result.data.buildings.length > 0) {
+        setSelectedBuilding(result.data.buildings[0].building_id);
+      }
     } catch (error) {
       console.error('Error loading setup calendar:', error);
       toast.error('Failed to load setup calendar');
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleRoom = (roomId) => {
-    setExpandedRooms(prev => ({
-      ...prev,
-      [roomId]: !prev[roomId]
-    }));
   };
 
   if (loading) {
@@ -52,158 +49,175 @@ export default function SetupCalendar() {
     );
   }
 
+  const currentBuilding = data.buildings.find(b => b.building_id === selectedBuilding);
+
   return (
     <div className="space-y-6">
-      {/* Summary Stats */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="pt-6">
             <div className="text-2xl font-bold text-slate-900">{data.summary.total_events}</div>
-            <div className="text-sm text-slate-600">Total Events</div>
+            <p className="text-sm text-slate-600">Total Events</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="pt-6">
             <div className="text-2xl font-bold text-slate-900">{data.summary.active_rooms}</div>
-            <div className="text-sm text-slate-600">Active Rooms</div>
+            <p className="text-sm text-slate-600">Active Rooms</p>
           </CardContent>
         </Card>
-        <Card className={data.summary.total_conflicts > 0 ? 'border-red-300 bg-red-50' : ''}>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{data.summary.total_conflicts}</div>
-            <div className="text-sm text-slate-600">Setup Conflicts</div>
+        <Card className={data.summary.total_conflicts > 0 ? 'border-red-200 bg-red-50' : ''}>
+          <CardContent className="pt-6">
+            <div className={`text-2xl font-bold ${data.summary.total_conflicts > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+              {data.summary.total_conflicts}
+            </div>
+            <p className="text-sm text-slate-600">Setup Conflicts</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-slate-600">Date Range</div>
-            <div className="text-xs text-slate-500">
-              {format(parseISO(data.summary.date_range.start), 'MMM d')} - {format(parseISO(data.summary.date_range.end), 'MMM d')}
+          <CardContent className="pt-6">
+            <div className="text-sm text-slate-900 font-medium">
+              {format(new Date(data.summary.date_range.start), 'MMM d')} - {format(new Date(data.summary.date_range.end), 'MMM d')}
             </div>
+            <p className="text-sm text-slate-600">Date Range</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Buildings */}
-      {data.buildings.map((building) => (
-        <Card key={building.building_id}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">{building.building_name}</CardTitle>
-                <div className="flex gap-4 mt-2 text-sm text-slate-600">
-                  <span>{building.room_count} rooms</span>
-                  <span>{building.event_count} events</span>
-                  {building.conflict_count > 0 && (
-                    <Badge variant="destructive" className="gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      {building.conflict_count} conflicts
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {building.rooms.map((room) => (
-                <div key={room.room_id} className="border rounded-lg">
-                  {/* Room Header */}
-                  <button
-                    onClick={() => toggleRoom(room.room_id)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <div className="font-semibold text-slate-900">
-                          {room.room_name} {room.room_number && `(${room.room_number})`}
-                        </div>
-                        <div className="text-sm text-slate-600">
-                          {room.events.length} events
-                          {room.conflicts.length > 0 && (
-                            <span className="ml-2 text-red-600 font-medium">
-                              • {room.conflicts.length} conflicts
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {expandedRooms[room.room_id] ? (
-                      <ChevronUp className="w-5 h-5 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-slate-400" />
-                    )}
-                  </button>
+      {/* Building Selector */}
+      {data.buildings.length > 1 && (
+        <div className="flex gap-2">
+          {data.buildings.map(building => (
+            <Button
+              key={building.building_id}
+              variant={selectedBuilding === building.building_id ? 'default' : 'outline'}
+              onClick={() => setSelectedBuilding(building.building_id)}
+            >
+              {building.building_name}
+              {building.conflict_count > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {building.conflict_count}
+                </Badge>
+              )}
+            </Button>
+          ))}
+        </div>
+      )}
 
-                  {/* Room Details */}
-                  {expandedRooms[room.room_id] && (
-                    <div className="border-t bg-slate-50 p-4 space-y-3">
-                      {/* Conflicts */}
+      {/* Building Details */}
+      {currentBuilding && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">
+              {currentBuilding.building_name}
+            </h3>
+            <div className="flex gap-4 text-sm text-slate-600">
+              <span>{currentBuilding.room_count} rooms</span>
+              <span>{currentBuilding.event_count} events</span>
+              {currentBuilding.conflict_count > 0 && (
+                <span className="text-red-600 font-medium">
+                  {currentBuilding.conflict_count} conflicts
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Rooms */}
+          <div className="space-y-4">
+            {currentBuilding.rooms.map(room => (
+              <Card key={room.room_id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      {room.room_name} {room.room_number && `(${room.room_number})`}
+                    </CardTitle>
+                    <div className="flex gap-2">
+                      <Badge variant="outline">{room.events.length} events</Badge>
                       {room.conflicts.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="text-sm font-semibold text-red-600 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            Setup/Teardown Conflicts
-                          </div>
-                          {room.conflicts.map((conflict, idx) => (
-                            <div key={idx} className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
-                              <div className="font-semibold text-red-900 mb-2">
-                                Conflict: {conflict.shortage_minutes} minutes short
-                              </div>
-                              <div className="space-y-1 text-slate-700">
-                                <div>
-                                  <span className="font-medium">Event 1:</span> {conflict.event1.event_name}
-                                  <div className="text-xs text-slate-600 ml-4">
-                                    Ends: {format(parseISO(conflict.event1.end_time), 'h:mm a')} + {conflict.event1.teardown_minutes}min teardown
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Event 2:</span> {conflict.event2.event_name}
-                                  <div className="text-xs text-slate-600 ml-4">
-                                    Starts: {format(parseISO(conflict.event2.start_time), 'h:mm a')} - {conflict.event2.setup_minutes}min setup needed
-                                  </div>
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-red-300 flex items-center gap-2 text-xs">
-                                  <Clock className="w-3 h-3" />
-                                  Gap: {conflict.gap_minutes}min | Required: {conflict.required_minutes}min
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <Badge variant="destructive">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          {room.conflicts.length} conflicts
+                        </Badge>
                       )}
-
-                      {/* Events */}
-                      <div className="space-y-2">
-                        <div className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          Scheduled Events
-                        </div>
-                        {room.events.map((event, idx) => (
-                          <div key={idx} className="bg-white border rounded-lg p-3 text-sm">
-                            <div className="font-semibold text-slate-900">{event.event_name}</div>
-                            <div className="text-xs text-slate-600 mt-1">
-                              {format(parseISO(event.start_time), 'MMM d, h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Events Timeline */}
+                  <div className="space-y-3">
+                    {room.events.map((event, idx) => (
+                      <div key={idx} className="border-l-2 border-blue-200 pl-4 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-slate-900">{event.event_name}</div>
+                            <div className="text-sm text-slate-600 mt-1 flex items-center gap-2">
+                              <Calendar className="w-3 h-3" />
+                              {format(new Date(event.start_time), 'MMM d, h:mm a')} - {format(new Date(event.end_time), 'h:mm a')}
                             </div>
-                            <div className="flex gap-2 mt-2">
-                              <Badge variant="outline" className="text-xs">
-                                Setup: {event.room_setup.setup_time_minutes}min
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                Teardown: {event.room_setup.teardown_time_minutes}min
-                              </Badge>
+                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                              <Clock className="w-3 h-3" />
+                              Setup: {event.room_setup.setup_time_minutes}min • Teardown: {event.room_setup.teardown_time_minutes}min
                             </div>
                           </div>
-                        ))}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+
+                  {/* Conflicts */}
+                  {room.conflicts.length > 0 && (
+                    <div className="mt-4 pt-4 border-t space-y-3">
+                      <div className="text-sm font-semibold text-red-600 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Setup/Teardown Conflicts
+                      </div>
+                      {room.conflicts.map((conflict, idx) => (
+                        <div key={idx} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-red-900">
+                              Conflict #{idx + 1}
+                            </span>
+                            <Badge variant="destructive">
+                              {conflict.shortage_minutes} min short
+                            </Badge>
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            <div>
+                              <div className="text-slate-700">{conflict.event1.event_name}</div>
+                              <div className="text-xs text-slate-600">
+                                Ends: {format(new Date(conflict.event1.end_time), 'h:mm a')} 
+                                <span className="text-red-600 ml-2">
+                                  + {conflict.event1.teardown_minutes}min teardown
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <ArrowRight className="w-4 h-4" />
+                              <span className="text-xs">
+                                Gap: {conflict.gap_minutes} min (need {conflict.required_minutes} min)
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-slate-700">{conflict.event2.event_name}</div>
+                              <div className="text-xs text-slate-600">
+                                <span className="text-red-600">
+                                  {conflict.event2.setup_minutes}min setup + 
+                                </span>
+                                {' '}Starts: {format(new Date(conflict.event2.start_time), 'h:mm a')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
