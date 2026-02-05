@@ -413,16 +413,50 @@ export default function SetupCalendar() {
                                                 weekend ? 'bg-red-50/30' : 'bg-white'
                                               }`}
                                             >
-                                              {dayEvents.length > 0 && (
-                                                <div className="flex items-center gap-1.5">
-                                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex-shrink-0" />
-                                                  {dayEvents.length > 1 && (
-                                                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 py-0">
-                                                      +{dayEvents.length - 1}
-                                                    </Badge>
-                                                  )}
-                                                </div>
-                                              )}
+                                              <div className="flex flex-wrap gap-1.5 items-start content-start">
+                                                {dayEvents.slice(0, 4).map((event, idx) => {
+                                                  const hasConflict = conflictEventIds.has(event.event_id);
+                                                  
+                                                  return (
+                                                    <React.Fragment key={idx}>
+                                                      {/* Yellow dot for setup */}
+                                                      {event.room_setup && (
+                                                        <div 
+                                                          className="w-2.5 h-2.5 rounded-full bg-yellow-500 cursor-pointer hover:scale-125 transition-transform"
+                                                          title={`Setup: ${event.event_name} - ${event.room_setup.setup_time_minutes || 60} min`}
+                                                        />
+                                                      )}
+                                                      
+                                                      {/* Green dot for event (red if conflict) */}
+                                                      <div 
+                                                        className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:scale-125 transition-transform ${
+                                                          hasConflict ? 'bg-red-500' : 'bg-green-500'
+                                                        }`}
+                                                        title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}${event.room_setup ? `\nSetup: ${event.room_setup.setup_type}` : ''}`}
+                                                      />
+                                                      
+                                                      {/* Yellow dot for teardown */}
+                                                      {event.room_setup && (
+                                                        <div 
+                                                          className="w-2.5 h-2.5 rounded-full bg-yellow-500 cursor-pointer hover:scale-125 transition-transform"
+                                                          title={`Teardown: ${event.event_name}`}
+                                                        />
+                                                      )}
+                                                    </React.Fragment>
+                                                  );
+                                                })}
+                                                
+                                                {/* "+N" badge if more than 4 events */}
+                                                {dayEvents.length > 4 && (
+                                                  <Badge 
+                                                    variant="secondary" 
+                                                    className="text-[9px] px-1 py-0 h-4 leading-none"
+                                                    title={`${dayEvents.length - 4} more events`}
+                                                  >
+                                                    +{dayEvents.length - 4}
+                                                  </Badge>
+                                                )}
+                                              </div>
                                             </div>
                                           );
                                         })}
