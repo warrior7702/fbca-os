@@ -344,7 +344,7 @@ export default function SetupCalendar() {
                                     >
                                       {/* Day Header */}
                                       <div className={`h-12 flex flex-col items-center justify-center border-b border-l border-slate-300 ${
-                                        isWeekendDay ? 'bg-red-100' : 'bg-slate-100'
+                                        isWeekendDay ? 'bg-pink-100' : 'bg-slate-100'
                                       }`}>
                                         <div className="text-xs font-medium text-slate-600">
                                           {format(day, 'EEE')}
@@ -361,7 +361,7 @@ export default function SetupCalendar() {
                                           <div 
                                             key={room.room_id}
                                             className={`h-20 border-b border-l border-slate-300 p-1 ${
-                                              isWeekendDay ? 'bg-red-50' : 'bg-white'
+                                              isWeekendDay ? 'bg-pink-50' : 'bg-white'
                                             }`}
                                           >
                                             {dayEvents.length > 0 ? (
