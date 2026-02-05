@@ -143,14 +143,16 @@ async function getPCOEvents(pcoToken, startDate, endDate) {
           end_time: instance.attributes?.ends_at,
           rooms: rooms
         });
+      } else {
+        console.log(`[DEBUG] Event ${eventId} (${instance.attributes?.name}) has no rooms with setup requirements`);
       }
-      
-    } catch (e) {
+
+      } catch (e) {
       console.error(`[DEBUG] Failed to fetch event ${eventId}:`, e.message);
-    }
-  }
-  
-  console.log(`[DEBUG] Processed ${events.length} events with rooms`);
+      }
+      }
+
+      console.log(`[DEBUG] Found ${events.length} events with setup-required rooms out of ${filteredInstances.length} instances`);
   return events;
 }
 
