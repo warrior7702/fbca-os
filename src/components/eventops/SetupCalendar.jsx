@@ -104,25 +104,6 @@ export default function SetupCalendar() {
     return rooms;
   };
 
-  // Generate 14 days starting from today
-  const generateCalendarDays = () => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push(date);
-    }
-    return days;
-  };
-
-  const calendarDays = generateCalendarDays();
-
-  const isWeekend = (date) => {
-    const day = date.getDay();
-    return day === 0 || day === 6; // Sunday or Saturday
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -322,10 +303,106 @@ export default function SetupCalendar() {
                             No rooms match the current filters
                           </p>
                         ) : (
-                          <div className="text-sm text-slate-600">
-                            <p className="text-center py-8 text-slate-400">
-                              Calendar grid coming soon...
-                            </p>
+                          <div className="overflow-x-auto">
+                            {/* Calendar Grid */}
+                            <div className="min-w-[1200px]">
+                              {/* Header Row - 14 Days */}
+                              <div className="flex border-b-2 border-slate-300 mb-2">
+                                <div className="w-48 flex-shrink-0 p-2 font-semibold text-slate-700">
+                                  Room
+                                </div>
+                                {Array.from({ length: 14 }).map((_, dayOffset) => {
+                                  const date = new Date();
+                                  date.setDate(date.getDate() + dayOffset);
+                                  const dayName = format(date, 'EEE');
+                                  const dayNum = format(date, 'd');
+                                  return (
+                                    <div key={dayOffset} className="flex-1 min-w-[70px] p-2 text-center border-l border-slate-200">
+                                      <div className="font-semibold text-slate-700 text-sm">{dayName}</div>
+                                      <div className="text-xs text-slate-500">{dayNum}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Room Rows */}
+                              {filteredRooms.map((room) => {
+                                // Group events by day
+                                const eventsByDay = {};
+                                room.events.forEach(event => {
+                                  const eventDate = new Date(event.start_time);
+                                  const dayKey = format(eventDate, 'yyyy-MM-dd');
+                                  if (!eventsByDay[dayKey]) {
+                                    eventsByDay[dayKey] = [];
+                                  }
+                                  eventsByDay[dayKey].push(event);
+                                });
+
+                                return (
+                                  <div key={room.room_id} className="flex border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                                    {/* Room Name */}
+                                    <div className="w-48 flex-shrink-0 p-3 font-medium text-sm text-slate-700 flex items-center">
+                                      <div>
+                                        <div>{room.room_name}</div>
+                                        {room.room_number && (
+                                          <div className="text-xs text-slate-500">{room.room_number}</div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Day Cells */}
+                                    {Array.from({ length: 14 }).map((_, dayOffset) => {
+                                      const date = new Date();
+                                      date.setDate(date.getDate() + dayOffset);
+                                      const dayKey = format(date, 'yyyy-MM-dd');
+                                      const dayEvents = eventsByDay[dayKey] || [];
+                                      
+                                      // Check if any events have conflicts
+                                      const hasConflict = room.conflicts.some(conflict => {
+                                        const conflict1Date = format(new Date(conflict.event1.start_time), 'yyyy-MM-dd');
+                                        const conflict2Date = format(new Date(conflict.event2.start_time), 'yyyy-MM-dd');
+                                        return conflict1Date === dayKey || conflict2Date === dayKey;
+                                      });
+
+                                      return (
+                                        <div key={dayOffset} className="flex-1 min-w-[70px] p-1 border-l border-slate-200">
+                                          <div className="space-y-1">
+                                            {dayEvents.map((event, idx) => {
+                                              const hasEventConflict = room.conflicts.some(conflict =>
+                                                conflict.event1.event_id === event.event_id ||
+                                                conflict.event2.event_id === event.event_id
+                                              );
+                                              
+                                              return (
+                                                <div
+                                                  key={idx}
+                                                  className={`text-xs p-1 rounded cursor-pointer transition-all ${
+                                                    hasEventConflict
+                                                      ? 'bg-red-100 border border-red-300 text-red-900 hover:bg-red-200'
+                                                      : 'bg-blue-100 border border-blue-300 text-blue-900 hover:bg-blue-200'
+                                                  }`}
+                                                  title={`${event.event_name}\n${format(new Date(event.start_time), 'h:mm a')} - ${format(new Date(event.end_time), 'h:mm a')}\nSetup: ${event.room_setup.setup_type}`}
+                                                >
+                                                  <div className="font-semibold truncate">
+                                                    {format(new Date(event.start_time), 'h:mm a')}
+                                                  </div>
+                                                  <div className="truncate text-[10px]">
+                                                    {event.event_name.substring(0, 15)}{event.event_name.length > 15 ? '...' : ''}
+                                                  </div>
+                                                  {hasEventConflict && (
+                                                    <AlertTriangle className="w-3 h-3 mt-0.5" />
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
