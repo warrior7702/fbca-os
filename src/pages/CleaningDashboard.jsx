@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Flame, ThermometerSun, CheckCircle2, Calendar, Building2, ArrowLeft } from "lucide-react";
+import { Loader2, Flame, ThermometerSun, CheckCircle2, Calendar, Building2, ArrowLeft, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 import CleaningAcknowledgeModal from "@/components/eventops/CleaningAcknowledgeModal";
 
 export default function CleaningDashboard() {
@@ -265,6 +266,20 @@ export default function CleaningDashboard() {
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Last Cleaned */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 px-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>
+                        Last cleaned: {
+                          (() => {
+                            const room = allRooms.find(r => r.id === warning.room_id);
+                            if (!room?.last_cleaned_at) return 'Never';
+                            return formatDistanceToNow(new Date(room.last_cleaned_at), { addSuffix: true });
+                          })()
+                        }
+                      </span>
                     </div>
 
                     {/* Buttons */}
