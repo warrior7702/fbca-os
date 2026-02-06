@@ -283,18 +283,12 @@ Deno.serve(async (req) => {
     const allEvents = Object.values(eventsMap);
     console.log('Events with bookable rooms:', Object.keys(resourceMap).length);
 
-    console.log(`\n✓ Processing complete!`);
-    console.log(`  - Processed: ${processedCount} events`);
-    console.log(`  - Total resource requests: ${totalResourceRequests}`);
-    console.log(`  - Bookable room matches: ${totalBookableMatches}`);
-    console.log(`  - Events with bookable rooms: ${Object.keys(resourceMap).length}`);
-    
     // Debug: Show sample resource IDs from events
     if (Object.keys(resourceMap).length > 0) {
       const sampleEventId = Object.keys(resourceMap)[0];
       const sampleResources = resourceMap[sampleEventId];
       console.log(`\nSample event resource IDs from PCO:`);
-      console.log(`  Event ID: ${sampleEventId}`);
+      console.log(`  Event ID: ${sampleEventId}, Event: ${eventsMap[sampleEventId]?.attributes?.name}`);
       sampleResources.slice(0, 3).forEach(r => {
         console.log(`  - Resource ID: ${r.resource_data.id}, Name: ${r.resource_data.attributes?.name}`);
       });
