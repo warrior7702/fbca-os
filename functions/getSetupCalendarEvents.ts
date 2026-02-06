@@ -374,6 +374,18 @@ Deno.serve(async (req) => {
       buildingMap[building.id] = building;
     }
 
+    // Debug: Show sample room pco_resource_ids from database
+    const roomsWithPCOId = rooms.filter(r => r.pco_resource_id);
+    console.log(`\nDatabase rooms with pco_resource_id: ${roomsWithPCOId.length} of ${rooms.length}`);
+    if (roomsWithPCOId.length > 0) {
+      console.log(`Sample database room pco_resource_ids:`);
+      roomsWithPCOId.slice(0, 5).forEach(r => {
+        console.log(`  - PCO ID: ${r.pco_resource_id}, Room: ${r.name || r.room_number}, Building: ${buildingMap[r.building_id]?.name}`);
+      });
+    } else {
+      console.log(`⚠️ NO ROOMS have pco_resource_id set in database!`);
+    }
+
     // Initialize ALL buildings (even if no events)
     const buildingData = {};
     for (const building of buildings) {
