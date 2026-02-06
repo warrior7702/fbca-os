@@ -238,11 +238,11 @@ Deno.serve(async (req) => {
       console.log('Sample event:', JSON.stringify(allEvents[0], null, 2).substring(0, 500));
     }
 
-    // Step 3: Fetch resource requests - process first 20 events only to stay under timeout
+    // Step 3: Fetch resource requests using correct endpoint
     const resourceMap = {};
-    const maxEvents = Math.min(allEvents.length, 20);
+    const maxEvents = allEvents.length; // Process all events
     
-    console.log(`Processing ${maxEvents} of ${allEvents.length} events...`);
+    console.log(`Processing all ${maxEvents} events...`);
     
     let totalResourceRequests = 0;
     let totalBookableMatches = 0;
@@ -250,11 +250,11 @@ Deno.serve(async (req) => {
     
     for (let i = 0; i < maxEvents; i++) {
       const event = allEvents[i];
-      console.log(`[${i + 1}/${maxEvents}] Fetching resources for event ${event.id} (${event.attributes?.name?.substring(0, 30)}...)`);
       
       try {
+        // FIXED: Use /event_resource_requests endpoint (not /events/{id}/resource_requests)
         const requestsResponse = await fetchWithRetry(
-          `https://api.planningcenteronline.com/calendar/v2/events/${event.id}/resource_requests?include=resource&per_page=100`,
+          `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?filter=event_id&where[event_id]=${event.id}&include=resource&per_page=100`,
           accessToken
         );
 
@@ -270,7 +270,6 @@ Deno.serve(async (req) => {
           }
 
           totalResourceRequests += resourceRequestCount;
-          console.log(`  -> Found ${resourceRequestCount} resource requests, ${Object.keys(resourcesInResponse).length} resources`);
 
           const requests = [];
           for (const request of requestsData.data || []) {
@@ -288,20 +287,17 @@ Deno.serve(async (req) => {
 
           if (requests.length > 0) {
             resourceMap[event.id] = requests;
-            console.log(`  -> ✓ ${requests.length} bookable rooms matched`);
           }
-        } else {
-          console.log(`  -> API error: ${requestsResponse.status}`);
         }
         
         processedCount++;
       } catch (error) {
-        console.error(`  -> Error: ${error.message}`);
+        console.error(`Error processing event ${event.id}:`, error.message);
       }
       
-      // Small delay every 5 events
-      if (i % 5 === 4) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+      // Small delay every 10 events
+      if (i % 10 === 9) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
