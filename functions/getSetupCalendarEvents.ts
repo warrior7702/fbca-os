@@ -1,9 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Cache for 5 minutes to avoid repeated API calls
+// Cache disabled for testing - set to 0 to force fresh data
 let cachedResult = null;
 let cacheTime = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 0;
 
 async function refreshTokenIfNeeded(base44, user) {
   const expiresAt = new Date(user.pco_token_expires_at);
