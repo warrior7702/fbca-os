@@ -411,19 +411,35 @@ Deno.serve(async (req) => {
     }
 
     // Add events to rooms
+    let matchedRooms = 0;
+    let unmatchedRooms = 0;
+    const unmatchedPCOIds = new Set();
+    
     for (const event of eventsWithSetup) {
       for (const room of event.rooms) {
         const roomEntity = Object.values(roomMap).find(r => 
           r.pco_resource_id === room.pco_resource_id
         );
 
-        if (!roomEntity) continue;
+        if (!roomEntity) {
+          unmatchedRooms++;
+          unmatchedPCOIds.add(room.pco_resource_id);
+          continue;
+        }
 
+        matchedRooms++;
         const buildingId = roomEntity.building_id;
         if (buildingData[buildingId]?.rooms[roomEntity.id]) {
           buildingData[buildingId].rooms[roomEntity.id].events.push(event);
         }
       }
+    }
+    
+    console.log(`\nRoom matching results:`);
+    console.log(`  - Matched rooms: ${matchedRooms}`);
+    console.log(`  - Unmatched rooms: ${unmatchedRooms}`);
+    if (unmatchedPCOIds.size > 0) {
+      console.log(`  - Sample unmatched PCO IDs:`, Array.from(unmatchedPCOIds).slice(0, 5));
     }
 
     // Add conflicts to rooms
