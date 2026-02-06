@@ -200,12 +200,12 @@ Deno.serve(async (req) => {
     
     console.time('Fetch all events with resources');
 
-    // OPTIMIZED: Fetch events with resource requests in a single API call
+    // OPTIMIZED: Fetch events - PCO doesn't support nested includes, so we fetch events first
     const eventsResponse = await fetchWithRetry(
       `https://api.planningcenteronline.com/calendar/v2/event_instances?` +
       `where[starts_at][gte]=${startISO}&` +
       `where[starts_at][lte]=${endISO}&` +
-      `include=event,event.resource_requests,event.resource_requests.resource&` +
+      `include=event&` +
       `per_page=100`,
       accessToken
     );
