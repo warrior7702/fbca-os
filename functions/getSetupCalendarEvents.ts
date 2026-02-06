@@ -218,45 +218,74 @@ Deno.serve(async (req) => {
     const eventInstances = eventsData.data || [];
     
     console.log('API Response - Event Instances:', eventInstances.length);
-    console.log('API Response - Included records:', eventsData.included?.length || 0);
+    console.log('API Response - Included events:', eventsData.included?.filter(i => i.type === 'Event').length || 0);
 
-    // Build lookup maps from included data
+    // Build event lookup
     const eventsLookup = {};
-    const resourceRequestsMap = {};
-    const resourcesMap = {};
-
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
-      } else if (included.type === 'ResourceRequest') {
-        const eventId = included.relationships?.event?.data?.id;
-        if (eventId) {
-          if (!resourceRequestsMap[eventId]) {
-            resourceRequestsMap[eventId] = [];
-          }
-          resourceRequestsMap[eventId].push(included);
-        }
-      } else if (included.type === 'Resource') {
-        resourcesMap[included.id] = included;
       }
     }
 
-    console.log('Parsed Events:', Object.keys(eventsLookup).length);
-    console.log('Events with resource requests:', Object.keys(resourceRequestsMap).length);
-    console.log('Total resources:', Object.keys(resourcesMap).length);
+    const eventIds = Object.keys(eventsLookup);
+    console.log('Unique events to fetch resources for:', eventIds.length);
 
-    // Build resource map with full resource data
+    // Batch fetch resource requests (up to 10 events at a time to avoid timeout)
     const resourceMap = {};
-    for (const [eventId, requests] of Object.entries(resourceRequestsMap)) {
-      resourceMap[eventId] = requests.map(req => {
-        const resourceId = req.relationships?.resource?.data?.id;
-        return {
-          resource_data: resourcesMap[resourceId],
-          quantity: req.attributes?.quantity || 1
-        };
-      }).filter(r => r.resource_data); // Only include requests with valid resources
+    const batchSize = 10;
+    
+    for (let i = 0; i < eventIds.length; i += batchSize) {
+      const batch = eventIds.slice(i, Math.min(i + batchSize, eventIds.length));
+      console.log(`Fetching resource requests for batch ${Math.floor(i / batchSize) + 1} (${batch.length} events)...`);
+      
+      // Fetch resource requests for this batch in parallel
+      const batchPromises = batch.map(async (eventId) => {
+        const requestsResponse = await fetchWithRetry(
+          `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_requests?include=resource&per_page=100`,
+          accessToken
+        );
+
+        if (!requestsResponse.ok) {
+          return { eventId, requests: [] };
+        }
+
+        const requestsData = await requestsResponse.json();
+        const requests = [];
+
+        // Build resources map from included
+        const resourcesInResponse = {};
+        for (const inc of requestsData.included || []) {
+          if (inc.type === 'Resource') {
+            resourcesInResponse[inc.id] = inc;
+          }
+        }
+
+        for (const request of requestsData.data || []) {
+          const resourceId = request.relationships?.resource?.data?.id;
+          const resourceData = resourcesInResponse[resourceId];
+          
+          if (resourceData) {
+            requests.push({
+              resource_data: resourceData,
+              quantity: request.attributes?.quantity || 1
+            });
+          }
+        }
+
+        return { eventId, requests };
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      
+      for (const { eventId, requests } of batchResults) {
+        if (requests.length > 0) {
+          resourceMap[eventId] = requests;
+        }
+      }
     }
 
+    console.log('Events with resource requests:', Object.keys(resourceMap).length);
     console.timeEnd('Fetch all events with resources');
 
     // Parse setup requirements
