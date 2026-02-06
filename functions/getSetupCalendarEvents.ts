@@ -248,6 +248,13 @@ Deno.serve(async (req) => {
     // Detect conflicts
     const conflicts = detectSetupConflicts(eventsWithSetup);
 
+    // Debug logging
+    console.log('=== SETUP CALENDAR DEBUG ===');
+    console.log('Date range:', startISO, 'to', endISO);
+    console.log('Total event instances fetched:', eventInstances.length);
+    console.log('Total unique events:', Object.keys(eventsLookup).length);
+    console.log('Events with setup requirements:', eventsWithSetup.length);
+
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
     const rooms = await base44.entities.Room.list();
@@ -262,9 +269,31 @@ Deno.serve(async (req) => {
       buildingMap[building.id] = building;
     }
 
-    // Organize response by building
+    // Initialize ALL buildings (even if no events)
     const buildingData = {};
+    for (const building of buildings) {
+      buildingData[building.id] = {
+        building_id: building.id,
+        building_name: building.name || 'Unknown Building',
+        rooms: {}
+      };
+    }
 
+    // Add all rooms to their buildings
+    for (const room of rooms) {
+      const buildingId = room.building_id;
+      if (buildingData[buildingId]) {
+        buildingData[buildingId].rooms[room.id] = {
+          room_id: room.id,
+          room_name: room.name,
+          room_number: room.room_number,
+          events: [],
+          conflicts: []
+        };
+      }
+    }
+
+    // Add events to rooms
     for (const event of eventsWithSetup) {
       for (const room of event.rooms) {
         const roomEntity = Object.values(roomMap).find(r => 
@@ -274,27 +303,9 @@ Deno.serve(async (req) => {
         if (!roomEntity) continue;
 
         const buildingId = roomEntity.building_id;
-        const building = buildingMap[buildingId];
-
-        if (!buildingData[buildingId]) {
-          buildingData[buildingId] = {
-            building_id: buildingId,
-            building_name: building?.name || 'Unknown Building',
-            rooms: {}
-          };
+        if (buildingData[buildingId]?.rooms[roomEntity.id]) {
+          buildingData[buildingId].rooms[roomEntity.id].events.push(event);
         }
-
-        if (!buildingData[buildingId].rooms[roomEntity.id]) {
-          buildingData[buildingId].rooms[roomEntity.id] = {
-            room_id: roomEntity.id,
-            room_name: roomEntity.name,
-            room_number: roomEntity.room_number,
-            events: [],
-            conflicts: []
-          };
-        }
-
-        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
       }
     }
 
@@ -316,7 +327,9 @@ Deno.serve(async (req) => {
       room_count: Object.values(building.rooms).length,
       event_count: Object.values(building.rooms).reduce((sum, r) => sum + r.events.length, 0),
       conflict_count: Object.values(building.rooms).reduce((sum, r) => sum + r.conflicts.length, 0)
-    }));
+    })).filter(b => b.room_count > 0); // Only show buildings with rooms
+
+    console.log('Buildings with events:', buildingsArray.map(b => `${b.building_name}: ${b.event_count} events, ${b.room_count} rooms`));
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
