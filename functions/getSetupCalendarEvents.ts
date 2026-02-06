@@ -204,10 +204,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch resource requests for each event
+    // Fetch resource requests for each event (limit to prevent timeouts)
     const resourceMap = {};
+    const eventIds = Object.keys(eventsLookup).slice(0, 50); // Limit to 50 events to prevent timeout
 
-    for (const eventId of Object.keys(eventsLookup)) {
+    console.log('Fetching resource requests for', eventIds.length, 'events...');
+
+    for (const eventId of eventIds) {
       const requestsResponse = await fetchWithRetry(
         `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
         accessToken
