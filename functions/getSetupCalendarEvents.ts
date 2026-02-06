@@ -312,8 +312,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log('Resource processing complete!');
     console.log('Total resource requests found:', totalResourceRequests);
     console.log('Bookable room matches:', totalBookableMatches);
+    console.log('Events added to resourceMap:', Object.keys(resourceMap).length);
 
     // Build events lookup from events that have bookable room requests
     const eventsLookup = {};
