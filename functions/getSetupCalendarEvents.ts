@@ -234,6 +234,9 @@ Deno.serve(async (req) => {
     const allEvents = eventsData.data || [];
     
     console.log('Total events fetched:', allEvents.length);
+    if (allEvents.length > 0) {
+      console.log('Sample event:', JSON.stringify(allEvents[0], null, 2).substring(0, 500));
+    }
 
     // Step 3: Fetch resource requests sequentially with smaller batches (avoid rate limits)
     const resourceMap = {};
