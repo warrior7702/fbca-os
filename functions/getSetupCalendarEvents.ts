@@ -200,12 +200,28 @@ Deno.serve(async (req) => {
     
     console.time('Fetch all events with resources');
 
-    // OPTIMIZED: Fetch events - PCO doesn't support nested includes, so we fetch events first
+    // Step 1: Fetch bookable rooms from PCO
+    const bookableRoomsResponse = await fetchWithRetry(
+      `https://api.planningcenteronline.com/calendar/v2/resources?filter=room&per_page=100`,
+      accessToken
+    );
+
+    if (!bookableRoomsResponse.ok) {
+      throw new Error(`Failed to fetch bookable rooms: ${bookableRoomsResponse.status}`);
+    }
+
+    const bookableRoomsData = await bookableRoomsResponse.json();
+    const bookableRooms = bookableRoomsData.data || [];
+    const bookableRoomIds = new Set(bookableRooms.map(r => r.id));
+    
+    console.log('Total bookable rooms from PCO:', bookableRooms.length);
+
+    // Step 2: Fetch events directly (not event_instances)
     const eventsResponse = await fetchWithRetry(
-      `https://api.planningcenteronline.com/calendar/v2/event_instances?` +
+      `https://api.planningcenteronline.com/calendar/v2/events?` +
+      `filter=future&` +
       `where[starts_at][gte]=${startISO}&` +
       `where[starts_at][lte]=${endISO}&` +
-      `include=event&` +
       `per_page=100`,
       accessToken
     );
@@ -215,39 +231,26 @@ Deno.serve(async (req) => {
     }
 
     const eventsData = await eventsResponse.json();
-    const eventInstances = eventsData.data || [];
+    const allEvents = eventsData.data || [];
     
-    console.log('API Response - Event Instances:', eventInstances.length);
-    console.log('API Response - Included events:', eventsData.included?.filter(i => i.type === 'Event').length || 0);
+    console.log('Total events fetched:', allEvents.length);
 
-    // Build event lookup
-    const eventsLookup = {};
-    for (const included of eventsData.included || []) {
-      if (included.type === 'Event') {
-        eventsLookup[included.id] = included;
-      }
-    }
-
-    const eventIds = Object.keys(eventsLookup);
-    console.log('Unique events to fetch resources for:', eventIds.length);
-
-    // Batch fetch resource requests (up to 10 events at a time to avoid timeout)
+    // Step 3: Batch fetch resource requests for these events
     const resourceMap = {};
     const batchSize = 10;
     
-    for (let i = 0; i < eventIds.length; i += batchSize) {
-      const batch = eventIds.slice(i, Math.min(i + batchSize, eventIds.length));
+    for (let i = 0; i < allEvents.length; i += batchSize) {
+      const batch = allEvents.slice(i, Math.min(i + batchSize, allEvents.length));
       console.log(`Fetching resource requests for batch ${Math.floor(i / batchSize) + 1} (${batch.length} events)...`);
       
-      // Fetch resource requests for this batch in parallel
-      const batchPromises = batch.map(async (eventId) => {
+      const batchPromises = batch.map(async (event) => {
         const requestsResponse = await fetchWithRetry(
-          `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/resource_requests?include=resource&per_page=100`,
+          `https://api.planningcenteronline.com/calendar/v2/events/${event.id}/resource_requests?include=resource&per_page=100`,
           accessToken
         );
 
         if (!requestsResponse.ok) {
-          return { eventId, requests: [] };
+          return { eventId: event.id, event, requests: [] };
         }
 
         const requestsData = await requestsResponse.json();
@@ -261,11 +264,12 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Filter to only bookable rooms
         for (const request of requestsData.data || []) {
           const resourceId = request.relationships?.resource?.data?.id;
           const resourceData = resourcesInResponse[resourceId];
           
-          if (resourceData) {
+          if (resourceData && bookableRoomIds.has(resourceId)) {
             requests.push({
               resource_data: resourceData,
               quantity: request.attributes?.quantity || 1
@@ -273,19 +277,27 @@ Deno.serve(async (req) => {
           }
         }
 
-        return { eventId, requests };
+        return { eventId: event.id, event, requests };
       });
 
       const batchResults = await Promise.all(batchPromises);
       
-      for (const { eventId, requests } of batchResults) {
+      for (const { eventId, event, requests } of batchResults) {
         if (requests.length > 0) {
           resourceMap[eventId] = requests;
         }
       }
     }
 
-    console.log('Events with resource requests:', Object.keys(resourceMap).length);
+    // Build events lookup from events that have bookable room requests
+    const eventsLookup = {};
+    for (const event of allEvents) {
+      if (resourceMap[event.id]) {
+        eventsLookup[event.id] = event;
+      }
+    }
+
+    console.log('Events with bookable room requests:', Object.keys(eventsLookup).length);
     console.timeEnd('Fetch all events with resources');
 
     // Parse setup requirements
