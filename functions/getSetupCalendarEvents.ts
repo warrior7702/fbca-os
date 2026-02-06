@@ -238,18 +238,19 @@ Deno.serve(async (req) => {
       console.log('Sample event:', JSON.stringify(allEvents[0], null, 2).substring(0, 500));
     }
 
-    // Step 3: Fetch resource requests sequentially with smaller batches (avoid rate limits)
+    // Step 3: Fetch resource requests - process first 20 events only to stay under timeout
     const resourceMap = {};
-    const maxEvents = Math.min(allEvents.length, 50); // Limit to 50 events max
+    const maxEvents = Math.min(allEvents.length, 20);
     
-    console.log(`Processing ${maxEvents} events...`);
+    console.log(`Processing ${maxEvents} of ${allEvents.length} events...`);
     
     let totalResourceRequests = 0;
     let totalBookableMatches = 0;
-    let sampleLogged = false;
+    let processedCount = 0;
     
     for (let i = 0; i < maxEvents; i++) {
       const event = allEvents[i];
+      console.log(`[${i + 1}/${maxEvents}] Fetching resources for event ${event.id} (${event.attributes?.name?.substring(0, 30)}...)`);
       
       try {
         const requestsResponse = await fetchWithRetry(
@@ -259,32 +260,19 @@ Deno.serve(async (req) => {
 
         if (requestsResponse.ok) {
           const requestsData = await requestsResponse.json();
-          const requests = [];
-
-          // Build resources map from included
+          const resourceRequestCount = requestsData.data?.length || 0;
           const resourcesInResponse = {};
+          
           for (const inc of requestsData.included || []) {
             if (inc.type === 'Resource') {
               resourcesInResponse[inc.id] = inc;
             }
           }
 
-          totalResourceRequests += requestsData.data?.length || 0;
+          totalResourceRequests += resourceRequestCount;
+          console.log(`  -> Found ${resourceRequestCount} resource requests, ${Object.keys(resourcesInResponse).length} resources`);
 
-          // Log first event with resources for debugging
-          if (!sampleLogged && requestsData.data?.length > 0) {
-            sampleLogged = true;
-            console.log('Sample event with resources:', event.attributes?.name);
-            console.log('Resource requests count:', requestsData.data.length);
-            console.log('Resources in response:', Object.keys(resourcesInResponse).length);
-            if (requestsData.data[0]) {
-              const firstReqResourceId = requestsData.data[0].relationships?.resource?.data?.id;
-              console.log('First resource ID:', firstReqResourceId);
-              console.log('Is bookable?:', bookableRoomIds.has(firstReqResourceId));
-            }
-          }
-
-          // Filter to only bookable rooms
+          const requests = [];
           for (const request of requestsData.data || []) {
             const resourceId = request.relationships?.resource?.data?.id;
             const resourceData = resourcesInResponse[resourceId];
@@ -300,15 +288,20 @@ Deno.serve(async (req) => {
 
           if (requests.length > 0) {
             resourceMap[event.id] = requests;
+            console.log(`  -> ✓ ${requests.length} bookable rooms matched`);
           }
+        } else {
+          console.log(`  -> API error: ${requestsResponse.status}`);
         }
+        
+        processedCount++;
       } catch (error) {
-        console.error(`Error fetching resources for event ${event.id}:`, error.message);
+        console.error(`  -> Error: ${error.message}`);
       }
       
-      // Small delay to avoid rate limiting
-      if (i % 10 === 0 && i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay every 5 events
+      if (i % 5 === 4) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
