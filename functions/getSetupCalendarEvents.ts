@@ -457,15 +457,37 @@ Deno.serve(async (req) => {
     }
 
     // Convert to array and calculate stats
-    const buildingsArray = Object.values(buildingData).map(building => ({
-      ...building,
-      rooms: Object.values(building.rooms),
-      room_count: Object.values(building.rooms).length,
-      event_count: Object.values(building.rooms).reduce((sum, r) => sum + r.events.length, 0),
-      conflict_count: Object.values(building.rooms).reduce((sum, r) => sum + r.conflicts.length, 0)
-    })).filter(b => b.room_count > 0); // Only show buildings with rooms
+    console.log(`\n=== BUILDING DATA CONVERSION ===`);
+    const buildingsArray = Object.values(buildingData).map(building => {
+      const roomsArray = Object.values(building.rooms);
+      const eventCount = roomsArray.reduce((sum, r) => sum + r.events.length, 0);
+      const conflictCount = roomsArray.reduce((sum, r) => sum + r.conflicts.length, 0);
+      
+      console.log(`Building: ${building.building_name}`);
+      console.log(`  - Total rooms: ${roomsArray.length}`);
+      console.log(`  - Total events: ${eventCount}`);
+      console.log(`  - Rooms with events: ${roomsArray.filter(r => r.events.length > 0).length}`);
+      
+      if (eventCount > 0) {
+        roomsArray.filter(r => r.events.length > 0).slice(0, 3).forEach(r => {
+          console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
+        });
+      }
+      
+      return {
+        ...building,
+        rooms: roomsArray,
+        room_count: roomsArray.length,
+        event_count: eventCount,
+        conflict_count: conflictCount
+      };
+    }).filter(b => b.room_count > 0); // Only show buildings with rooms
 
-    console.log('Buildings with events:', buildingsArray.map(b => `${b.building_name}: ${b.event_count} events, ${b.room_count} rooms`));
+    console.log(`\n=== FINAL BUILDING ARRAY ===`);
+    console.log('Total buildings:', buildingsArray.length);
+    buildingsArray.forEach(b => {
+      console.log(`  - ${b.building_name}: ${b.event_count} events, ${b.room_count} rooms`);
+    });
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
