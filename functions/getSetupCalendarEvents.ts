@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
 
-    return Response.json({
+    const result = {
       success: true,
       summary: {
         total_events: totalEvents,
@@ -377,8 +377,15 @@ Deno.serve(async (req) => {
           end: end.toISOString().split('T')[0]
         }
       },
-      buildings: buildingsArray
-    });
+      buildings: buildingsArray,
+      cached: false
+    };
+
+    // Cache the result
+    cachedResult = result;
+    cacheTime = Date.now();
+
+    return Response.json(result);
 
   } catch (error) {
     console.error('Error in getSetupCalendarEvents:', error);
