@@ -59,32 +59,35 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
 function parseSetupRequirements(event, resourceMap) {
   const rooms = [];
 
-  // Get resource requests for this event
+  // Get resource requests for this event (or empty array if none)
   const resourceRequests = resourceMap[event.id] || [];
 
-  for (const request of resourceRequests) {
-    const resource = request.resource_data;
-    if (!resource) continue;
+  // If event has bookable rooms, add them
+  if (resourceRequests.length > 0) {
+    for (const request of resourceRequests) {
+      const resource = request.resource_data;
+      if (!resource) continue;
 
-    // Extract setup type from event questions or default to "Standard"
-    let setupType = 'Standard';
-    if (event.attributes?.custom_data) {
-      try {
-        const customData = JSON.parse(event.attributes.custom_data);
-        setupType = customData.setup_type || 'Standard';
-      } catch (e) {
-        // Use default
+      // Extract setup type from event questions or default to "Standard"
+      let setupType = 'Standard';
+      if (event.attributes?.custom_data) {
+        try {
+          const customData = JSON.parse(event.attributes.custom_data);
+          setupType = customData.setup_type || 'Standard';
+        } catch (e) {
+          // Use default
+        }
       }
-    }
 
-    rooms.push({
-      room_id: resource.id,
-      room_name: resource.attributes?.name || 'Unknown',
-      pco_resource_id: resource.id,
-      setup_type: setupType,
-      setup_time_minutes: 60,
-      teardown_time_minutes: 60
-    });
+      rooms.push({
+        room_id: resource.id,
+        room_name: resource.attributes?.name || 'Unknown',
+        pco_resource_id: resource.id,
+        setup_type: setupType,
+        setup_time_minutes: 60, // Default 60 minutes
+        teardown_time_minutes: 60 // Default 60 minutes
+      });
+    }
   }
 
   return {
