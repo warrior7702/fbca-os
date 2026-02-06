@@ -219,90 +219,69 @@ Deno.serve(async (req) => {
     
     console.log('Total bookable rooms from PCO:', bookableRooms.length);
 
-    // Step 2: Fetch events directly (not event_instances)
+    // Step 2: Fetch ALL events with resource_requests included in single call
+    console.log('Fetching events with resource requests included...');
     const eventsResponse = await fetchWithRetry(
-      `https://api.planningcenteronline.com/calendar/v2/events?` +
+      `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?` +
       `filter=future&` +
       `where[starts_at][gte]=${startISO}&` +
       `where[starts_at][lte]=${endISO}&` +
+      `include=event,resource&` +
       `per_page=100`,
       accessToken
     );
 
     if (!eventsResponse.ok) {
-      throw new Error(`Failed to fetch events: ${eventsResponse.status}`);
+      throw new Error(`Failed to fetch event resource requests: ${eventsResponse.status}`);
     }
 
-    const eventsData = await eventsResponse.json();
-    const allEvents = eventsData.data || [];
+    const resourceRequestsData = await eventsResponse.json();
+    const allResourceRequests = resourceRequestsData.data || [];
     
-    console.log('Total events fetched:', allEvents.length);
-    if (allEvents.length > 0) {
-      console.log('Sample event:', JSON.stringify(allEvents[0], null, 2).substring(0, 500));
+    // Build maps from included data
+    const eventsMap = {};
+    const resourcesMap = {};
+    
+    for (const inc of resourceRequestsData.included || []) {
+      if (inc.type === 'Event') {
+        eventsMap[inc.id] = inc;
+      } else if (inc.type === 'Resource') {
+        resourcesMap[inc.id] = inc;
+      }
     }
+    
+    console.log('Total resource requests fetched:', allResourceRequests.length);
+    console.log('Total events included:', Object.keys(eventsMap).length);
+    console.log('Total resources included:', Object.keys(resourcesMap).length);
 
-    // Step 3: Fetch resource requests using correct endpoint
+    // Step 3: Build resourceMap grouped by event
     const resourceMap = {};
-    const maxEvents = allEvents.length; // Process all events
-    
-    console.log(`Processing all ${maxEvents} events...`);
-    
-    let totalResourceRequests = 0;
     let totalBookableMatches = 0;
-    let processedCount = 0;
     
-    for (let i = 0; i < maxEvents; i++) {
-      const event = allEvents[i];
+    for (const request of allResourceRequests) {
+      const eventId = request.relationships?.event?.data?.id;
+      const resourceId = request.relationships?.resource?.data?.id;
+      const resourceData = resourcesMap[resourceId];
       
-      try {
-        // FIXED: Use /event_resource_requests endpoint (not /events/{id}/resource_requests)
-        const requestsResponse = await fetchWithRetry(
-          `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?filter=event_id&where[event_id]=${event.id}&include=resource&per_page=100`,
-          accessToken
-        );
-
-        if (requestsResponse.ok) {
-          const requestsData = await requestsResponse.json();
-          const resourceRequestCount = requestsData.data?.length || 0;
-          const resourcesInResponse = {};
-          
-          for (const inc of requestsData.included || []) {
-            if (inc.type === 'Resource') {
-              resourcesInResponse[inc.id] = inc;
-            }
-          }
-
-          totalResourceRequests += resourceRequestCount;
-
-          const requests = [];
-          for (const request of requestsData.data || []) {
-            const resourceId = request.relationships?.resource?.data?.id;
-            const resourceData = resourcesInResponse[resourceId];
-            
-            if (resourceData && bookableRoomIds.has(resourceId)) {
-              totalBookableMatches++;
-              requests.push({
-                resource_data: resourceData,
-                quantity: request.attributes?.quantity || 1
-              });
-            }
-          }
-
-          if (requests.length > 0) {
-            resourceMap[event.id] = requests;
-          }
+      if (!eventId || !resourceData) continue;
+      
+      // Only include bookable rooms
+      if (bookableRoomIds.has(resourceId)) {
+        if (!resourceMap[eventId]) {
+          resourceMap[eventId] = [];
         }
         
-        processedCount++;
-      } catch (error) {
-        console.error(`Error processing event ${event.id}:`, error.message);
-      }
-      
-      // Small delay every 10 events
-      if (i % 10 === 9) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        resourceMap[eventId].push({
+          resource_data: resourceData,
+          quantity: request.attributes?.quantity || 1
+        });
+        
+        totalBookableMatches++;
       }
     }
+    
+    const allEvents = Object.values(eventsMap);
+    console.log('Events with bookable rooms:', Object.keys(resourceMap).length);
 
     console.log(`\n✓ Processing complete!`);
     console.log(`  - Processed: ${processedCount} events`);
