@@ -185,12 +185,28 @@ Deno.serve(async (req) => {
 
     const accessToken = await refreshTokenIfNeeded(base44, user);
 
-    // Fetch event instances for date range
+    // Check cache first
+    const cacheKey = `${start.toISOString()}_${end.toISOString()}`;
+    const forceFresh = url.searchParams.get('refresh') === 'true';
+    
+    if (!forceFresh && cachedResult && cacheTime && (Date.now() - cacheTime < CACHE_TTL)) {
+      console.log('Returning cached events (age:', Math.round((Date.now() - cacheTime) / 1000), 'seconds)');
+      return Response.json(cachedResult);
+    }
+
+    // Fetch event instances for date range with resource requests included
     const startISO = start.toISOString();
     const endISO = end.toISOString();
+    
+    console.time('Fetch all events with resources');
 
+    // OPTIMIZED: Fetch events with resource requests in a single API call
     const eventsResponse = await fetchWithRetry(
-      `https://api.planningcenteronline.com/calendar/v2/event_instances?where[starts_at][gte]=${startISO}&where[starts_at][lte]=${endISO}&include=event&per_page=100`,
+      `https://api.planningcenteronline.com/calendar/v2/event_instances?` +
+      `where[starts_at][gte]=${startISO}&` +
+      `where[starts_at][lte]=${endISO}&` +
+      `include=event,event.resource_requests,event.resource_requests.resource&` +
+      `per_page=100`,
       accessToken
     );
 
@@ -200,48 +216,48 @@ Deno.serve(async (req) => {
 
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
+    
+    console.log('API Response - Event Instances:', eventInstances.length);
+    console.log('API Response - Included records:', eventsData.included?.length || 0);
 
-    // Build event lookup
+    // Build lookup maps from included data
     const eventsLookup = {};
+    const resourceRequestsMap = {};
+    const resourcesMap = {};
+
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
-      }
-    }
-
-    // Fetch resource requests for each event (limit to prevent timeouts)
-    const resourceMap = {};
-    const eventIds = Object.keys(eventsLookup).slice(0, 50); // Limit to 50 events to prevent timeout
-
-    console.log('Fetching resource requests for', eventIds.length, 'events...');
-
-    for (const eventId of eventIds) {
-      const requestsResponse = await fetchWithRetry(
-        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
-        accessToken
-      );
-
-      if (requestsResponse.ok) {
-        const requestsData = await requestsResponse.json();
-        const requests = [];
-
-        for (const request of requestsData.data || []) {
-          // Find resource in included
-          const resourceData = (requestsData.included || []).find(
-            i => i.type === 'Resource' && i.id === request.relationships?.resource?.data?.id
-          );
-
-          if (resourceData) {
-            requests.push({
-              resource_data: resourceData,
-              quantity: request.attributes?.quantity || 1
-            });
+      } else if (included.type === 'ResourceRequest') {
+        const eventId = included.relationships?.event?.data?.id;
+        if (eventId) {
+          if (!resourceRequestsMap[eventId]) {
+            resourceRequestsMap[eventId] = [];
           }
+          resourceRequestsMap[eventId].push(included);
         }
-
-        resourceMap[eventId] = requests;
+      } else if (included.type === 'Resource') {
+        resourcesMap[included.id] = included;
       }
     }
+
+    console.log('Parsed Events:', Object.keys(eventsLookup).length);
+    console.log('Events with resource requests:', Object.keys(resourceRequestsMap).length);
+    console.log('Total resources:', Object.keys(resourcesMap).length);
+
+    // Build resource map with full resource data
+    const resourceMap = {};
+    for (const [eventId, requests] of Object.entries(resourceRequestsMap)) {
+      resourceMap[eventId] = requests.map(req => {
+        const resourceId = req.relationships?.resource?.data?.id;
+        return {
+          resource_data: resourcesMap[resourceId],
+          quantity: req.attributes?.quantity || 1
+        };
+      }).filter(r => r.resource_data); // Only include requests with valid resources
+    }
+
+    console.timeEnd('Fetch all events with resources');
 
     // Parse setup requirements
     const eventsWithSetup = [];
