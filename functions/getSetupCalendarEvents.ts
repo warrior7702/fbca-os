@@ -244,6 +244,10 @@ Deno.serve(async (req) => {
     
     console.log(`Processing ${maxEvents} events...`);
     
+    let totalResourceRequests = 0;
+    let totalBookableMatches = 0;
+    let sampleLogged = false;
+    
     for (let i = 0; i < maxEvents; i++) {
       const event = allEvents[i];
       
@@ -265,12 +269,28 @@ Deno.serve(async (req) => {
             }
           }
 
+          totalResourceRequests += requestsData.data?.length || 0;
+
+          // Log first event with resources for debugging
+          if (!sampleLogged && requestsData.data?.length > 0) {
+            sampleLogged = true;
+            console.log('Sample event with resources:', event.attributes?.name);
+            console.log('Resource requests count:', requestsData.data.length);
+            console.log('Resources in response:', Object.keys(resourcesInResponse).length);
+            if (requestsData.data[0]) {
+              const firstReqResourceId = requestsData.data[0].relationships?.resource?.data?.id;
+              console.log('First resource ID:', firstReqResourceId);
+              console.log('Is bookable?:', bookableRoomIds.has(firstReqResourceId));
+            }
+          }
+
           // Filter to only bookable rooms
           for (const request of requestsData.data || []) {
             const resourceId = request.relationships?.resource?.data?.id;
             const resourceData = resourcesInResponse[resourceId];
             
             if (resourceData && bookableRoomIds.has(resourceId)) {
+              totalBookableMatches++;
               requests.push({
                 resource_data: resourceData,
                 quantity: request.attributes?.quantity || 1
@@ -291,6 +311,9 @@ Deno.serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
+
+    console.log('Total resource requests found:', totalResourceRequests);
+    console.log('Bookable room matches:', totalBookableMatches);
 
     // Build events lookup from events that have bookable room requests
     const eventsLookup = {};
