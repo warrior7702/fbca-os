@@ -235,57 +235,57 @@ Deno.serve(async (req) => {
     
     console.log('Total events fetched:', allEvents.length);
 
-    // Step 3: Batch fetch resource requests for these events
+    // Step 3: Fetch resource requests sequentially with smaller batches (avoid rate limits)
     const resourceMap = {};
-    const batchSize = 10;
+    const maxEvents = Math.min(allEvents.length, 50); // Limit to 50 events max
     
-    for (let i = 0; i < allEvents.length; i += batchSize) {
-      const batch = allEvents.slice(i, Math.min(i + batchSize, allEvents.length));
-      console.log(`Fetching resource requests for batch ${Math.floor(i / batchSize) + 1} (${batch.length} events)...`);
+    console.log(`Processing ${maxEvents} events...`);
+    
+    for (let i = 0; i < maxEvents; i++) {
+      const event = allEvents[i];
       
-      const batchPromises = batch.map(async (event) => {
+      try {
         const requestsResponse = await fetchWithRetry(
           `https://api.planningcenteronline.com/calendar/v2/events/${event.id}/resource_requests?include=resource&per_page=100`,
           accessToken
         );
 
-        if (!requestsResponse.ok) {
-          return { eventId: event.id, event, requests: [] };
-        }
+        if (requestsResponse.ok) {
+          const requestsData = await requestsResponse.json();
+          const requests = [];
 
-        const requestsData = await requestsResponse.json();
-        const requests = [];
+          // Build resources map from included
+          const resourcesInResponse = {};
+          for (const inc of requestsData.included || []) {
+            if (inc.type === 'Resource') {
+              resourcesInResponse[inc.id] = inc;
+            }
+          }
 
-        // Build resources map from included
-        const resourcesInResponse = {};
-        for (const inc of requestsData.included || []) {
-          if (inc.type === 'Resource') {
-            resourcesInResponse[inc.id] = inc;
+          // Filter to only bookable rooms
+          for (const request of requestsData.data || []) {
+            const resourceId = request.relationships?.resource?.data?.id;
+            const resourceData = resourcesInResponse[resourceId];
+            
+            if (resourceData && bookableRoomIds.has(resourceId)) {
+              requests.push({
+                resource_data: resourceData,
+                quantity: request.attributes?.quantity || 1
+              });
+            }
+          }
+
+          if (requests.length > 0) {
+            resourceMap[event.id] = requests;
           }
         }
-
-        // Filter to only bookable rooms
-        for (const request of requestsData.data || []) {
-          const resourceId = request.relationships?.resource?.data?.id;
-          const resourceData = resourcesInResponse[resourceId];
-          
-          if (resourceData && bookableRoomIds.has(resourceId)) {
-            requests.push({
-              resource_data: resourceData,
-              quantity: request.attributes?.quantity || 1
-            });
-          }
-        }
-
-        return { eventId: event.id, event, requests };
-      });
-
-      const batchResults = await Promise.all(batchPromises);
+      } catch (error) {
+        console.error(`Error fetching resources for event ${event.id}:`, error.message);
+      }
       
-      for (const { eventId, event, requests } of batchResults) {
-        if (requests.length > 0) {
-          resourceMap[eventId] = requests;
-        }
+      // Small delay to avoid rate limiting
+      if (i % 10 === 0 && i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
