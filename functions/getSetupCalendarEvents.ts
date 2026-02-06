@@ -253,7 +253,15 @@ Deno.serve(async (req) => {
     console.log('Date range:', startISO, 'to', endISO);
     console.log('Total event instances fetched:', eventInstances.length);
     console.log('Total unique events:', Object.keys(eventsLookup).length);
-    console.log('Events with setup requirements:', eventsWithSetup.length);
+    console.log('Events with resource requests:', Object.keys(resourceMap).filter(id => resourceMap[id].length > 0).length);
+    console.log('Events with rooms after parsing:', eventsWithSetup.length);
+    
+    // Log sample of events with no resources
+    const eventsWithoutResources = Object.keys(eventsLookup).filter(id => !resourceMap[id] || resourceMap[id].length === 0);
+    if (eventsWithoutResources.length > 0) {
+      console.log('Events WITHOUT resource requests:', eventsWithoutResources.length);
+      console.log('Sample event names without resources:', eventsWithoutResources.slice(0, 3).map(id => eventsLookup[id]?.attributes?.name));
+    }
 
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
