@@ -346,6 +346,14 @@ Deno.serve(async (req) => {
     console.log('Events with bookable room requests:', Object.keys(resourceMap).length);
     console.log('Events with rooms after parsing:', eventsWithSetup.length);
 
+    // If no events found, diagnose why
+    if (Object.keys(eventsLookup).length === 0) {
+      console.log('⚠️ NO EVENTS FOUND - Diagnostic:');
+      console.log('- Total events fetched from PCO:', allEvents.length);
+      console.log('- Total bookable rooms:', bookableRoomIds.size);
+      console.log('- Sample bookable room IDs:', Array.from(bookableRoomIds).slice(0, 5));
+    }
+
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
     const rooms = await base44.entities.Room.list();
