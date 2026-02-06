@@ -383,34 +383,64 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Add events to rooms
+    // Add events to rooms - DETAILED LOGGING
+    console.log(`\n=== EVENT TO ROOM MATCHING ===`);
+    console.log(`Total events to match: ${eventsWithSetup.length}`);
+    
     let matchedRooms = 0;
     let unmatchedRooms = 0;
     const unmatchedPCOIds = new Set();
+    const matchedEventIds = new Set();
     
     for (const event of eventsWithSetup) {
+      let eventMatched = false;
+      console.log(`\nProcessing event: ${event.event_name} (ID: ${event.event_id})`);
+      console.log(`  - Event has ${event.rooms.length} rooms`);
+      
       for (const room of event.rooms) {
-        const roomEntity = Object.values(roomMap).find(r => 
-          r.pco_resource_id === room.pco_resource_id
-        );
+        console.log(`  - Checking room: ${room.room_name} (PCO ID: ${room.pco_resource_id})`);
+        
+        const roomEntity = Object.values(roomMap).find(r => {
+          const match = r.pco_resource_id === room.pco_resource_id;
+          if (match) {
+            console.log(`    ✓ MATCHED to database room: ${r.name || r.room_number} (ID: ${r.id}, Building: ${buildingMap[r.building_id]?.name})`);
+          }
+          return match;
+        });
 
         if (!roomEntity) {
           unmatchedRooms++;
           unmatchedPCOIds.add(room.pco_resource_id);
+          console.log(`    ✗ NOT MATCHED - PCO ID not found in database`);
           continue;
         }
 
         matchedRooms++;
+        eventMatched = true;
         const buildingId = roomEntity.building_id;
+        
+        console.log(`    - Building ID: ${buildingId}, Building: ${buildingMap[buildingId]?.name}`);
+        console.log(`    - buildingData exists: ${!!buildingData[buildingId]}`);
+        console.log(`    - room in buildingData: ${!!buildingData[buildingId]?.rooms[roomEntity.id]}`);
+        
         if (buildingData[buildingId]?.rooms[roomEntity.id]) {
           buildingData[buildingId].rooms[roomEntity.id].events.push(event);
+          console.log(`    ✓ Event added to room's events array`);
+        } else {
+          console.log(`    ✗ FAILED to add event - room not in buildingData structure`);
         }
+      }
+      
+      if (eventMatched) {
+        matchedEventIds.add(event.event_id);
       }
     }
     
-    console.log(`\nRoom matching results:`);
-    console.log(`  - Matched rooms: ${matchedRooms}`);
-    console.log(`  - Unmatched rooms: ${unmatchedRooms}`);
+    console.log(`\n=== MATCHING SUMMARY ===`);
+    console.log(`  - Total events processed: ${eventsWithSetup.length}`);
+    console.log(`  - Events successfully matched: ${matchedEventIds.size}`);
+    console.log(`  - Room matches: ${matchedRooms}`);
+    console.log(`  - Room mismatches: ${unmatchedRooms}`);
     if (unmatchedPCOIds.size > 0) {
       console.log(`  - Sample unmatched PCO IDs:`, Array.from(unmatchedPCOIds).slice(0, 5));
     }
