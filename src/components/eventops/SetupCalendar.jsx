@@ -28,13 +28,55 @@ export default function SetupCalendar() {
   const loadCalendarData = async () => {
     setLoading(true);
     try {
+      console.log('=== SETUP CALENDAR PAGE LOAD ===');
+      console.log('Calling getSetupCalendarEvents...');
+      
       const response = await base44.functions.invoke("getSetupCalendarEvents", {});
       const result = response.data;
-      setData(result);
+      
+      console.log('Raw data received by UI:', result);
+      console.log('Summary:', result.summary);
+      console.log('Buildings count:', result.buildings?.length);
+      console.log('Total events across all buildings (before filtering):', 
+        result.buildings?.reduce((sum, b) => 
+          sum + b.rooms.reduce((rSum, r) => rSum + (r.events?.length || 0), 0), 0
+        )
+      );
+      
+      // FILTER: Only show rooms that have events
+      const buildingsWithEvents = result.buildings.map(building => ({
+        ...building,
+        // Filter to ONLY rooms that have events
+        rooms: building.rooms.filter(room => room.events && room.events.length > 0),
+        // Update room count to match filtered rooms
+        room_count: building.rooms.filter(room => room.events && room.events.length > 0).length,
+        event_count: building.rooms
+          .filter(room => room.events && room.events.length > 0)
+          .reduce((sum, r) => sum + r.events.length, 0)
+      }));
+
+      // Only show buildings that have rooms with events
+      const filteredBuildings = buildingsWithEvents.filter(b => b.room_count > 0);
+      
+      console.log('=== AFTER FILTERING ===');
+      console.log('Filtered buildings with events:', filteredBuildings.length);
+      filteredBuildings.forEach(b => {
+        console.log(`  - ${b.building_name}: ${b.room_count} rooms with ${b.event_count} events`);
+        b.rooms.forEach(r => {
+          console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
+        });
+      });
+      
+      const filteredResult = {
+        ...result,
+        buildings: filteredBuildings
+      };
+      
+      setData(filteredResult);
       
       // Expand all buildings by default
       const buildingMap = {};
-      result.buildings.forEach((building) => {
+      filteredBuildings.forEach((building) => {
         buildingMap[building.building_id] = true;
       });
       setExpandedBuildings(buildingMap);
