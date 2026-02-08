@@ -142,8 +142,8 @@ export default function SetupCalendar() {
       accentClass: "text-red-600",
     },
     {
-      label: "Active Rooms",
-      value: summary.active_rooms,
+      label: "Rooms with Upcoming Events",
+      value: summary.rooms_with_events,
       icon: Building2,
       bgClass: "bg-blue-50",
       accentClass: "text-blue-600",
