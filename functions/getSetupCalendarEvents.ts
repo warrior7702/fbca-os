@@ -338,7 +338,12 @@ Deno.serve(async (req) => {
 
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
-    const allRooms = await base44.entities.Room.list();
+    const allRoomsFromDB = await base44.entities.Room.list();
+    
+    // Filter to only PCO-bookable rooms
+    const allRooms = allRoomsFromDB.filter(r => r.pco_resource_id);
+    console.log(`Filtered to ${allRooms.length} PCO-bookable rooms (out of ${allRoomsFromDB.length} total)`);
+    
     const buildingMap = {};
 
     for (const building of buildings) {
