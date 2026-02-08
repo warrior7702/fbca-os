@@ -203,18 +203,21 @@ Deno.serve(async (req) => {
     
     console.time('Fetch all events with resources');
 
-    // Step 1: Fetch bookable rooms from PCO
-    const bookableRoomsResponse = await fetchWithRetry(
-      `https://api.planningcenteronline.com/calendar/v2/resources?filter=room&per_page=100`,
-      accessToken
-    );
-
-    if (!bookableRoomsResponse.ok) {
-      throw new Error(`Failed to fetch bookable rooms: ${bookableRoomsResponse.status}`);
+    // Step 1: Fetch ALL resources from PCO and filter by kind=Room
+    let allRooms = [];
+    let nextUrl = `https://api.planningcenteronline.com/calendar/v2/resources?per_page=100`;
+    
+    while (nextUrl) {
+      const response = await fetchWithRetry(nextUrl, accessToken);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch resources: ${response.status}`);
+      }
+      const data = await response.json();
+      allRooms = allRooms.concat(data.data || []);
+      nextUrl = data.links?.next || null;
     }
-
-    const bookableRoomsData = await bookableRoomsResponse.json();
-    const bookableRooms = bookableRoomsData.data || [];
+    
+    const bookableRooms = allRooms.filter(r => r.attributes?.kind === 'Room');
     const bookableRoomIds = new Set(bookableRooms.map(r => r.id));
     
     console.log('Total bookable rooms from PCO:', bookableRooms.length);
