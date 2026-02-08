@@ -362,13 +362,20 @@ Deno.serve(async (req) => {
       console.log(`⚠️ NO ROOMS have pco_resource_id set in database!`);
     }
 
-    // Create a map of PCO resource ID to room for fast lookup
+    // Create a map of PCO resource ID to room for fast lookup (with String conversion for type safety)
     const pcoIdToRoomMap = {};
     for (const room of allRooms) {
       if (room.pco_resource_id) {
-        pcoIdToRoomMap[room.pco_resource_id] = room;
+        pcoIdToRoomMap[String(room.pco_resource_id)] = room;
       }
     }
+    
+    console.log('\n🔍 === PCO ID TO ROOM MAP ===');
+    console.log(`Total rooms in map: ${Object.keys(pcoIdToRoomMap).length}`);
+    const sampleMapEntries = Object.entries(pcoIdToRoomMap).slice(0, 3);
+    sampleMapEntries.forEach(([pcoId, room]) => {
+      console.log(`  - PCO ID: "${pcoId}" (type: ${typeof pcoId}) → Room: ${room.room_name || room.room_number}`);
+    });
 
     // Initialize ALL buildings (even if no events)
     const buildingData = {};
@@ -409,10 +416,11 @@ Deno.serve(async (req) => {
       console.log(`  - Event has ${event.rooms.length} rooms`);
       
       for (const room of event.rooms) {
-        console.log(`  - Checking room: ${room.room_name} (PCO ID: ${room.pco_resource_id})`);
+        const pcoIdStr = String(room.pco_resource_id);
+        console.log(`  - Checking room: ${room.room_name} (PCO ID: "${pcoIdStr}" type: ${typeof room.pco_resource_id})`);
         
-        // Use the fast lookup map
-        const roomEntity = pcoIdToRoomMap[room.pco_resource_id];
+        // Use the fast lookup map with String conversion
+        const roomEntity = pcoIdToRoomMap[pcoIdStr];
 
         if (!roomEntity) {
           unmatchedRooms++;
