@@ -335,28 +335,31 @@ Deno.serve(async (req) => {
 
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
-    const rooms = await base44.entities.Room.list();
-    const roomMap = {};
+    const allRooms = await base44.entities.Room.list();
     const buildingMap = {};
-
-    for (const room of rooms) {
-      roomMap[room.id] = room;
-    }
 
     for (const building of buildings) {
       buildingMap[building.id] = building;
     }
 
     // Debug: Show sample room pco_resource_ids from database
-    const roomsWithPCOId = rooms.filter(r => r.pco_resource_id);
-    console.log(`\nDatabase rooms with pco_resource_id: ${roomsWithPCOId.length} of ${rooms.length}`);
+    const roomsWithPCOId = allRooms.filter(r => r.pco_resource_id);
+    console.log(`\nDatabase rooms with pco_resource_id: ${roomsWithPCOId.length} of ${allRooms.length}`);
     if (roomsWithPCOId.length > 0) {
       console.log(`Sample database room pco_resource_ids:`);
       roomsWithPCOId.slice(0, 5).forEach(r => {
-        console.log(`  - PCO ID: ${r.pco_resource_id}, Room: ${r.name || r.room_number}, Building: ${buildingMap[r.building_id]?.name}`);
+        console.log(`  - PCO ID: ${r.pco_resource_id}, Room: ${r.room_name || r.room_number}, Building: ${buildingMap[r.building_id]?.name}`);
       });
     } else {
       console.log(`⚠️ NO ROOMS have pco_resource_id set in database!`);
+    }
+
+    // Create a map of PCO resource ID to room for fast lookup
+    const pcoIdToRoomMap = {};
+    for (const room of allRooms) {
+      if (room.pco_resource_id) {
+        pcoIdToRoomMap[room.pco_resource_id] = room;
+      }
     }
 
     // Initialize ALL buildings (even if no events)
@@ -370,12 +373,12 @@ Deno.serve(async (req) => {
     }
 
     // Add all rooms to their buildings
-    for (const room of rooms) {
+    for (const room of allRooms) {
       const buildingId = room.building_id;
       if (buildingData[buildingId]) {
         buildingData[buildingId].rooms[room.id] = {
           room_id: room.id,
-          room_name: room.name,
+          room_name: room.room_name,
           room_number: room.room_number,
           events: [],
           conflicts: []
@@ -400,13 +403,8 @@ Deno.serve(async (req) => {
       for (const room of event.rooms) {
         console.log(`  - Checking room: ${room.room_name} (PCO ID: ${room.pco_resource_id})`);
         
-        const roomEntity = Object.values(roomMap).find(r => {
-          const match = r.pco_resource_id === room.pco_resource_id;
-          if (match) {
-            console.log(`    ✓ MATCHED to database room: ${r.name || r.room_number} (ID: ${r.id}, Building: ${buildingMap[r.building_id]?.name})`);
-          }
-          return match;
-        });
+        // Use the fast lookup map
+        const roomEntity = pcoIdToRoomMap[room.pco_resource_id];
 
         if (!roomEntity) {
           unmatchedRooms++;
@@ -415,6 +413,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        console.log(`    ✓ MATCHED to database room: ${roomEntity.room_name || roomEntity.room_number} (ID: ${roomEntity.id}, Building: ${buildingMap[roomEntity.building_id]?.name})`);
         matchedRooms++;
         eventMatched = true;
         const buildingId = roomEntity.building_id;
@@ -447,7 +446,7 @@ Deno.serve(async (req) => {
 
     // Add conflicts to rooms
     for (const conflict of conflicts) {
-      const roomEntity = Object.values(roomMap).find(r => r.id === conflict.room_id);
+      const roomEntity = allRooms.find(r => r.id === conflict.room_id);
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
@@ -497,7 +496,7 @@ Deno.serve(async (req) => {
       summary: {
         total_events: totalEvents,
         total_conflicts: totalConflicts,
-        active_rooms: Object.keys(roomMap).length,
+        active_rooms: allRooms.length,
         date_range: {
           start: start.toISOString().split('T')[0],
           end: end.toISOString().split('T')[0]
