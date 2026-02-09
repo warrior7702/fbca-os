@@ -528,13 +528,8 @@ Deno.serve(async (req) => {
           end: end.toISOString().split('T')[0]
         }
       },
-      buildings: buildingsArray,
-      cached: false
+      buildings: buildingsArray
     };
-
-    // Cache the result
-    cachedResult = result;
-    cacheTime = Date.now();
 
     return Response.json(result);
 
