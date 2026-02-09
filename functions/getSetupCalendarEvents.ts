@@ -494,7 +494,8 @@ Deno.serve(async (req) => {
       }
       
       return {
-        ...building,
+        building_id: building.building_id,
+        building_name: building.building_name,
         rooms: roomsWithEvents,
         room_count: roomsWithEvents.length,
         event_count: eventCount,
