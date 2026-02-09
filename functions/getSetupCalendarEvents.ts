@@ -186,14 +186,7 @@ Deno.serve(async (req) => {
 
     const accessToken = await refreshTokenIfNeeded(base44, user);
 
-    // Check cache first
-    const cacheKey = `${start.toISOString()}_${end.toISOString()}`;
-    const forceFresh = url.searchParams.get('refresh') === 'true';
-    
-    if (!forceFresh && cachedResult && cacheTime && (Date.now() - cacheTime < CACHE_TTL)) {
-      console.log('Returning cached events (age:', Math.round((Date.now() - cacheTime) / 1000), 'seconds)');
-      return Response.json(cachedResult);
-    }
+    // Always fetch fresh data (caching disabled for now)
 
     // Fetch event instances for date range with resource requests included
     const startISO = start.toISOString();
