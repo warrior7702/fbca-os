@@ -1,8 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Cache disabled for testing - set to 0 to force fresh data
-let cachedResult = null;
-let cacheTime = null;
+// Cache disabled - always fetch fresh data
 const CACHE_TTL = 0;
 
 async function refreshTokenIfNeeded(base44, user) {
