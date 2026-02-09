@@ -34,9 +34,22 @@ export default function SetupCalendar() {
       const response = await base44.functions.invoke("getSetupCalendarEvents", {});
       const result = response.data;
       
-      console.log('Raw data received by UI:', result);
-      console.log('Summary:', result.summary);
-      console.log('Buildings count:', result.buildings?.length);
+      console.log('📊 Raw data received by UI:', result);
+      console.log('📊 Summary:', result.summary);
+      console.log('📊 Buildings count:', result.buildings?.length);
+      
+      // Debug each building
+      result.buildings?.forEach(building => {
+        console.log(`📊 ${building.building_name}:`, {
+          room_count: building.room_count,
+          rooms_array_length: building.rooms?.length,
+          event_count: building.event_count,
+          sample_rooms: building.rooms?.slice(0, 2).map(r => ({
+            name: r.room_name || r.room_number,
+            events: r.events?.length || 0
+          }))
+        });
+      });
       
       setData(result);
       
@@ -205,15 +218,10 @@ export default function SetupCalendar() {
         ) : (
           filteredBuildings.map((building) => {
             const isExpanded = expandedBuildings[building.building_id] ?? true;
-            const roomCount = building.rooms?.length || 0;
-            const eventCount = building.rooms?.reduce(
-              (sum, room) => sum + (room.events?.length || 0),
-              0
-            ) || 0;
-            const conflictCount = building.rooms?.reduce(
-              (sum, room) => sum + (room.conflicts?.length || 0),
-              0
-            ) || 0;
+            // Use backend-calculated counts (already filtered to rooms with events)
+            const roomCount = building.room_count || 0;
+            const eventCount = building.event_count || 0;
+            const conflictCount = building.conflict_count || 0;
 
             return (
               <div key={building.building_id} className="border rounded-lg overflow-hidden">

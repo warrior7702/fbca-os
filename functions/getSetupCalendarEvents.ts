@@ -505,7 +505,12 @@ Deno.serve(async (req) => {
     console.log(`\n=== FINAL BUILDING ARRAY ===`);
     console.log('Total buildings:', buildingsArray.length);
     buildingsArray.forEach(b => {
-      console.log(`  - ${b.building_name}: ${b.event_count} events, ${b.room_count} rooms`);
+      console.log(`  - ${b.building_name}: ${b.event_count} events, ${b.room_count} rooms with events`);
+      console.log(`    Sample rooms:`, b.rooms.slice(0, 2).map(r => ({
+        id: r.room_id,
+        name: r.room_name || r.room_number,
+        events: r.events.length
+      })));
     });
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
