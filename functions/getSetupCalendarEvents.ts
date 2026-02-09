@@ -471,37 +471,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert to array and calculate stats
+    // Convert to array and calculate stats - ONLY include rooms with events
     console.log(`\n=== BUILDING DATA CONVERSION ===`);
-    const buildingsArray = Object.values(buildingData).map(building => {
+    const buildingsArray = [];
+    
+    for (const building of Object.values(buildingData)) {
       const allRoomsArray = Object.values(building.rooms);
       
-      // FILTER: Only include rooms that have events in the next 14 days
-      const roomsWithEvents = allRoomsArray.filter(r => r.events.length > 0);
+      // CRITICAL: Only include rooms that have events
+      const roomsWithEvents = allRoomsArray.filter(r => r.events && r.events.length > 0);
+      
+      console.log(`Building: ${building.building_name}`);
+      console.log(`  - Total PCO-bookable rooms: ${allRoomsArray.length}`);
+      console.log(`  - Rooms with events: ${roomsWithEvents.length}`);
+      
+      // Skip buildings with no events
+      if (roomsWithEvents.length === 0) {
+        console.log(`  - Skipping (no events)`);
+        continue;
+      }
       
       const eventCount = roomsWithEvents.reduce((sum, r) => sum + r.events.length, 0);
       const conflictCount = roomsWithEvents.reduce((sum, r) => sum + r.conflicts.length, 0);
       
-      console.log(`Building: ${building.building_name}`);
-      console.log(`  - Total PCO-bookable rooms: ${allRoomsArray.length}`);
-      console.log(`  - Rooms with events in next 14 days: ${roomsWithEvents.length}`);
       console.log(`  - Total events: ${eventCount}`);
+      roomsWithEvents.slice(0, 3).forEach(r => {
+        console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
+      });
       
-      if (eventCount > 0) {
-        roomsWithEvents.slice(0, 3).forEach(r => {
-          console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
-        });
-      }
-      
-      return {
+      buildingsArray.push({
         building_id: building.building_id,
         building_name: building.building_name,
-        rooms: roomsWithEvents,
+        rooms: roomsWithEvents, // Only rooms with events
         room_count: roomsWithEvents.length,
         event_count: eventCount,
         conflict_count: conflictCount
-      };
-    }).filter(b => b.room_count > 0); // Only show buildings with rooms that have events
+      });
+    }
 
     console.log(`\n=== FINAL BUILDING ARRAY ===`);
     console.log('Total buildings:', buildingsArray.length);
