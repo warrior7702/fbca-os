@@ -490,10 +490,11 @@ Deno.serve(async (req) => {
         console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
       });
       
+      console.log(`  - ✅ PUSHING TO ARRAY: ${building.building_name} with ${roomsWithEvents.length} rooms`);
       buildingsArray.push({
         building_id: building.building_id,
         building_name: building.building_name,
-        rooms: roomsWithEvents, // Only rooms with events
+        rooms: roomsWithEvents,
         room_count: roomsWithEvents.length,
         event_count: eventCount,
         conflict_count: conflictCount
