@@ -474,29 +474,33 @@ Deno.serve(async (req) => {
     // Convert to array and calculate stats
     console.log(`\n=== BUILDING DATA CONVERSION ===`);
     const buildingsArray = Object.values(buildingData).map(building => {
-      const roomsArray = Object.values(building.rooms);
-      const eventCount = roomsArray.reduce((sum, r) => sum + r.events.length, 0);
-      const conflictCount = roomsArray.reduce((sum, r) => sum + r.conflicts.length, 0);
+      const allRoomsArray = Object.values(building.rooms);
+      
+      // FILTER: Only include rooms that have events in the next 14 days
+      const roomsWithEvents = allRoomsArray.filter(r => r.events.length > 0);
+      
+      const eventCount = roomsWithEvents.reduce((sum, r) => sum + r.events.length, 0);
+      const conflictCount = roomsWithEvents.reduce((sum, r) => sum + r.conflicts.length, 0);
       
       console.log(`Building: ${building.building_name}`);
-      console.log(`  - Total rooms: ${roomsArray.length}`);
+      console.log(`  - Total PCO-bookable rooms: ${allRoomsArray.length}`);
+      console.log(`  - Rooms with events in next 14 days: ${roomsWithEvents.length}`);
       console.log(`  - Total events: ${eventCount}`);
-      console.log(`  - Rooms with events: ${roomsArray.filter(r => r.events.length > 0).length}`);
       
       if (eventCount > 0) {
-        roomsArray.filter(r => r.events.length > 0).slice(0, 3).forEach(r => {
+        roomsWithEvents.slice(0, 3).forEach(r => {
           console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
         });
       }
       
       return {
         ...building,
-        rooms: roomsArray,
-        room_count: roomsArray.length,
+        rooms: roomsWithEvents,
+        room_count: roomsWithEvents.length,
         event_count: eventCount,
         conflict_count: conflictCount
       };
-    }).filter(b => b.room_count > 0); // Only show buildings with rooms
+    }).filter(b => b.room_count > 0); // Only show buildings with rooms that have events
 
     console.log(`\n=== FINAL BUILDING ARRAY ===`);
     console.log('Total buildings:', buildingsArray.length);
