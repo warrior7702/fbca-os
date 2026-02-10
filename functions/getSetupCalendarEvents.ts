@@ -491,8 +491,8 @@ Deno.serve(async (req) => {
       buildingsArray.push({
         building_id: building.building_id,
         building_name: building.building_name,
-        rooms: roomsWithEvents,
-        room_count: roomsWithEvents.length,
+        rooms: roomsWithEvents, // Only rooms with events
+        room_count: roomsWithEvents.length, // Count only rooms with events
         event_count: eventCount,
         conflict_count: conflictCount
       });
