@@ -448,12 +448,13 @@ Deno.serve(async (req) => {
       console.log(`  - Sample unmatched PCO IDs:`, Array.from(unmatchedPCOIds).slice(0, 5));
     }
 
-    // Add conflicts to rooms
+    // Add conflicts to rooms (only if room exists in buildingData)
     for (const conflict of conflicts) {
       const roomEntity = allRooms.find(r => r.id === conflict.room_id);
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
+      // Room should already exist if it has events
       if (buildingData[buildingId]?.rooms[conflict.room_id]) {
         buildingData[buildingId].rooms[conflict.room_id].conflicts.push(conflict);
       }
