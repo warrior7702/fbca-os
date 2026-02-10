@@ -38,20 +38,34 @@ export default function SetupCalendar() {
       console.log('📊 Summary:', result.summary);
       console.log('📊 Buildings count:', result.buildings?.length);
       
-      // Debug each building
-      result.buildings?.forEach(building => {
-        console.log(`📊 ${building.building_name}:`, {
-          room_count: building.room_count,
-          rooms_array_length: building.rooms?.length,
-          event_count: building.event_count,
-          sample_rooms: building.rooms?.slice(0, 2).map(r => ({
-            name: r.room_name || r.room_number,
-            events: r.events?.length || 0
-          }))
-        });
+      // FRONTEND FILTER: Only keep buildings/rooms with events (backend should do this, but adding failsafe)
+      const filteredBuildings = result.buildings
+        ?.map(building => {
+          // Filter out rooms with no events
+          const roomsWithEvents = building.rooms?.filter(r => r.events && r.events.length > 0) || [];
+          
+          if (roomsWithEvents.length === 0) {
+            return null; // Skip buildings with no events
+          }
+          
+          return {
+            ...building,
+            rooms: roomsWithEvents,
+            room_count: roomsWithEvents.length,
+            event_count: roomsWithEvents.reduce((sum, r) => sum + r.events.length, 0)
+          };
+        })
+        .filter(b => b !== null) || [];
+      
+      console.log(`📊 After frontend filter: ${filteredBuildings.length} buildings with events`);
+      filteredBuildings.forEach(building => {
+        console.log(`📊 ${building.building_name}: ${building.room_count} rooms, ${building.event_count} events`);
       });
       
-      setData(result);
+      setData({
+        ...result,
+        buildings: filteredBuildings
+      });
       
       // Expand all buildings by default
       const buildingMap = {};
