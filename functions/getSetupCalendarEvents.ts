@@ -1,4 +1,7 @@
+// VERSION 4 - CACHE BUSTED
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+
+const FUNCTION_VERSION = "v4-fixed-empty-rooms";
 
 async function refreshTokenIfNeeded(base44, user) {
   const expiresAt = new Date(user.pco_token_expires_at);
