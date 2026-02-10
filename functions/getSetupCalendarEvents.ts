@@ -413,13 +413,24 @@ Deno.serve(async (req) => {
         
         console.log(`    - Building ID: ${buildingId}, Building: ${buildingMap[buildingId]?.name}`);
         console.log(`    - buildingData exists: ${!!buildingData[buildingId]}`);
-        console.log(`    - room in buildingData: ${!!buildingData[buildingId]?.rooms[roomEntity.id]}`);
         
-        if (buildingData[buildingId]?.rooms[roomEntity.id]) {
+        // Create room if it doesn't exist (lazy initialization)
+        if (buildingData[buildingId]) {
+          if (!buildingData[buildingId].rooms[roomEntity.id]) {
+            buildingData[buildingId].rooms[roomEntity.id] = {
+              room_id: roomEntity.id,
+              room_name: roomEntity.room_name,
+              room_number: roomEntity.room_number,
+              events: [],
+              conflicts: []
+            };
+            console.log(`    ✓ Created room in buildingData`);
+          }
+          
           buildingData[buildingId].rooms[roomEntity.id].events.push(event);
           console.log(`    ✓ Event added to room's events array`);
         } else {
-          console.log(`    ✗ FAILED to add event - room not in buildingData structure`);
+          console.log(`    ✗ FAILED - building not found in buildingData`);
         }
       }
       
