@@ -309,8 +309,8 @@ Deno.serve(async (req) => {
     // Detect conflicts
     const conflicts = detectSetupConflicts(eventsWithSetup);
 
-    // Debug logging
-    console.log('=== SETUP CALENDAR DEBUG ===');
+    // Debug logging - v2 (force cache clear)
+    console.log('=== SETUP CALENDAR DEBUG (v2) ===');
     console.log('Date range:', startISO, 'to', endISO);
     console.log('Total unique events:', Object.keys(eventsLookup).length);
     console.log('Events with bookable room requests:', Object.keys(resourceMap).length);
