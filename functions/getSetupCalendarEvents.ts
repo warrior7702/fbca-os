@@ -461,36 +461,40 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert to array and calculate stats
-    console.log(`\n=== BUILDING DATA CONVERSION ===`);
+    // Convert to array and calculate stats - FIXED VERSION v3
+    console.log(`\n=== BUILDING DATA CONVERSION (v3 FIXED) ===`);
     const buildingsArray = [];
     
     for (const building of Object.values(buildingData)) {
-      const roomsArray = Object.values(building.rooms);
+      const allRoomsInBuilding = Object.values(building.rooms);
+      
+      // CRITICAL FIX: Only include rooms that actually have events
+      const roomsWithEvents = allRoomsInBuilding.filter(room => room.events && room.events.length > 0);
       
       console.log(`Building: ${building.building_name}`);
-      console.log(`  - Rooms in structure: ${roomsArray.length}`);
+      console.log(`  - All rooms in structure: ${allRoomsInBuilding.length}`);
+      console.log(`  - Rooms WITH events: ${roomsWithEvents.length}`);
       
-      // Skip buildings with no rooms (which means no events)
-      if (roomsArray.length === 0) {
-        console.log(`  - Skipping (no rooms/events)`);
+      // Skip buildings with no rooms that have events
+      if (roomsWithEvents.length === 0) {
+        console.log(`  - Skipping (no rooms with events)`);
         continue;
       }
       
-      const eventCount = roomsArray.reduce((sum, r) => sum + r.events.length, 0);
-      const conflictCount = roomsArray.reduce((sum, r) => sum + r.conflicts.length, 0);
+      const eventCount = roomsWithEvents.reduce((sum, r) => sum + r.events.length, 0);
+      const conflictCount = roomsWithEvents.reduce((sum, r) => sum + r.conflicts.length, 0);
       
       console.log(`  - Total events: ${eventCount}`);
-      roomsArray.slice(0, 3).forEach(r => {
+      roomsWithEvents.slice(0, 3).forEach(r => {
         console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
       });
       
-      console.log(`  - ✅ PUSHING TO ARRAY: ${building.building_name} with ${roomsArray.length} rooms`);
+      console.log(`  - ✅ PUSHING TO ARRAY: ${building.building_name} with ${roomsWithEvents.length} rooms`);
       buildingsArray.push({
         building_id: building.building_id,
         building_name: building.building_name,
-        rooms: roomsArray,
-        room_count: roomsArray.length,
+        rooms: roomsWithEvents,
+        room_count: roomsWithEvents.length,
         event_count: eventCount,
         conflict_count: conflictCount
       });
