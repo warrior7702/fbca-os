@@ -98,11 +98,13 @@ export default function SetupCalendar() {
   const { summary, buildings } = data;
   const setupTasks = summary.total_events * 2;
 
-  // Filter buildings
+  // Filter buildings - only show buildings with events
+  const buildingsWithEvents = buildings.filter((b) => b.event_count > 0);
+  
   const filteredBuildings =
     selectedBuilding === "all"
-      ? buildings
-      : buildings.filter((b) => b.building_id === selectedBuilding);
+      ? buildingsWithEvents
+      : buildingsWithEvents.filter((b) => b.building_id === selectedBuilding);
 
   // Summary cards
   const summaryCards = [
@@ -185,7 +187,7 @@ export default function SetupCalendar() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Buildings</SelectItem>
-                {buildings.map((building) => (
+                {buildingsWithEvents.map((building) => (
                   <SelectItem key={building.building_id} value={building.building_id}>
                     {building.building_name}
                   </SelectItem>
