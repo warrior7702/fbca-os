@@ -375,19 +375,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Add all rooms to their buildings
-    for (const room of allRooms) {
-      const buildingId = room.building_id;
-      if (buildingData[buildingId]) {
-        buildingData[buildingId].rooms[room.id] = {
-          room_id: room.id,
-          room_name: room.room_name,
-          room_number: room.room_number,
-          events: [],
-          conflicts: []
-        };
-      }
-    }
+    // DON'T add all rooms upfront - only add rooms when they have events
+    // This prevents empty rooms from being included in the final output
 
     // Add events to rooms - DETAILED LOGGING
     console.log(`\n=== EVENT TO ROOM MATCHING ===`);
