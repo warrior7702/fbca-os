@@ -1,8 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Cache disabled - always fetch fresh data
-const CACHE_TTL = 0;
-
 async function refreshTokenIfNeeded(base44, user) {
   const expiresAt = new Date(user.pco_token_expires_at);
   const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
