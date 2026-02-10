@@ -200,9 +200,9 @@ export default function SetupCalendar() {
               className="w-48"
             />
 
-            <Button variant="outline" size="sm" onClick={loadCalendarData}>
-              Refresh
-            </Button>
+<Button variant="outline" size="sm" onClick={loadCalendarData} disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : '📥'} {loading ? 'Loading...' : 'Refresh'}
+                                  </Button>
           </div>
         </CardContent>
       </Card>
