@@ -156,6 +156,7 @@ function detectSetupConflicts(eventsWithSetup) {
 
 Deno.serve(async (req) => {
   try {
+    console.log('🔄 CACHE BUSTED - NEW VERSION DEPLOYED');
     const base44 = createClientFromRequest(req);
     const currentUser = await base44.auth.me();
 
