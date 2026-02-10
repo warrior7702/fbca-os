@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
       console.log(`  - PCO ID: "${pcoId}" (type: ${typeof pcoId}) → Room: ${room.room_name || room.room_number}`);
     });
 
-    // Initialize ALL buildings (even if no events)
+    // Initialize building structure - ONLY add rooms when they get events (v5)
     const buildingData = {};
     for (const building of buildings) {
       buildingData[building.id] = {
@@ -378,9 +378,8 @@ Deno.serve(async (req) => {
         rooms: {}
       };
     }
-
-    // DON'T add all rooms upfront - only add rooms when they have events
-    // This prevents empty rooms from being included in the final output
+    
+    console.log(`\n🏗️ V5 INITIALIZATION: Created ${buildings.length} building structures`)
 
     // Add events to rooms - DETAILED LOGGING
     console.log(`\n=== EVENT TO ROOM MATCHING ===`);
