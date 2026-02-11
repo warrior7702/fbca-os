@@ -236,6 +236,23 @@ export default function SetupCalendar() {
               0
             ) || 0;
 
+            // Filter to bookable rooms with events for this building
+            const filteredRooms = (building.rooms || []).filter(room => {
+              const isBookable = room.pco_resource_id || room.room_id;
+              const hasEvents = room.events && room.events.length > 0;
+              return isBookable && hasEvents;
+            });
+
+            const filteredRoomCount = filteredRooms.length;
+            const filteredEventCount = filteredRooms.reduce(
+              (sum, room) => sum + (room.events?.length || 0),
+              0
+            );
+            const filteredConflictCount = filteredRooms.reduce(
+              (sum, room) => sum + (room.conflicts?.length || 0),
+              0
+            );
+
             return (
               <div key={building.building_id} className="border rounded-lg overflow-hidden">
                 {/* Building Header */}
@@ -257,14 +274,14 @@ export default function SetupCalendar() {
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="bg-slate-700 px-3 py-1 rounded-full">
-                      {roomCount} rooms
+                      {filteredRoomCount} rooms
                     </span>
                     <span className="bg-slate-700 px-3 py-1 rounded-full">
-                      {eventCount} events
+                      {filteredEventCount} events
                     </span>
-                    {conflictCount > 0 && (
+                    {filteredConflictCount > 0 && (
                       <span className="bg-red-600 px-3 py-1 rounded-full">
-                        {conflictCount} conflicts
+                        {filteredConflictCount} conflicts
                       </span>
                     )}
                   </div>
@@ -273,9 +290,26 @@ export default function SetupCalendar() {
                 {/* Building Content */}
                 {isExpanded && (
                   <div className="bg-white p-6 border-t">
-                    {building.rooms && building.rooms.length > 0 ? (
-                      <div className="space-y-4">
-                        {building.rooms.map((room) => (
+                    {(() => {
+                      // Filter to bookable rooms with events
+                      const filteredRooms = (building.rooms || []).filter(room => {
+                        // Must be a bookable room (has pco_resource_id)
+                        const isBookable = room.pco_resource_id || room.room_id;
+                        // Must have events in the 14-day window
+                        const hasEvents = room.events && room.events.length > 0;
+                        return isBookable && hasEvents;
+                      });
+
+                      console.log(`${building.building_name} - Filtered Rooms:`, {
+                        total_rooms: building.rooms?.length || 0,
+                        bookable_with_events: filteredRooms.length,
+                        event_count: filteredRooms.reduce((sum, r) => sum + (r.events?.length || 0), 0),
+                        conflict_count: filteredRooms.reduce((sum, r) => sum + (r.conflicts?.length || 0), 0)
+                      });
+
+                      return filteredRooms.length > 0 ? (
+                        <div className="space-y-4">
+                          {filteredRooms.map((room) => (
                           <div
                             key={room.room_id}
                             className="p-4 bg-slate-50 rounded-lg border border-slate-200"
@@ -322,13 +356,14 @@ export default function SetupCalendar() {
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-slate-500 py-8">
-                        No rooms in this building
-                      </p>
-                    )}
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center text-slate-500 py-8">
+                          No bookable rooms with events in this building
+                        </p>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
