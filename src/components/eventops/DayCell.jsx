@@ -78,7 +78,7 @@ export default function DayCell({ day, room }) {
 
   return (
     <div
-      className={`border-b border-r border-slate-300 p-2 transition-colors hover:bg-slate-100 ${
+      className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 ${
         day.isWeekend ? 'bg-pink-50' : 'bg-white'
       }`}
     >
