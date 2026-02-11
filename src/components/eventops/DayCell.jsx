@@ -44,34 +44,58 @@ export default function DayCell({ day, room }) {
   // DEBUG: Single cell test - only for first day
   const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
   
-  if (isDebugCell && room.events && room.events.length > 0) {
-    console.log('=== DEBUG CELL ===');
-    console.log('Room:', room.room_name);
-    console.log('Day:', day.fullDate);
-    console.log('Total events in room:', room.events.length);
-    console.log('Event Keys:', Object.keys(room.events[0]));
-    console.log('First Event:', room.events[0]);
-    console.log('Checking fields - start_time:', room.events[0].start_time);
-    console.log('Checking fields - starts_at:', room.events[0].starts_at);
-    console.log('Checking fields - start:', room.events[0].start);
+  // Find the correct datetime field
+  let dateField = null;
+  if (room.events && room.events.length > 0) {
+    const firstEvent = room.events[0];
+    
+    if (isDebugCell) {
+      console.log('=== DEFENSIVE CHECK ===');
+      console.log('Room:', room.room_name, 'Day:', day.fullDate);
+      console.log('Total events:', room.events.length);
+      console.log('First event keys:', Object.keys(firstEvent));
+      console.log('First event:', JSON.stringify(firstEvent, null, 2));
+    }
+    
+    // Detect which field contains the datetime
+    if (firstEvent.start_time) {
+      dateField = 'start_time';
+    } else if (firstEvent.starts_at) {
+      dateField = 'starts_at';
+    } else if (firstEvent.date) {
+      dateField = 'date';
+    } else {
+      // Last resort - find any ISO date-like string
+      for (const [key, value] of Object.entries(firstEvent)) {
+        if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+          dateField = key;
+          break;
+        }
+      }
+    }
+    
+    if (isDebugCell) {
+      console.log('Detected dateField:', dateField);
+    }
   }
   
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
-    if (!event.start_time || !day.fullDate) return false;
+    if (!dateField || !event[dateField] || !day.fullDate) return false;
+    
     try {
-      const eventDate = parseISO(event.start_time);
+      const eventDate = parseISO(event[dateField]);
       const dayDate = parseISO(day.fullDate);
       const matches = isSameDay(eventDate, dayDate);
       
       if (isDebugCell) {
-        console.log('Testing event:', event.event_name, 'start_time:', event.start_time, 'matches:', matches);
+        console.log(`Event "${event.event_name}" | room_id: ${room.room_id} | day: ${day.fullDate} | dateField: "${dateField}" = "${event[dateField]}" | matches: ${matches}`);
       }
       
       return matches;
     } catch (e) {
       if (isDebugCell) {
-        console.log('Parse error for event:', event.event_name, e);
+        console.log(`Parse error - event: ${event.event_name}, field: ${dateField}, value: ${event[dateField]}, error:`, e.message);
       }
       return false;
     }
