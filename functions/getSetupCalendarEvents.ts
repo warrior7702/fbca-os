@@ -51,7 +51,7 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(event, resourceMap, roomMap) {
+function parseSetupRequirements(event, resourceMap) {
   const rooms = [];
 
   // Get resource requests for this event
@@ -60,10 +60,6 @@ function parseSetupRequirements(event, resourceMap, roomMap) {
   for (const request of resourceRequests) {
     const resource = request.resource_data;
     if (!resource) continue;
-
-    // Check if this resource is actually a bookable room
-    const isBookableRoom = Object.values(roomMap).some(r => r.pco_resource_id === resource.id);
-    if (!isBookableRoom) continue;
 
     // Extract setup type from event questions or default to "Standard"
     let setupType = 'Standard';
@@ -200,24 +196,11 @@ Deno.serve(async (req) => {
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
 
-    // Build event lookup and instance lookup
+    // Build event lookup
     const eventsLookup = {};
-    const instancesByEvent = {};
-    
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
-      }
-    }
-
-    // Group instances by event
-    for (const instance of eventInstances) {
-      const eventId = instance.relationships?.event?.data?.id;
-      if (eventId) {
-        if (!instancesByEvent[eventId]) {
-          instancesByEvent[eventId] = [];
-        }
-        instancesByEvent[eventId].push(instance);
       }
     }
 
@@ -252,22 +235,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse setup requirements for each event instance
+    // Parse setup requirements
     const eventsWithSetup = [];
     for (const eventId of Object.keys(eventsLookup)) {
       const event = eventsLookup[eventId];
-      const instances = instancesByEvent[eventId] || [];
-      
-      for (const instance of instances) {
-        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, roomMap);
-        if (parsed.rooms.length > 0) {
-          // Add instance-specific times
-          eventsWithSetup.push({
-            ...parsed,
-            start_time: instance.attributes?.starts_at,
-            end_time: instance.attributes?.ends_at
-          });
-        }
+      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
+      if (parsed.rooms.length > 0) {
+        eventsWithSetup.push(parsed);
       }
     }
 
@@ -297,23 +271,15 @@ Deno.serve(async (req) => {
           r.pco_resource_id === room.pco_resource_id
         );
 
-        if (!roomEntity) {
-          console.log('Room not found in AkitaBox:', room.room_name, room.pco_resource_id);
-          continue;
-        }
+        if (!roomEntity) continue;
 
         const buildingId = roomEntity.building_id;
         const building = buildingMap[buildingId];
 
-        if (!building) {
-          console.log('Building not found:', buildingId);
-          continue;
-        }
-
         if (!buildingData[buildingId]) {
           buildingData[buildingId] = {
             building_id: buildingId,
-            building_name: building.name,
+            building_name: building?.name || 'Unknown Building',
             rooms: {}
           };
         }
@@ -323,28 +289,14 @@ Deno.serve(async (req) => {
             room_id: roomEntity.id,
             room_name: roomEntity.name,
             room_number: roomEntity.room_number,
-            pco_resource_id: roomEntity.pco_resource_id,
             events: [],
             conflicts: []
           };
         }
 
-        // Push event with all necessary data
-        const eventForRoom = {
-          event_id: event.event_id,
-          event_name: event.event_name,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          setup_type: room.setup_type,
-          setup_time_minutes: room.setup_time_minutes,
-          teardown_time_minutes: room.teardown_time_minutes
-        };
-        
-        buildingData[buildingId].rooms[roomEntity.id].events.push(eventForRoom);
+        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
       }
     }
-
-    console.log('Buildings with events:', Object.keys(buildingData).map(id => buildingMap[id]?.name).filter(Boolean));
 
     // Add conflicts to rooms
     for (const conflict of conflicts) {

@@ -14,14 +14,12 @@ function EventDot({ event }) {
   const timeStr = formatTime(event.start_time);
   const label = `${event.event_name}${timeStr ? ' ' + timeStr : ''}`;
 
-  console.log('EventDot rendering:', { event_name: event.event_name, timeStr, label });
-
   return (
     <div 
-      className="w-full bg-green-100 border-l-2 border-green-500 rounded-sm mb-1 px-1.5 py-1 overflow-hidden"
+      className="w-full h-4 bg-green-100 border-l-2 border-green-500 rounded-sm mb-1 px-1 flex items-center overflow-hidden"
       title={label}
     >
-      <span className="text-[10px] font-medium text-green-800 truncate block leading-tight">
+      <span className="text-[9px] font-medium text-green-800 truncate leading-none">
         {label}
       </span>
     </div>
@@ -43,30 +41,14 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // Debug: Log what we're working with
-  if (room.events && room.events.length > 0) {
-    console.log(`DayCell processing [${room.room_name}]:`, {
-      dayFullDate: day.fullDate,
-      totalEvents: room.events.length,
-      firstEventStart: room.events[0]?.start_time
-    });
-  }
-
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
     if (!event.start_time || !day.fullDate) return false;
     try {
       const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      const match = isSameDay(eventDate, dayDate);
-      
-      if (match) {
-        console.log(`EVENT MATCHED: ${event.event_name} on ${day.fullDate}`);
-      }
-      
-      return match;
+      return isSameDay(eventDate, dayDate);
     } catch (e) {
-      console.error('Date parsing error:', e, { event_start: event.start_time, day_date: day.fullDate });
       return false;
     }
   });
@@ -84,15 +66,12 @@ export default function DayCell({ day, room }) {
     }
   });
 
-  // Debug logging
-  if (eventsOnDay.length > 0) {
-    console.log(`DayCell [${room.room_name} - ${day.fullDate}]:`, {
-      eventsOnDay: eventsOnDay.length,
-      hasConflict,
-      events: eventsOnDay.map(e => ({ name: e.event_name, start: e.start_time })),
-      dayFullDate: day.fullDate
-    });
-  }
+  // Log for verification
+  console.log(`DayCell [${room.room_name} - ${day.fullDate}]:`, {
+    eventsOnDay: eventsOnDay.length,
+    hasConflict,
+    events: eventsOnDay.map(e => e.event_name)
+  });
 
   const eventsToShow = eventsOnDay.slice(0, 3);
   const hasMoreEvents = eventsOnDay.length > 3;
