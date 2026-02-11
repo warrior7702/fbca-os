@@ -41,24 +41,21 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // DEBUG: Single cell test - only for first day
-  const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
-  
-  if (isDebugCell && room.events && room.events.length > 0) {
-    console.log('=== DEBUG CELL ===');
-    console.log('Room:', room.room_name);
-    console.log('Day:', day.fullDate);
-    console.log('Total events in room:', room.events.length);
-    console.log('First Event Keys:', Object.keys(room.events[0]));
-    console.log('First Event Data:', JSON.stringify(room.events[0], null, 2));
+  // DEBUG: Log event structure once to identify correct datetime field
+  if (room.events && room.events.length > 0 && !window.__eventStructureLogged) {
+    console.log('=== EVENT STRUCTURE DEBUG ===');
+    console.log('First event object:', JSON.stringify(room.events[0], null, 2));
+    console.log('Available datetime fields:');
+    console.log('  start_time:', room.events[0].start_time);
+    console.log('  starts_at:', room.events[0].starts_at);
+    console.log('  date:', room.events[0].date);
+    console.log('  All keys:', Object.keys(room.events[0]));
+    window.__eventStructureLogged = true;
   }
   
-  // Find the correct datetime field (could be start_time, starts_at, etc)
+  // Defensive: find the correct datetime field
   const getEventDateTime = (event) => {
-    if (event.start_time) return event.start_time;
-    if (event.starts_at) return event.starts_at;
-    if (event.date) return event.date;
-    return null;
+    return event.start_time || event.starts_at || event.date;
   };
   
   // Filter events occurring on this day
@@ -68,17 +65,8 @@ export default function DayCell({ day, room }) {
     try {
       const eventDate = parseISO(eventDateTime);
       const dayDate = parseISO(day.fullDate);
-      const matches = isSameDay(eventDate, dayDate);
-      
-      if (isDebugCell) {
-        console.log('Testing event:', event.event_name, 'dateTime:', eventDateTime, 'matches:', matches);
-      }
-      
-      return matches;
+      return isSameDay(eventDate, dayDate);
     } catch (e) {
-      if (isDebugCell) {
-        console.log('Parse error for event:', event.event_name, 'dateTime:', eventDateTime, e);
-      }
       return false;
     }
   });
