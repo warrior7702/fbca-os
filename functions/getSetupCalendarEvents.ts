@@ -51,7 +51,7 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(event, resourceMap) {
+function parseSetupRequirements(event, resourceMap, instanceTime) {
   const rooms = [];
 
   // Get resource requests for this event
@@ -85,8 +85,8 @@ function parseSetupRequirements(event, resourceMap) {
   return {
     event_id: event.id,
     event_name: event.attributes?.name || 'Unnamed Event',
-    start_time: event.attributes?.starts_at,
-    end_time: event.attributes?.ends_at,
+    start_time: instanceTime?.starts_at || event.attributes?.starts_at,
+    end_time: instanceTime?.ends_at || event.attributes?.ends_at,
     rooms
   };
 }
@@ -259,11 +259,8 @@ Deno.serve(async (req) => {
       
       // Create an event entry for each instance
       for (const instance of instances) {
-        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
+        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, instance);
         if (parsed.rooms.length > 0) {
-          // Override with instance-specific times
-          parsed.start_time = instance.starts_at;
-          parsed.end_time = instance.ends_at;
           eventsWithSetup.push(parsed);
         }
       }
