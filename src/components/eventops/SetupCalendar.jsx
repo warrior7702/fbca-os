@@ -364,9 +364,13 @@ export default function SetupCalendar() {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-center text-slate-500 py-8">
-                          No bookable rooms with events in this building
-                        </p>
+                        <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-12 text-center">
+                          <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                          <p className="text-slate-600 font-medium">No events scheduled</p>
+                          <p className="text-slate-500 text-sm mt-1">
+                            This building has no room setups in the next 14 days
+                          </p>
+                        </div>
                       );
                     })()}
                   </div>
