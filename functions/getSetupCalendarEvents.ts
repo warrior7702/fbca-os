@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
       const instances = instancesByEvent[eventId] || [];
       
       for (const instance of instances) {
-        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
+        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, roomMap);
         if (parsed.rooms.length > 0) {
           // Add instance-specific times
           eventsWithSetup.push({
