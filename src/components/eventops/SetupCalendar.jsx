@@ -13,6 +13,7 @@ import {
 import { Calendar, AlertTriangle, Building2, CheckCircle2, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
+import DayCell from "./DayCell";
 
 function generateDays() {
   const today = new Date();
@@ -348,14 +349,13 @@ export default function SetupCalendar() {
                                   </p>
                                 </div>
 
-                                {/* Day Cells (empty for now) */}
+                                {/* Day Cells */}
                                 {generateDays().map((day) => (
-                                  <div
+                                  <DayCell
                                     key={`${room.room_id}-${day.fullDate}`}
-                                    className="border-b border-r border-slate-300 p-2 bg-white"
-                                  >
-                                    {/* Empty for now */}
-                                  </div>
+                                    day={day}
+                                    room={room}
+                                  />
                                 ))}
                               </React.Fragment>
                             ))}
