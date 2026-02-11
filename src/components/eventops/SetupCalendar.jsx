@@ -12,6 +12,26 @@ import {
 } from "@/components/ui/select";
 import { Calendar, AlertTriangle, Building2, CheckCircle2, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { format, addDays } from "date-fns";
+
+function generateDays() {
+  const today = new Date();
+  const days = [];
+  
+  for (let i = 0; i < 14; i++) {
+    const date = addDays(today, i);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+    
+    days.push({
+      dateNum: date.getDate(),
+      dayName: format(date, 'EEE'), // Mon, Tue, etc.
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+      fullDate: format(date, 'yyyy-MM-dd')
+    });
+  }
+  
+  return days;
+}
 
 export default function SetupCalendar() {
   const [data, setData] = useState(null);
@@ -22,6 +42,10 @@ export default function SetupCalendar() {
 
   useEffect(() => {
     loadCalendarData();
+    
+    // Log the 14-day array for verification
+    const days = generateDays();
+    console.log('14-Day Array:', days);
   }, []);
 
   const loadCalendarData = async () => {
