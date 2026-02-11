@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { Calendar, AlertTriangle, Building2, CheckCircle2, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import CalendarGrid from "./CalendarGrid";
 
 export default function SetupCalendar() {
   const [data, setData] = useState(null);
@@ -28,29 +27,8 @@ export default function SetupCalendar() {
   const loadCalendarData = async () => {
     setLoading(true);
     try {
-      console.log('=== SETUP CALENDAR PAGE LOAD ===');
-      console.log('Calling getSetupCalendarEvents...');
-      
       const response = await base44.functions.invoke("getSetupCalendarEvents", {});
       const result = response.data;
-      
-      console.log('📊 Raw data received by UI:', result);
-      console.log('📊 Summary:', result.summary);
-      console.log('📊 Buildings count:', result.buildings?.length);
-      
-      // Debug each building
-      result.buildings?.forEach(building => {
-        console.log(`📊 ${building.building_name}:`, {
-          room_count: building.room_count,
-          rooms_array_length: building.rooms?.length,
-          event_count: building.event_count,
-          sample_rooms: building.rooms?.slice(0, 2).map(r => ({
-            name: r.room_name || r.room_number,
-            events: r.events?.length || 0
-          }))
-        });
-      });
-      
       setData(result);
       
       // Expand all buildings by default
@@ -98,13 +76,11 @@ export default function SetupCalendar() {
   const { summary, buildings } = data;
   const setupTasks = summary.total_events * 2;
 
-  // Filter buildings - only show buildings with events
-  const buildingsWithEvents = buildings.filter((b) => b.event_count > 0);
-  
+  // Filter buildings
   const filteredBuildings =
     selectedBuilding === "all"
-      ? buildingsWithEvents
-      : buildingsWithEvents.filter((b) => b.building_id === selectedBuilding);
+      ? buildings
+      : buildings.filter((b) => b.building_id === selectedBuilding);
 
   // Summary cards
   const summaryCards = [
@@ -123,8 +99,8 @@ export default function SetupCalendar() {
       accentClass: "text-red-600",
     },
     {
-      label: "Rooms with Upcoming Events",
-      value: summary.rooms_with_events,
+      label: "Active Rooms",
+      value: summary.active_rooms,
       icon: Building2,
       bgClass: "bg-blue-50",
       accentClass: "text-blue-600",
@@ -187,7 +163,7 @@ export default function SetupCalendar() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Buildings</SelectItem>
-                {buildingsWithEvents.map((building) => (
+                {buildings.map((building) => (
                   <SelectItem key={building.building_id} value={building.building_id}>
                     {building.building_name}
                   </SelectItem>
@@ -202,9 +178,9 @@ export default function SetupCalendar() {
               className="w-48"
             />
 
-<Button variant="outline" size="sm" onClick={loadCalendarData} disabled={loading}>
-                  {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : '📥'} {loading ? 'Loading...' : 'Refresh'}
-                                  </Button>
+            <Button variant="outline" size="sm" onClick={loadCalendarData}>
+              Refresh
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -220,10 +196,15 @@ export default function SetupCalendar() {
         ) : (
           filteredBuildings.map((building) => {
             const isExpanded = expandedBuildings[building.building_id] ?? true;
-            // Use backend-calculated counts (already filtered to rooms with events)
-            const roomCount = building.room_count || 0;
-            const eventCount = building.event_count || 0;
-            const conflictCount = building.conflict_count || 0;
+            const roomCount = building.rooms?.length || 0;
+            const eventCount = building.rooms?.reduce(
+              (sum, room) => sum + (room.events?.length || 0),
+              0
+            ) || 0;
+            const conflictCount = building.rooms?.reduce(
+              (sum, room) => sum + (room.conflicts?.length || 0),
+              0
+            ) || 0;
 
             return (
               <div key={building.building_id} className="border rounded-lg overflow-hidden">
@@ -261,8 +242,38 @@ export default function SetupCalendar() {
 
                 {/* Building Content */}
                 {isExpanded && (
-                  <div className="bg-white border-t">
-                    <CalendarGrid building={building} />
+                  <div className="bg-white p-6 border-t">
+                    {building.rooms && building.rooms.length > 0 ? (
+                      <div className="space-y-4">
+                        {building.rooms.map((room) => (
+                          <div
+                            key={room.room_id}
+                            className="p-4 bg-slate-50 rounded-lg border border-slate-200"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {room.room_name || `Room ${room.room_number}`}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {room.room_number && `Room #${room.room_number}`}
+                                </p>
+                              </div>
+                              <div className="text-xs text-slate-600">
+                                {room.events?.length || 0} events
+                              </div>
+                            </div>
+                            <div className="h-24 bg-white border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-400 text-sm">
+                              14-day grid will render here
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-slate-500 py-8">
+                        No rooms in this building
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

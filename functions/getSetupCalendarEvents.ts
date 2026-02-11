@@ -1,7 +1,4 @@
-// VERSION 4 - CACHE BUSTED
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-
-const FUNCTION_VERSION = "v4-fixed-empty-rooms";
 
 async function refreshTokenIfNeeded(base44, user) {
   const expiresAt = new Date(user.pco_token_expires_at);
@@ -57,35 +54,32 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
 function parseSetupRequirements(event, resourceMap) {
   const rooms = [];
 
-  // Get resource requests for this event (or empty array if none)
+  // Get resource requests for this event
   const resourceRequests = resourceMap[event.id] || [];
 
-  // If event has bookable rooms, add them
-  if (resourceRequests.length > 0) {
-    for (const request of resourceRequests) {
-      const resource = request.resource_data;
-      if (!resource) continue;
+  for (const request of resourceRequests) {
+    const resource = request.resource_data;
+    if (!resource) continue;
 
-      // Extract setup type from event questions or default to "Standard"
-      let setupType = 'Standard';
-      if (event.attributes?.custom_data) {
-        try {
-          const customData = JSON.parse(event.attributes.custom_data);
-          setupType = customData.setup_type || 'Standard';
-        } catch (e) {
-          // Use default
-        }
+    // Extract setup type from event questions or default to "Standard"
+    let setupType = 'Standard';
+    if (event.attributes?.custom_data) {
+      try {
+        const customData = JSON.parse(event.attributes.custom_data);
+        setupType = customData.setup_type || 'Standard';
+      } catch (e) {
+        // Use default
       }
-
-      rooms.push({
-        room_id: resource.id,
-        room_name: resource.attributes?.name || 'Unknown',
-        pco_resource_id: resource.id,
-        setup_type: setupType,
-        setup_time_minutes: 60, // Default 60 minutes
-        teardown_time_minutes: 60 // Default 60 minutes
-      });
     }
+
+    rooms.push({
+      room_id: resource.id,
+      room_name: resource.attributes?.name || 'Unknown',
+      pco_resource_id: resource.id,
+      setup_type: setupType,
+      setup_time_minutes: 60,
+      teardown_time_minutes: 60
+    });
   }
 
   return {
@@ -159,7 +153,6 @@ function detectSetupConflicts(eventsWithSetup) {
 
 Deno.serve(async (req) => {
   try {
-    console.log(`🚀 RUNNING VERSION: ${FUNCTION_VERSION}`);
     const base44 = createClientFromRequest(req);
     const currentUser = await base44.auth.me();
 
@@ -187,118 +180,60 @@ Deno.serve(async (req) => {
 
     const accessToken = await refreshTokenIfNeeded(base44, user);
 
-    // Always fetch fresh data (caching disabled for now)
-
-    // Fetch event instances for date range with resource requests included
+    // Fetch event instances for date range
     const startISO = start.toISOString();
     const endISO = end.toISOString();
-    
-    console.time('Fetch all events with resources');
 
-    // Step 1: Fetch ALL resources from PCO and filter by kind=Room
-    let allRooms = [];
-    let nextUrl = `https://api.planningcenteronline.com/calendar/v2/resources?per_page=100`;
-    
-    while (nextUrl) {
-      const response = await fetchWithRetry(nextUrl, accessToken);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch resources: ${response.status}`);
-      }
-      const data = await response.json();
-      allRooms = allRooms.concat(data.data || []);
-      nextUrl = data.links?.next || null;
-    }
-    
-    const bookableRooms = allRooms.filter(r => r.attributes?.kind === 'Room');
-    const bookableRoomIds = new Set(bookableRooms.map(r => r.id));
-    
-    console.log('Total bookable rooms from PCO:', bookableRooms.length);
-
-    // Step 2: Fetch ALL events with resource_requests included in single call
-    console.log('Fetching events with resource requests included...');
     const eventsResponse = await fetchWithRetry(
-      `https://api.planningcenteronline.com/calendar/v2/event_resource_requests?` +
-      `filter=future&` +
-      `where[starts_at][gte]=${startISO}&` +
-      `where[starts_at][lte]=${endISO}&` +
-      `include=event,resource&` +
-      `per_page=100`,
+      `https://api.planningcenteronline.com/calendar/v2/event_instances?where[starts_at][gte]=${startISO}&where[starts_at][lte]=${endISO}&include=event&per_page=100`,
       accessToken
     );
 
     if (!eventsResponse.ok) {
-      throw new Error(`Failed to fetch event resource requests: ${eventsResponse.status}`);
+      throw new Error(`Failed to fetch events: ${eventsResponse.status}`);
     }
 
-    const resourceRequestsData = await eventsResponse.json();
-    const allResourceRequests = resourceRequestsData.data || [];
-    
-    // Build maps from included data
-    const eventsMap = {};
-    const resourcesMap = {};
-    
-    for (const inc of resourceRequestsData.included || []) {
-      if (inc.type === 'Event') {
-        eventsMap[inc.id] = inc;
-      } else if (inc.type === 'Resource') {
-        resourcesMap[inc.id] = inc;
-      }
-    }
-    
-    console.log('Total resource requests fetched:', allResourceRequests.length);
-    console.log('Total events included:', Object.keys(eventsMap).length);
-    console.log('Total resources included:', Object.keys(resourcesMap).length);
+    const eventsData = await eventsResponse.json();
+    const eventInstances = eventsData.data || [];
 
-    // Step 3: Build resourceMap grouped by event
-    const resourceMap = {};
-    let totalBookableMatches = 0;
-    
-    for (const request of allResourceRequests) {
-      const eventId = request.relationships?.event?.data?.id;
-      const resourceId = request.relationships?.resource?.data?.id;
-      const resourceData = resourcesMap[resourceId];
-      
-      if (!eventId || !resourceData) continue;
-      
-      // Only include bookable rooms
-      if (bookableRoomIds.has(resourceId)) {
-        if (!resourceMap[eventId]) {
-          resourceMap[eventId] = [];
-        }
-        
-        resourceMap[eventId].push({
-          resource_data: resourceData,
-          quantity: request.attributes?.quantity || 1
-        });
-        
-        totalBookableMatches++;
-      }
-    }
-    
-    const allEvents = Object.values(eventsMap);
-    console.log('Events with bookable rooms:', Object.keys(resourceMap).length);
-
-    // Debug: Show sample resource IDs from events
-    if (Object.keys(resourceMap).length > 0) {
-      const sampleEventId = Object.keys(resourceMap)[0];
-      const sampleResources = resourceMap[sampleEventId];
-      console.log(`\nSample event resource IDs from PCO:`);
-      console.log(`  Event ID: ${sampleEventId}, Event: ${eventsMap[sampleEventId]?.attributes?.name}`);
-      sampleResources.slice(0, 3).forEach(r => {
-        console.log(`  - Resource ID: ${r.resource_data.id}, Name: ${r.resource_data.attributes?.name}`);
-      });
-    }
-
-    // Build events lookup from events that have bookable room requests
+    // Build event lookup
     const eventsLookup = {};
-    for (const event of allEvents) {
-      if (resourceMap[event.id]) {
-        eventsLookup[event.id] = event;
+    for (const included of eventsData.included || []) {
+      if (included.type === 'Event') {
+        eventsLookup[included.id] = included;
       }
     }
 
-    console.log('Events with bookable room requests:', Object.keys(eventsLookup).length);
-    console.timeEnd('Fetch all events with resources');
+    // Fetch resource requests for each event
+    const resourceMap = {};
+
+    for (const eventId of Object.keys(eventsLookup)) {
+      const requestsResponse = await fetchWithRetry(
+        `https://api.planningcenteronline.com/calendar/v2/events/${eventId}/event_resource_requests?include=resource&per_page=100`,
+        accessToken
+      );
+
+      if (requestsResponse.ok) {
+        const requestsData = await requestsResponse.json();
+        const requests = [];
+
+        for (const request of requestsData.data || []) {
+          // Find resource in included
+          const resourceData = (requestsData.included || []).find(
+            i => i.type === 'Resource' && i.id === request.relationships?.resource?.data?.id
+          );
+
+          if (resourceData) {
+            requests.push({
+              resource_data: resourceData,
+              quantity: request.attributes?.quantity || 1
+            });
+          }
+        }
+
+        resourceMap[eventId] = requests;
+      }
+    }
 
     // Parse setup requirements
     const eventsWithSetup = [];
@@ -313,228 +248,92 @@ Deno.serve(async (req) => {
     // Detect conflicts
     const conflicts = detectSetupConflicts(eventsWithSetup);
 
-    // Debug logging - v2 (force cache clear)
-    console.log('=== SETUP CALENDAR DEBUG (v2) ===');
-    console.log('Date range:', startISO, 'to', endISO);
-    console.log('Total unique events:', Object.keys(eventsLookup).length);
-    console.log('Events with bookable room requests:', Object.keys(resourceMap).length);
-    console.log('Events with rooms after parsing:', eventsWithSetup.length);
-
-    // If no events found, diagnose why
-    if (Object.keys(eventsLookup).length === 0) {
-      console.log('⚠️ NO EVENTS FOUND - Diagnostic:');
-      console.log('- Total events fetched from PCO:', allEvents.length);
-      console.log('- Total bookable rooms:', bookableRoomIds.size);
-      console.log('- Sample bookable room IDs:', Array.from(bookableRoomIds).slice(0, 5));
-    }
-
     // Load buildings and rooms for context
     const buildings = await base44.entities.Building.list();
-    const allRoomsFromDB = await base44.entities.Room.list();
-    
-    // Filter to only PCO-bookable rooms
-    const allRooms = allRoomsFromDB.filter(r => r.pco_resource_id);
-    console.log(`Filtered to ${allRooms.length} PCO-bookable rooms (out of ${allRoomsFromDB.length} total)`);
-    
+    const rooms = await base44.entities.Room.list();
+    const roomMap = {};
     const buildingMap = {};
+
+    for (const room of rooms) {
+      roomMap[room.id] = room;
+    }
 
     for (const building of buildings) {
       buildingMap[building.id] = building;
     }
 
-    // Debug: Show sample room pco_resource_ids from database
-    const roomsWithPCOId = allRooms.filter(r => r.pco_resource_id);
-    console.log(`\nDatabase rooms with pco_resource_id: ${roomsWithPCOId.length} of ${allRooms.length}`);
-    if (roomsWithPCOId.length > 0) {
-      console.log(`Sample database room pco_resource_ids:`);
-      roomsWithPCOId.slice(0, 5).forEach(r => {
-        console.log(`  - PCO ID: ${r.pco_resource_id}, Room: ${r.room_name || r.room_number}, Building: ${buildingMap[r.building_id]?.name}`);
-      });
-    } else {
-      console.log(`⚠️ NO ROOMS have pco_resource_id set in database!`);
-    }
-
-    // Create a map of PCO resource ID to room for fast lookup (with String conversion for type safety)
-    const pcoIdToRoomMap = {};
-    for (const room of allRooms) {
-      if (room.pco_resource_id) {
-        pcoIdToRoomMap[String(room.pco_resource_id)] = room;
-      }
-    }
-    
-    console.log('\n🔍 === PCO ID TO ROOM MAP ===');
-    console.log(`Total rooms in map: ${Object.keys(pcoIdToRoomMap).length}`);
-    const sampleMapEntries = Object.entries(pcoIdToRoomMap).slice(0, 3);
-    sampleMapEntries.forEach(([pcoId, room]) => {
-      console.log(`  - PCO ID: "${pcoId}" (type: ${typeof pcoId}) → Room: ${room.room_name || room.room_number}`);
-    });
-
-    // Initialize ALL buildings (even if no events)
+    // Organize response by building
     const buildingData = {};
-    for (const building of buildings) {
-      buildingData[building.id] = {
-        building_id: building.id,
-        building_name: building.name || 'Unknown Building',
-        rooms: {}
-      };
-    }
 
-    // DON'T add all rooms upfront - only add rooms when they have events
-    // This prevents empty rooms from being included in the final output
-
-    // Add events to rooms - DETAILED LOGGING
-    console.log(`\n=== EVENT TO ROOM MATCHING ===`);
-    console.log(`Total events to match: ${eventsWithSetup.length}`);
-    
-    let matchedRooms = 0;
-    let unmatchedRooms = 0;
-    const unmatchedPCOIds = new Set();
-    const matchedEventIds = new Set();
-    
     for (const event of eventsWithSetup) {
-      let eventMatched = false;
-      console.log(`\nProcessing event: ${event.event_name} (ID: ${event.event_id})`);
-      console.log(`  - Event has ${event.rooms.length} rooms`);
-      
       for (const room of event.rooms) {
-        const pcoIdStr = String(room.pco_resource_id);
-        console.log(`  - Checking room: ${room.room_name} (PCO ID: "${pcoIdStr}" type: ${typeof room.pco_resource_id})`);
-        
-        // Use the fast lookup map with String conversion
-        const roomEntity = pcoIdToRoomMap[pcoIdStr];
+        const roomEntity = Object.values(roomMap).find(r => 
+          r.pco_resource_id === room.pco_resource_id
+        );
 
-        if (!roomEntity) {
-          unmatchedRooms++;
-          unmatchedPCOIds.add(room.pco_resource_id);
-          console.log(`    ✗ NOT MATCHED - PCO ID not found in database`);
-          continue;
-        }
+        if (!roomEntity) continue;
 
-        console.log(`    ✓ MATCHED to database room: ${roomEntity.room_name || roomEntity.room_number} (ID: ${roomEntity.id}, Building: ${buildingMap[roomEntity.building_id]?.name})`);
-        matchedRooms++;
-        eventMatched = true;
         const buildingId = roomEntity.building_id;
-        
-        console.log(`    - Building ID: ${buildingId}, Building: ${buildingMap[buildingId]?.name}`);
-        console.log(`    - buildingData exists: ${!!buildingData[buildingId]}`);
-        
-        // Create room if it doesn't exist (lazy initialization)
-        if (buildingData[buildingId]) {
-          if (!buildingData[buildingId].rooms[roomEntity.id]) {
-            buildingData[buildingId].rooms[roomEntity.id] = {
-              room_id: roomEntity.id,
-              room_name: roomEntity.room_name,
-              room_number: roomEntity.room_number,
-              events: [],
-              conflicts: []
-            };
-            console.log(`    ✓ Created room in buildingData`);
-          }
-          
-          buildingData[buildingId].rooms[roomEntity.id].events.push(event);
-          console.log(`    ✓ Event added to room's events array`);
-        } else {
-          console.log(`    ✗ FAILED - building not found in buildingData`);
+        const building = buildingMap[buildingId];
+
+        if (!buildingData[buildingId]) {
+          buildingData[buildingId] = {
+            building_id: buildingId,
+            building_name: building?.name || 'Unknown Building',
+            rooms: {}
+          };
         }
+
+        if (!buildingData[buildingId].rooms[roomEntity.id]) {
+          buildingData[buildingId].rooms[roomEntity.id] = {
+            room_id: roomEntity.id,
+            room_name: roomEntity.name,
+            room_number: roomEntity.room_number,
+            events: [],
+            conflicts: []
+          };
+        }
+
+        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
       }
-      
-      if (eventMatched) {
-        matchedEventIds.add(event.event_id);
-      }
-    }
-    
-    console.log(`\n=== MATCHING SUMMARY ===`);
-    console.log(`  - Total events processed: ${eventsWithSetup.length}`);
-    console.log(`  - Events successfully matched: ${matchedEventIds.size}`);
-    console.log(`  - Room matches: ${matchedRooms}`);
-    console.log(`  - Room mismatches: ${unmatchedRooms}`);
-    if (unmatchedPCOIds.size > 0) {
-      console.log(`  - Sample unmatched PCO IDs:`, Array.from(unmatchedPCOIds).slice(0, 5));
     }
 
-    // Add conflicts to rooms (only if room exists in buildingData)
+    // Add conflicts to rooms
     for (const conflict of conflicts) {
-      const roomEntity = allRooms.find(r => r.id === conflict.room_id);
+      const roomEntity = Object.values(roomMap).find(r => r.id === conflict.room_id);
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
-      // Room should already exist if it has events
       if (buildingData[buildingId]?.rooms[conflict.room_id]) {
         buildingData[buildingId].rooms[conflict.room_id].conflicts.push(conflict);
       }
     }
 
-    // Convert to array and calculate stats - FIXED VERSION v3
-    console.log(`\n=== BUILDING DATA CONVERSION (v3 FIXED) ===`);
-    const buildingsArray = [];
-    
-    for (const building of Object.values(buildingData)) {
-      const allRoomsInBuilding = Object.values(building.rooms);
-      
-      // CRITICAL FIX: Only include rooms that actually have events
-      const roomsWithEvents = allRoomsInBuilding.filter(room => room.events && room.events.length > 0);
-      
-      console.log(`Building: ${building.building_name}`);
-      console.log(`  - All rooms in structure: ${allRoomsInBuilding.length}`);
-      console.log(`  - Rooms WITH events: ${roomsWithEvents.length}`);
-      
-      // Skip buildings with no rooms that have events
-      if (roomsWithEvents.length === 0) {
-        console.log(`  - Skipping (no rooms with events)`);
-        continue;
-      }
-      
-      const eventCount = roomsWithEvents.reduce((sum, r) => sum + r.events.length, 0);
-      const conflictCount = roomsWithEvents.reduce((sum, r) => sum + r.conflicts.length, 0);
-      
-      console.log(`  - Total events: ${eventCount}`);
-      roomsWithEvents.slice(0, 3).forEach(r => {
-        console.log(`    - ${r.room_name || r.room_number}: ${r.events.length} events`);
-      });
-      
-      console.log(`  - ✅ PUSHING TO ARRAY: ${building.building_name} with ${roomsWithEvents.length} rooms`);
-      buildingsArray.push({
-        building_id: building.building_id,
-        building_name: building.building_name,
-        rooms: roomsWithEvents,
-        room_count: roomsWithEvents.length,
-        event_count: eventCount,
-        conflict_count: conflictCount
-      });
-    }
-
-    console.log(`\n=== FINAL BUILDING ARRAY ===`);
-    console.log('Total buildings:', buildingsArray.length);
-    buildingsArray.forEach(b => {
-      console.log(`  - ${b.building_name}: ${b.event_count} events, ${b.room_count} rooms with events`);
-      console.log(`    Sample rooms:`, b.rooms.slice(0, 2).map(r => ({
-        id: r.room_id,
-        name: r.room_name || r.room_number,
-        events: r.events.length
-      })));
-    });
+    // Convert to array and calculate stats
+    const buildingsArray = Object.values(buildingData).map(building => ({
+      ...building,
+      rooms: Object.values(building.rooms),
+      room_count: Object.values(building.rooms).length,
+      event_count: Object.values(building.rooms).reduce((sum, r) => sum + r.events.length, 0),
+      conflict_count: Object.values(building.rooms).reduce((sum, r) => sum + r.conflicts.length, 0)
+    }));
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
-    const roomsWithEvents = buildingsArray.reduce((sum, b) => 
-      sum + b.rooms.filter(r => r.events.length > 0).length, 0
-    );
 
-    const result = {
+    return Response.json({
       success: true,
       summary: {
         total_events: totalEvents,
         total_conflicts: totalConflicts,
-        rooms_with_events: roomsWithEvents,
+        active_rooms: Object.keys(roomMap).length,
         date_range: {
           start: start.toISOString().split('T')[0],
           end: end.toISOString().split('T')[0]
         }
       },
       buildings: buildingsArray
-    };
-
-    return Response.json(result);
+    });
 
   } catch (error) {
     console.error('Error in getSetupCalendarEvents:', error);
