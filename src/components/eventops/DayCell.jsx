@@ -66,12 +66,15 @@ export default function DayCell({ day, room }) {
     }
   });
 
-  // Log for verification
-  console.log(`DayCell [${room.room_name} - ${day.fullDate}]:`, {
-    eventsOnDay: eventsOnDay.length,
-    hasConflict,
-    events: eventsOnDay.map(e => e.event_name)
-  });
+  // Debug logging
+  if (eventsOnDay.length > 0) {
+    console.log(`DayCell [${room.room_name} - ${day.fullDate}]:`, {
+      eventsOnDay: eventsOnDay.length,
+      hasConflict,
+      events: eventsOnDay.map(e => ({ name: e.event_name, start: e.start_time })),
+      dayFullDate: day.fullDate
+    });
+  }
 
   const eventsToShow = eventsOnDay.slice(0, 3);
   const hasMoreEvents = eventsOnDay.length > 3;
