@@ -41,6 +41,12 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
+  // DEBUG: Log first event keys
+  if (room.events && room.events.length > 0) {
+    console.log('DayCell Event Keys:', Object.keys(room.events[0]));
+    console.log('DayCell First Event Sample:', room.events[0]);
+  }
+  
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
     if (!event.start_time || !day.fullDate) return false;
