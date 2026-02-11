@@ -293,8 +293,20 @@ export default function SetupCalendar() {
                                 {room.events?.length || 0} events
                               </div>
                             </div>
-                            <div className="h-24 bg-white border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-400 text-sm">
-                              14-day grid will render here
+                            <div className="overflow-x-auto">
+                              <div 
+                                style={{ 
+                                  display: 'grid', 
+                                  gridTemplateColumns: '140px repeat(14, 1fr)',
+                                  minWidth: '1000px',
+                                  border: '2px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#fff'
+                                }}
+                                className="h-24"
+                              >
+                                {/* Grid cells will go here */}
+                              </div>
                             </div>
                           </div>
                         ))}
