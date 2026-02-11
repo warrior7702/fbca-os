@@ -279,10 +279,15 @@ Deno.serve(async (req) => {
         const buildingId = roomEntity.building_id;
         const building = buildingMap[buildingId];
 
+        if (!building) {
+          console.log('Building not found:', buildingId);
+          continue;
+        }
+
         if (!buildingData[buildingId]) {
           buildingData[buildingId] = {
             building_id: buildingId,
-            building_name: building?.name || 'Unknown Building',
+            building_name: building.name,
             rooms: {}
           };
         }
@@ -298,7 +303,16 @@ Deno.serve(async (req) => {
           };
         }
 
-        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
+        // Push flattened event data (not nested rooms)
+        buildingData[buildingId].rooms[roomEntity.id].events.push({
+          event_id: event.event_id,
+          event_name: event.event_name,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          setup_type: room.setup_type,
+          setup_time_minutes: room.setup_time_minutes,
+          teardown_time_minutes: room.teardown_time_minutes
+        });
       }
     }
 
