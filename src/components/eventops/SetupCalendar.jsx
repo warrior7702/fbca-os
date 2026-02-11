@@ -308,55 +308,58 @@ export default function SetupCalendar() {
                       });
 
                       return filteredRooms.length > 0 ? (
-                        <div className="space-y-4">
-                          {filteredRooms.map((room) => (
-                          <div
-                            key={room.room_id}
-                            className="p-4 bg-slate-50 rounded-lg border border-slate-200"
+                        <div className="overflow-x-auto">
+                          <div 
+                            style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: '140px repeat(14, 1fr)',
+                              minWidth: '1000px',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: '#fff'
+                            }}
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {room.room_name || `Room ${room.room_number}`}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {room.room_number && `Room #${room.room_number}`}
-                                </p>
-                              </div>
-                              <div className="text-xs text-slate-600">
-                                {room.events?.length || 0} events
-                              </div>
+                            {/* Header Row */}
+                            <div className="bg-slate-100 border-b border-r border-slate-300 p-2 font-semibold text-sm text-slate-700 flex items-center">
+                              Room
                             </div>
-                            <div className="overflow-x-auto">
-                              <div 
-                                style={{ 
-                                  display: 'grid', 
-                                  gridTemplateColumns: '140px repeat(14, 1fr)',
-                                  minWidth: '1000px',
-                                  border: '2px solid #e2e8f0',
-                                  borderRadius: '6px',
-                                  backgroundColor: '#fff'
-                                }}
+                            {generateDays().map((day) => (
+                              <div
+                                key={day.fullDate}
+                                className={`border-b border-r border-slate-300 p-2 text-center text-xs font-medium text-white ${
+                                  day.isWeekend ? 'bg-red-600' : 'bg-slate-800'
+                                }`}
                               >
-                                {/* Header Row */}
-                                <div className="bg-slate-100 border-b border-r border-slate-300 p-2 font-semibold text-sm text-slate-700 flex items-center">
-                                  Room
+                                <div className="font-bold">{day.dateNum}</div>
+                                <div className="opacity-90">{day.dayName}</div>
+                              </div>
+                            ))}
+
+                            {/* Room Rows */}
+                            {filteredRooms.map((room) => (
+                              <React.Fragment key={room.room_id}>
+                                {/* Room Name Cell */}
+                                <div className="border-b border-r border-slate-300 p-3 bg-slate-50">
+                                  <p className="font-semibold text-sm text-slate-900">
+                                    {room.room_name || `Room ${room.room_number}`}
+                                  </p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {room.room_number && `#${room.room_number}`} • {room.events?.length || 0} events
+                                  </p>
                                 </div>
+
+                                {/* Day Cells (empty for now) */}
                                 {generateDays().map((day) => (
                                   <div
-                                    key={day.fullDate}
-                                    className={`border-b border-r border-slate-300 p-2 text-center text-xs font-medium text-white ${
-                                      day.isWeekend ? 'bg-red-600' : 'bg-slate-800'
-                                    }`}
+                                    key={`${room.room_id}-${day.fullDate}`}
+                                    className="border-b border-r border-slate-300 p-2 bg-white"
                                   >
-                                    <div className="font-bold">{day.dateNum}</div>
-                                    <div className="opacity-90">{day.dayName}</div>
+                                    {/* Empty for now */}
                                   </div>
                                 ))}
-                              </div>
-                            </div>
+                              </React.Fragment>
+                            ))}
                           </div>
-                          ))}
                         </div>
                       ) : (
                         <p className="text-center text-slate-500 py-8">
