@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
     const eventsWithSetup = [];
     for (const eventId of Object.keys(eventsLookup)) {
       const event = eventsLookup[eventId];
-      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
+      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, instanceTimesMap[eventId]);
       if (parsed.rooms.length > 0) {
         eventsWithSetup.push(parsed);
       }
