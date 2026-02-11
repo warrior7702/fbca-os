@@ -293,7 +293,8 @@ export default function SetupCalendar() {
                   <div className="bg-white p-6 border-t">
                     {(() => {
                       // Filter to bookable rooms with events
-                      const filteredRooms = (building.rooms || []).filter(room => {
+                      const allRooms = building.rooms || [];
+                      const filteredRooms = allRooms.filter(room => {
                         // Must be a bookable room (has pco_resource_id)
                         const isBookable = room.pco_resource_id || room.room_id;
                         // Must have events in the 14-day window
@@ -302,12 +303,13 @@ export default function SetupCalendar() {
                       });
 
                       console.log(`${building.building_name} - Filtered Rooms:`, {
-                        total_rooms: building.rooms?.length || 0,
+                        total_rooms: allRooms.length,
                         bookable_with_events: filteredRooms.length,
                         event_count: filteredRooms.reduce((sum, r) => sum + (r.events?.length || 0), 0),
                         conflict_count: filteredRooms.reduce((sum, r) => sum + (r.conflicts?.length || 0), 0)
                       });
 
+                      // Always show the building section, even if no events
                       return filteredRooms.length > 0 ? (
                         <div className="overflow-x-auto">
                           <div 
