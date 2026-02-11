@@ -41,10 +41,19 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // DEBUG: Log first event keys
-  if (room.events && room.events.length > 0) {
-    console.log('DayCell Event Keys:', Object.keys(room.events[0]));
-    console.log('DayCell First Event Sample:', room.events[0]);
+  // DEBUG: Single cell test - only for first day
+  const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
+  
+  if (isDebugCell && room.events && room.events.length > 0) {
+    console.log('=== DEBUG CELL ===');
+    console.log('Room:', room.room_name);
+    console.log('Day:', day.fullDate);
+    console.log('Total events in room:', room.events.length);
+    console.log('Event Keys:', Object.keys(room.events[0]));
+    console.log('First Event:', room.events[0]);
+    console.log('Checking fields - start_time:', room.events[0].start_time);
+    console.log('Checking fields - starts_at:', room.events[0].starts_at);
+    console.log('Checking fields - start:', room.events[0].start);
   }
   
   // Filter events occurring on this day
@@ -53,8 +62,17 @@ export default function DayCell({ day, room }) {
     try {
       const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      return isSameDay(eventDate, dayDate);
+      const matches = isSameDay(eventDate, dayDate);
+      
+      if (isDebugCell) {
+        console.log('Testing event:', event.event_name, 'start_time:', event.start_time, 'matches:', matches);
+      }
+      
+      return matches;
     } catch (e) {
+      if (isDebugCell) {
+        console.log('Parse error for event:', event.event_name, e);
+      }
       return false;
     }
   });
