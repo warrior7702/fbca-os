@@ -294,7 +294,13 @@ Deno.serve(async (req) => {
           };
         }
 
-        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
+        buildingData[buildingId].rooms[roomEntity.id].events.push({
+          event_id: event.event_id,
+          event_name: event.event_name,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          rooms: event.rooms
+        });
       }
     }
 
