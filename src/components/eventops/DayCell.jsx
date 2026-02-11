@@ -114,6 +114,7 @@ export default function DayCell({ day, room }) {
       className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 ${
         day.isWeekend ? 'bg-pink-50' : 'bg-white'
       }`}
+      title={`${eventsOnDay.length} event(s)`}
     >
       {/* Conflict Bar */}
       {hasConflict && <ConflictDot />}
@@ -125,6 +126,11 @@ export default function DayCell({ day, room }) {
 
       {/* Count Badge */}
       {hasMoreEvents && <CountBadge count={eventsOnDay.length} />}
+      
+      {/* Always show count in bottom-right for debugging */}
+      <div className="text-[10px] text-slate-400 text-right mt-1">
+        {eventsOnDay.length > 0 && eventsOnDay.length}
+      </div>
     </div>
   );
 }
