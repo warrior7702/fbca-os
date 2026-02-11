@@ -2,8 +2,27 @@ import React from "react";
 import { format, isSameDay, parseISO } from "date-fns";
 
 function EventDot({ event }) {
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const timeStr = formatTime(event.start_time);
+  const label = `${event.event_name}${timeStr ? ' ' + timeStr : ''}`;
+
   return (
-    <div className="h-1.5 bg-green-500 rounded-full mb-1" title={event.event_name} />
+    <div 
+      className="w-full h-4 bg-green-100 border-l-2 border-green-500 rounded-sm mb-1 px-1 flex items-center overflow-hidden"
+      title={label}
+    >
+      <span className="text-[9px] font-medium text-green-800 truncate leading-none">
+        {label}
+      </span>
+    </div>
   );
 }
 
