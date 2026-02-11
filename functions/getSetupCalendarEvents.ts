@@ -275,26 +275,15 @@ Deno.serve(async (req) => {
       buildingMap[building.id] = building;
     }
 
-    // Create mapping from PCO resource ID to Room entity ID
-    const pcoToRoomId = {};
-    for (const room of rooms) {
-      if (room.pco_resource_id) {
-        pcoToRoomId[room.pco_resource_id] = room.id;
-      }
-    }
-
-    // Build room-to-events mapping using entity IDs
+    // Build room-to-events mapping
     const roomEventsMap = {};
     for (const event of eventsWithSetup) {
       for (const room of event.rooms) {
-        const entityRoomId = pcoToRoomId[room.room_id];
-        if (!entityRoomId) continue;
-        
-        if (!roomEventsMap[entityRoomId]) {
-          roomEventsMap[entityRoomId] = [];
+        if (!roomEventsMap[room.room_id]) {
+          roomEventsMap[room.room_id] = [];
         }
         // Store the event with only the relevant room setup info
-        roomEventsMap[entityRoomId].push({
+        roomEventsMap[room.room_id].push({
           event_id: event.event_id,
           event_name: event.event_name,
           start_time: event.start_time,
