@@ -303,9 +303,22 @@ export default function SetupCalendar() {
                                   borderRadius: '6px',
                                   backgroundColor: '#fff'
                                 }}
-                                className="h-24"
                               >
-                                {/* Grid cells will go here */}
+                                {/* Header Row */}
+                                <div className="bg-slate-100 border-b border-r border-slate-300 p-2 font-semibold text-sm text-slate-700 flex items-center">
+                                  Room
+                                </div>
+                                {generateDays().map((day) => (
+                                  <div
+                                    key={day.fullDate}
+                                    className={`border-b border-r border-slate-300 p-2 text-center text-xs font-medium text-white ${
+                                      day.isWeekend ? 'bg-red-600' : 'bg-slate-800'
+                                    }`}
+                                  >
+                                    <div className="font-bold">{day.dateNum}</div>
+                                    <div className="opacity-90">{day.dayName}</div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           </div>
