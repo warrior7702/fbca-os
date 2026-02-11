@@ -1,4 +1,6 @@
-// VERSION 4 - CACHE BUSTED
+// ===================================
+// VERSION 5 - ABSOLUTE FILTER ONLY
+// ===================================
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const FUNCTION_VERSION = "v5-absolute-filter";
