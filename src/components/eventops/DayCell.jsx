@@ -14,12 +14,14 @@ function EventDot({ event }) {
   const timeStr = formatTime(event.start_time);
   const label = `${event.event_name}${timeStr ? ' ' + timeStr : ''}`;
 
+  console.log('EventDot rendering:', { event_name: event.event_name, timeStr, label });
+
   return (
     <div 
-      className="w-full h-4 bg-green-100 border-l-2 border-green-500 rounded-sm mb-1 px-1 flex items-center overflow-hidden"
+      className="w-full bg-green-100 border-l-2 border-green-500 rounded-sm mb-1 px-1.5 py-1 overflow-hidden"
       title={label}
     >
-      <span className="text-[9px] font-medium text-green-800 truncate leading-none">
+      <span className="text-[10px] font-medium text-green-800 truncate block leading-tight">
         {label}
       </span>
     </div>
