@@ -53,14 +53,20 @@ export default function SetupCalendar() {
     try {
       const response = await base44.functions.invoke("getSetupCalendarEvents", {});
       const result = response.data;
-      setData(result);
       
-      // Expand all buildings by default
-      const buildingMap = {};
-      result.buildings.forEach((building) => {
-        buildingMap[building.building_id] = true;
-      });
-      setExpandedBuildings(buildingMap);
+      if (result?.success && result?.buildings) {
+        setData(result);
+        
+        // Expand all buildings by default
+        const buildingMap = {};
+        result.buildings.forEach((building) => {
+          buildingMap[building.building_id] = true;
+        });
+        setExpandedBuildings(buildingMap);
+      } else {
+        console.error("Invalid data structure:", result);
+        toast.error("Invalid calendar data received");
+      }
     } catch (error) {
       console.error("Error loading calendar data:", error);
       toast.error("Failed to load setup calendar data");
