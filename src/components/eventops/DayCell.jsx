@@ -24,17 +24,27 @@ function CountBadge({ count }) {
 export default function DayCell({ day, room }) {
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
-    const eventDate = parseISO(event.start_time);
-    const dayDate = parseISO(day.fullDate);
-    return isSameDay(eventDate, dayDate);
+    if (!event.start_time || !day.fullDate) return false;
+    try {
+      const eventDate = parseISO(event.start_time);
+      const dayDate = parseISO(day.fullDate);
+      return isSameDay(eventDate, dayDate);
+    } catch (e) {
+      return false;
+    }
   });
 
   // Check if there's a conflict on this day
   const hasConflict = (room.conflicts || []).some(conflict => {
-    const conflict1Date = parseISO(conflict.event1.start_time);
-    const conflict2Date = parseISO(conflict.event2.start_time);
-    const dayDate = parseISO(day.fullDate);
-    return isSameDay(conflict1Date, dayDate) || isSameDay(conflict2Date, dayDate);
+    if (!conflict?.event1?.start_time || !conflict?.event2?.start_time || !day.fullDate) return false;
+    try {
+      const conflict1Date = parseISO(conflict.event1.start_time);
+      const conflict2Date = parseISO(conflict.event2.start_time);
+      const dayDate = parseISO(day.fullDate);
+      return isSameDay(conflict1Date, dayDate) || isSameDay(conflict2Date, dayDate);
+    } catch (e) {
+      return false;
+    }
   });
 
   // Log for verification
