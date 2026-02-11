@@ -51,7 +51,7 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(event, resourceMap) {
+function parseSetupRequirements(event, resourceMap, instanceTimes) {
   const rooms = [];
 
   // Get resource requests for this event
@@ -85,8 +85,8 @@ function parseSetupRequirements(event, resourceMap) {
   return {
     event_id: event.id,
     event_name: event.attributes?.name || 'Unnamed Event',
-    start_time: event.attributes?.starts_at,
-    end_time: event.attributes?.ends_at,
+    start_time: instanceTimes?.starts_at || event.attributes?.starts_at,
+    end_time: instanceTimes?.ends_at || event.attributes?.ends_at,
     rooms
   };
 }
