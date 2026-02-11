@@ -251,18 +251,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse setup requirements with instance times
+    // Parse setup requirements - one entry per instance
     const eventsWithSetup = [];
-    for (const eventId of Object.keys(eventsLookup)) {
-      const event = eventsLookup[eventId];
-      const instances = instanceLookup[eventId] || [];
+    const processedInstances = new Set();
+    
+    for (const instance of eventInstances) {
+      const eventId = instance.relationships?.event?.data?.id;
+      if (!eventId) continue;
       
-      // Create an event entry for each instance
-      for (const instance of instances) {
-        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, instance);
-        if (parsed.rooms.length > 0) {
-          eventsWithSetup.push(parsed);
-        }
+      // Create unique key for this instance
+      const instanceKey = `${eventId}-${instance.attributes?.starts_at}`;
+      if (processedInstances.has(instanceKey)) continue;
+      processedInstances.add(instanceKey);
+      
+      const event = eventsLookup[eventId];
+      if (!event) continue;
+      
+      const instanceTime = {
+        starts_at: instance.attributes?.starts_at,
+        ends_at: instance.attributes?.ends_at
+      };
+      
+      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, instanceTime);
+      if (parsed.rooms.length > 0) {
+        eventsWithSetup.push(parsed);
       }
     }
 
