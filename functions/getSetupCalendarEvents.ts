@@ -325,12 +325,12 @@ Deno.serve(async (req) => {
 
     // Add conflicts to rooms
     for (const conflict of conflicts) {
-      const roomEntity = Object.values(roomMap).find(r => r.id === conflict.room_id);
+      const roomEntity = roomMap[conflict.room_id];
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
-      if (buildingData[buildingId]?.rooms[conflict.room_id]) {
-        buildingData[buildingId].rooms[conflict.room_id].conflicts.push(conflict);
+      if (buildingData[buildingId]?.rooms[roomEntity.id]) {
+        buildingData[buildingId].rooms[roomEntity.id].conflicts.push(conflict);
       }
     }
 
