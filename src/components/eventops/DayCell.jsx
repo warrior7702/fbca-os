@@ -41,47 +41,14 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // DEBUG: Single cell test - only for first day
-  const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
-  
-  // Detect which datetime field is actually present
-  let datetimeField = null;
-  if (room.events && room.events.length > 0) {
-    const firstEvent = room.events[0];
-    if (firstEvent.start_time) datetimeField = 'start_time';
-    else if (firstEvent.starts_at) datetimeField = 'starts_at';
-    else if (firstEvent.start) datetimeField = 'start';
-    
-    if (isDebugCell) {
-      console.log('=== DEBUG CELL ===');
-      console.log('Room:', room.room_name);
-      console.log('Day:', day.fullDate);
-      console.log('Total events in room:', room.events.length);
-      console.log('Event Keys:', Object.keys(firstEvent));
-      console.log('First Event:', firstEvent);
-      console.log('Detected datetime field:', datetimeField);
-      console.log('All events:', room.events.map(e => ({ name: e.event_name, [datetimeField]: e[datetimeField] })));
-    }
-  }
-  
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
-    const datetimeValue = event[datetimeField];
-    if (!datetimeValue || !day.fullDate) return false;
+    if (!event.start_time || !day.fullDate) return false;
     try {
-      const eventDate = parseISO(datetimeValue);
+      const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      const matches = isSameDay(eventDate, dayDate);
-      
-      if (isDebugCell) {
-        console.log('Testing event:', event.event_name, datetimeField + ':', datetimeValue, 'matches:', matches);
-      }
-      
-      return matches;
+      return isSameDay(eventDate, dayDate);
     } catch (e) {
-      if (isDebugCell) {
-        console.log('Parse error for event:', event.event_name, 'field:', datetimeField, 'value:', datetimeValue, 'error:', e);
-      }
       return false;
     }
   });
@@ -114,7 +81,6 @@ export default function DayCell({ day, room }) {
       className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 ${
         day.isWeekend ? 'bg-pink-50' : 'bg-white'
       }`}
-      title={`${eventsOnDay.length} event(s)`}
     >
       {/* Conflict Bar */}
       {hasConflict && <ConflictDot />}
@@ -126,11 +92,6 @@ export default function DayCell({ day, room }) {
 
       {/* Count Badge */}
       {hasMoreEvents && <CountBadge count={eventsOnDay.length} />}
-      
-      {/* Always show count in bottom-right for debugging */}
-      <div className="text-[10px] text-slate-400 text-right mt-1">
-        {eventsOnDay.length > 0 && eventsOnDay.length}
-      </div>
     </div>
   );
 }
