@@ -97,17 +97,19 @@ export default function DayCell({ day, room }) {
     events: eventsOnDay.map(e => e.event_name)
   });
 
+  const eventsToShow = eventsOnDay.slice(0, 3);
+  const hasMoreEvents = eventsOnDay.length > 3;
+
   return (
     <div
       className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 flex items-center justify-center ${
         day.isWeekend ? 'bg-pink-50' : 'bg-white'
       }`}
     >
-      {eventsOnDay.length > 0 && (
-        <div className="text-2xl font-bold text-blue-600">
-          {eventsOnDay.length}
-        </div>
-      )}
+      {/* TEMP: Show count to verify date matching works */}
+      <div className="text-3xl font-bold text-slate-300">
+        {eventsOnDay.length}
+      </div>
     </div>
   );
 }
