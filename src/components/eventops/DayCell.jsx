@@ -43,14 +43,30 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
+  // Debug: Log what we're working with
+  if (room.events && room.events.length > 0) {
+    console.log(`DayCell processing [${room.room_name}]:`, {
+      dayFullDate: day.fullDate,
+      totalEvents: room.events.length,
+      firstEventStart: room.events[0]?.start_time
+    });
+  }
+
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
     if (!event.start_time || !day.fullDate) return false;
     try {
       const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      return isSameDay(eventDate, dayDate);
+      const match = isSameDay(eventDate, dayDate);
+      
+      if (match) {
+        console.log(`EVENT MATCHED: ${event.event_name} on ${day.fullDate}`);
+      }
+      
+      return match;
     } catch (e) {
+      console.error('Date parsing error:', e, { event_start: event.start_time, day_date: day.fullDate });
       return false;
     }
   });
