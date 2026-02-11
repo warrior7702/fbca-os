@@ -303,8 +303,8 @@ Deno.serve(async (req) => {
           };
         }
 
-        // Push flattened event data (not nested rooms)
-        buildingData[buildingId].rooms[roomEntity.id].events.push({
+        // Push event with all necessary data
+        const eventForRoom = {
           event_id: event.event_id,
           event_name: event.event_name,
           start_time: event.start_time,
@@ -312,7 +312,9 @@ Deno.serve(async (req) => {
           setup_type: room.setup_type,
           setup_time_minutes: room.setup_time_minutes,
           teardown_time_minutes: room.teardown_time_minutes
-        });
+        };
+        
+        buildingData[buildingId].rooms[roomEntity.id].events.push(eventForRoom);
       }
     }
 
