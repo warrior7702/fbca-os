@@ -320,13 +320,14 @@ Deno.serve(async (req) => {
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
+    const activeRooms = buildingsArray.reduce((sum, b) => sum + b.room_count, 0);
 
     return Response.json({
       success: true,
       summary: {
         total_events: totalEvents,
         total_conflicts: totalConflicts,
-        active_rooms: Object.keys(roomMap).length,
+        active_rooms: activeRooms,
         date_range: {
           start: start.toISOString().split('T')[0],
           end: end.toISOString().split('T')[0]
