@@ -51,7 +51,7 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(event, resourceMap) {
+function parseSetupRequirements(event, resourceMap, roomMap) {
   const rooms = [];
 
   // Get resource requests for this event
@@ -60,6 +60,10 @@ function parseSetupRequirements(event, resourceMap) {
   for (const request of resourceRequests) {
     const resource = request.resource_data;
     if (!resource) continue;
+
+    // Check if this resource is actually a bookable room
+    const isBookableRoom = Object.values(roomMap).some(r => r.pco_resource_id === resource.id);
+    if (!isBookableRoom) continue;
 
     // Extract setup type from event questions or default to "Standard"
     let setupType = 'Standard';
