@@ -51,7 +51,7 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(event, resourceMap, instanceTime) {
+function parseSetupRequirements(event, resourceMap) {
   const rooms = [];
 
   // Get resource requests for this event
@@ -85,8 +85,8 @@ function parseSetupRequirements(event, resourceMap, instanceTime) {
   return {
     event_id: event.id,
     event_name: event.attributes?.name || 'Unnamed Event',
-    start_time: instanceTime?.starts_at || event.attributes?.starts_at,
-    end_time: instanceTime?.ends_at || event.attributes?.ends_at,
+    start_time: event.attributes?.starts_at,
+    end_time: event.attributes?.ends_at,
     rooms
   };
 }
@@ -196,27 +196,11 @@ Deno.serve(async (req) => {
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
 
-    // Build event lookup and instance mapping
+    // Build event lookup
     const eventsLookup = {};
-    const instanceLookup = {};
-    
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
-      }
-    }
-    
-    // Map instances to their event IDs with actual dates
-    for (const instance of eventInstances) {
-      const eventId = instance.relationships?.event?.data?.id;
-      if (eventId) {
-        if (!instanceLookup[eventId]) {
-          instanceLookup[eventId] = [];
-        }
-        instanceLookup[eventId].push({
-          starts_at: instance.attributes?.starts_at,
-          ends_at: instance.attributes?.ends_at
-        });
       }
     }
 
@@ -251,28 +235,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse setup requirements - one entry per instance
+    // Parse setup requirements
     const eventsWithSetup = [];
-    const processedInstances = new Set();
-    
-    for (const instance of eventInstances) {
-      const eventId = instance.relationships?.event?.data?.id;
-      if (!eventId) continue;
-      
-      // Create unique key for this instance
-      const instanceKey = `${eventId}-${instance.attributes?.starts_at}`;
-      if (processedInstances.has(instanceKey)) continue;
-      processedInstances.add(instanceKey);
-      
+    for (const eventId of Object.keys(eventsLookup)) {
       const event = eventsLookup[eventId];
-      if (!event) continue;
-      
-      const instanceTime = {
-        starts_at: instance.attributes?.starts_at,
-        ends_at: instance.attributes?.ends_at
-      };
-      
-      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] }, instanceTime);
+      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
       if (parsed.rooms.length > 0) {
         eventsWithSetup.push(parsed);
       }
