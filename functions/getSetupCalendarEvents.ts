@@ -318,6 +318,20 @@ Deno.serve(async (req) => {
       conflict_count: Object.values(building.rooms).reduce((sum, r) => sum + r.conflicts.length, 0)
     }));
 
+    // Add buildings with no events
+    for (const building of buildings) {
+      if (!buildingData[building.id]) {
+        buildingsArray.push({
+          building_id: building.id,
+          building_name: building.name,
+          rooms: [],
+          room_count: 0,
+          event_count: 0,
+          conflict_count: 0
+        });
+      }
+    }
+
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);
     const activeRooms = buildingsArray.reduce((sum, b) => sum + b.room_count, 0);
