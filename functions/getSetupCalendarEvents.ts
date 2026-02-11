@@ -275,40 +275,52 @@ Deno.serve(async (req) => {
       buildingMap[building.id] = building;
     }
 
+    // Build room-to-events mapping
+    const roomEventsMap = {};
+    for (const event of eventsWithSetup) {
+      for (const room of event.rooms) {
+        if (!roomEventsMap[room.room_id]) {
+          roomEventsMap[room.room_id] = [];
+        }
+        // Store the event with only the relevant room setup info
+        roomEventsMap[room.room_id].push({
+          event_id: event.event_id,
+          event_name: event.event_name,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          setup_type: room.setup_type,
+          setup_time_minutes: room.setup_time_minutes,
+          teardown_time_minutes: room.teardown_time_minutes
+        });
+      }
+    }
+
     // Organize response by building
     const buildingData = {};
 
-    for (const event of eventsWithSetup) {
-      for (const room of event.rooms) {
-        const roomEntity = Object.values(roomMap).find(r => 
-          r.pco_resource_id === room.pco_resource_id
-        );
+    for (const roomId of Object.keys(roomEventsMap)) {
+      const roomEntity = roomMap[roomId];
+      if (!roomEntity) continue;
 
-        if (!roomEntity) continue;
+      const buildingId = roomEntity.building_id;
+      const building = buildingMap[buildingId];
 
-        const buildingId = roomEntity.building_id;
-        const building = buildingMap[buildingId];
-
-        if (!buildingData[buildingId]) {
-          buildingData[buildingId] = {
-            building_id: buildingId,
-            building_name: building?.name || 'Unknown Building',
-            rooms: {}
-          };
-        }
-
-        if (!buildingData[buildingId].rooms[roomEntity.id]) {
-          buildingData[buildingId].rooms[roomEntity.id] = {
-            room_id: roomEntity.id,
-            room_name: roomEntity.name,
-            room_number: roomEntity.room_number,
-            events: [],
-            conflicts: []
-          };
-        }
-
-        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
+      if (!buildingData[buildingId]) {
+        buildingData[buildingId] = {
+          building_id: buildingId,
+          building_name: building?.name || 'Unknown Building',
+          rooms: {}
+        };
       }
+
+      buildingData[buildingId].rooms[roomEntity.id] = {
+        room_id: roomEntity.id,
+        room_name: roomEntity.name,
+        room_number: roomEntity.room_number,
+        pco_resource_id: roomEntity.pco_resource_id,
+        events: roomEventsMap[roomId],
+        conflicts: []
+      };
     }
 
     // Add conflicts to rooms
