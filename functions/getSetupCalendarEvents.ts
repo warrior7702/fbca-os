@@ -87,7 +87,11 @@ function parseSetupRequirements(event, resourceMap) {
     event_name: event.attributes?.name || 'Unnamed Event',
     start_time: event.attributes?.starts_at,
     end_time: event.attributes?.ends_at,
-    rooms
+    rooms: rooms.map(room => ({
+      room_id: room.room_id,
+      room_name: room.room_name,
+      pco_resource_id: room.pco_resource_id
+    }))
   };
 }
 
