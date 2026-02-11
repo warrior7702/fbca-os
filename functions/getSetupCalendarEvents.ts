@@ -196,11 +196,27 @@ Deno.serve(async (req) => {
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
 
-    // Build event lookup
+    // Build event lookup and instance mapping
     const eventsLookup = {};
+    const instanceLookup = {};
+    
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
+      }
+    }
+    
+    // Map instances to their event IDs with actual dates
+    for (const instance of eventInstances) {
+      const eventId = instance.relationships?.event?.data?.id;
+      if (eventId) {
+        if (!instanceLookup[eventId]) {
+          instanceLookup[eventId] = [];
+        }
+        instanceLookup[eventId].push({
+          starts_at: instance.attributes?.starts_at,
+          ends_at: instance.attributes?.ends_at
+        });
       }
     }
 
@@ -235,13 +251,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse setup requirements
+    // Parse setup requirements with instance times
     const eventsWithSetup = [];
     for (const eventId of Object.keys(eventsLookup)) {
       const event = eventsLookup[eventId];
-      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
-      if (parsed.rooms.length > 0) {
-        eventsWithSetup.push(parsed);
+      const instances = instanceLookup[eventId] || [];
+      
+      // Create an event entry for each instance
+      for (const instance of instances) {
+        const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
+        if (parsed.rooms.length > 0) {
+          // Override with instance-specific times
+          parsed.start_time = instance.starts_at;
+          parsed.end_time = instance.ends_at;
+          eventsWithSetup.push(parsed);
+        }
       }
     }
 
