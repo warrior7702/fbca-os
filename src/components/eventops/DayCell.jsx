@@ -41,32 +41,45 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // DEBUG: Log event structure once to identify correct datetime field
-  if (room.events && room.events.length > 0 && !window.__eventStructureLogged) {
-    console.log('=== EVENT STRUCTURE DEBUG ===');
-    console.log('First event object:', JSON.stringify(room.events[0], null, 2));
-    console.log('Available datetime fields:');
-    console.log('  start_time:', room.events[0].start_time);
-    console.log('  starts_at:', room.events[0].starts_at);
-    console.log('  date:', room.events[0].date);
-    console.log('  All keys:', Object.keys(room.events[0]));
-    window.__eventStructureLogged = true;
+  // DEBUG: Single cell test - only for first day
+  const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
+  
+  if (isDebugCell && room.events && room.events.length > 0) {
+    console.log('=== DEBUG CELL ===');
+    console.log('Room:', room.room_name);
+    console.log('Day:', day.fullDate);
+    console.log('Total events in room:', room.events.length);
+    console.log('First Event Full Object:', JSON.stringify(room.events[0], null, 2));
+    console.log('Event Keys:', Object.keys(room.events[0]));
   }
   
-  // Defensive: find the correct datetime field
-  const getEventDateTime = (event) => {
-    return event.start_time || event.starts_at || event.date;
-  };
-  
-  // Filter events occurring on this day
+  // Filter events occurring on this day - try multiple field names
   const eventsOnDay = (room.events || []).filter(event => {
-    const eventDateTime = getEventDateTime(event);
-    if (!eventDateTime || !day.fullDate) return false;
+    if (!day.fullDate) return false;
+    
+    // Try to find a datetime field - could be start_time, starts_at, date, etc.
+    const dateField = event.start_time || event.starts_at || event.date;
+    if (!dateField) {
+      if (isDebugCell) {
+        console.log('Event has no date field:', event.event_name, 'Available keys:', Object.keys(event));
+      }
+      return false;
+    }
+    
     try {
-      const eventDate = parseISO(eventDateTime);
+      const eventDate = parseISO(dateField);
       const dayDate = parseISO(day.fullDate);
-      return isSameDay(eventDate, dayDate);
+      const matches = isSameDay(eventDate, dayDate);
+      
+      if (isDebugCell) {
+        console.log('Testing event:', event.event_name, 'dateField:', dateField, 'matches:', matches);
+      }
+      
+      return matches;
     } catch (e) {
+      if (isDebugCell) {
+        console.log('Parse error for event:', event.event_name, 'dateField:', dateField, 'error:', e.message);
+      }
       return false;
     }
   });
