@@ -43,12 +43,20 @@ function CountBadge({ count }) {
 export default function DayCell({ day, room }) {
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
-    if (!event.start_time || !day.fullDate) return false;
+    if (!event.start_time || !day.fullDate) {
+      console.log(`[${room.room_name} - ${day.fullDate}] Event filtered out - missing start_time:`, event.start_time);
+      return false;
+    }
     try {
       const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      return isSameDay(eventDate, dayDate);
+      const matches = isSameDay(eventDate, dayDate);
+      if (!matches) {
+        console.log(`[${room.room_name} - ${day.fullDate}] Date mismatch - event date:`, event.start_time);
+      }
+      return matches;
     } catch (e) {
+      console.log(`[${room.room_name} - ${day.fullDate}] Parse error:`, e.message, 'start_time:', event.start_time);
       return false;
     }
   });
