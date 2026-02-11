@@ -196,8 +196,20 @@ Deno.serve(async (req) => {
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
 
-    // Build event lookup
+    // Build event lookup and instance times map
     const eventsLookup = {};
+    const instanceTimesMap = {};
+    
+    for (const instance of eventInstances) {
+      const eventId = instance.relationships?.event?.data?.id;
+      if (eventId && !instanceTimesMap[eventId]) {
+        instanceTimesMap[eventId] = {
+          starts_at: instance.attributes?.starts_at,
+          ends_at: instance.attributes?.ends_at
+        };
+      }
+    }
+    
     for (const included of eventsData.included || []) {
       if (included.type === 'Event') {
         eventsLookup[included.id] = included;
