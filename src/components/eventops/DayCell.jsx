@@ -41,32 +41,38 @@ function CountBadge({ count }) {
 }
 
 export default function DayCell({ day, room }) {
-  // DEBUG: Log event structure once
-  if (room.events && room.events.length > 0 && !window._eventStructureLogged) {
-    console.log('=== EVENT OBJECT STRUCTURE ===');
-    console.log('First event keys:', Object.keys(room.events[0]));
-    console.log('First event object:', JSON.stringify(room.events[0], null, 2));
-    window._eventStructureLogged = true;
-  }
+  // DEBUG: Single cell test - only for first day
+  const isDebugCell = day.fullDate === '2026-02-11' && room.room_name?.includes('Sanctuary');
   
-  // Determine which datetime field to use
-  const getEventDateTime = (event) => {
-    if (event.start_time) return event.start_time;
-    if (event.starts_at) return event.starts_at;
-    if (event.date) return event.date;
-    return null;
-  };
+  if (isDebugCell && room.events && room.events.length > 0) {
+    console.log('=== DEBUG CELL ===');
+    console.log('Room:', room.room_name);
+    console.log('Day:', day.fullDate);
+    console.log('Total events in room:', room.events.length);
+    console.log('Event Keys:', Object.keys(room.events[0]));
+    console.log('First Event:', room.events[0]);
+    console.log('Checking fields - start_time:', room.events[0].start_time);
+    console.log('Checking fields - starts_at:', room.events[0].starts_at);
+    console.log('Checking fields - start:', room.events[0].start);
+  }
   
   // Filter events occurring on this day
   const eventsOnDay = (room.events || []).filter(event => {
-    const dateTime = getEventDateTime(event);
-    if (!dateTime || !day.fullDate) return false;
+    if (!event.start_time || !day.fullDate) return false;
     try {
-      const eventDate = parseISO(dateTime);
+      const eventDate = parseISO(event.start_time);
       const dayDate = parseISO(day.fullDate);
-      return isSameDay(eventDate, dayDate);
+      const matches = isSameDay(eventDate, dayDate);
+      
+      if (isDebugCell) {
+        console.log('Testing event:', event.event_name, 'start_time:', event.start_time, 'matches:', matches);
+      }
+      
+      return matches;
     } catch (e) {
-      console.log('Parse error for event:', event.event_name, 'datetime:', dateTime, e);
+      if (isDebugCell) {
+        console.log('Parse error for event:', event.event_name, e);
+      }
       return false;
     }
   });
@@ -91,25 +97,17 @@ export default function DayCell({ day, room }) {
     events: eventsOnDay.map(e => e.event_name)
   });
 
-  const eventsToShow = eventsOnDay.slice(0, 3);
-  const hasMoreEvents = eventsOnDay.length > 3;
-
   return (
     <div
-      className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 ${
+      className={`border-b border-r border-slate-300 p-2 min-h-[80px] transition-colors hover:bg-slate-100 flex items-center justify-center ${
         day.isWeekend ? 'bg-pink-50' : 'bg-white'
       }`}
     >
-      {/* Conflict Bar */}
-      {hasConflict && <ConflictDot />}
-
-      {/* Event Bars */}
-      {eventsToShow.map((event, idx) => (
-        <EventDot key={idx} event={event} />
-      ))}
-
-      {/* Count Badge */}
-      {hasMoreEvents && <CountBadge count={eventsOnDay.length} />}
+      {eventsOnDay.length > 0 && (
+        <div className="text-2xl font-bold text-blue-600">
+          {eventsOnDay.length}
+        </div>
+      )}
     </div>
   );
 }
