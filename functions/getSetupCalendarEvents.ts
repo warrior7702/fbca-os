@@ -51,12 +51,11 @@ async function fetchWithRetry(url, accessToken, maxRetries = 3) {
   throw new Error('Max retries exceeded');
 }
 
-function parseSetupRequirements(eventInstance, resourceMap) {
+function parseSetupRequirements(event, resourceMap) {
   const rooms = [];
-  const eventId = eventInstance.relationships?.event?.data?.id;
 
   // Get resource requests for this event
-  const resourceRequests = resourceMap[eventId] || [];
+  const resourceRequests = resourceMap[event.id] || [];
 
   for (const request of resourceRequests) {
     const resource = request.resource_data;
@@ -64,6 +63,14 @@ function parseSetupRequirements(eventInstance, resourceMap) {
 
     // Extract setup type from event questions or default to "Standard"
     let setupType = 'Standard';
+    if (event.attributes?.custom_data) {
+      try {
+        const customData = JSON.parse(event.attributes.custom_data);
+        setupType = customData.setup_type || 'Standard';
+      } catch (e) {
+        // Use default
+      }
+    }
 
     rooms.push({
       room_id: resource.id,
@@ -76,10 +83,10 @@ function parseSetupRequirements(eventInstance, resourceMap) {
   }
 
   return {
-    event_id: eventId,
-    event_name: eventInstance.attributes?.name || 'Unnamed Event',
-    start_time: eventInstance.attributes?.starts_at,
-    end_time: eventInstance.attributes?.ends_at,
+    event_id: event.id,
+    event_name: event.attributes?.name || 'Unnamed Event',
+    start_time: event.attributes?.starts_at,
+    end_time: event.attributes?.ends_at,
     rooms
   };
 }
@@ -228,13 +235,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse setup requirements from event instances
+    // Parse setup requirements
     const eventsWithSetup = [];
-    for (const eventInstance of eventInstances) {
-      const eventId = eventInstance.relationships?.event?.data?.id;
-      if (!eventId) continue;
-      
-      const parsed = parseSetupRequirements(eventInstance, { [eventId]: resourceMap[eventId] || [] });
+    for (const eventId of Object.keys(eventsLookup)) {
+      const event = eventsLookup[eventId];
+      const parsed = parseSetupRequirements(event, { [eventId]: resourceMap[eventId] || [] });
       if (parsed.rooms.length > 0) {
         eventsWithSetup.push(parsed);
       }
