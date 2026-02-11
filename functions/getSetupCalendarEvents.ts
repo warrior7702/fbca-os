@@ -295,32 +295,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Organize response by building
+    // Organize response by building - Initialize all buildings and rooms
     const buildingData = {};
 
+    // First pass: Initialize all buildings and rooms with empty events
+    for (const building of buildings) {
+      buildingData[building.id] = {
+        building_id: building.id,
+        building_name: building.name,
+        rooms: {}
+      };
+      
+      // Initialize all rooms in this building
+      for (const room of rooms) {
+        if (room.building_id === building.id) {
+          buildingData[building.id].rooms[room.id] = {
+            room_id: room.id,
+            room_name: room.name,
+            room_number: room.room_number,
+            pco_resource_id: room.pco_resource_id,
+            events: [],
+            conflicts: []
+          };
+        }
+      }
+    }
+
+    // Second pass: Populate events for rooms that have them
     for (const roomId of Object.keys(roomEventsMap)) {
       const roomEntity = roomMap[roomId];
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
-      const building = buildingMap[buildingId];
-
-      if (!buildingData[buildingId]) {
-        buildingData[buildingId] = {
-          building_id: buildingId,
-          building_name: building?.name || 'Unknown Building',
-          rooms: {}
-        };
+      if (buildingData[buildingId]?.rooms[roomEntity.id]) {
+        buildingData[buildingId].rooms[roomEntity.id].events = roomEventsMap[roomId];
       }
-
-      buildingData[buildingId].rooms[roomEntity.id] = {
-        room_id: roomEntity.id,
-        room_name: roomEntity.name,
-        room_number: roomEntity.room_number,
-        pco_resource_id: roomEntity.pco_resource_id,
-        events: roomEventsMap[roomId],
-        conflicts: []
-      };
     }
 
     // Add conflicts to rooms
