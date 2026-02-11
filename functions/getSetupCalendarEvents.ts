@@ -271,7 +271,10 @@ Deno.serve(async (req) => {
           r.pco_resource_id === room.pco_resource_id
         );
 
-        if (!roomEntity) continue;
+        if (!roomEntity) {
+          console.log('Room not found in AkitaBox:', room.room_name, room.pco_resource_id);
+          continue;
+        }
 
         const buildingId = roomEntity.building_id;
         const building = buildingMap[buildingId];
@@ -289,6 +292,7 @@ Deno.serve(async (req) => {
             room_id: roomEntity.id,
             room_name: roomEntity.name,
             room_number: roomEntity.room_number,
+            pco_resource_id: roomEntity.pco_resource_id,
             events: [],
             conflicts: []
           };
@@ -297,6 +301,8 @@ Deno.serve(async (req) => {
         buildingData[buildingId].rooms[roomEntity.id].events.push(event);
       }
     }
+
+    console.log('Buildings with events:', Object.keys(buildingData).map(id => buildingMap[id]?.name).filter(Boolean));
 
     // Add conflicts to rooms
     for (const conflict of conflicts) {
