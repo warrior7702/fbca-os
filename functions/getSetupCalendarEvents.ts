@@ -1,7 +1,7 @@
 // VERSION 4 - CACHE BUSTED
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-const FUNCTION_VERSION = "v5-absolute-filter";
+const FUNCTION_VERSION = "v4-fixed-empty-rooms";
 
 async function refreshTokenIfNeeded(base44, user) {
   const expiresAt = new Date(user.pco_token_expires_at);
@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
       console.log(`  - PCO ID: "${pcoId}" (type: ${typeof pcoId}) → Room: ${room.room_name || room.room_number}`);
     });
 
-    // Initialize building structure - ONLY add rooms when they get events (v5)
+    // Initialize ALL buildings (even if no events)
     const buildingData = {};
     for (const building of buildings) {
       buildingData[building.id] = {
@@ -378,8 +378,9 @@ Deno.serve(async (req) => {
         rooms: {}
       };
     }
-    
-    console.log(`\n🏗️ V5 INITIALIZATION: Created ${buildings.length} building structures`)
+
+    // DON'T add all rooms upfront - only add rooms when they have events
+    // This prevents empty rooms from being included in the final output
 
     // Add events to rooms - DETAILED LOGGING
     console.log(`\n=== EVENT TO ROOM MATCHING ===`);
