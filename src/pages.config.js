@@ -73,6 +73,7 @@ import DepartmentTest from './pages/DepartmentTest';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import Documents from './pages/Documents';
 import EmailTemplateEditor from './pages/EmailTemplateEditor';
+import EventHub from './pages/EventHub';
 import EventOpsDetail from './pages/EventOpsDetail';
 import FBCANexts from './pages/FBCANexts';
 import FloorPlanManager from './pages/FloorPlanManager';
@@ -122,7 +123,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import EventHub from './pages/EventHub';
 import __Layout from './Layout.jsx';
 
 
@@ -153,6 +153,7 @@ export const PAGES = {
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
     "Documents": Documents,
     "EmailTemplateEditor": EmailTemplateEditor,
+    "EventHub": EventHub,
     "EventOpsDetail": EventOpsDetail,
     "FBCANexts": FBCANexts,
     "FloorPlanManager": FloorPlanManager,
@@ -202,7 +203,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "EventHub": EventHub,
 }
 
 export const pagesConfig = {

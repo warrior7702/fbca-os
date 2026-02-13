@@ -861,13 +861,15 @@ export default function MyTasks() {
                             <motion.div
                               key={email.messageId || email.id}
                               whileHover={{ scale: 1.01 }}
-                              onClick={() => {
-                                setSelectedEmail(email);
-                                setShowEmailDetail(true);
-                              }}
-                              className="group cursor-pointer w-full p-1.5 sm:p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
+                              className="group w-full p-1.5 sm:p-2 bg-white rounded hover:bg-blue-50 hover:shadow-sm transition-all flex flex-col"
                             >
-                              <div className="flex items-start justify-between gap-2">
+                              <div 
+                                className="flex items-start justify-between gap-2 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedEmail(email);
+                                  setShowEmailDetail(true);
+                                }}
+                              >
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-[10px] sm:text-xs truncate ${
                                     email.isRead ? 'font-normal text-slate-700' : 'font-semibold text-slate-900'
@@ -889,6 +891,37 @@ export default function MyTasks() {
                                   )}
                                 </div>
                               </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2 w-full text-xs h-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const newTicket = await base44.entities.Ticket.create({
+                                      subject: email.subject || '(No Subject)',
+                                      description: email.bodyPreview || email.body || 'Email content',
+                                      category: 'technology',
+                                      status: 'open',
+                                      priority: 'medium',
+                                      scope: 'BUILDING',
+                                      requester_email: user.email,
+                                      requester_name: user.full_name,
+                                      assigned_to: user.email,
+                                      assigned_to_name: user.full_name,
+                                      source: 'email'
+                                    });
+                                    toast.success('Ticket created successfully!');
+                                    navigate(`/ticketdetail?id=${newTicket.id}`);
+                                  } catch (error) {
+                                    console.error('Error creating ticket:', error);
+                                    toast.error('Failed to create ticket');
+                                  }
+                                }}
+                              >
+                                <TicketIcon className="w-3 h-3 mr-1" />
+                                Create Ticket
+                              </Button>
                             </motion.div>
                           ))}
                           {categoryEmails.length > 5 && (
