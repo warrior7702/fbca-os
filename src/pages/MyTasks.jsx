@@ -595,11 +595,14 @@ export default function MyTasks() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer col-span-2 sm:col-span-1" onClick={() => navigate(createPageUrl('SupportTickets'))}>
+          <Card className="hover:shadow-lg hover:border-purple-300 transition-all cursor-pointer col-span-2 sm:col-span-1 group" onClick={() => navigate(createPageUrl('SupportTickets'))}>
             <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between mb-1">
                 <TicketIcon className="w-4 h-4 text-purple-600" />
-                <p className="text-[10px] sm:text-xs text-slate-500">My Tickets</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-[10px] sm:text-xs text-slate-500">My Tickets</p>
+                  <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               </div>
               <div className="flex items-center gap-2 sm:gap-3">
                 <div>
