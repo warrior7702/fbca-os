@@ -87,11 +87,7 @@ function parseSetupRequirements(event, resourceMap) {
     event_name: event.attributes?.name || 'Unnamed Event',
     start_time: event.attributes?.starts_at,
     end_time: event.attributes?.ends_at,
-    rooms: rooms.map(room => ({
-      room_id: room.room_id,
-      room_name: room.room_name,
-      pco_resource_id: room.pco_resource_id
-    }))
+    rooms
   };
 }
 
@@ -200,20 +196,11 @@ Deno.serve(async (req) => {
     const eventsData = await eventsResponse.json();
     const eventInstances = eventsData.data || [];
 
-    // Build event lookup from instances (which have actual start/end times)
+    // Build event lookup
     const eventsLookup = {};
-    for (const instance of eventInstances) {
-      const eventId = instance.relationships?.event?.data?.id;
-      if (eventId && !eventsLookup[eventId]) {
-        // Store instance with its times
-        eventsLookup[eventId] = {
-          id: eventId,
-          attributes: {
-            name: instance.attributes?.name || 'Unnamed Event',
-            starts_at: instance.attributes?.starts_at,
-            ends_at: instance.attributes?.ends_at
-          }
-        };
+    for (const included of eventsData.included || []) {
+      if (included.type === 'Event') {
+        eventsLookup[included.id] = included;
       }
     }
 
@@ -275,82 +262,50 @@ Deno.serve(async (req) => {
       buildingMap[building.id] = building;
     }
 
-    // Create mapping from PCO resource ID to Room entity ID
-    const pcoToRoomId = {};
-    for (const room of rooms) {
-      if (room.pco_resource_id) {
-        pcoToRoomId[room.pco_resource_id] = room.id;
-      }
-    }
-
-    // Build room-to-events mapping using entity IDs
-    const roomEventsMap = {};
-    for (const event of eventsWithSetup) {
-      for (const room of event.rooms) {
-        const entityRoomId = pcoToRoomId[room.room_id];
-        if (!entityRoomId) continue;
-        
-        if (!roomEventsMap[entityRoomId]) {
-          roomEventsMap[entityRoomId] = [];
-        }
-        // Store the event with only the relevant room setup info
-        roomEventsMap[entityRoomId].push({
-          event_id: event.event_id,
-          event_name: event.event_name,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          setup_type: room.setup_type,
-          setup_time_minutes: room.setup_time_minutes,
-          teardown_time_minutes: room.teardown_time_minutes
-        });
-      }
-    }
-
-    // Organize response by building - Initialize all buildings and rooms
+    // Organize response by building
     const buildingData = {};
 
-    // First pass: Initialize all buildings and rooms with empty events
-    for (const building of buildings) {
-      buildingData[building.id] = {
-        building_id: building.id,
-        building_name: building.name,
-        rooms: {}
-      };
-      
-      // Initialize all rooms in this building
-      for (const room of rooms) {
-        if (room.building_id === building.id) {
-          buildingData[building.id].rooms[room.id] = {
-            room_id: room.id,
-            room_name: room.name,
-            room_number: room.room_number,
-            pco_resource_id: room.pco_resource_id,
+    for (const event of eventsWithSetup) {
+      for (const room of event.rooms) {
+        const roomEntity = Object.values(roomMap).find(r => 
+          r.pco_resource_id === room.pco_resource_id
+        );
+
+        if (!roomEntity) continue;
+
+        const buildingId = roomEntity.building_id;
+        const building = buildingMap[buildingId];
+
+        if (!buildingData[buildingId]) {
+          buildingData[buildingId] = {
+            building_id: buildingId,
+            building_name: building?.name || 'Unknown Building',
+            rooms: {}
+          };
+        }
+
+        if (!buildingData[buildingId].rooms[roomEntity.id]) {
+          buildingData[buildingId].rooms[roomEntity.id] = {
+            room_id: roomEntity.id,
+            room_name: roomEntity.name,
+            room_number: roomEntity.room_number,
             events: [],
             conflicts: []
           };
         }
-      }
-    }
 
-    // Second pass: Populate events for rooms that have them
-    for (const roomId of Object.keys(roomEventsMap)) {
-      const roomEntity = roomMap[roomId];
-      if (!roomEntity) continue;
-
-      const buildingId = roomEntity.building_id;
-      if (buildingData[buildingId]?.rooms[roomEntity.id]) {
-        buildingData[buildingId].rooms[roomEntity.id].events = roomEventsMap[roomId];
+        buildingData[buildingId].rooms[roomEntity.id].events.push(event);
       }
     }
 
     // Add conflicts to rooms
     for (const conflict of conflicts) {
-      const roomEntity = roomMap[conflict.room_id];
+      const roomEntity = Object.values(roomMap).find(r => r.id === conflict.room_id);
       if (!roomEntity) continue;
 
       const buildingId = roomEntity.building_id;
-      if (buildingData[buildingId]?.rooms[roomEntity.id]) {
-        buildingData[buildingId].rooms[roomEntity.id].conflicts.push(conflict);
+      if (buildingData[buildingId]?.rooms[conflict.room_id]) {
+        buildingData[buildingId].rooms[conflict.room_id].conflicts.push(conflict);
       }
     }
 
@@ -361,7 +316,21 @@ Deno.serve(async (req) => {
       room_count: Object.values(building.rooms).length,
       event_count: Object.values(building.rooms).reduce((sum, r) => sum + r.events.length, 0),
       conflict_count: Object.values(building.rooms).reduce((sum, r) => sum + r.conflicts.length, 0)
-    }))
+    }));
+
+    // Add buildings with no events
+    for (const building of buildings) {
+      if (!buildingData[building.id]) {
+        buildingsArray.push({
+          building_id: building.id,
+          building_name: building.name,
+          rooms: [],
+          room_count: 0,
+          event_count: 0,
+          conflict_count: 0
+        });
+      }
+    }
 
     const totalEvents = buildingsArray.reduce((sum, b) => sum + b.event_count, 0);
     const totalConflicts = buildingsArray.reduce((sum, b) => sum + b.conflict_count, 0);

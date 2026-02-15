@@ -56,11 +56,6 @@ export default function SetupCalendar() {
       const result = response.data;
       
       if (result?.success && result?.buildings) {
-        // DEBUG: Log first event sample
-        if (result.buildings[0]?.rooms[0]?.events[0]) {
-          console.log('FIRST EVENT SAMPLE:', JSON.stringify(result.buildings[0].rooms[0].events[0]));
-        }
-        
         setData(result);
         
         // Expand all buildings by default
