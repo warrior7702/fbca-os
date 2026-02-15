@@ -82,7 +82,7 @@ export default function MyTasks() {
 
   const createPageUrl = (pageName) => {
     switch (pageName) {
-      case 'SupportTickets': return '/support-tickets';
+      case 'SupportTickets': return '/supporttickets';
       default: return `/${pageName.toLowerCase()}`;
     }
   };
