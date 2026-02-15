@@ -345,12 +345,19 @@ export default function Settings() {
     }
   };
 
-  const handleConnectPCO = () => {
+  const handleConnectPCO = async () => {
     try {
       console.log('🔗 Starting direct PCO connection...');
       
-      // Direct redirect to the initPCOAuthDirect endpoint
-      window.location.href = `${window.location.origin}/api/functions/initPCOAuthDirect`;
+      // Call backend to get authorization URL and redirect
+      const response = await base44.functions.invoke('initPCOAuthDirect', {});
+      
+      if (response.data.ok && response.data.auth_url) {
+        console.log('✅ Redirecting to PCO authorization...');
+        window.location.href = response.data.auth_url;
+      } else {
+        throw new Error(response.data.error || 'Failed to initiate PCO auth');
+      }
     } catch (error) {
       console.error('❌ PCO connection error:', error);
       toast.error('Failed to connect: ' + error.message);

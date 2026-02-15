@@ -39,8 +39,10 @@ Deno.serve(async (req) => {
 
         console.log('✅ Authorization URL:', authUrl.toString());
 
-        // Direct redirect instead of JSON response
-        return Response.redirect(authUrl.toString(), 302);
+        return Response.json({
+            ok: true,
+            auth_url: authUrl.toString()
+        });
 
     } catch (error) {
         console.error('❌ Init auth error:', error);
