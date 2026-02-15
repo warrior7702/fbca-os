@@ -347,33 +347,20 @@ export default function Settings() {
 
   const handleConnectPCO = async () => {
     try {
-      console.log('🔗 Starting PCO connection...');
+      console.log('🔗 Starting direct PCO connection...');
       
-      const appUrl = window.location.origin;
-      const callbackUrl = `${appUrl}/Settings?connected=pco`;
+      // Call backend to get authorization URL (ensures we use PCO_CLIENT_ID)
+      const response = await base44.functions.invoke('initPCOAuthDirect');
       
-      // PCO OAuth flow
-      const clientId = 'your_app_id'; // This will be replaced by backend
-      const authUrl = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=calendar people`;
-      
-      // Try to get proper auth URL from backend
-      try {
-        const response = await base44.functions.invoke('initPCOAuthDirect', {});
-        if (response.data?.auth_url) {
-          console.log('✅ Using backend auth URL');
-          window.location.href = response.data.auth_url;
-          return;
-        }
-      } catch (backendError) {
-        console.warn('Backend auth URL failed, trying direct OAuth:', backendError);
+      if (response.data.ok && response.data.auth_url) {
+        console.log('✅ Redirecting to PCO authorization...');
+        window.location.href = response.data.auth_url;
+      } else {
+        throw new Error(response.data.error || 'Failed to initiate PCO auth');
       }
-      
-      // Fallback to direct OAuth URL construction
-      window.location.href = `https://api.planningcenteronline.com/oauth/authorize?client_id=bb89b2e71e2b4b1b6e9e5a11b0a7c6e7f2a2e8f1d8b6e7f1c9b0a7e8f1d8b6e7&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=calendar people`;
-      
     } catch (error) {
       console.error('❌ PCO connection error:', error);
-      toast.error('Failed to connect to Planning Center. Please contact support.');
+      toast.error('Failed to connect: ' + error.message);
     }
   };
 

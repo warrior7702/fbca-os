@@ -95,6 +95,7 @@ import MicrosoftLogin from './pages/MicrosoftLogin';
 import MyApprovals from './pages/MyApprovals';
 import MyDepartment from './pages/MyDepartment';
 import MyMeetings from './pages/MyMeetings';
+import MyTasks from './pages/MyTasks';
 import NormalizeUserNames from './pages/NormalizeUserNames';
 import Notifications from './pages/Notifications';
 import Onboarding from './pages/Onboarding';
@@ -122,7 +123,6 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import MyTasks from './pages/MyTasks';
 import __Layout from './Layout.jsx';
 
 
@@ -175,6 +175,7 @@ export const PAGES = {
     "MyApprovals": MyApprovals,
     "MyDepartment": MyDepartment,
     "MyMeetings": MyMeetings,
+    "MyTasks": MyTasks,
     "NormalizeUserNames": NormalizeUserNames,
     "Notifications": Notifications,
     "Onboarding": Onboarding,
@@ -202,7 +203,6 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "MyTasks": MyTasks,
 }
 
 export const pagesConfig = {
