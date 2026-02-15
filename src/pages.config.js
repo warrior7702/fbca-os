@@ -73,6 +73,7 @@ import DepartmentTest from './pages/DepartmentTest';
 import DiagnoseMysteryResource from './pages/DiagnoseMysteryResource';
 import Documents from './pages/Documents';
 import EmailTemplateEditor from './pages/EmailTemplateEditor';
+import EventHub from './pages/EventHub';
 import EventOpsDetail from './pages/EventOpsDetail';
 import FBCANexts from './pages/FBCANexts';
 import FloorPlanManager from './pages/FloorPlanManager';
@@ -94,7 +95,6 @@ import MicrosoftLogin from './pages/MicrosoftLogin';
 import MyApprovals from './pages/MyApprovals';
 import MyDepartment from './pages/MyDepartment';
 import MyMeetings from './pages/MyMeetings';
-import MyTasks from './pages/MyTasks';
 import NormalizeUserNames from './pages/NormalizeUserNames';
 import Notifications from './pages/Notifications';
 import Onboarding from './pages/Onboarding';
@@ -104,7 +104,6 @@ import PhantomUserHunter from './pages/PhantomUserHunter';
 import ProjectReview from './pages/ProjectReview';
 import RoleManagement from './pages/RoleManagement';
 import Search from './pages/Search';
-import Settings from './pages/Settings';
 import SharePoint from './pages/SharePoint';
 import StaffDirectory from './pages/StaffDirectory';
 import SupportTickets from './pages/SupportTickets';
@@ -122,7 +121,8 @@ import VoiceProfiles from './pages/VoiceProfiles';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowHub from './pages/WorkflowHub';
 import index from './pages/index';
-import EventHub from './pages/EventHub';
+import Settings from './pages/Settings';
+import MyTasks from './pages/MyTasks';
 import __Layout from './Layout.jsx';
 
 
@@ -153,6 +153,7 @@ export const PAGES = {
     "DiagnoseMysteryResource": DiagnoseMysteryResource,
     "Documents": Documents,
     "EmailTemplateEditor": EmailTemplateEditor,
+    "EventHub": EventHub,
     "EventOpsDetail": EventOpsDetail,
     "FBCANexts": FBCANexts,
     "FloorPlanManager": FloorPlanManager,
@@ -174,7 +175,6 @@ export const PAGES = {
     "MyApprovals": MyApprovals,
     "MyDepartment": MyDepartment,
     "MyMeetings": MyMeetings,
-    "MyTasks": MyTasks,
     "NormalizeUserNames": NormalizeUserNames,
     "Notifications": Notifications,
     "Onboarding": Onboarding,
@@ -184,7 +184,6 @@ export const PAGES = {
     "ProjectReview": ProjectReview,
     "RoleManagement": RoleManagement,
     "Search": Search,
-    "Settings": Settings,
     "SharePoint": SharePoint,
     "StaffDirectory": StaffDirectory,
     "SupportTickets": SupportTickets,
@@ -202,7 +201,8 @@ export const PAGES = {
     "WorkflowDetail": WorkflowDetail,
     "WorkflowHub": WorkflowHub,
     "index": index,
-    "EventHub": EventHub,
+    "Settings": Settings,
+    "MyTasks": MyTasks,
 }
 
 export const pagesConfig = {
