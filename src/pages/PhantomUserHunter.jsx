@@ -249,8 +249,8 @@ export default function PhantomUserHunter() {
       // SEARCH 6: Check OAuth token introspection
       console.log('📍 Checking OAuth token ownership...');
       try {
-        const clientId = Deno.env.get('PCO_CLIENT_ID') || 'not-set';
-        const clientSecret = Deno.env.get('PCO_CLIENT_SECRET') || 'not-set';
+        const clientId = 'not-set';
+        const clientSecret = 'not-set';
         
         if (clientId !== 'not-set' && clientSecret !== 'not-set') {
           const introspectRes = await fetch('https://api.planningcenteronline.com/oauth/introspect', {

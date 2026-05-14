@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -134,7 +133,7 @@ export default function ProjectReview() {
           // Auto-generate tasks based on event date
           const eventDate = foundRequest.pco_event_date || goalData.event_date;
           if (eventDate) {
-            const autoTasks = generateAutoTasks(eventDate, foundRequest.title);
+            const autoTasks = generateAutoTasks(eventDate, foundRequest.title, goalData.need_type);
             setTasks(autoTasks);
             
             // Set calendar to event month
@@ -153,67 +152,153 @@ export default function ProjectReview() {
     }
   };
 
-  const generateAutoTasks = (eventDate, projectName) => {
-    const eventDateObj = new Date(eventDate);
-    
-    // Find the Sunday before the event
-    const sundayBefore = new Date(eventDateObj);
-    while (sundayBefore.getDay() !== 0) {
-      sundayBefore.setDate(sundayBefore.getDate() - 1);
-    }
-    
-    return [
+  // Task templates by need_type. offset_days < 0 = before event, 0 = event day.
+  // Special offset_type: 'sunday_before' = nearest Sunday before the event.
+  const TASK_TEMPLATES = {
+    graphics: [
       {
-        id: `task-${Date.now()}-1`,
-        name: `Graphics for ${projectName}`,
+        name: (p) => `Graphics for ${p}`,
         type: 'graphics',
-        due_date: subDays(eventDateObj, 14).toISOString(),
+        offset_days: -21,
         assigned_to: 'Shelby Meeks',
-        status: 'not_started',
         description: 'Create all graphic design assets for this event',
         color: 'pink'
       },
       {
-        id: `task-${Date.now()}-2`,
-        name: 'Pulpit Announcement',
-        type: 'pulpit_announcement',
-        due_date: sundayBefore.toISOString(),
+        name: () => 'Digital Signs Go Live',
+        type: 'digital_signs',
+        offset_days: -14,
         assigned_to: 'Kyle Judkins',
-        status: 'not_started',
-        description: 'Prepare and deliver pulpit announcement',
-        color: 'pink'
+        description: 'Launch digital signage campaign',
+        color: 'blue'
       },
       {
-        id: `task-${Date.now()}-3`,
-        name: 'Social Media Reel #1',
-        type: 'social_media',
-        due_date: subDays(eventDateObj, 10).toISOString(),
+        name: () => 'Pulpit Announcement',
+        type: 'pulpit_announcement',
+        offset_type: 'sunday_before',
         assigned_to: 'Kyle Judkins',
-        status: 'not_started',
+        description: 'Prepare and deliver pulpit announcement',
+        color: 'pink'
+      }
+    ],
+    marketing: [
+      {
+        name: () => 'Social Media Reel #1',
+        type: 'social_media',
+        offset_days: -21,
+        assigned_to: 'Kyle Judkins',
         description: 'Create first promotional reel for social media',
         color: 'orange'
       },
       {
-        id: `task-${Date.now()}-4`,
-        name: 'Social Media Reel #2',
+        name: () => 'Social Media Reel #2',
         type: 'social_media',
-        due_date: subDays(eventDateObj, 5).toISOString(),
+        offset_days: -10,
         assigned_to: 'Kyle Judkins',
-        status: 'not_started',
         description: 'Create second promotional reel for social media',
         color: 'orange'
       },
       {
-        id: `task-${Date.now()}-5`,
-        name: 'Digital Signs Go Live',
-        type: 'digital_signs',
-        due_date: subDays(eventDateObj, 14).toISOString(),
+        name: () => 'Social Media Reel #3',
+        type: 'social_media',
+        offset_days: -5,
         assigned_to: 'Kyle Judkins',
-        status: 'not_started',
+        description: 'Create third promotional reel for social media',
+        color: 'orange'
+      },
+      {
+        name: () => 'Pulpit Announcement',
+        type: 'pulpit_announcement',
+        offset_type: 'sunday_before',
+        assigned_to: 'Kyle Judkins',
+        description: 'Prepare and deliver pulpit announcement',
+        color: 'pink'
+      }
+    ],
+    both: [
+      {
+        name: (p) => `Graphics for ${p}`,
+        type: 'graphics',
+        offset_days: -21,
+        assigned_to: 'Shelby Meeks',
+        description: 'Create all graphic design assets for this event',
+        color: 'pink'
+      },
+      {
+        name: () => 'Digital Signs Go Live',
+        type: 'digital_signs',
+        offset_days: -14,
+        assigned_to: 'Kyle Judkins',
         description: 'Launch digital signage campaign',
         color: 'blue'
+      },
+      {
+        name: () => 'Social Media Reel #1',
+        type: 'social_media',
+        offset_days: -21,
+        assigned_to: 'Kyle Judkins',
+        description: 'Create first promotional reel for social media',
+        color: 'orange'
+      },
+      {
+        name: () => 'Social Media Reel #2',
+        type: 'social_media',
+        offset_days: -10,
+        assigned_to: 'Kyle Judkins',
+        description: 'Create second promotional reel for social media',
+        color: 'orange'
+      },
+      {
+        name: () => 'Social Media Reel #3',
+        type: 'social_media',
+        offset_days: -5,
+        assigned_to: 'Kyle Judkins',
+        description: 'Create third promotional reel for social media',
+        color: 'orange'
+      },
+      {
+        name: () => 'Pulpit Announcement',
+        type: 'pulpit_announcement',
+        offset_type: 'sunday_before',
+        assigned_to: 'Kyle Judkins',
+        description: 'Prepare and deliver pulpit announcement',
+        color: 'pink'
       }
-    ];
+    ]
+  };
+
+  const getSundayBefore = (dateObj) => {
+    const d = new Date(dateObj);
+    while (d.getDay() !== 0) d.setDate(d.getDate() - 1);
+    return d;
+  };
+
+  const generateAutoTasks = (eventDate, projectName, needType) => {
+    const eventDateObj = new Date(eventDate);
+    const normalizedType = (needType || 'both').toLowerCase().replace(/\s+/g, '_');
+    const templates = TASK_TEMPLATES[normalizedType] || TASK_TEMPLATES.both;
+
+    return templates.map((tpl, i) => {
+      let dueDate;
+      if (tpl.offset_type === 'sunday_before') {
+        dueDate = getSundayBefore(eventDateObj).toISOString();
+      } else {
+        dueDate = subDays(eventDateObj, Math.abs(tpl.offset_days)).toISOString();
+      }
+
+      return {
+        id: `task-${Date.now()}-${i + 1}`,
+        name: tpl.name(projectName),
+        type: tpl.type,
+        due_date: dueDate,
+        assigned_to: tpl.assigned_to,
+        status: 'not_started',
+        description: tpl.description,
+        color: tpl.color,
+        offset_days: tpl.offset_days ?? null,
+        offset_type: tpl.offset_type ?? null
+      };
+    });
   };
 
   const addPhotographerTask = () => {
