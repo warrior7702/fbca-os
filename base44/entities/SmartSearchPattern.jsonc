@@ -1,0 +1,50 @@
+{
+  "name": "SmartSearchPattern",
+  "type": "object",
+  "properties": {
+    "event_name_pattern": {
+      "type": "string",
+      "description": "Normalized event name pattern (lowercase, key words)"
+    },
+    "resource_name_pattern": {
+      "type": "string",
+      "description": "Normalized resource name pattern"
+    },
+    "selected_cardholder_name": {
+      "type": "string",
+      "description": "Name of the cardholder that was selected"
+    },
+    "selected_pin": {
+      "type": "string",
+      "description": "PIN that was selected"
+    },
+    "selected_member_id": {
+      "type": "string",
+      "description": "Member ID of selected cardholder"
+    },
+    "search_term_used": {
+      "type": "string",
+      "description": "The search term that led to this selection"
+    },
+    "confidence_score": {
+      "type": "number",
+      "default": 1,
+      "description": "Confidence score - increases with repeated patterns"
+    },
+    "times_selected": {
+      "type": "integer",
+      "default": 1,
+      "description": "How many times this pattern led to this selection"
+    },
+    "last_used": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time this pattern was used"
+    }
+  },
+  "required": [
+    "event_name_pattern",
+    "selected_cardholder_name",
+    "selected_pin"
+  ]
+}

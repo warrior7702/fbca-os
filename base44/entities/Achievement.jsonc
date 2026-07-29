@@ -1,0 +1,83 @@
+{
+  "name": "Achievement",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Achievement name (e.g., 'Task Master')"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this achievement is for"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Lucide icon name"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "tasks",
+        "approvals",
+        "collaboration",
+        "events",
+        "exploration",
+        "speed",
+        "consistency",
+        "special"
+      ],
+      "description": "Achievement category"
+    },
+    "points": {
+      "type": "integer",
+      "description": "Points awarded for this achievement"
+    },
+    "rarity": {
+      "type": "string",
+      "enum": [
+        "common",
+        "rare",
+        "epic",
+        "legendary"
+      ],
+      "default": "common",
+      "description": "How rare/difficult this achievement is"
+    },
+    "requirement_type": {
+      "type": "string",
+      "enum": [
+        "task_count",
+        "approval_count",
+        "event_attendance",
+        "ticket_resolved",
+        "first_time",
+        "streak",
+        "speed",
+        "integration"
+      ],
+      "description": "Type of requirement to unlock"
+    },
+    "requirement_value": {
+      "type": "integer",
+      "description": "Threshold value for requirement"
+    },
+    "badge_color": {
+      "type": "string",
+      "description": "Hex color for badge background"
+    },
+    "is_hidden": {
+      "type": "boolean",
+      "default": false,
+      "description": "Hidden until unlocked (secret achievements)"
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "icon",
+    "category",
+    "points",
+    "rarity",
+    "requirement_type"
+  ]
+}

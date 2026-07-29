@@ -1,0 +1,48 @@
+{
+  "name": "StaffContact",
+  "type": "object",
+  "properties": {
+    "last_name": {
+      "type": "string",
+      "description": "Last name"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "First name"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Full name for easy searching"
+    },
+    "ministry": {
+      "type": "string",
+      "description": "Ministry/Department"
+    },
+    "title": {
+      "type": "string",
+      "description": "Job title"
+    },
+    "extension": {
+      "type": "string",
+      "description": "Phone extension"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Direct phone number"
+    },
+    "cell_phone": {
+      "type": "string",
+      "description": "Cell phone number"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email address"
+    }
+  },
+  "required": [
+    "last_name",
+    "first_name",
+    "full_name",
+    "email"
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "name": "Asset",
+  "type": "object",
+  "properties": {
+    "akita_asset_id": {
+      "type": "string",
+      "description": "AkitaBox asset ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Asset name"
+    },
+    "asset_category": {
+      "type": "string",
+      "description": "Asset category"
+    },
+    "asset_group_id": {
+      "type": "string",
+      "description": "Related asset group ID"
+    },
+    "organization_name": {
+      "type": "string",
+      "description": "Organization"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Related building ID"
+    },
+    "building_name": {
+      "type": "string",
+      "description": "Building name for reference"
+    },
+    "building_akita_id": {
+      "type": "string",
+      "description": "Building AkitaBox ID"
+    },
+    "building_group": {
+      "type": "string",
+      "description": "Building group"
+    },
+    "building_group_id": {
+      "type": "string",
+      "description": "Building group ID"
+    },
+    "floor_id": {
+      "type": "string",
+      "description": "Related floor ID"
+    },
+    "floor_name": {
+      "type": "string",
+      "description": "Floor name for reference"
+    },
+    "floor_akita_id": {
+      "type": "string",
+      "description": "Floor AkitaBox ID"
+    },
+    "room_id": {
+      "type": "string",
+      "description": "Related room ID"
+    },
+    "room_number": {
+      "type": "string",
+      "description": "Room number"
+    },
+    "room_akita_id": {
+      "type": "string",
+      "description": "Room AkitaBox ID"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "type": {
+      "type": "string",
+      "description": "Asset type"
+    },
+    "asset_id_number": {
+      "type": "string",
+      "description": "Asset ID number"
+    },
+    "manufacturer": {
+      "type": "string",
+      "description": "Manufacturer"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model"
+    },
+    "serial_number": {
+      "type": "string",
+      "description": "Serial number"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description"
+    },
+    "condition": {
+      "type": "string",
+      "description": "Condition"
+    },
+    "condition_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Condition date"
+    },
+    "installation_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Installation date"
+    },
+    "warranty_expiration_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Warranty expiration"
+    },
+    "verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Verification status"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Active",
+        "Decommissioned"
+      ],
+      "default": "Active",
+      "description": "Asset status"
+    },
+    "decommissioned_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Decommissioned date"
+    },
+    "website_url": {
+      "type": "string",
+      "description": "Website URL"
+    },
+    "om_manuals": {
+      "type": "string",
+      "description": "OM manuals"
+    },
+    "warranty_notes": {
+      "type": "string",
+      "description": "Warranty notes"
+    },
+    "cost": {
+      "type": "number",
+      "description": "Cost"
+    },
+    "total_cost": {
+      "type": "number",
+      "description": "Total cost"
+    },
+    "number": {
+      "type": "string",
+      "description": "Number"
+    },
+    "akita_url": {
+      "type": "string",
+      "description": "AkitaBox URL"
+    },
+    "x_coord": {
+      "type": "number",
+      "description": "X coordinate (0-1 normalized)"
+    },
+    "y_coord": {
+      "type": "number",
+      "description": "Y coordinate (0-1 normalized)"
+    },
+    "qr_code": {
+      "type": "string",
+      "description": "QR code"
+    },
+    "qr_code_image": {
+      "type": "string",
+      "description": "QR code image URL"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation date"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Created by user"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update date"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Updated by user"
+    }
+  },
+  "required": [
+    "akita_asset_id",
+    "name"
+  ]
+}

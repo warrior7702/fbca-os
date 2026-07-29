@@ -1,0 +1,42 @@
+{
+  "name": "RoomOccupancyDaily",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date for occupancy tracking"
+    },
+    "room_pco_resource_id": {
+      "type": "string",
+      "description": "PCO room resource ID"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "room_is_bookable": {
+      "type": "boolean",
+      "description": "Whether room is bookable"
+    },
+    "minutes_booked": {
+      "type": "number",
+      "default": 0,
+      "description": "Total minutes booked for this room on this date"
+    },
+    "booking_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of bookings for this room on this date"
+    },
+    "peak_conflicts": {
+      "type": "number",
+      "default": 0,
+      "description": "Overlapping/near-back-to-back booking indicator"
+    }
+  },
+  "required": [
+    "date",
+    "room_pco_resource_id"
+  ]
+}

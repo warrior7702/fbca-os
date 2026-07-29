@@ -1,0 +1,30 @@
+{
+  "name": "TicketRoleAssignment",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User email"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "ticket_role": {
+      "type": "string",
+      "enum": [
+        "worker",
+        "viewer"
+      ],
+      "description": "Ticket system role"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department/Team"
+    }
+  },
+  "required": [
+    "user_email",
+    "ticket_role"
+  ]
+}

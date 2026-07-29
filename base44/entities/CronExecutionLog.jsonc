@@ -1,0 +1,63 @@
+{
+  "name": "CronExecutionLog",
+  "type": "object",
+  "properties": {
+    "function_name": {
+      "type": "string",
+      "description": "Name of the cron function executed"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "started",
+        "success",
+        "failed"
+      ],
+      "description": "Execution status"
+    },
+    "trigger_source": {
+      "type": "string",
+      "description": "What triggered it (Vercel Cron, manual, etc.)"
+    },
+    "synced_by_email": {
+      "type": "string",
+      "description": "User email used for sync"
+    },
+    "events_checked": {
+      "type": "integer",
+      "description": "Number of events checked"
+    },
+    "mystery_resources_found": {
+      "type": "integer",
+      "description": "Number of mystery resources found"
+    },
+    "new_requests_created": {
+      "type": "integer",
+      "description": "Number of new workflow requests created"
+    },
+    "emails_sent": {
+      "type": "integer",
+      "description": "Number of emails sent"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error message if failed"
+    },
+    "error_stack": {
+      "type": "string",
+      "description": "Full error stack trace"
+    },
+    "execution_time_ms": {
+      "type": "integer",
+      "description": "How long execution took in milliseconds"
+    },
+    "result_details": {
+      "type": "object",
+      "description": "Full result object from execution"
+    }
+  },
+  "required": [
+    "function_name",
+    "status"
+  ]
+}

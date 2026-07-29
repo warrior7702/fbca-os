@@ -1,0 +1,55 @@
+{
+  "name": "EventOpsTask",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (relation to PCO_Event)"
+    },
+    "approval_group": {
+      "type": "string",
+      "enum": [
+        "Room Setups",
+        "Maintenance"
+      ],
+      "description": "Approval group - Room Setups or Maintenance"
+    },
+    "task_name": {
+      "type": "string",
+      "description": "Task name/title"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Task due date/time (nullable)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "todo",
+        "in_progress",
+        "done"
+      ],
+      "default": "todo",
+      "description": "Task status"
+    },
+    "assigned_to_email": {
+      "type": "string",
+      "description": "Email of assigned person (nullable)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When task was completed (nullable)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Task notes (nullable)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "approval_group",
+    "task_name"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "PCO_EventRoom",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (relation to PCO_Event)"
+    },
+    "pco_room_id": {
+      "type": "string",
+      "description": "PCO room ID"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name for reference"
+    },
+    "campus_hub_room_id": {
+      "type": "string",
+      "description": "Link to Campus Hub Room entity (optional)"
+    },
+    "is_bookable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether room is bookable (from PCO metadata)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "pco_room_id",
+    "room_name"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "LocalEventCode",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "PCO event ID"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Event name for display"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start date/time"
+    },
+    "access_time": {
+      "type": "string",
+      "description": "Access time range (e.g., 9:00 AM - 4:00 PM)"
+    },
+    "door_code": {
+      "type": "string",
+      "description": "Door code or Unlock"
+    }
+  },
+  "required": [
+    "event_id",
+    "door_code"
+  ]
+}

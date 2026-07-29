@@ -1,0 +1,49 @@
+{
+  "name": "EventOpsSyncState",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Payload version"
+    },
+    "last_ingest_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last successful ingest timestamp"
+    },
+    "window_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of data window"
+    },
+    "window_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "End of data window"
+    },
+    "events_count": {
+      "type": "integer",
+      "description": "Number of events ingested",
+      "default": 0
+    },
+    "rooms_count": {
+      "type": "integer",
+      "description": "Number of rooms ingested",
+      "default": 0
+    },
+    "resources_count": {
+      "type": "integer",
+      "description": "Number of resources ingested",
+      "default": 0
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the payload was generated"
+    }
+  },
+  "required": [
+    "version",
+    "last_ingest_at"
+  ]
+}

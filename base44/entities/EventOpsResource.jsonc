@@ -1,0 +1,65 @@
+{
+  "name": "EventOpsResource",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Parent event ID"
+    },
+    "pco_resource_id": {
+      "type": "string",
+      "description": "PCO resource ID"
+    },
+    "resource_name": {
+      "type": "string",
+      "description": "Resource name"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Resource kind/type"
+    },
+    "category": {
+      "type": "string",
+      "description": "Resource category if available"
+    },
+    "approval_group_name": {
+      "type": "string",
+      "description": "Approval group this resource belongs to"
+    },
+    "approval_status": {
+      "type": "string",
+      "description": "Approval status for this resource"
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Number of this resource requested",
+      "default": 1
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Questions and answers for this resource"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time this resource was synced"
+    }
+  },
+  "required": [
+    "event_id",
+    "pco_resource_id",
+    "resource_name"
+  ]
+}

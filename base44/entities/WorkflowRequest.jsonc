@@ -1,0 +1,154 @@
+{
+  "name": "WorkflowRequest",
+  "type": "object",
+  "properties": {
+    "request_number": {
+      "type": "string",
+      "description": "Auto-generated request number (e.g., CR-001234)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "mystery_resource",
+        "manual_form",
+        "continue_existing"
+      ],
+      "description": "Type of request entry point"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "request",
+        "minister_goal_review",
+        "project_review",
+        "campaign_running",
+        "completed",
+        "cancelled"
+      ],
+      "default": "request",
+      "description": "Current workflow status"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "urgent"
+      ],
+      "default": "medium",
+      "description": "Request priority"
+    },
+    "title": {
+      "type": "string",
+      "description": "Request title/summary"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "requestor_email": {
+      "type": "string",
+      "description": "Email of person who made the request"
+    },
+    "requestor_name": {
+      "type": "string",
+      "description": "Name of requestor"
+    },
+    "ministry_department": {
+      "type": "string",
+      "description": "Ministry or department (e.g., Pastoral Care, College, Youth Ministry)"
+    },
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID"
+    },
+    "pco_event_name": {
+      "type": "string",
+      "description": "PCO event name"
+    },
+    "pco_event_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "PCO event date"
+    },
+    "pco_resource_request_id": {
+      "type": "string",
+      "description": "PCO resource request ID"
+    },
+    "goal_review_data": {
+      "type": "object",
+      "description": "Data from minister goal review stage"
+    },
+    "project_review_data": {
+      "type": "object",
+      "description": "Data from project review stage"
+    },
+    "campaign_data": {
+      "type": "object",
+      "description": "Campaign execution data"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "Email of assigned team member"
+    },
+    "assigned_to_name": {
+      "type": "string",
+      "description": "Name of assigned team member"
+    },
+    "work_orders": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Work orders/tickets created from this request"
+    },
+    "conversation_history": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Conversation thread for this request"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Attached files"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Target completion date"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was completed"
+    },
+    "email_sent": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether intake email was sent"
+    },
+    "email_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When email was sent"
+    },
+    "email_error": {
+      "type": "string",
+      "description": "Email error message if failed"
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "requestor_email",
+    "status"
+  ]
+}

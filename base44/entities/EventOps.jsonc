@@ -1,0 +1,104 @@
+{
+  "name": "EventOps",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "Unique PCO event ID"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Event name"
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start date/time"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end date/time"
+    },
+    "approval_status": {
+      "type": "string",
+      "description": "Approval status from PCO"
+    },
+    "owner_name": {
+      "type": "string",
+      "description": "Event owner name"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Event owner email"
+    },
+    "needs_room_setup": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether room setup is required"
+    },
+    "needs_maintenance": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether maintenance work is required"
+    },
+    "setup_due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Setup deadline (default: starts_at - 60m)"
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": [
+        "Not Started",
+        "In Progress",
+        "Done",
+        "Blocked"
+      ],
+      "default": "Not Started",
+      "description": "Overall event ops status"
+    },
+    "percent_complete": {
+      "type": "number",
+      "default": 0,
+      "description": "Completion percentage (0-100)"
+    },
+    "rooms_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total number of rooms"
+    },
+    "rooms_complete_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of rooms completed"
+    },
+    "alert_heavy_usage": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for heavy room usage"
+    },
+    "alert_turnaround_before_cleaning": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for tight turnaround before cleaning"
+    },
+    "alert_saturday_night_priority": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for Saturday night priority"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last sync timestamp"
+    },
+    "raw_pco": {
+      "type": "object",
+      "description": "Full PCO payload for debugging"
+    }
+  },
+  "required": [
+    "pco_event_id"
+  ]
+}

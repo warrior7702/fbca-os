@@ -1,0 +1,37 @@
+{
+  "name": "IntegrationConfig",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Config key (e.g., PCO_SYNC_BASE_URL)"
+    },
+    "value": {
+      "type": "string",
+      "description": "Config value"
+    },
+    "value_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "boolean",
+        "secret"
+      ],
+      "default": "text",
+      "description": "Type of value stored"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this config is for"
+    },
+    "category": {
+      "type": "string",
+      "description": "Config category (e.g., pco_sync, email, etc.)"
+    }
+  },
+  "required": [
+    "key",
+    "value"
+  ]
+}

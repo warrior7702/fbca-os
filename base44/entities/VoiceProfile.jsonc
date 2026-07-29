@@ -1,0 +1,50 @@
+{
+  "name": "VoiceProfile",
+  "type": "object",
+  "properties": {
+    "person_name": {
+      "type": "string",
+      "description": "Full name of the person"
+    },
+    "person_email": {
+      "type": "string",
+      "description": "Email address"
+    },
+    "voice_samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "audio_url": {
+            "type": "string"
+          },
+          "transcript": {
+            "type": "string"
+          },
+          "recorded_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration": {
+            "type": "integer"
+          }
+        }
+      },
+      "default": [],
+      "description": "Audio samples for voice identification"
+    },
+    "voice_characteristics": {
+      "type": "object",
+      "description": "AI-extracted voice characteristics for matching"
+    },
+    "times_identified": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of times successfully identified"
+    }
+  },
+  "required": [
+    "person_name",
+    "person_email"
+  ]
+}

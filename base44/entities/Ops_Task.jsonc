@@ -1,0 +1,123 @@
+{
+  "name": "Ops_Task",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Foreign key to PCO_Event (pco_event_id)"
+    },
+    "pco_event_instance_id": {
+      "type": "string",
+      "description": "PCO event instance ID"
+    },
+    "pco_request_id": {
+      "type": "string",
+      "description": "PCO request ID (nullable)"
+    },
+    "department": {
+      "type": "string",
+      "enum": [
+        "Facilities",
+        "Cleaning",
+        "IT"
+      ],
+      "description": "Department responsible"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "room_setup",
+        "maintenance",
+        "cleaning_alert"
+      ],
+      "description": "Type of operations task"
+    },
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Task summary/description"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "todo",
+        "in_progress",
+        "done",
+        "blocked"
+      ],
+      "default": "todo",
+      "description": "Task status"
+    },
+    "assigned_to_email": {
+      "type": "string",
+      "description": "Email of assigned person (nullable)"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Task due date/time"
+    },
+    "start_window_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Earliest time task can start (nullable)"
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Task checklist items"
+    },
+    "completion_log": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Completion log (json array)"
+    },
+    "created_from": {
+      "type": "string",
+      "enum": [
+        "pco_auto",
+        "manual"
+      ],
+      "description": "How task was created"
+    },
+    "room_id": {
+      "type": "string",
+      "description": "Room entity ID (nullable)"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Building entity ID (nullable)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "med",
+        "high",
+        "critical"
+      ],
+      "default": "med",
+      "description": "Task priority"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When task was completed (nullable)"
+    }
+  },
+  "required": [
+    "task_type",
+    "pco_event_instance_id",
+    "title",
+    "summary"
+  ]
+}

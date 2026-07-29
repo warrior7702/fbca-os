@@ -1,0 +1,41 @@
+{
+  "name": "CleaningLog",
+  "type": "object",
+  "properties": {
+    "room_id": {
+      "type": "string",
+      "description": "Foreign key to Room.id"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "marked_clean",
+        "acknowledged"
+      ],
+      "description": "Type of cleaning action performed"
+    },
+    "performed_by": {
+      "type": "string",
+      "description": "User ID or email who performed the action"
+    },
+    "performed_by_name": {
+      "type": "string",
+      "description": "Name of user who performed the action"
+    },
+    "performed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when action was performed"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes or context"
+    }
+  },
+  "required": [
+    "room_id",
+    "action",
+    "performed_by",
+    "performed_at"
+  ]
+}

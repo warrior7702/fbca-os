@@ -1,0 +1,89 @@
+{
+  "name": "EventOpsItem",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "Unique PCO event ID"
+    },
+    "pco_event_name": {
+      "type": "string",
+      "description": "Event name from PCO"
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start date/time"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end date/time"
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Array of room objects associated with event"
+    },
+    "approval_groups": {
+      "type": "object",
+      "description": "Approval groups data (JSON)"
+    },
+    "setup_required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether room setup is required"
+    },
+    "maintenance_required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether maintenance work is required"
+    },
+    "setup_details": {
+      "type": "string",
+      "description": "Detailed setup instructions and notes"
+    },
+    "maintenance_details": {
+      "type": "string",
+      "description": "Detailed maintenance instructions and notes"
+    },
+    "status_setup": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "done"
+      ],
+      "default": "pending",
+      "description": "Setup work status"
+    },
+    "status_maintenance": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "done"
+      ],
+      "default": "pending",
+      "description": "Maintenance work status"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last sync timestamp from PCO"
+    },
+    "source_payload": {
+      "type": "object",
+      "description": "Full source payload from PCO (JSON)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "pco_event_name",
+    "starts_at",
+    "ends_at"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "CleaningZone",
+  "type": "object",
+  "properties": {
+    "zone_id": {
+      "type": "string",
+      "description": "Unique zone identifier (e.g., Z001, Z002)"
+    },
+    "building": {
+      "type": "string",
+      "description": "Building name"
+    },
+    "floor": {
+      "type": "string",
+      "description": "Floor identifier"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "mon_wed_full_clean",
+        "not_cleaned",
+        "vip"
+      ],
+      "description": "Cleaning schedule category"
+    },
+    "schedule_note": {
+      "type": "string",
+      "description": "Detailed schedule description"
+    },
+    "room_count": {
+      "type": "integer",
+      "description": "Number of rooms in this zone"
+    },
+    "last_cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last zone cleaning completion"
+    }
+  },
+  "required": [
+    "zone_id",
+    "building",
+    "category"
+  ]
+}

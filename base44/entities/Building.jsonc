@@ -1,0 +1,40 @@
+{
+  "name": "Building",
+  "type": "object",
+  "properties": {
+    "akita_building_id": {
+      "type": "string",
+      "description": "AkitaBox building ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Building name"
+    },
+    "address": {
+      "type": "string",
+      "description": "Building address"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    },
+    "floorplan_scale": {
+      "type": "number",
+      "default": 1,
+      "description": "Floor plan image scale adjustment"
+    },
+    "floorplan_offset_x": {
+      "type": "number",
+      "default": 0,
+      "description": "Floor plan horizontal offset in pixels"
+    },
+    "floorplan_offset_y": {
+      "type": "number",
+      "default": 0,
+      "description": "Floor plan vertical offset in pixels"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "CleaningSchedule",
+  "type": "object",
+  "properties": {
+    "campus_hub_room_id": {
+      "type": "string",
+      "description": "Campus Hub Room entity ID"
+    },
+    "pco_room_id": {
+      "type": "string",
+      "description": "PCO room ID (if mapped)"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name for reference"
+    },
+    "next_cleaning_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Next scheduled cleaning time"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "biweekly",
+        "monthly"
+      ],
+      "default": "weekly",
+      "description": "Cleaning frequency"
+    },
+    "last_cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last completed cleaning"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Special cleaning notes or requirements"
+    }
+  },
+  "required": [
+    "next_cleaning_at"
+  ]
+}

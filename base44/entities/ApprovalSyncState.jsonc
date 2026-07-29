@@ -1,0 +1,38 @@
+{
+  "name": "ApprovalSyncState",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User email this sync state belongs to"
+    },
+    "last_sync": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last successful sync timestamp"
+    },
+    "total_fetched": {
+      "type": "integer",
+      "description": "Total requests fetched in last sync"
+    },
+    "new_upserts": {
+      "type": "integer",
+      "description": "New or updated approvals in last sync"
+    },
+    "removed": {
+      "type": "integer",
+      "description": "Approvals removed (closed) in last sync"
+    },
+    "my_groups": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User's approval groups"
+    }
+  },
+  "required": [
+    "user_email",
+    "last_sync"
+  ]
+}

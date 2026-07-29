@@ -1,0 +1,57 @@
+{
+  "name": "EventOpsRoom",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Parent event ID"
+    },
+    "pco_resource_id": {
+      "type": "string",
+      "description": "PCO resource ID"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "approval_group_name": {
+      "type": "string",
+      "description": "Approval group this room belongs to"
+    },
+    "approval_status": {
+      "type": "string",
+      "description": "Approval status for this room"
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Number of this resource requested",
+      "default": 1
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Questions and answers for this room"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time this room was synced"
+    }
+  },
+  "required": [
+    "event_id",
+    "pco_resource_id",
+    "room_name"
+  ]
+}

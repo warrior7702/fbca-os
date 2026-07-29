@@ -1,0 +1,52 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of user receiving notification"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ticket_assigned",
+        "ticket_status_change",
+        "ticket_comment",
+        "solution_provided",
+        "ticket_escalated"
+      ],
+      "description": "Type of notification"
+    },
+    "title": {
+      "type": "string",
+      "description": "Notification title"
+    },
+    "message": {
+      "type": "string",
+      "description": "Notification message"
+    },
+    "related_ticket_id": {
+      "type": "string",
+      "description": "ID of related ticket"
+    },
+    "related_ticket_number": {
+      "type": "string",
+      "description": "Ticket number for display"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether notification has been read"
+    },
+    "action_url": {
+      "type": "string",
+      "description": "URL to navigate when clicked"
+    }
+  },
+  "required": [
+    "user_email",
+    "type",
+    "title",
+    "message"
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "name": "Room",
+  "type": "object",
+  "properties": {
+    "akita_room_id": {
+      "type": "string",
+      "description": "AkitaBox room ID"
+    },
+    "room_number": {
+      "type": "string",
+      "description": "Room number (e.g., '101', 'EXT')"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name (e.g., 'Conference Room', 'Exterior')"
+    },
+    "room_category": {
+      "type": "string",
+      "description": "Room category"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Interior",
+        "Exterior"
+      ],
+      "default": "Interior",
+      "description": "Room location type - Exterior rooms excluded from floor plan rendering"
+    },
+    "floor_id": {
+      "type": "string",
+      "description": "Related floor ID"
+    },
+    "floor_name": {
+      "type": "string",
+      "description": "Floor name for reference"
+    },
+    "floor_number": {
+      "type": "string",
+      "description": "Floor number (1, 2, 3, etc.)"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Related building ID"
+    },
+    "building_name": {
+      "type": "string",
+      "description": "Building name for reference"
+    },
+    "building": {
+      "type": "string",
+      "description": "Building identifier (Main Church, Wade Building, etc.)"
+    },
+    "square_feet": {
+      "type": "string",
+      "description": "Square feet"
+    },
+    "type": {
+      "type": "string",
+      "description": "Room type"
+    },
+    "floor_type": {
+      "type": "string",
+      "description": "Floor type"
+    },
+    "verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Verification status"
+    },
+    "description": {
+      "type": "string",
+      "description": "Room description"
+    },
+    "occupant": {
+      "type": "string",
+      "description": "Room occupant"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Active",
+        "Decommissioned"
+      ],
+      "default": "Active",
+      "description": "Room status"
+    },
+    "decommissioned_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Decommissioned date"
+    },
+    "akita_url": {
+      "type": "string",
+      "description": "AkitaBox URL"
+    },
+    "portal_url": {
+      "type": "string",
+      "description": "Portal URL"
+    },
+    "pco_resource_id": {
+      "type": "string",
+      "description": "Planning Center Online resource ID"
+    },
+    "is_bookable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether room is bookable (PCO source of truth)"
+    },
+    "bookable_source": {
+      "type": "string",
+      "default": "PCO",
+      "description": "Source of bookable status"
+    },
+    "zone_id": {
+      "type": "string",
+      "description": "Cleaning zone ID - links room to its cleaning zone"
+    },
+    "cleaning_schedule": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "mon_wed_full_clean",
+        "not_cleaned",
+        "vip",
+        "unknown"
+      ],
+      "description": "Cleaning schedule category from zone assignment"
+    },
+    "last_cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last cleaning completion"
+    },
+    "last_pco_sync_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last PCO sync timestamp"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation date"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Created by user"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update date"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Updated by user"
+    }
+  },
+  "required": [
+    "akita_room_id"
+  ]
+}

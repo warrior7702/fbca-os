@@ -1,0 +1,30 @@
+{
+  "name": "Role",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Role name (e.g., 'Support Manager', 'IT Admin')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Role description"
+    },
+    "is_system": {
+      "type": "boolean",
+      "default": false,
+      "description": "System roles cannot be deleted"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Array of permission codes"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

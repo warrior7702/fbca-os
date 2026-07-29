@@ -1,0 +1,53 @@
+{
+  "name": "EventOpsEvent",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "PCO event ID (unique key)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Event name/title"
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start time"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end time"
+    },
+    "approval_status": {
+      "type": "string",
+      "description": "Overall approval status"
+    },
+    "percent_approved": {
+      "type": "number",
+      "description": "Percentage of resources approved"
+    },
+    "flags": {
+      "type": "object",
+      "description": "Computed flags for UI highlighting",
+      "default": {}
+    },
+    "raw_payload": {
+      "type": "object",
+      "description": "Full raw event data for debugging",
+      "default": {}
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time this event was synced"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_name",
+    "starts_at",
+    "ends_at"
+  ]
+}

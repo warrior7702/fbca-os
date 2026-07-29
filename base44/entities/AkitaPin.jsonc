@@ -1,0 +1,36 @@
+{
+  "name": "AkitaPin",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "description": "Akita asset _id"
+    },
+    "level_id": {
+      "type": "string",
+      "description": "OSLevel id"
+    },
+    "document_id": {
+      "type": "string",
+      "description": "Floorplan document _id (optional)"
+    },
+    "x": {
+      "type": "number",
+      "description": "X position as percentage 0-100"
+    },
+    "y": {
+      "type": "number",
+      "description": "Y position as percentage 0-100"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Base44 user id who last updated"
+    }
+  },
+  "required": [
+    "asset_id",
+    "level_id",
+    "x",
+    "y"
+  ]
+}

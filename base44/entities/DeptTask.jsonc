@@ -1,0 +1,58 @@
+{
+  "name": "DeptTask",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "details": {
+      "type": "string",
+      "description": "Task details/description"
+    },
+    "assignee": {
+      "type": "string",
+      "description": "Primary assignee email"
+    },
+    "assignee_name": {
+      "type": "string",
+      "description": "Primary assignee display name"
+    },
+    "assignee2": {
+      "type": "string",
+      "description": "Secondary assignee email (optional)"
+    },
+    "assignee2_name": {
+      "type": "string",
+      "description": "Secondary assignee display name"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Due date"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether task is completed"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When task was completed"
+    },
+    "completed_by": {
+      "type": "string",
+      "description": "Email of user who completed the task"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department this task belongs to"
+    }
+  },
+  "required": [
+    "title",
+    "assignee",
+    "due_date"
+  ]
+}

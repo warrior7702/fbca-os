@@ -1,0 +1,279 @@
+{
+  "name": "Ticket",
+  "type": "object",
+  "properties": {
+    "ticket_number": {
+      "type": "string",
+      "description": "Auto-generated ticket number (e.g., TKT-001234)"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Ticket subject/title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the issue"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "ASSET",
+        "ROOM",
+        "BUILDING"
+      ],
+      "description": "Ticket scope: ASSET for specific asset issues, ROOM for general room issues, BUILDING for building-wide issues"
+    },
+    "building": {
+      "type": "string",
+      "description": "Building location"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Building entity ID"
+    },
+    "floor_id": {
+      "type": "string",
+      "description": "Floor entity ID"
+    },
+    "room_id": {
+      "type": "string",
+      "description": "Room entity ID"
+    },
+    "room_number": {
+      "type": "string",
+      "description": "Room number or common name"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Asset entity ID (for ASSET-scoped tickets)"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Name of the asset (for ASSET-scoped tickets)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "awaiting_information",
+        "awaiting_parts",
+        "resolved",
+        "archived"
+      ],
+      "default": "open",
+      "description": "Current ticket status"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium",
+      "description": "Ticket priority level"
+    },
+    "priority_reason": {
+      "type": "string",
+      "description": "Short explanation of why priority was suggested"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "technology",
+        "cleaning",
+        "maintenance"
+      ],
+      "description": "Ticket category"
+    },
+    "assigned_department": {
+      "type": "string",
+      "description": "Assigned department (IT / Facilities / Cleaning)"
+    },
+    "assigned_department_reason": {
+      "type": "string",
+      "description": "Why this department was suggested"
+    },
+    "recurring_issue": {
+      "type": "boolean",
+      "default": false,
+      "description": "Flagged if 3+ tickets on same asset/room within 6 months"
+    },
+    "requester_email": {
+      "type": "string",
+      "description": "Email of person who created ticket"
+    },
+    "requester_name": {
+      "type": "string",
+      "description": "Name of person who created ticket"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "Email of assigned staff member"
+    },
+    "assigned_to_name": {
+      "type": "string",
+      "description": "Name of assigned staff member"
+    },
+    "assigned_to_2": {
+      "type": "string",
+      "description": "Email of second assigned staff member (optional)"
+    },
+    "assigned_to_2_name": {
+      "type": "string",
+      "description": "Name of second assigned staff member"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "When the ticket is due"
+    },
+    "original_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Original due date (before any automatic extensions)"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "web_form",
+        "email",
+        "bot",
+        "workflow"
+      ],
+      "default": "web_form",
+      "description": "How the ticket was created"
+    },
+    "source_context_type": {
+      "type": "string",
+      "description": "Context type where ticket originated from (asset/room/building)"
+    },
+    "source_context_url": {
+      "type": "string",
+      "description": "Full URL where ticket was created from"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tags for categorization and search"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "default": [],
+      "description": "Attached files"
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "author_email": {
+            "type": "string"
+          },
+          "author_name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "is_internal": {
+            "type": "boolean",
+            "default": false
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "default": [],
+      "description": "Ticket conversation thread"
+    },
+    "suggested_solution": {
+      "type": "string",
+      "description": "AI-suggested solution based on similar tickets"
+    },
+    "time_to_first_response": {
+      "type": "number",
+      "description": "Minutes until first staff response"
+    },
+    "time_to_resolution": {
+      "type": "number",
+      "description": "Minutes until ticket resolved"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When ticket was marked resolved"
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When ticket was archived"
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last activity timestamp"
+    },
+    "teams_conversation_id": {
+      "type": "string",
+      "description": "Teams conversation ID for proactive messaging"
+    },
+    "teams_service_url": {
+      "type": "string",
+      "description": "Teams service URL for Bot Framework API"
+    },
+    "related_tickets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs of related/linked tickets"
+    },
+    "linked_room_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Linked room IDs for multi-room scope"
+    },
+    "linked_asset_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Linked asset IDs for multi-asset scope"
+    }
+  },
+  "required": [
+    "subject",
+    "description",
+    "requester_email",
+    "status",
+    "priority",
+    "scope"
+  ]
+}

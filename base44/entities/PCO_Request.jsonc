@@ -1,0 +1,81 @@
+{
+  "name": "PCO_Request",
+  "type": "object",
+  "properties": {
+    "pco_request_id": {
+      "type": "string",
+      "description": "Unique PCO request ID"
+    },
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (foreign key to PCO_Event)"
+    },
+    "pco_event_instance_id": {
+      "type": "string",
+      "description": "PCO event instance ID"
+    },
+    "resource_name": {
+      "type": "string",
+      "description": "Name of requested resource"
+    },
+    "resource_category": {
+      "type": "string",
+      "enum": [
+        "room_setup",
+        "maintenance",
+        "building_access",
+        "other"
+      ],
+      "description": "Category of resource requested"
+    },
+    "approval_group_name": {
+      "type": "string",
+      "description": "Approval group name"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "denied"
+      ],
+      "description": "Approval status"
+    },
+    "approval_status": {
+      "type": "string",
+      "description": "Approval status (legacy field)"
+    },
+    "answers": {
+      "type": "object",
+      "description": "Full question/answer payload (json)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes text"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was created"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last synced timestamp"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last updated timestamp"
+    },
+    "raw_json": {
+      "type": "object",
+      "description": "Full PCO request payload"
+    }
+  },
+  "required": [
+    "pco_request_id",
+    "pco_event_id",
+    "resource_name"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "PCO_RequestAnswer",
+  "type": "object",
+  "properties": {
+    "pco_request_id": {
+      "type": "string",
+      "description": "PCO request ID"
+    },
+    "question": {
+      "type": "string",
+      "description": "Question text"
+    },
+    "answer": {
+      "type": "string",
+      "description": "Answer value"
+    },
+    "answer_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "bool",
+        "choice"
+      ],
+      "description": "Type of answer"
+    },
+    "sort_order": {
+      "type": "number",
+      "description": "Display order"
+    }
+  },
+  "required": [
+    "pco_request_id",
+    "question",
+    "answer",
+    "answer_type"
+  ]
+}

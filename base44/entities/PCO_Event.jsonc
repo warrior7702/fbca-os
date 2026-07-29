@@ -1,0 +1,43 @@
+{
+  "name": "PCO_Event",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "Unique PCO event ID"
+    },
+    "title": {
+      "type": "string",
+      "description": "Event title"
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start date/time"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end date/time"
+    },
+    "status": {
+      "type": "string",
+      "description": "Event status (active/cancelled/etc)"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last updated timestamp"
+    },
+    "raw": {
+      "type": "object",
+      "description": "Full normalized PCO payload (optional)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "title",
+    "starts_at",
+    "ends_at"
+  ]
+}

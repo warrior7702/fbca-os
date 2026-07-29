@@ -1,0 +1,64 @@
+{
+  "name": "SharePointFavorite",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User who favorited this item"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "SharePoint site ID"
+    },
+    "site_name": {
+      "type": "string",
+      "description": "SharePoint site name"
+    },
+    "drive_id": {
+      "type": "string",
+      "description": "SharePoint drive/library ID"
+    },
+    "drive_name": {
+      "type": "string",
+      "description": "Drive/library name"
+    },
+    "file_id": {
+      "type": "string",
+      "description": "File ID"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "File name"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "File web URL"
+    },
+    "ministry": {
+      "type": "string",
+      "enum": [
+        "Youth",
+        "Worship",
+        "Pastoral",
+        "Children",
+        "Outreach",
+        "Events",
+        "Admin",
+        "Facilities",
+        "Other"
+      ],
+      "description": "Ministry category"
+    },
+    "last_accessed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time user accessed this file"
+    }
+  },
+  "required": [
+    "user_email",
+    "site_id",
+    "file_id",
+    "file_name"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "name": "WeeklyFocus",
+  "type": "object",
+  "properties": {
+    "department": {
+      "type": "string",
+      "description": "Department this focus belongs to"
+    },
+    "week_of": {
+      "type": "string",
+      "format": "date",
+      "description": "Monday of the week (YYYY-MM-DD)"
+    },
+    "focus_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean",
+            "default": false
+          },
+          "linked_project_id": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Top 3 focus items for the week"
+    }
+  },
+  "required": [
+    "department",
+    "week_of"
+  ]
+}

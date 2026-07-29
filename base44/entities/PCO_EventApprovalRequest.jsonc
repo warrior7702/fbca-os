@@ -1,0 +1,55 @@
+{
+  "name": "PCO_EventApprovalRequest",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (relation to PCO_Event)"
+    },
+    "approval_group": {
+      "type": "string",
+      "enum": [
+        "Room Setups",
+        "Maintenance"
+      ],
+      "description": "Approval group - only Room Setups or Maintenance"
+    },
+    "requested_resources": {
+      "type": "object",
+      "description": "JSON payload of requested resources"
+    },
+    "answers": {
+      "type": "object",
+      "description": "Question/Answer payload from PCO"
+    },
+    "submitted_by": {
+      "type": "string",
+      "description": "Submitter email (optional)"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was submitted"
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "denied"
+      ],
+      "default": "pending",
+      "description": "Approval status"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When request was approved (nullable)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "approval_group",
+    "submitted_at"
+  ]
+}

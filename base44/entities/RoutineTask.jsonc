@@ -1,0 +1,79 @@
+{
+  "name": "RoutineTask",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Task description"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly"
+      ],
+      "default": "monthly",
+      "description": "How often this task repeats"
+    },
+    "assignee": {
+      "type": "string",
+      "description": "Primary assignee email"
+    },
+    "assignee_name": {
+      "type": "string",
+      "description": "Primary assignee display name"
+    },
+    "assignee2": {
+      "type": "string",
+      "description": "Secondary assignee email (optional)"
+    },
+    "assignee2_name": {
+      "type": "string",
+      "description": "Secondary assignee display name"
+    },
+    "next_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Next due date for this routine task"
+    },
+    "last_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this task was last completed"
+    },
+    "last_completed_by": {
+      "type": "string",
+      "description": "Email of user who last completed this task"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department this task belongs to"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Attached files"
+    }
+  },
+  "required": [
+    "title",
+    "frequency"
+  ]
+}

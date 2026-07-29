@@ -1,0 +1,111 @@
+{
+  "name": "RoomOps",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (foreign key to EventOps)"
+    },
+    "room_pco_resource_id": {
+      "type": "string",
+      "description": "PCO room resource ID"
+    },
+    "room_name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "room_is_bookable": {
+      "type": "boolean",
+      "description": "Whether room is bookable"
+    },
+    "room_available_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When room becomes available (nullable)"
+    },
+    "setup_due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Setup deadline"
+    },
+    "clean_due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cleaning deadline (nullable)"
+    },
+    "ready_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When room was marked ready (nullable)"
+    },
+    "status_setup": {
+      "type": "string",
+      "enum": [
+        "Not Started",
+        "In Progress",
+        "Done",
+        "Blocked"
+      ],
+      "default": "Not Started",
+      "description": "Setup status"
+    },
+    "status_cleaning": {
+      "type": "string",
+      "enum": [
+        "Not Started",
+        "In Progress",
+        "Done",
+        "Blocked"
+      ],
+      "default": "Not Started",
+      "description": "Cleaning status"
+    },
+    "status_reset": {
+      "type": "string",
+      "enum": [
+        "Not Started",
+        "In Progress",
+        "Done",
+        "Blocked"
+      ],
+      "default": "Not Started",
+      "description": "Room reset status"
+    },
+    "assigned_to_email": {
+      "type": "string",
+      "description": "Assigned staff email (nullable)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Room ops notes (nullable)"
+    },
+    "alert_heavy_usage": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for heavy room usage"
+    },
+    "alert_turnaround_before_cleaning": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for tight turnaround before cleaning"
+    },
+    "alert_saturday_night_priority": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alert flag for Saturday night priority"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last sync timestamp"
+    },
+    "raw_pco_room": {
+      "type": "object",
+      "description": "Full PCO room payload for debugging"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "room_pco_resource_id"
+  ]
+}

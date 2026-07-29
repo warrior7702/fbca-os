@@ -1,0 +1,32 @@
+{
+  "name": "PushSubscription",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User email"
+    },
+    "endpoint": {
+      "type": "string",
+      "description": "Push notification endpoint"
+    },
+    "p256dh": {
+      "type": "string",
+      "description": "Public key"
+    },
+    "auth": {
+      "type": "string",
+      "description": "Auth secret"
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "Device/browser info"
+    }
+  },
+  "required": [
+    "user_email",
+    "endpoint",
+    "p256dh",
+    "auth"
+  ]
+}

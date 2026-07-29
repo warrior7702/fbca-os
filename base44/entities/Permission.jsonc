@@ -1,0 +1,36 @@
+{
+  "name": "Permission",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Permission code (e.g., 'tickets.view', 'users.manage')"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable permission name"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this permission allows"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "tickets",
+        "communications",
+        "users",
+        "settings",
+        "approvals",
+        "tasks",
+        "system"
+      ],
+      "description": "Permission category"
+    }
+  },
+  "required": [
+    "code",
+    "name",
+    "category"
+  ]
+}

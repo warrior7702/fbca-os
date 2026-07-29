@@ -1,0 +1,63 @@
+{
+  "name": "SharePointSiteAccess",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User who accessed the site"
+    },
+    "site_id": {
+      "type": "string",
+      "description": "SharePoint site ID"
+    },
+    "site_name": {
+      "type": "string",
+      "description": "SharePoint site name"
+    },
+    "site_url": {
+      "type": "string",
+      "description": "Site web URL"
+    },
+    "access_count": {
+      "type": "integer",
+      "default": 1,
+      "description": "Number of times accessed"
+    },
+    "is_favorited": {
+      "type": "boolean",
+      "default": false,
+      "description": "Is this a favorite site"
+    },
+    "last_accessed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last access timestamp"
+    },
+    "ai_category": {
+      "type": "string",
+      "description": "AI-generated primary category"
+    },
+    "ai_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "AI-generated tags"
+    },
+    "ai_description": {
+      "type": "string",
+      "description": "AI-generated site description"
+    },
+    "categorized_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When AI categorization was performed"
+    }
+  },
+  "required": [
+    "user_email",
+    "site_id",
+    "site_name"
+  ]
+}

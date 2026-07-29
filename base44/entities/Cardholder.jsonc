@@ -1,0 +1,26 @@
+{
+  "name": "Cardholder",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of cardholder"
+    },
+    "pin": {
+      "type": "string",
+      "description": "6-digit door code/PIN"
+    },
+    "member_id": {
+      "type": "string",
+      "description": "Member ID"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email address"
+    }
+  },
+  "required": [
+    "name",
+    "pin"
+  ]
+}

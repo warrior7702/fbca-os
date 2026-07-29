@@ -1,0 +1,49 @@
+{
+  "name": "EventOpsRoomState",
+  "type": "object",
+  "properties": {
+    "pco_event_id": {
+      "type": "string",
+      "description": "PCO event ID (relation to PCO_Event)"
+    },
+    "pco_room_id": {
+      "type": "string",
+      "description": "PCO room ID"
+    },
+    "setup_window_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Setup window start time (nullable)"
+    },
+    "setup_window_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Setup window end time (nullable)"
+    },
+    "clean_due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When cleaning is due (nullable)"
+    },
+    "clean_status": {
+      "type": "string",
+      "enum": [
+        "not_needed",
+        "scheduled",
+        "alerted",
+        "done"
+      ],
+      "default": "not_needed",
+      "description": "Cleaning status"
+    },
+    "clean_alert_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When cleaning conflict alert was sent (nullable)"
+    }
+  },
+  "required": [
+    "pco_event_id",
+    "pco_room_id"
+  ]
+}

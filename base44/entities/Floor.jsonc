@@ -1,0 +1,79 @@
+{
+  "name": "Floor",
+  "type": "object",
+  "properties": {
+    "akita_floor_id": {
+      "type": "string",
+      "description": "AkitaBox floor/level ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Floor name (e.g. First Floor, Roof)"
+    },
+    "level_number": {
+      "type": "number",
+      "description": "Floor level number (1, 2, 3, etc.)"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Related building ID"
+    },
+    "building_name": {
+      "type": "string",
+      "description": "Building name for reference"
+    },
+    "floor_plan_file": {
+      "type": "string",
+      "description": "DEPRECATED - Legacy floor plan file URL"
+    },
+    "primary_floorplan_file": {
+      "type": "string",
+      "description": "Primary floor plan file URL (PDF or image)"
+    },
+    "alternate_floorplans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "default": [],
+      "description": "Alternate floor plans (HVAC, Electrical, Legacy, etc.)"
+    },
+    "akita_url": {
+      "type": "string",
+      "description": "AkitaBox URL"
+    },
+    "portal_url": {
+      "type": "string",
+      "description": "Portal URL"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation date"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update date"
+    }
+  },
+  "required": [
+    "akita_floor_id",
+    "name"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "PCO_BookableRoom",
+  "type": "object",
+  "properties": {
+    "pco_room_id": {
+      "type": "string",
+      "description": "Unique PCO room ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Room name"
+    },
+    "is_bookable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether room is available for booking"
+    },
+    "building_name": {
+      "type": "string",
+      "description": "Building name (optional)"
+    },
+    "campus_hub_room_id": {
+      "type": "string",
+      "description": "Link to Campus Hub Room entity (optional)"
+    },
+    "campus": {
+      "type": "string",
+      "description": "Campus location (optional)"
+    },
+    "location": {
+      "type": "string",
+      "description": "Additional location info (optional)"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last synced timestamp"
+    },
+    "raw_json": {
+      "type": "object",
+      "description": "Full PCO room payload (optional)"
+    }
+  },
+  "required": [
+    "pco_room_id",
+    "name"
+  ]
+}

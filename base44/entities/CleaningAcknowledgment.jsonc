@@ -1,0 +1,48 @@
+{
+  "name": "CleaningAcknowledgment",
+  "type": "object",
+  "properties": {
+    "room_id": {
+      "type": "string",
+      "description": "Foreign key to Room.id"
+    },
+    "warning_text": {
+      "type": "string",
+      "description": "The warning text that was acknowledged"
+    },
+    "acknowledged_by": {
+      "type": "string",
+      "description": "User ID or name who acknowledged the warning"
+    },
+    "acknowledged_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when warning was acknowledged"
+    },
+    "auto_cleared": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether acknowledgment was automatically cleared after event"
+    },
+    "auto_cleared_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when acknowledgment was auto-cleared"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event time for auto-clear logic"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes from the person acknowledging"
+    }
+  },
+  "required": [
+    "room_id",
+    "warning_text",
+    "acknowledged_by",
+    "acknowledged_at"
+  ]
+}

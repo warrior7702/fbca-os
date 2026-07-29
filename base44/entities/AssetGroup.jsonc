@@ -1,0 +1,17 @@
+{
+  "name": "AssetGroup",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Asset group name (e.g. Fire and Life Safety)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Group description"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

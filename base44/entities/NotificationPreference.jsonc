@@ -1,0 +1,68 @@
+{
+  "name": "NotificationPreference",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User email"
+    },
+    "ticket_created_email": {
+      "type": "boolean",
+      "default": false,
+      "description": "Email when new ticket created in department"
+    },
+    "ticket_assigned_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Email when ticket assigned"
+    },
+    "ticket_assigned_inapp": {
+      "type": "boolean",
+      "default": true,
+      "description": "In-app when ticket assigned"
+    },
+    "ticket_status_change_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Email on status change"
+    },
+    "ticket_status_change_inapp": {
+      "type": "boolean",
+      "default": true,
+      "description": "In-app on status change"
+    },
+    "ticket_comment_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Email on new comment"
+    },
+    "ticket_comment_inapp": {
+      "type": "boolean",
+      "default": true,
+      "description": "In-app on new comment"
+    },
+    "solution_provided_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Email when solution provided"
+    },
+    "solution_provided_inapp": {
+      "type": "boolean",
+      "default": true,
+      "description": "In-app when solution provided"
+    },
+    "ticket_escalated_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Email when ticket escalated"
+    },
+    "ticket_escalated_inapp": {
+      "type": "boolean",
+      "default": true,
+      "description": "In-app when ticket escalated"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

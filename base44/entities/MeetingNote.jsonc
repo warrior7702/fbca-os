@@ -1,0 +1,124 @@
+{
+  "name": "MeetingNote",
+  "type": "object",
+  "properties": {
+    "meeting_id": {
+      "type": "string",
+      "description": "Microsoft Calendar meeting ID"
+    },
+    "meeting_subject": {
+      "type": "string",
+      "description": "Meeting subject/title"
+    },
+    "meeting_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Meeting date and time"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "User who recorded the notes"
+    },
+    "audio_url": {
+      "type": "string",
+      "description": "URL to the audio recording"
+    },
+    "summary": {
+      "type": "string",
+      "description": "AI-generated summary of the meeting"
+    },
+    "key_points": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Bullet points of key discussion points"
+    },
+    "outline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Meeting outline with topics and details"
+    },
+    "action_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "assigned_to": {
+            "type": "string"
+          },
+          "assigned_email": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Action items with assignments"
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Full transcript of the meeting audio"
+    },
+    "transcript_segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "speaker_name": {
+            "type": "string"
+          },
+          "speaker_email": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Transcript broken into segments with speaker assignments"
+    },
+    "speakers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Identified speakers in the meeting"
+    },
+    "recording_duration": {
+      "type": "integer",
+      "description": "Recording duration in seconds"
+    }
+  },
+  "required": [
+    "meeting_id",
+    "user_email"
+  ]
+}

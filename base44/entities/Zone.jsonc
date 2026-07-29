@@ -1,0 +1,94 @@
+{
+  "name": "Zone",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Zone name (e.g., 'Main Floor', 'Upper Level')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Zone description and details"
+    },
+    "building": {
+      "type": "string",
+      "description": "Building location"
+    },
+    "building_id": {
+      "type": "string",
+      "description": "Building entity ID"
+    },
+    "floor": {
+      "type": "string",
+      "description": "Floor number or level"
+    },
+    "color_category": {
+      "type": "string",
+      "description": "Color code from floor plan (e.g., 'light_blue', 'pink', 'green', 'red', 'beige')"
+    },
+    "cleaning_schedule": {
+      "type": "string",
+      "enum": [
+        "overnight_event_monday",
+        "vip_day_porter",
+        "daily",
+        "mon_wed_full_clean",
+        "overnight_event_mon_fri",
+        "overnight_event_sunday_fri",
+        "not_cleaned"
+      ],
+      "description": "Cleaning schedule type based on zone color category"
+    },
+    "room_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Array of room IDs that belong to this zone"
+    },
+    "last_cleaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last cleaning completion"
+    },
+    "cleaning_warning": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Warning message (e.g., 'Needs cleaned before Youth Group on Feb 5')"
+        },
+        "room_id": {
+          "type": "string",
+          "description": "First room needing cleaning"
+        },
+        "event_name": {
+          "type": "string",
+          "description": "Upcoming event name"
+        },
+        "event_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Upcoming event date/time"
+        }
+      },
+      "description": "Cleaning warning for upcoming events"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "needs_cleaning",
+        "in_progress",
+        "closed"
+      ],
+      "default": "clean",
+      "description": "Current zone status"
+    }
+  },
+  "required": [
+    "name",
+    "building_id"
+  ]
+}

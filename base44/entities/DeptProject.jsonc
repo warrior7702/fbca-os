@@ -1,0 +1,64 @@
+{
+  "name": "DeptProject",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Project title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department this project belongs to"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "in_progress",
+        "on_hold",
+        "completed"
+      ],
+      "default": "planning",
+      "description": "Project status"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium",
+      "description": "Priority level"
+    },
+    "target_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Target completion date"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Project owner email"
+    },
+    "owner_name": {
+      "type": "string",
+      "description": "Project owner name"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Project tags"
+    }
+  },
+  "required": [
+    "title",
+    "department"
+  ]
+}

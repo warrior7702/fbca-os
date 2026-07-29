@@ -1,0 +1,72 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "admin",
+        "super_user"
+      ],
+      "default": "user",
+      "description": "User access level: user (standard), super_user (sees all admin features), admin (full system admin)"
+    },
+    "pco_access_token": {
+      "type": "string",
+      "description": "Planning Center OAuth access token"
+    },
+    "pco_refresh_token": {
+      "type": "string",
+      "description": "Planning Center OAuth refresh token"
+    },
+    "pco_token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When PCO token expires"
+    },
+    "pco_user_id": {
+      "type": "string",
+      "description": "Planning Center Calendar user ID"
+    },
+    "microsoft_access_token": {
+      "type": "string",
+      "description": "Microsoft OAuth access token"
+    },
+    "microsoft_refresh_token": {
+      "type": "string",
+      "description": "Microsoft OAuth refresh token"
+    },
+    "microsoft_token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When Microsoft token expires"
+    },
+    "wallpaper": {
+      "type": "string",
+      "description": "Desktop wallpaper preference"
+    },
+    "desktop_layout": {
+      "type": "object",
+      "description": "Desktop icon positions"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Preferred display name"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department/Ministry"
+    },
+    "role_title": {
+      "type": "string",
+      "description": "Job title/role at FBCA"
+    },
+    "last_email_check": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time email polling ran for this user"
+    }
+  },
+  "required": []
+}
